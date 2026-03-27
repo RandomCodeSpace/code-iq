@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68.0", "setuptools-scm>=8.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "code-intelligence"
+version = "0.1.0"
+description = "CLI tool for intelligent code graph discovery and analysis"
+requires-python = ">=3.11"
+dependencies = [
+    "typer>=0.9",
+    "rich>=13.0",
+    "tree-sitter>=0.23",
+    "tree-sitter-java>=0.23",
+    "tree-sitter-python>=0.23",
+    "tree-sitter-typescript>=0.23",
+    "tree-sitter-javascript>=0.23",
+    "networkx>=3.2",
+    "lxml>=5.0",
+    "pyyaml>=6.0",
+    "sqlparse>=0.5",
+    "pydantic>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+]
+
+[project.scripts]
+code-intelligence = "code_intelligence.cli:app"
+
+[project.entry-points."code_intelligence.detectors"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
