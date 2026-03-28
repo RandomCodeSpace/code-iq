@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="https://github.com/RandomCodeSpace/code-iq/actions"><img src="https://img.shields.io/github/actions/workflow/status/RandomCodeSpace/code-iq/ci.yml?branch=main&style=flat-square&logo=github&label=CI" alt="CI"></a>
-  <a href="https://github.com/RandomCodeSpace/code-iq/releases"><img src="https://img.shields.io/badge/release-v0.1.0-blue?style=flat-square&logo=github&logoColor=white" alt="Release v0.1.0"></a>
+  <a href="https://github.com/RandomCodeSpace/code-iq/releases"><img src="https://img.shields.io/github/v/release/RandomCodeSpace/code-iq?include_prereleases&style=flat-square&logo=github&label=Release" alt="Release"></a>
   <a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/PyPI-coming%20soon-lightgrey?style=flat-square&logo=pypi&logoColor=white" alt="PyPI"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square&logo=python&logoColor=white" alt="Python 3.11+"></a>
   <a href="https://github.com/RandomCodeSpace/code-iq/blob/main/LICENSE"><img src="https://img.shields.io/github/license/RandomCodeSpace/code-iq?style=flat-square&label=License" alt="MIT License"></a>
