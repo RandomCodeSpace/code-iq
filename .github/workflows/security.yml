@@ -1,0 +1,119 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  dependency-audit:
+    name: Dependency vulnerability scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install project + audit tools
+        run: |
+          pip install -e .
+          pip install pip-audit safety
+
+      - name: pip-audit (PyPI advisory DB)
+        run: pip-audit --strict --desc
+
+      - name: Safety check (SafetyCLI DB)
+        run: safety check --output json || true
+        continue-on-error: true
+
+  sast:
+    name: Static analysis (Bandit + Semgrep)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Bandit
+        run: pip install bandit[toml]
+
+      - name: Bandit security scan
+        run: bandit -r src/code_intelligence/ -f json -o bandit-report.json || true
+
+      - name: Bandit summary
+        if: always()
+        run: bandit -r src/code_intelligence/ -f screen -ll || true
+
+      - name: Semgrep SAST
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: p/python p/security-audit p/owasp-top-ten
+        continue-on-error: true
+
+  wheel-scan:
+    name: Wheel integrity scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build wheel
+        run: |
+          pip install build
+          python -m build
+
+      - name: Verify wheel metadata
+        run: |
+          pip install check-wheel-contents
+          check-wheel-contents dist/*.whl
+
+      - name: Scan wheel with pip-audit
+        run: |
+          pip install pip-audit
+          pip install dist/*.whl
+          pip-audit --strict --desc
+
+      - name: Check for leaked secrets
+        uses: trufflesecurity/trufflehog@main
+        with:
+          extra_args: --only-verified --results=verified
+          path: .
+
+  license-check:
+    name: License compliance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install and check licenses
+        run: |
+          pip install -e .
+          pip install pip-licenses
+          echo "=== All dependency licenses ==="
+          pip-licenses --format=table --with-urls
+          echo ""
+          echo "=== Checking for copyleft ==="
+          pip-licenses --allow-only="MIT;BSD License;BSD-2-Clause;BSD-3-Clause;Apache Software License;Apache-2.0;ISC;PSF;HPND;Python Software Foundation License;Public Domain;Mozilla Public License 2.0 (MPL 2.0)" || echo "WARNING: Found non-permissive licenses"
