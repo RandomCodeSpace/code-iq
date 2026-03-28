@@ -1,12 +1,59 @@
+# Python
 __pycache__/
 *.py[cod]
+*$py.class
+*.so
 *.egg-info/
+*.egg
+.eggs/
 dist/
 build/
-.eggs/
-*.egg
-.pytest_cache/
-.code-intelligence/
-*.db
+sdist/
+wheels/
+*.whl
+
+# Virtual environments
 .venv/
 venv/
+env/
+ENV/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project
+.code-intelligence/
+.code_intelligence_cache*/
+*.db
+*.db-wal
+*.db-shm
+
+# Environment & secrets
+.env
+.env.local
+*.pem
+*.key
+
+# Logs
+*.log
+
+# Distribution
+*.tar.gz
+*.zip
