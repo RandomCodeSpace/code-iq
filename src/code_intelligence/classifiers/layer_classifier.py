@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any, Sequence
 
-from code_intelligence.models.graph import GraphNode, NodeKind, SourceLocation
+from code_intelligence.models.graph import GraphNode, NodeKind
 
 _FRONTEND_NODE_KINDS = {NodeKind.COMPONENT, NodeKind.HOOK}
 _BACKEND_NODE_KINDS = {NodeKind.GUARD, NodeKind.MIDDLEWARE, NodeKind.ENDPOINT, NodeKind.REPOSITORY, NodeKind.DATABASE_CONNECTION, NodeKind.QUERY}
@@ -35,25 +35,10 @@ class LayerClassifier:
             node.properties["layer"] = self._classify_one(node)
 
     def classify_store(self, store: Any) -> None:
-        """Classify nodes directly in a GraphStore, updating networkx data in-place."""
-        for node_id, data in store.graph.nodes(data=True):
-            if "kind" not in data:
-                continue
-            # Build a lightweight GraphNode for classification
-            loc = data.get("location")
-            if isinstance(loc, dict):
-                loc = SourceLocation(**loc)
-            node = GraphNode(
-                id=data.get("id", node_id),
-                kind=NodeKind(data["kind"]),
-                label=data.get("label", ""),
-                location=loc,
-                properties=data.get("properties", {}),
-            )
+        """Classify nodes in a GraphStore, updating properties via public API."""
+        for node in store.all_nodes():
             layer = self._classify_one(node)
-            # Update the networkx data dict directly
-            props = data.setdefault("properties", {})
-            props["layer"] = layer
+            store.update_node_properties(node.id, {"layer": layer})
 
     def _classify_one(self, node: GraphNode) -> str:
         if node.kind in _FRONTEND_NODE_KINDS:

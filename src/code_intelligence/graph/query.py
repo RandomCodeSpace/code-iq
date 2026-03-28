@@ -162,11 +162,11 @@ class GraphQuery:
                 if spec.direction != "both":
                     # For directional focus, do a BFS in the specified direction
                     focused_ids.update(
-                        nid for nid, _ in ego_store.graph.nodes(data=True)
+                        n.id for n in ego_store.all_nodes()
                     )
                 else:
                     focused_ids.update(
-                        nid for nid, _ in ego_store.graph.nodes(data=True)
+                        n.id for n in ego_store.all_nodes()
                     )
             store = store.subgraph(focused_ids)
 

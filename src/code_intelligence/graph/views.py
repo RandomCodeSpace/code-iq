@@ -91,10 +91,10 @@ class ArchitectView:
             new_store.add_node(enriched)
 
         # --- 2. Roll up edges -----------------------------------------
-        # Pre-build node_id -> module_id mapping from raw NetworkX data
+        # Pre-build node_id -> module_id mapping via public API
         module_map: dict[str, str | None] = {}
-        for nid, data in store.graph.nodes(data=True):
-            module_map[nid] = data.get("module")
+        for node in store.all_nodes():
+            module_map[node.id] = node.module
 
         # (source_module, target_module, rolled_kind) -> weight
         edge_weights: dict[tuple[str, str, EdgeKind], int] = defaultdict(int)

@@ -1,15 +1,13 @@
-"""NetworkX-backed graph store with typed operations."""
+"""Graph store facade delegating to a pluggable backend."""
 
 from __future__ import annotations
 
 import logging
+import warnings
 from collections.abc import Callable
 from typing import Any
 
-import networkx as nx
-
-logger = logging.getLogger(__name__)
-
+from code_intelligence.graph.backend import CypherBackend, GraphBackend
 from code_intelligence.models.graph import (
     CodeGraph,
     EdgeKind,
@@ -18,81 +16,61 @@ from code_intelligence.models.graph import (
     NodeKind,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class GraphStore:
-    """Wraps NetworkX MultiDiGraph with typed node/edge operations."""
+    """Public API for graph operations. Delegates to a pluggable backend."""
 
-    def __init__(self) -> None:
-        self._g: nx.MultiDiGraph = nx.MultiDiGraph()
+    def __init__(self, backend: GraphBackend | None = None) -> None:
+        if backend is None:
+            from code_intelligence.graph.backends.networkx import NetworkXBackend
+            backend = NetworkXBackend()
+        self._backend: GraphBackend = backend
 
     @property
-    def graph(self) -> nx.MultiDiGraph:
-        return self._g
+    def graph(self) -> Any:
+        """Deprecated. Direct backend access; only works with NetworkXBackend."""
+        warnings.warn(
+            "GraphStore.graph is deprecated. Use public API methods instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if hasattr(self._backend, "_g"):
+            return self._backend._g
+        raise AttributeError("Backend does not expose raw graph object")
 
     @property
     def node_count(self) -> int:
-        return self._g.number_of_nodes()
+        return self._backend.node_count
 
     @property
     def edge_count(self) -> int:
-        return self._g.number_of_edges()
+        return self._backend.edge_count
 
     def add_node(self, node: GraphNode) -> None:
-        if node.id in self._g:
-            logger.debug("Duplicate node ID %s, keeping first", node.id)
-            return
-        self._g.add_node(node.id, **node.model_dump())
+        self._backend.add_node(node)
 
     def add_edge(self, edge: GraphEdge) -> None:
-        # Let NetworkX auto-assign unique integer keys to avoid
-        # collisions when multiple edges of the same kind connect the same pair.
-        self._g.add_edge(
-            edge.source,
-            edge.target,
-            **edge.model_dump(),
-        )
+        self._backend.add_edge(edge)
 
     def get_node(self, node_id: str) -> GraphNode | None:
-        if node_id not in self._g:
-            return None
-        data = self._g.nodes[node_id]
-        return GraphNode(**data)
+        return self._backend.get_node(node_id)
 
     def get_edges_between(self, source: str, target: str) -> list[GraphEdge]:
-        if not self._g.has_edge(source, target):
-            return []
-        edges = []
-        for _key, data in self._g[source][target].items():
-            edges.append(GraphEdge(**data))
-        return edges
+        return self._backend.get_edges_between(source, target)
 
     def all_nodes(self) -> list[GraphNode]:
-        result = []
-        for _, data in self._g.nodes(data=True):
-            if "id" in data and "kind" in data:
-                result.append(GraphNode(**data))
-        return result
+        return self._backend.all_nodes()
 
     def all_edges(self) -> list[GraphEdge]:
-        result = []
-        for _, _, data in self._g.edges(data=True):
-            if "source" in data and "target" in data:
-                result.append(GraphEdge(**data))
-        return result
+        return self._backend.all_edges()
 
     def nodes_by_kind(self, kind: NodeKind) -> list[GraphNode]:
-        return [
-            GraphNode(**data)
-            for _, data in self._g.nodes(data=True)
-            if data.get("kind") == kind.value and "id" in data
-        ]
+        return self._backend.nodes_by_kind(kind)
 
     def edges_by_kind(self, kind: EdgeKind) -> list[GraphEdge]:
-        return [
-            GraphEdge(**data)
-            for _, _, data in self._g.edges(data=True)
-            if data.get("kind") == kind.value and "source" in data
-        ]
+        return self._backend.edges_by_kind(kind)
 
     def neighbors(
         self,
@@ -100,24 +78,10 @@ class GraphStore:
         edge_kinds: set[EdgeKind] | None = None,
         direction: str = "both",
     ) -> list[str]:
-        """Get neighbor node IDs, optionally filtered by edge kind and direction."""
-        result: set[str] = set()
-        if direction in ("out", "both"):
-            for _, target, data in self._g.out_edges(node_id, data=True):
-                if edge_kinds is None or EdgeKind(data.get("kind", "")) in edge_kinds:
-                    result.add(target)
-        if direction in ("in", "both"):
-            for source, _, data in self._g.in_edges(node_id, data=True):
-                if edge_kinds is None or EdgeKind(data.get("kind", "")) in edge_kinds:
-                    result.add(source)
-        return sorted(result)
+        return self._backend.neighbors(node_id, edge_kinds, direction)
 
     def subgraph(self, node_ids: set[str]) -> GraphStore:
-        """Create a new GraphStore containing only the specified nodes and edges between them."""
-        new_store = GraphStore()
-        sub = self._g.subgraph(node_ids)
-        new_store._g = nx.MultiDiGraph(sub)
-        return new_store
+        return GraphStore(backend=self._backend.subgraph(node_ids))
 
     def ego(
         self,
@@ -125,9 +89,8 @@ class GraphStore:
         radius: int = 2,
         edge_kinds: set[EdgeKind] | None = None,
     ) -> GraphStore:
-        """Extract an N-hop neighborhood around a center node."""
-        if center not in self._g:
-            return GraphStore()
+        if not self._backend.has_node(center):
+            return GraphStore(backend=type(self._backend)() if callable(type(self._backend)) else None)
 
         visited: set[str] = {center}
         frontier: set[str] = {center}
@@ -149,44 +112,29 @@ class GraphStore:
         node_filter: Callable[[GraphNode], bool] | None = None,
         edge_filter: Callable[[GraphEdge], bool] | None = None,
     ) -> GraphStore:
-        """Create a filtered copy of the graph."""
-        new_store = GraphStore()
+        new_store = GraphStore()  # Always uses NetworkX for filtered results
 
-        for _, data in self._g.nodes(data=True):
-            if "id" not in data or "kind" not in data:
-                continue
-            node = GraphNode(**data)
+        for node in self.all_nodes():
             if node_filter is None or node_filter(node):
                 new_store.add_node(node)
 
-        for _, _, data in self._g.edges(data=True):
-            if "source" not in data or "target" not in data:
-                continue
-            edge = GraphEdge(**data)
-            if edge.source in new_store._g and edge.target in new_store._g:
+        for edge in self.all_edges():
+            if new_store._backend.has_node(edge.source) and new_store._backend.has_node(edge.target):
                 if edge_filter is None or edge_filter(edge):
                     new_store.add_edge(edge)
 
         return new_store
 
     def find_cycles(self, limit: int = 100) -> list[list[str]]:
-        """Find simple cycles in the graph, up to *limit* results."""
-        cycles: list[list[str]] = []
-        for cycle in nx.simple_cycles(self._g):
-            cycles.append(cycle)
-            if len(cycles) >= limit:
-                break
-        return cycles
+        return self._backend.find_cycles(limit)
 
     def shortest_path(self, source: str, target: str) -> list[str] | None:
-        """Find shortest path between two nodes."""
-        try:
-            return nx.shortest_path(self._g, source, target)
-        except nx.NetworkXNoPath:
-            return None
+        return self._backend.shortest_path(source, target)
+
+    def update_node_properties(self, node_id: str, properties: dict[str, Any]) -> None:
+        self._backend.update_node_properties(node_id, properties)
 
     def to_model(self) -> CodeGraph:
-        """Serialize to Pydantic CodeGraph model."""
         nodes = self.all_nodes()
         edges = self.all_edges()
         node_counts: dict[str, int] = {}
@@ -212,9 +160,23 @@ class GraphStore:
         )
 
     def from_model(self, code_graph: CodeGraph) -> None:
-        """Load from Pydantic CodeGraph model."""
-        self._g.clear()
+        self._backend.clear()
         for node in code_graph.nodes:
-            self.add_node(node)
+            self._backend.add_node(node)
         for edge in code_graph.edges:
-            self.add_edge(edge)
+            self._backend.add_edge(edge)
+
+    @property
+    def supports_cypher(self) -> bool:
+        return isinstance(self._backend, CypherBackend)
+
+    def query_cypher(self, cypher: str, params: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+        if not isinstance(self._backend, CypherBackend):
+            raise NotImplementedError(
+                f"Backend {type(self._backend).__name__} does not support Cypher. "
+                "Use kuzu, neo4j, or age backend."
+            )
+        return self._backend.query_cypher(cypher, params)
+
+    def close(self) -> None:
+        self._backend.close()
