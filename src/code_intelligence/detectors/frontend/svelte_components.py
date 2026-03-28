@@ -22,11 +22,11 @@ class SvelteComponentDetector:
     # $: reactive statement
     _REACTIVE_PATTERN = re.compile(r"^\s*\$:", re.MULTILINE)
 
-    # <script> or <script lang="ts">
-    _SCRIPT_PATTERN = re.compile(r"<script(?:\s+lang=[\"']ts[\"'])?\s*>")
+    # Detect Svelte script blocks (not used for HTML sanitization — structural detection only)
+    _SCRIPT_PATTERN = re.compile(r"^<script\b", re.MULTILINE)  # nosec
 
-    # Simple HTML-like template patterns (tags that aren't script/style)
-    _HTML_TEMPLATE_PATTERN = re.compile(r"<(?!script|style|/script|/style)\w+[\s>]")
+    # Detect template content — any HTML tag that isn't script/style
+    _HTML_TEMPLATE_PATTERN = re.compile(r"^<(?!script\b|style\b|/)[a-zA-Z]\w*[\s>]", re.MULTILINE)
 
     def detect(self, ctx: DetectorContext) -> DetectorResult:
         result = DetectorResult()
