@@ -310,6 +310,76 @@ def test_triage_endpoints(client):
     assert any(ep["kind"] == "endpoint" for ep in endpoints)
 
 
+# ── Kinds (Explorer UI) ──────────────────────────────────────────────────
+
+
+def test_list_kinds(client):
+    """GET /api/kinds returns kind list with counts."""
+    resp = client.get("/api/kinds")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "kinds" in data
+    assert "total_nodes" in data
+    assert "total_edges" in data
+    assert data["total_nodes"] == 5
+    assert data["total_edges"] == 4
+    # Should have multiple kinds
+    assert len(data["kinds"]) >= 3
+    # Sorted by count descending
+    counts = [k["count"] for k in data["kinds"]]
+    assert counts == sorted(counts, reverse=True)
+
+
+def test_nodes_by_kind(client):
+    """GET /api/kinds/endpoint returns paginated endpoint nodes."""
+    resp = client.get("/api/kinds/endpoint")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["kind"] == "endpoint"
+    assert data["total"] == 2
+    assert len(data["nodes"]) == 2
+    for n in data["nodes"]:
+        assert "id" in n
+        assert "label" in n
+        assert "edge_count" in n
+
+
+def test_nodes_by_kind_pagination(client):
+    """GET /api/kinds/endpoint?limit=1&offset=0 returns one node."""
+    resp = client.get("/api/kinds/endpoint", params={"limit": 1, "offset": 0})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 2
+    assert len(data["nodes"]) == 1
+
+
+def test_nodes_by_kind_invalid(client):
+    """GET /api/kinds/bogus returns empty result (not 4xx)."""
+    resp = client.get("/api/kinds/bogus")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 0
+    assert data["nodes"] == []
+
+
+def test_node_detail(client):
+    """GET /api/nodes/ep:users:get/detail returns node with edges."""
+    resp = client.get("/api/nodes/ep:users:get/detail")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["node"]["id"] == "ep:users:get"
+    assert isinstance(data["edges_out"], list)
+    assert isinstance(data["edges_in"], list)
+    assert len(data["edges_out"]) >= 1
+    assert len(data["edges_in"]) >= 1
+
+
+def test_node_detail_404(client):
+    """GET /api/nodes/nonexistent/detail returns 404."""
+    resp = client.get("/api/nodes/nonexistent/detail")
+    assert resp.status_code == 404
+
+
 # ── Search ───────────────────────────────────────────────────────────────────
 
 

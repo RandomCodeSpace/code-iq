@@ -28,6 +28,20 @@ def create_router(service: CodeIQService) -> APIRouter:
     async def stats():
         return service.get_stats()
 
+    # ── Kinds (Explorer UI) ────────────────────────────────────────────────
+
+    @router.get("/kinds")
+    async def list_kinds():
+        return service.list_kinds()
+
+    @router.get("/kinds/{kind}")
+    async def nodes_by_kind(
+        kind: str,
+        limit: Annotated[int, Query(ge=1)] = 50,
+        offset: Annotated[int, Query(ge=0)] = 0,
+    ):
+        return service.nodes_by_kind_paginated(kind, limit=limit, offset=offset)
+
     # ── Nodes & Edges ────────────────────────────────────────────────────
 
     @router.get("/nodes")
@@ -38,8 +52,9 @@ def create_router(service: CodeIQService) -> APIRouter:
     ):
         return service.list_nodes(kind=kind, limit=limit, offset=offset)
 
-    # NOTE: /neighbors must be registered before the catch-all {node_id:path}
-    # route, otherwise Starlette's greedy path matching swallows "/neighbors".
+    # NOTE: /neighbors and /detail must be registered before the catch-all
+    # {node_id:path} route, otherwise Starlette's greedy path matching
+    # swallows them.
 
     @router.get("/nodes/{node_id:path}/neighbors")
     async def get_neighbors(
@@ -49,6 +64,16 @@ def create_router(service: CodeIQService) -> APIRouter:
     ):
         kinds = edge_kinds.split(",") if edge_kinds else None
         return service.get_neighbors(node_id, direction=direction, edge_kinds=kinds)
+
+    @router.get(
+        "/nodes/{node_id:path}/detail",
+        responses={404: {"description": "Node not found"}},
+    )
+    async def node_detail(node_id: str):
+        result = service.node_detail_with_edges(node_id)
+        if result is None:
+            raise HTTPException(status_code=404, detail=f"Node not found: {node_id}")
+        return result
 
     @router.get(
         "/nodes/{node_id:path}",

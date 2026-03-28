@@ -86,7 +86,7 @@ def _store_to_dict(store: GraphStore) -> dict:
 
 
 class CodeIQService:
-    """Stateful service wrapping the code-intelligence library.
+    """Stateful service wrapping the OSSCodeIQ library.
 
     Thread-safe: analysis replaces the internal store under a lock;
     read operations are safe against a snapshot reference.
@@ -121,7 +121,7 @@ class CodeIQService:
 
     def _open_store(self) -> GraphStore:
         """Open or create a GraphStore for the configured backend."""
-        graph_dir = self._path / ".code-intelligence"
+        graph_dir = self._path / ".osscodeiq"
         if self._backend_name == "kuzu":
             db_path = str(graph_dir / "graph.kuzu")
             backend_obj = create_backend("kuzu", path=db_path)
@@ -432,6 +432,110 @@ class CodeIQService:
 
         matches.sort(key=lambda n: n.label)
         return [_node_to_dict(n) for n in matches[:limit]]
+
+    def list_kinds(self) -> dict:
+        """Return all node kinds with counts and preview labels."""
+        from collections import Counter
+
+        all_nodes = sorted(self.store.all_nodes(), key=lambda n: n.id)
+        kind_counts: Counter[str] = Counter()
+        kind_previews: dict[str, list[str]] = {}
+
+        for node in all_nodes:
+            kv = node.kind.value
+            kind_counts[kv] += 1
+            if kv not in kind_previews:
+                kind_previews[kv] = []
+            if len(kind_previews[kv]) < 5:
+                kind_previews[kv].append(node.label)
+
+        kinds = sorted(
+            [
+                {"kind": k, "count": c, "preview": kind_previews[k]}
+                for k, c in kind_counts.items()
+            ],
+            key=lambda x: (-x["count"], x["kind"]),
+        )
+
+        return {
+            "kinds": kinds,
+            "total_nodes": self.store.node_count,
+            "total_edges": self.store.edge_count,
+        }
+
+    def nodes_by_kind_paginated(
+        self,
+        kind: str,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> dict:
+        """Return paginated nodes of a specific kind with edge counts."""
+        try:
+            nk = NodeKind(kind)
+        except ValueError:
+            return {"kind": kind, "total": 0, "limit": limit, "offset": offset, "nodes": []}
+
+        all_kind_nodes = sorted(self.store.nodes_by_kind(nk), key=lambda n: n.id)
+        total = len(all_kind_nodes)
+        page = all_kind_nodes[offset : offset + limit]
+
+        all_edges = self.store.all_edges()
+        nodes_out: list[dict] = []
+        for node in page:
+            edge_count = sum(
+                1 for e in all_edges if e.source == node.id or e.target == node.id
+            )
+            nodes_out.append({
+                "id": node.id,
+                "label": node.label,
+                "module": node.module,
+                "file_path": node.location.file_path if node.location else None,
+                "line_start": node.location.line_start if node.location else None,
+                "edge_count": edge_count,
+                "properties": node.properties,
+            })
+
+        return {
+            "kind": kind,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "nodes": nodes_out,
+        }
+
+    def node_detail_with_edges(self, node_id: str) -> dict | None:
+        """Return full node detail with incoming and outgoing edges."""
+        node = self.store.get_node(node_id)
+        if node is None:
+            return None
+
+        all_edges = self.store.all_edges()
+        edges_out: list[dict] = []
+        edges_in: list[dict] = []
+
+        for edge in sorted(all_edges, key=lambda e: (e.source, e.target)):
+            if edge.source == node_id:
+                target_node = self.store.get_node(edge.target)
+                edges_out.append({
+                    "kind": edge.kind.value,
+                    "target_id": edge.target,
+                    "target_label": target_node.label if target_node else edge.target,
+                    "label": edge.label,
+                })
+            elif edge.target == node_id:
+                source_node = self.store.get_node(edge.source)
+                edges_in.append({
+                    "kind": edge.kind.value,
+                    "source_id": edge.source,
+                    "source_label": source_node.label if source_node else edge.source,
+                    "label": edge.label,
+                })
+
+        return {
+            "node": _node_to_dict(node),
+            "edges_out": edges_out,
+            "edges_in": edges_in,
+        }
 
     def read_file(self, file_path: str) -> str:
         """Read a file from the codebase, preventing path traversal."""

@@ -210,6 +210,132 @@ def test_read_file_path_traversal(service):
         service.read_file("../../etc/passwd")
 
 
+# ── list_kinds ──────────────────────────────────────────────────────────────
+
+
+def test_list_kinds(service):
+    result = service.list_kinds()
+    assert "kinds" in result
+    assert "total_nodes" in result
+    assert "total_edges" in result
+    assert result["total_nodes"] == 5
+    assert result["total_edges"] == 5
+    # Sorted by count desc — endpoint has 2 nodes, should be first
+    kinds = result["kinds"]
+    assert len(kinds) >= 3  # endpoint, entity, class, guard
+    assert kinds[0]["count"] >= kinds[-1]["count"]
+    # Each kind has preview list of up to 5 labels
+    for k in kinds:
+        assert "kind" in k
+        assert "count" in k
+        assert "preview" in k
+        assert len(k["preview"]) <= 5
+
+
+def test_list_kinds_preview_content(service):
+    result = service.list_kinds()
+    endpoint_kind = next(k for k in result["kinds"] if k["kind"] == "endpoint")
+    assert endpoint_kind["count"] == 2
+    assert len(endpoint_kind["preview"]) == 2
+    assert "GET /users" in endpoint_kind["preview"]
+    assert "POST /users" in endpoint_kind["preview"]
+
+
+def test_list_kinds_empty():
+    """Empty graph returns zero counts."""
+    from osscodeiq.server.service import CodeIQService
+    import tempfile, pathlib
+    with tempfile.TemporaryDirectory() as td:
+        svc = CodeIQService(path=pathlib.Path(td), backend="networkx")
+        svc._store = GraphStore()
+        result = svc.list_kinds()
+        assert result["kinds"] == []
+        assert result["total_nodes"] == 0
+        assert result["total_edges"] == 0
+
+
+# ── nodes_by_kind_paginated ────────────────────────────────────────────────
+
+
+def test_nodes_by_kind_paginated(service):
+    result = service.nodes_by_kind_paginated("endpoint")
+    assert result["kind"] == "endpoint"
+    assert result["total"] == 2
+    assert len(result["nodes"]) == 2
+    for n in result["nodes"]:
+        assert "id" in n
+        assert "label" in n
+        assert "module" in n
+        assert "file_path" in n
+        assert "line_start" in n
+        assert "edge_count" in n
+        assert "properties" in n
+
+
+def test_nodes_by_kind_paginated_pagination(service):
+    result = service.nodes_by_kind_paginated("endpoint", limit=1, offset=0)
+    assert result["total"] == 2
+    assert len(result["nodes"]) == 1
+    first_id = result["nodes"][0]["id"]
+
+    result2 = service.nodes_by_kind_paginated("endpoint", limit=1, offset=1)
+    assert len(result2["nodes"]) == 1
+    assert result2["nodes"][0]["id"] != first_id
+
+
+def test_nodes_by_kind_paginated_invalid_kind(service):
+    result = service.nodes_by_kind_paginated("nonexistent_kind_xyz")
+    assert result["total"] == 0
+    assert result["nodes"] == []
+
+
+def test_nodes_by_kind_paginated_edge_count(service):
+    result = service.nodes_by_kind_paginated("endpoint")
+    # ep:users:get has 2 outgoing + 1 incoming (guard:jwt PROTECTS) = 3
+    get_node = next(n for n in result["nodes"] if n["id"] == "ep:users:get")
+    assert get_node["edge_count"] == 3
+
+
+# ── node_detail_with_edges ─────────────────────────────────────────────────
+
+
+def test_node_detail_with_edges(service):
+    result = service.node_detail_with_edges("ep:users:get")
+    assert result is not None
+    assert result["node"]["id"] == "ep:users:get"
+    assert result["node"]["kind"] == "endpoint"
+    assert isinstance(result["edges_out"], list)
+    assert isinstance(result["edges_in"], list)
+    # ep:users:get -> ent:user (QUERIES), -> cls:userservice (CALLS)
+    assert len(result["edges_out"]) == 2
+    out_targets = {e["target_id"] for e in result["edges_out"]}
+    assert "ent:user" in out_targets
+    assert "cls:userservice" in out_targets
+    # guard:jwt -> ep:users:get (PROTECTS)
+    assert len(result["edges_in"]) == 1
+    assert result["edges_in"][0]["source_id"] == "guard:jwt"
+
+
+def test_node_detail_with_edges_not_found(service):
+    result = service.node_detail_with_edges("nonexistent")
+    assert result is None
+
+
+def test_node_detail_with_edges_no_edges(service):
+    """Node with no connections returns empty edge lists."""
+    # guard:jwt has outgoing edges only
+    result = service.node_detail_with_edges("ent:user")
+    assert result is not None
+    assert result["node"]["id"] == "ent:user"
+    # ent:user has no outgoing edges
+    assert len(result["edges_out"]) == 0
+    # ent:user has 2 incoming edges (from ep:users:get and cls:userservice)
+    assert len(result["edges_in"]) == 2
+
+
+# ── Determinism ─────────────────────────────────────────────────────────────
+
+
 def test_determinism(service):
     """Two calls produce identical output."""
     stats1 = service.get_stats()
