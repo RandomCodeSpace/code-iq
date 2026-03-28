@@ -115,7 +115,7 @@ def find_dependents(module_id: str) -> str:
 @mcp.tool()
 def generate_flow(view: str = "overview", format: str = "json") -> str:
     """Generate an architecture flow diagram. Views: overview, ci, deploy, runtime, auth. Formats: json, mermaid."""
-    return json.dumps(_svc().generate_flow(view, format=format), indent=2)
+    return json.dumps(_svc().generate_flow(view, fmt=format), indent=2)
 
 
 @mcp.tool()
