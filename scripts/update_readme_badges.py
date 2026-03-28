@@ -135,7 +135,7 @@ def main() -> None:
     )
     if vulns >= 0:
         vuln_color = "brightgreen" if vulns == 0 else "yellow" if vulns <= 3 else "red"
-        vuln_label = "0 - clean" if vulns == 0 else str(vulns)
+        vuln_label = "0" if vulns == 0 else str(vulns)
         content = update_badge(
             content, "vulnerabilities",
             badge("vulnerabilities", vuln_label, vuln_color, "hackthebox"),
