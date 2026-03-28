@@ -35,6 +35,8 @@ _STRUCTURED_LANGUAGES = {
     "scala", "swift", "r", "perl", "lua", "dart",
     "dockerfile", "toml", "ini", "dotenv", "csv",
     "vue", "svelte",
+    "html", "css", "scss", "less", "razor", "cshtml", "asciidoc",
+    "makefile", "gomod", "gosum", "groovy",
 }
 
 
@@ -52,57 +54,85 @@ class AnalysisResult:
     files_without_detectors: int
 
 
+def _parse_toml(content: bytes, file_path: str) -> dict:
+    """Parse TOML content."""
+    try:
+        import tomllib
+    except ModuleNotFoundError:
+        import tomli as tomllib  # type: ignore[no-redef]
+    try:
+        text = content.decode("utf-8", errors="replace")
+        data = tomllib.loads(text)
+    except Exception as exc:
+        return {"error": "invalid_toml", "file": file_path, "detail": str(exc)}
+    return {"type": "toml", "file": file_path, "data": data}
+
+
+def _parse_ini(content: bytes, file_path: str) -> dict:
+    """Parse INI content."""
+    import configparser
+    try:
+        text = content.decode("utf-8", errors="replace")
+        parser = configparser.ConfigParser()
+        parser.read_string(text)
+        data = {section: dict(parser[section]) for section in parser.sections()}
+    except Exception as exc:
+        return {"error": "invalid_ini", "file": file_path, "detail": str(exc)}
+    return {"type": "ini", "file": file_path, "data": data}
+
+
+def _text_passthrough(lang: str):
+    """Return a parser that passes through raw text for regex-based detection."""
+    def _parse(content: bytes, file_path: str) -> dict:
+        return {"type": lang, "file": file_path, "data": content.decode("utf-8", errors="replace")}
+    return _parse
+
+
+def _class_parser(module_path: str, class_name: str):
+    """Return a parser that lazily imports and delegates to a structured parser class."""
+    def _parse(content: bytes, file_path: str):
+        mod = __import__(module_path, fromlist=[class_name])
+        cls = getattr(mod, class_name)
+        return cls().parse(content, file_path)
+    return _parse
+
+
+# Dispatch table for structured parsers.  Keyed by language identifier.
+_STRUCTURED_PARSERS: dict[str, Any] = {
+    "xml": _class_parser("code_intelligence.parsing.structured.xml_parser", "XmlParser"),
+    "yaml": _class_parser("code_intelligence.parsing.structured.yaml_parser", "YamlParser"),
+    "json": _class_parser("code_intelligence.parsing.structured.json_parser", "JsonParser"),
+    "properties": _class_parser("code_intelligence.parsing.structured.properties_parser", "PropertiesParser"),
+    "gradle": _class_parser("code_intelligence.parsing.structured.gradle_parser", "GradleParser"),
+    "sql": _class_parser("code_intelligence.parsing.structured.sql_parser", "SqlParser"),
+    "toml": _parse_toml,
+    "ini": _parse_ini,
+    "markdown": _text_passthrough("markdown"),
+    "proto": _text_passthrough("proto"),
+    "vue": _text_passthrough("vue"),
+    "svelte": _text_passthrough("svelte"),
+    "html": _text_passthrough("html"),
+    "css": _text_passthrough("css"),
+    "scss": _text_passthrough("scss"),
+    "less": _text_passthrough("less"),
+    "razor": _text_passthrough("razor"),
+    "cshtml": _text_passthrough("cshtml"),
+    "asciidoc": _text_passthrough("asciidoc"),
+    "makefile": _text_passthrough("makefile"),
+    "gomod": _text_passthrough("gomod"),
+    "gosum": _text_passthrough("gosum"),
+    "groovy": _text_passthrough("groovy"),
+}
+
+
 def _parse_structured(language: str, content: bytes, file_path: str) -> Any:
     """Dispatch to the correct structured parser."""
-    if language == "xml":
-        from code_intelligence.parsing.structured.xml_parser import XmlParser
-        return XmlParser().parse(content, file_path)
-    elif language == "yaml":
-        from code_intelligence.parsing.structured.yaml_parser import YamlParser
-        return YamlParser().parse(content, file_path)
-    elif language == "json":
-        from code_intelligence.parsing.structured.json_parser import JsonParser
-        return JsonParser().parse(content, file_path)
-    elif language == "properties":
-        from code_intelligence.parsing.structured.properties_parser import PropertiesParser
-        return PropertiesParser().parse(content, file_path)
-    elif language == "gradle":
-        from code_intelligence.parsing.structured.gradle_parser import GradleParser
-        return GradleParser().parse(content, file_path)
-    elif language == "sql":
-        from code_intelligence.parsing.structured.sql_parser import SqlParser
-        return SqlParser().parse(content, file_path)
-    elif language == "toml":
+    parser = _STRUCTURED_PARSERS.get(language)
+    if parser is not None:
         try:
-            import tomllib
-        except ModuleNotFoundError:
-            import tomli as tomllib  # type: ignore[no-redef]
-        try:
-            text = content.decode("utf-8", errors="replace")
-            data = tomllib.loads(text)
-        except Exception as exc:
-            return {"error": "invalid_toml", "file": file_path, "detail": str(exc)}
-        return {"type": "toml", "file": file_path, "data": data}
-    elif language == "ini":
-        import configparser
-        try:
-            text = content.decode("utf-8", errors="replace")
-            parser = configparser.ConfigParser()
-            parser.read_string(text)
-            data = {section: dict(parser[section]) for section in parser.sections()}
-        except Exception as exc:
-            return {"error": "invalid_ini", "file": file_path, "detail": str(exc)}
-        return {"type": "ini", "file": file_path, "data": data}
-    elif language == "markdown":
-        # Return raw text for regex-based detection
-        return {"type": "markdown", "file": file_path, "data": content.decode("utf-8", errors="replace")}
-    elif language == "proto":
-        # Return raw text for regex-based detection
-        return {"type": "proto", "file": file_path, "data": content.decode("utf-8", errors="replace")}
-    elif language == "vue":
-        return {"type": "vue", "file": file_path, "data": content.decode("utf-8", errors="replace")}
-    elif language == "svelte":
-        return {"type": "svelte", "file": file_path, "data": content.decode("utf-8", errors="replace")}
+            return parser(content, file_path)
+        except Exception:
+            logger.debug("Structured parse failed for %s", file_path, exc_info=True)
     return None
 
 

@@ -26,6 +26,9 @@ class DiscoveryConfig(BaseModel):
         ".toml", ".ini", ".cfg", ".conf",
         ".env", ".csv", ".dockerfile",
         ".vue", ".svelte",
+        ".html", ".htm", ".css", ".scss", ".less",
+        ".mjs", ".cjs", ".mts", ".cts", ".jsonc",
+        ".groovy", ".pyi", ".razor", ".cshtml", ".adoc",
     ])
     exclude_patterns: list[str] = Field(default_factory=lambda: [
         "**/node_modules/**",

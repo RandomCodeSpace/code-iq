@@ -19,8 +19,8 @@ impl Storage for Config {
 pub fn process_data(data: &[u8]) -> Vec<u8> { vec![] }
 '''
         ctx = DetectorContext(file_path="lib.rs", language="rust", content=source, module_name="mylib")
-        from code_intelligence.detectors.generic.imports_detector import GenericImportsDetector
-        result = GenericImportsDetector().detect(ctx)
+        from code_intelligence.detectors.rust.rust_structures import RustStructuresDetector
+        result = RustStructuresDetector().detect(ctx)
         classes = [n for n in result.nodes if n.kind == NodeKind.CLASS]
         interfaces = [n for n in result.nodes if n.kind == NodeKind.INTERFACE]
         methods = [n for n in result.nodes if n.kind == NodeKind.METHOD]
@@ -41,8 +41,8 @@ class UserServiceImpl(private val repo: Repository) : UserService {
 }
 '''
         ctx = DetectorContext(file_path="UserService.kt", language="kotlin", content=source, module_name="app")
-        from code_intelligence.detectors.generic.imports_detector import GenericImportsDetector
-        result = GenericImportsDetector().detect(ctx)
+        from code_intelligence.detectors.kotlin.kotlin_structures import KotlinStructuresDetector
+        result = KotlinStructuresDetector().detect(ctx)
         classes = [n for n in result.nodes if n.kind == NodeKind.CLASS]
         interfaces = [n for n in result.nodes if n.kind == NodeKind.INTERFACE]
         assert len(classes) >= 2  # User + UserServiceImpl

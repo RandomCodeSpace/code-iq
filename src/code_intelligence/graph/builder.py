@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
 from code_intelligence.graph.backend import GraphBackend
@@ -12,11 +13,19 @@ from code_intelligence.models.graph import GraphEdge, GraphNode, EdgeKind, NodeK
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class LinkResult:
+    """Result returned by a Linker: new nodes and edges to add to the graph."""
+
+    nodes: list[GraphNode] = field(default_factory=list)
+    edges: list[GraphEdge] = field(default_factory=list)
+
+
 @runtime_checkable
 class Linker(Protocol):
     """Cross-file relationship inferencer."""
 
-    def link(self, store: GraphStore) -> list[GraphEdge]:
+    def link(self, store: GraphStore) -> LinkResult:
         ...
 
 
@@ -27,7 +36,7 @@ class TopicLinker:
     edges on the same topic label to create direct producer-to-consumer edges.
     """
 
-    def link(self, store: GraphStore) -> list[GraphEdge]:
+    def link(self, store: GraphStore) -> LinkResult:
         edges: list[GraphEdge] = []
 
         # Collect topic/queue nodes by label for matching
@@ -75,7 +84,7 @@ class TopicLinker:
 
         if edges:
             logger.debug("TopicLinker created %d edges", len(edges))
-        return edges
+        return LinkResult(edges=edges)
 
 
 class EntityLinker:
@@ -86,14 +95,14 @@ class EntityLinker:
     conventions and existing MAPS_TO relationships.
     """
 
-    def link(self, store: GraphStore) -> list[GraphEdge]:
+    def link(self, store: GraphStore) -> LinkResult:
         edges: list[GraphEdge] = []
 
         entities = store.nodes_by_kind(NodeKind.ENTITY)
         repositories = store.nodes_by_kind(NodeKind.REPOSITORY)
 
         if not entities or not repositories:
-            return edges
+            return LinkResult(edges=edges)
 
         # Build entity lookup by simple name (last part of FQN or label)
         entity_by_name: dict[str, GraphNode] = {}
@@ -132,7 +141,7 @@ class EntityLinker:
 
         if edges:
             logger.debug("EntityLinker created %d edges", len(edges))
-        return edges
+        return LinkResult(edges=edges)
 
 
 class ModuleContainmentLinker:
@@ -142,8 +151,9 @@ class ModuleContainmentLinker:
     with CONTAINS edges pointing to each member node.
     """
 
-    def link(self, store: GraphStore) -> list[GraphEdge]:
+    def link(self, store: GraphStore) -> LinkResult:
         edges: list[GraphEdge] = []
+        new_nodes: list[GraphNode] = []
 
         # Collect existing module nodes
         existing_modules = {n.id for n in store.nodes_by_kind(NodeKind.MODULE)}
@@ -159,15 +169,12 @@ class ModuleContainmentLinker:
             (e.source, e.target) for e in store.edges_by_kind(EdgeKind.CONTAINS)
         }
 
-        # Track modules we need to create (will be added via the builder)
-        self._new_module_nodes: list[GraphNode] = []
-
         for module_name, members in nodes_by_module.items():
             module_id = f"module:{module_name}"
 
             # Create module node if it doesn't exist
             if module_id not in existing_modules:
-                self._new_module_nodes.append(
+                new_nodes.append(
                     GraphNode(
                         id=module_id,
                         kind=NodeKind.MODULE,
@@ -190,7 +197,7 @@ class ModuleContainmentLinker:
 
         if edges:
             logger.debug("ModuleContainmentLinker created %d edges", len(edges))
-        return edges
+        return LinkResult(nodes=new_nodes, edges=edges)
 
 
 class GraphBuilder:
@@ -265,18 +272,13 @@ class GraphBuilder:
 
         for linker in self._linkers:
             try:
-                new_edges = linker.link(self._store)
+                result = linker.link(self._store)
 
-                # Some linkers (e.g. ModuleContainmentLinker) may also
-                # produce new nodes stored in a private attribute.
-                new_nodes: list[GraphNode] = getattr(
-                    linker, "_new_module_nodes", []
-                )
-                if new_nodes:
-                    self.add_nodes(new_nodes)
+                if result.nodes:
+                    self.add_nodes(result.nodes)
 
-                # Linker edges go to pending buffer too
-                self._pending_edges.extend(new_edges)
+                if result.edges:
+                    self._pending_edges.extend(result.edges)
             except Exception:
                 logger.warning(
                     "Linker %s failed",
@@ -284,7 +286,7 @@ class GraphBuilder:
                     exc_info=True,
                 )
 
-        # Flush linker edges (linker-created nodes are already added above)
+        # Flush linker-produced nodes and edges
         self.flush()
 
     def build(self) -> GraphStore:

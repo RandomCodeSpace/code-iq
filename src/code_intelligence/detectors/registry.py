@@ -29,96 +29,28 @@ class DetectorRegistry:
         self._by_name[detector.name] = detector
 
     def load_builtin_detectors(self) -> None:
-        """Import and register all built-in detectors."""
-        builtin_modules = [
-            "code_intelligence.detectors.java.spring_rest",
-            "code_intelligence.detectors.java.jpa_entity",
-            "code_intelligence.detectors.java.repository",
-            "code_intelligence.detectors.java.kafka",
-            "code_intelligence.detectors.java.spring_events",
-            "code_intelligence.detectors.java.rmi",
-            "code_intelligence.detectors.java.module_deps",
-            "code_intelligence.detectors.java.raw_sql",
-            "code_intelligence.detectors.java.graphql_resolver",
-            "code_intelligence.detectors.java.grpc_service",
-            "code_intelligence.detectors.java.jms",
-            "code_intelligence.detectors.java.rabbitmq",
-            "code_intelligence.detectors.java.websocket",
-            # Generic Java detectors
-            "code_intelligence.detectors.java.class_hierarchy",
-            "code_intelligence.detectors.java.public_api",
-            "code_intelligence.detectors.java.jaxrs",
-            "code_intelligence.detectors.java.kafka_protocol",
-            "code_intelligence.detectors.java.config_def",
-            "code_intelligence.detectors.java.jdbc",
-            "code_intelligence.detectors.java.ibm_mq",
-            "code_intelligence.detectors.java.tibco_ems",
-            "code_intelligence.detectors.java.azure_messaging",
-            "code_intelligence.detectors.java.azure_functions",
-            "code_intelligence.detectors.java.cosmos_db",
-            # IaC detectors
-            "code_intelligence.detectors.iac.bicep",
-            "code_intelligence.detectors.iac.terraform",
-            "code_intelligence.detectors.iac.dockerfile",
-            # Go detectors
-            "code_intelligence.detectors.go.go_structures",
-            # C# detectors
-            "code_intelligence.detectors.csharp.csharp_structures",
-            # C/C++ detectors
-            "code_intelligence.detectors.cpp.cpp_structures",
-            # Shell detectors
-            "code_intelligence.detectors.shell.bash_detector",
-            "code_intelligence.detectors.shell.powershell_detector",
-            # Generic multi-language
-            "code_intelligence.detectors.generic.imports_detector",
-            # Python detectors
-            "code_intelligence.detectors.python.flask_routes",
-            "code_intelligence.detectors.python.django_views",
-            "code_intelligence.detectors.python.fastapi_routes",
-            "code_intelligence.detectors.python.sqlalchemy_models",
-            "code_intelligence.detectors.python.celery_tasks",
-            # TypeScript detectors
-            "code_intelligence.detectors.typescript.express_routes",
-            "code_intelligence.detectors.typescript.nestjs_controllers",
-            "code_intelligence.detectors.typescript.graphql_resolvers",
-            "code_intelligence.detectors.typescript.typeorm_entities",
-            # Config/structured data detectors
-            "code_intelligence.detectors.config.json_structure",
-            "code_intelligence.detectors.config.yaml_structure",
-            "code_intelligence.detectors.config.toml_structure",
-            "code_intelligence.detectors.config.ini_structure",
-            "code_intelligence.detectors.config.package_json",
-            "code_intelligence.detectors.config.tsconfig_json",
-            "code_intelligence.detectors.config.openapi",
-            "code_intelligence.detectors.config.docker_compose",
-            "code_intelligence.detectors.config.github_actions",
-            "code_intelligence.detectors.config.kubernetes",
-            "code_intelligence.detectors.config.pyproject_toml",
-            "code_intelligence.detectors.config.sql_structure",
-            "code_intelligence.detectors.config.batch_structure",
-            "code_intelligence.detectors.config.properties_detector",
-            # Documentation detectors
-            "code_intelligence.detectors.docs.markdown_structure",
-            # Protocol Buffer detectors
-            "code_intelligence.detectors.proto.proto_structure",
-            # Auth detectors
-            "code_intelligence.detectors.java.spring_security",
-            "code_intelligence.detectors.python.django_auth",
-            "code_intelligence.detectors.python.fastapi_auth",
-            "code_intelligence.detectors.typescript.nestjs_guards",
-            "code_intelligence.detectors.typescript.passport_jwt",
-            "code_intelligence.detectors.config.kubernetes_rbac",
-            "code_intelligence.detectors.auth.ldap_auth",
-            "code_intelligence.detectors.auth.certificate_auth",
-            "code_intelligence.detectors.auth.session_header_auth",
-            # Frontend detectors
-            "code_intelligence.detectors.frontend.react_components",
-            "code_intelligence.detectors.frontend.vue_components",
-            "code_intelligence.detectors.frontend.angular_components",
-            "code_intelligence.detectors.frontend.svelte_components",
-            "code_intelligence.detectors.frontend.frontend_routes",
-        ]
-        for module_path in builtin_modules:
+        """Import and register all built-in detectors via package scanning."""
+        import pkgutil
+
+        import code_intelligence.detectors as detectors_pkg
+
+        # Walk all subpackages under code_intelligence.detectors
+        skip = {"registry", "base", "utils", "__init__"}
+        module_paths = []
+        for importer, modname, ispkg in pkgutil.walk_packages(
+            detectors_pkg.__path__,
+            prefix="code_intelligence.detectors.",
+        ):
+            # Skip non-detector modules
+            short_name = modname.rsplit(".", 1)[-1]
+            if short_name in skip or short_name.startswith("_"):
+                continue
+            module_paths.append(modname)
+
+        # Sort for deterministic registration order
+        module_paths.sort()
+
+        for module_path in module_paths:
             try:
                 mod = importlib.import_module(module_path)
                 # Convention: each module exposes a `detector` attribute or a class
@@ -136,7 +68,7 @@ class DetectorRegistry:
                             self.register(obj())
                             break
             except Exception:
-                logger.debug("Could not load builtin detector module %s", module_path, exc_info=True)
+                logger.debug("Could not load detector module %s", module_path, exc_info=True)
 
     def load_plugin_detectors(self) -> None:
         """Discover detectors via setuptools entry points."""

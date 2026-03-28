@@ -84,6 +84,34 @@ _EXTENSION_MAP: dict[str, str] = {
     ".csv": "csv",
     ".vue": "vue",
     ".svelte": "svelte",
+    ".html": "html",
+    ".htm": "html",
+    ".css": "css",
+    ".scss": "scss",
+    ".less": "less",
+    ".mjs": "javascript",
+    ".cjs": "javascript",
+    ".mts": "typescript",
+    ".cts": "typescript",
+    ".jsonc": "json",
+    ".groovy": "groovy",
+    ".pyi": "python",
+    ".razor": "razor",
+    ".cshtml": "cshtml",
+    ".adoc": "asciidoc",
+}
+
+
+_FILENAME_MAP: dict[str, str] = {
+    "Dockerfile": "dockerfile",
+    "Makefile": "makefile",
+    "GNUmakefile": "makefile",
+    "Jenkinsfile": "groovy",
+    "Vagrantfile": "ruby",
+    "Gemfile": "ruby",
+    "Rakefile": "ruby",
+    "go.mod": "gomod",
+    "go.sum": "gosum",
 }
 
 
@@ -99,13 +127,18 @@ class DiscoveredFile:
 
 
 def _map_extension_to_language(file_path: Path) -> str | None:
-    """Map a file's extension to a language string."""
+    """Map a file's extension to a language string.
+
+    Falls back to :data:`_FILENAME_MAP` when no extension matches, using the
+    basename of *file_path* (e.g. ``"Dockerfile"`` from ``"app/Dockerfile"``).
+    """
     name = file_path.name
     # Check compound extensions first (e.g. .gradle.kts)
     for ext, lang in _EXTENSION_MAP.items():
         if name.endswith(ext):
             return lang
-    return None
+    # Fallback: match the full filename (extensionless files like Dockerfile)
+    return _FILENAME_MAP.get(name)
 
 
 def _matches_any_pattern(path_str: str, patterns: list[str]) -> bool:
@@ -177,8 +210,9 @@ class FileDiscovery:
             if lang is None:
                 continue
 
-            # Check include extensions
-            if not any(
+            # Check include extensions (skip for extensionless filename matches)
+            is_filename_match = rel_path.name in _FILENAME_MAP
+            if not is_filename_match and not any(
                 rel.endswith(ext) for ext in discovery_cfg.include_extensions
             ):
                 continue

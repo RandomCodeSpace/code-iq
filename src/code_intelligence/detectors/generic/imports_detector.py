@@ -2,6 +2,9 @@
 
 Catches import/dependency patterns and structural definitions across
 languages that don't have dedicated detectors.
+
+Note: Kotlin, Rust, and Scala have been moved to dedicated detectors in
+detectors/kotlin/, detectors/rust/, and detectors/scala/ respectively.
 """
 
 from __future__ import annotations
@@ -31,42 +34,6 @@ _RUBY_REQUIRE_RE = re.compile(r"^(?:require|require_relative)\s+'([^']+)'", re.M
 _RUBY_MODULE_RE = re.compile(r'^\s*module\s+(\w+)', re.MULTILINE)
 _RUBY_CLASS_RE = re.compile(r'^\s*class\s+(\w+)(?:\s*<\s*(\w+))?', re.MULTILINE)
 _RUBY_DEF_RE = re.compile(r'^\s*def\s+(\w+)', re.MULTILINE)
-
-# ---------------------------------------------------------------------------
-# Rust patterns
-# ---------------------------------------------------------------------------
-_RUST_USE_RE = re.compile(r'^\s*use\s+([\w:]+)', re.MULTILINE)
-_RUST_STRUCT_RE = re.compile(r'^\s*(?:pub\s+)?struct\s+(\w+)', re.MULTILINE)
-_RUST_TRAIT_RE = re.compile(r'^\s*(?:pub\s+)?trait\s+(\w+)', re.MULTILINE)
-_RUST_IMPL_RE = re.compile(r'^\s*impl\s+(\w+)\s+for\s+(\w+)', re.MULTILINE)
-_RUST_FN_RE = re.compile(r'^\s*(?:pub\s+)?fn\s+(\w+)\s*\(', re.MULTILINE)
-_RUST_MOD_RE = re.compile(r'^\s*(?:pub\s+)?mod\s+(\w+)', re.MULTILINE)
-_RUST_ENUM_RE = re.compile(r'^\s*(?:pub\s+)?enum\s+(\w+)', re.MULTILINE)
-
-# ---------------------------------------------------------------------------
-# Kotlin patterns
-# ---------------------------------------------------------------------------
-_KOTLIN_IMPORT_RE = re.compile(r'^\s*import\s+([\w.]+)', re.MULTILINE)
-_KOTLIN_CLASS_RE = re.compile(
-    r'^\s*(?:data\s+)?(?:open\s+)?(?:abstract\s+)?class\s+(\w+)'
-    r'(?:\s*(?:\(.*?\))?\s*:\s*([\w\s,.<>]+))?',
-    re.MULTILINE,
-)
-_KOTLIN_INTERFACE_RE = re.compile(r'^\s*interface\s+(\w+)', re.MULTILINE)
-_KOTLIN_FUN_RE = re.compile(r'^\s*(?:override\s+)?(?:fun|suspend\s+fun)\s+(\w+)\s*\(', re.MULTILINE)
-_KOTLIN_OBJECT_RE = re.compile(r'^\s*object\s+(\w+)', re.MULTILINE)
-
-# ---------------------------------------------------------------------------
-# Scala patterns
-# ---------------------------------------------------------------------------
-_SCALA_IMPORT_RE = re.compile(r'^\s*import\s+([\w.]+)', re.MULTILINE)
-_SCALA_CLASS_RE = re.compile(
-    r'^\s*(?:case\s+)?class\s+(\w+)(?:\s+extends\s+(\w+))?(?:\s+with\s+([\w\s,]+))?',
-    re.MULTILINE,
-)
-_SCALA_TRAIT_RE = re.compile(r'^\s*trait\s+(\w+)', re.MULTILINE)
-_SCALA_OBJECT_RE = re.compile(r'^\s*object\s+(\w+)', re.MULTILINE)
-_SCALA_DEF_RE = re.compile(r'^\s*def\s+(\w+)\s*[\[(]', re.MULTILINE)
 
 # ---------------------------------------------------------------------------
 # Swift patterns
@@ -168,277 +135,6 @@ def _detect_ruby(ctx: DetectorContext, text: str, result: DetectorResult) -> Non
             ))
 
     for m in _RUBY_DEF_RE.finditer(text):
-        method_name = m.group(1)
-        result.nodes.append(GraphNode(
-            id=f"{ctx.file_path}:{method_name}",
-            kind=NodeKind.METHOD,
-            label=method_name,
-            fqn=method_name,
-            module=ctx.module_name,
-            location=SourceLocation(
-                file_path=ctx.file_path,
-                line_start=_find_line_number(text, m.start()),
-            ),
-        ))
-
-
-def _detect_rust(ctx: DetectorContext, text: str, result: DetectorResult) -> None:
-    file_node_id = ctx.file_path
-
-    for m in _RUST_USE_RE.finditer(text):
-        target = m.group(1)
-        result.edges.append(GraphEdge(
-            source=file_node_id,
-            target=target,
-            kind=EdgeKind.IMPORTS,
-            label=f"{ctx.file_path} imports {target}",
-        ))
-
-    for m in _RUST_MOD_RE.finditer(text):
-        mod_name = m.group(1)
-        result.nodes.append(GraphNode(
-            id=f"{ctx.file_path}:mod:{mod_name}",
-            kind=NodeKind.MODULE,
-            label=mod_name,
-            fqn=mod_name,
-            module=ctx.module_name,
-            location=SourceLocation(
-                file_path=ctx.file_path,
-                line_start=_find_line_number(text, m.start()),
-            ),
-        ))
-
-    for m in _RUST_STRUCT_RE.finditer(text):
-        struct_name = m.group(1)
-        result.nodes.append(GraphNode(
-            id=f"{ctx.file_path}:{struct_name}",
-            kind=NodeKind.CLASS,
-            label=struct_name,
-            fqn=struct_name,
-            module=ctx.module_name,
-            location=SourceLocation(
-                file_path=ctx.file_path,
-                line_start=_find_line_number(text, m.start()),
-            ),
-            properties={"type": "struct"},
-        ))
-
-    for m in _RUST_TRAIT_RE.finditer(text):
-        trait_name = m.group(1)
-        result.nodes.append(GraphNode(
-            id=f"{ctx.file_path}:{trait_name}",
-            kind=NodeKind.INTERFACE,
-            label=trait_name,
-            fqn=trait_name,
-            module=ctx.module_name,
-            location=SourceLocation(
-                file_path=ctx.file_path,
-                line_start=_find_line_number(text, m.start()),
-            ),
-            properties={"type": "trait"},
-        ))
-
-    for m in _RUST_ENUM_RE.finditer(text):
-        enum_name = m.group(1)
-        result.nodes.append(GraphNode(
-            id=f"{ctx.file_path}:{enum_name}",
-            kind=NodeKind.ENUM,
-            label=enum_name,
-            fqn=enum_name,
-            module=ctx.module_name,
-            location=SourceLocation(
-                file_path=ctx.file_path,
-                line_start=_find_line_number(text, m.start()),
-            ),
-        ))
-
-    for m in _RUST_IMPL_RE.finditer(text):
-        trait_name = m.group(1)
-        struct_name = m.group(2)
-        struct_node_id = f"{ctx.file_path}:{struct_name}"
-        trait_node_id = f"{ctx.file_path}:{trait_name}"
-        result.edges.append(GraphEdge(
-            source=struct_node_id,
-            target=trait_node_id,
-            kind=EdgeKind.IMPLEMENTS,
-            label=f"{struct_name} implements {trait_name}",
-        ))
-
-    for m in _RUST_FN_RE.finditer(text):
-        fn_name = m.group(1)
-        result.nodes.append(GraphNode(
-            id=f"{ctx.file_path}:{fn_name}",
-            kind=NodeKind.METHOD,
-            label=fn_name,
-            fqn=fn_name,
-            module=ctx.module_name,
-            location=SourceLocation(
-                file_path=ctx.file_path,
-                line_start=_find_line_number(text, m.start()),
-            ),
-            properties={"type": "function"},
-        ))
-
-
-def _detect_kotlin(ctx: DetectorContext, text: str, result: DetectorResult) -> None:
-    file_node_id = ctx.file_path
-
-    for m in _KOTLIN_IMPORT_RE.finditer(text):
-        target = m.group(1)
-        result.edges.append(GraphEdge(
-            source=file_node_id,
-            target=target,
-            kind=EdgeKind.IMPORTS,
-            label=f"{ctx.file_path} imports {target}",
-        ))
-
-    for m in _KOTLIN_CLASS_RE.finditer(text):
-        class_name = m.group(1)
-        supertypes_str = m.group(2)
-        node_id = f"{ctx.file_path}:{class_name}"
-        result.nodes.append(GraphNode(
-            id=node_id,
-            kind=NodeKind.CLASS,
-            label=class_name,
-            fqn=class_name,
-            module=ctx.module_name,
-            location=SourceLocation(
-                file_path=ctx.file_path,
-                line_start=_find_line_number(text, m.start()),
-            ),
-        ))
-        if supertypes_str:
-            for st in supertypes_str.split(","):
-                st = st.strip().split("(")[0].split("<")[0].strip()
-                if st:
-                    result.edges.append(GraphEdge(
-                        source=node_id,
-                        target=st,
-                        kind=EdgeKind.EXTENDS,
-                        label=f"{class_name} extends {st}",
-                    ))
-
-    for m in _KOTLIN_INTERFACE_RE.finditer(text):
-        iface_name = m.group(1)
-        result.nodes.append(GraphNode(
-            id=f"{ctx.file_path}:{iface_name}",
-            kind=NodeKind.INTERFACE,
-            label=iface_name,
-            fqn=iface_name,
-            module=ctx.module_name,
-            location=SourceLocation(
-                file_path=ctx.file_path,
-                line_start=_find_line_number(text, m.start()),
-            ),
-        ))
-
-    for m in _KOTLIN_OBJECT_RE.finditer(text):
-        obj_name = m.group(1)
-        result.nodes.append(GraphNode(
-            id=f"{ctx.file_path}:{obj_name}",
-            kind=NodeKind.CLASS,
-            label=obj_name,
-            fqn=obj_name,
-            module=ctx.module_name,
-            location=SourceLocation(
-                file_path=ctx.file_path,
-                line_start=_find_line_number(text, m.start()),
-            ),
-            properties={"type": "object"},
-        ))
-
-    for m in _KOTLIN_FUN_RE.finditer(text):
-        fn_name = m.group(1)
-        result.nodes.append(GraphNode(
-            id=f"{ctx.file_path}:{fn_name}",
-            kind=NodeKind.METHOD,
-            label=fn_name,
-            fqn=fn_name,
-            module=ctx.module_name,
-            location=SourceLocation(
-                file_path=ctx.file_path,
-                line_start=_find_line_number(text, m.start()),
-            ),
-        ))
-
-
-def _detect_scala(ctx: DetectorContext, text: str, result: DetectorResult) -> None:
-    file_node_id = ctx.file_path
-
-    for m in _SCALA_IMPORT_RE.finditer(text):
-        target = m.group(1)
-        result.edges.append(GraphEdge(
-            source=file_node_id,
-            target=target,
-            kind=EdgeKind.IMPORTS,
-            label=f"{ctx.file_path} imports {target}",
-        ))
-
-    for m in _SCALA_CLASS_RE.finditer(text):
-        class_name = m.group(1)
-        base_class = m.group(2)
-        traits_str = m.group(3)
-        node_id = f"{ctx.file_path}:{class_name}"
-        result.nodes.append(GraphNode(
-            id=node_id,
-            kind=NodeKind.CLASS,
-            label=class_name,
-            fqn=class_name,
-            module=ctx.module_name,
-            location=SourceLocation(
-                file_path=ctx.file_path,
-                line_start=_find_line_number(text, m.start()),
-            ),
-        ))
-        if base_class:
-            result.edges.append(GraphEdge(
-                source=node_id,
-                target=base_class,
-                kind=EdgeKind.EXTENDS,
-                label=f"{class_name} extends {base_class}",
-            ))
-        if traits_str:
-            for trait in traits_str.split(","):
-                trait = trait.strip()
-                if trait:
-                    result.edges.append(GraphEdge(
-                        source=node_id,
-                        target=trait,
-                        kind=EdgeKind.IMPLEMENTS,
-                        label=f"{class_name} implements {trait}",
-                    ))
-
-    for m in _SCALA_TRAIT_RE.finditer(text):
-        trait_name = m.group(1)
-        result.nodes.append(GraphNode(
-            id=f"{ctx.file_path}:{trait_name}",
-            kind=NodeKind.INTERFACE,
-            label=trait_name,
-            fqn=trait_name,
-            module=ctx.module_name,
-            location=SourceLocation(
-                file_path=ctx.file_path,
-                line_start=_find_line_number(text, m.start()),
-            ),
-            properties={"type": "trait"},
-        ))
-
-    for m in _SCALA_OBJECT_RE.finditer(text):
-        obj_name = m.group(1)
-        result.nodes.append(GraphNode(
-            id=f"{ctx.file_path}:{obj_name}",
-            kind=NodeKind.CLASS,
-            label=obj_name,
-            fqn=obj_name,
-            module=ctx.module_name,
-            location=SourceLocation(
-                file_path=ctx.file_path,
-                line_start=_find_line_number(text, m.start()),
-            ),
-            properties={"type": "object"},
-        ))
-
-    for m in _SCALA_DEF_RE.finditer(text):
         method_name = m.group(1)
         result.nodes.append(GraphNode(
             id=f"{ctx.file_path}:{method_name}",
@@ -695,9 +391,6 @@ def _detect_r(ctx: DetectorContext, text: str, result: DetectorResult) -> None:
 # Dispatch table: language -> handler function
 _LANGUAGE_HANDLERS: dict[str, Callable[[DetectorContext, str, DetectorResult], None]] = {
     "ruby": _detect_ruby,
-    "rust": _detect_rust,
-    "kotlin": _detect_kotlin,
-    "scala": _detect_scala,
     "swift": _detect_swift,
     "perl": _detect_perl,
     "lua": _detect_lua,
@@ -710,7 +403,7 @@ class GenericImportsDetector:
     """Detects imports, classes, and structural patterns across multiple languages."""
 
     name: str = "generic_imports"
-    supported_languages: tuple[str, ...] = ("ruby", "rust", "kotlin", "scala", "swift", "perl", "lua", "dart", "r")
+    supported_languages: tuple[str, ...] = ("ruby", "swift", "perl", "lua", "dart", "r")
 
     def detect(self, ctx: DetectorContext) -> DetectorResult:
         result = DetectorResult()
