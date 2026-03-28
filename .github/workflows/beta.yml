@@ -1,0 +1,90 @@
+name: Publish Beta
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "pyproject.toml"
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build-and-publish:
+    name: Build & publish beta
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: pip install build tomli
+
+      - name: Compute beta version
+        id: version
+        run: |
+          BASE=$(python3 -c "import tomli; print(tomli.load(open('pyproject.toml','rb'))['project']['version'])")
+          if git describe --tags --match "v*" HEAD 2>/dev/null; then
+            BETA_NUM=$(git rev-list "$(git describe --tags --match 'v*' --abbrev=0 HEAD)"..HEAD --count)
+          else
+            BETA_NUM=$(git rev-list HEAD --count)
+          fi
+          VERSION="${BASE}.dev${BETA_NUM}"
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          echo "Beta version: $VERSION (${SHORT_SHA})"
+
+      - name: Patch version in pyproject.toml
+        env:
+          BETA_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          python3 << 'PYEOF'
+          import os, re
+          ver = os.environ["BETA_VERSION"]
+          with open("pyproject.toml", "r") as f:
+              content = f.read()
+          content = re.sub(r'version\s*=\s*"[^"]+"', f'version = "{ver}"', content, count=1)
+          with open("pyproject.toml", "w") as f:
+              f.write(content)
+          PYEOF
+
+      - name: Build wheel and sdist
+        run: python -m build
+
+      - name: Verify wheel
+        run: |
+          pip install dist/*.whl
+          python -c "import importlib.metadata; print(f'Built: {importlib.metadata.version(\"code-intelligence\")}')"
+          python -c "from code_intelligence.detectors.registry import DetectorRegistry; r = DetectorRegistry(); r.load_builtin_detectors(); print(f'{len(r.all_detectors())} detectors')"
+
+      - name: Delete existing beta tag (if any)
+        env:
+          BETA_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          gh release delete "$BETA_TAG" --yes 2>/dev/null || true
+          git push origin ":refs/tags/$BETA_TAG" 2>/dev/null || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create beta release with wheel
+        env:
+          BETA_TAG: ${{ steps.version.outputs.tag }}
+          BETA_VERSION: ${{ steps.version.outputs.version }}
+          BETA_SHA: ${{ steps.version.outputs.sha }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$BETA_TAG" dist/* \
+            --title "Beta $BETA_VERSION ($BETA_SHA)" \
+            --notes "Auto-generated beta build from commit $BETA_SHA. Install with: pip install https://github.com/RandomCodeSpace/code-iq/releases/download/$BETA_TAG/code_intelligence-${BETA_VERSION}-py3-none-any.whl" \
+            --prerelease
