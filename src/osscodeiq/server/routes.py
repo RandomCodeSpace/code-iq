@@ -38,6 +38,18 @@ def create_router(service: CodeIQService) -> APIRouter:
     ):
         return service.list_nodes(kind=kind, limit=limit, offset=offset)
 
+    # NOTE: /neighbors must be registered before the catch-all {node_id:path}
+    # route, otherwise Starlette's greedy path matching swallows "/neighbors".
+
+    @router.get("/nodes/{node_id:path}/neighbors")
+    async def get_neighbors(
+        node_id: str,
+        direction: str = "both",
+        edge_kinds: str | None = None,
+    ):
+        kinds = edge_kinds.split(",") if edge_kinds else None
+        return service.get_neighbors(node_id, direction=direction, edge_kinds=kinds)
+
     @router.get(
         "/nodes/{node_id:path}",
         responses={404: {"description": "Node not found"}},
@@ -56,16 +68,7 @@ def create_router(service: CodeIQService) -> APIRouter:
     ):
         return service.list_edges(kind=kind, limit=limit, offset=offset)
 
-    # ── Neighbors & Ego ──────────────────────────────────────────────────
-
-    @router.get("/nodes/{node_id:path}/neighbors")
-    async def get_neighbors(
-        node_id: str,
-        direction: str = "both",
-        edge_kinds: str | None = None,
-    ):
-        kinds = edge_kinds.split(",") if edge_kinds else None
-        return service.get_neighbors(node_id, direction=direction, edge_kinds=kinds)
+    # ── Ego ──────────────────────────────────────────────────────────────
 
     @router.get("/ego/{center:path}")
     async def get_ego(
