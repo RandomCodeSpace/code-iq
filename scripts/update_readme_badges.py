@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 import sys
@@ -56,6 +57,17 @@ def count_detectors_and_languages() -> tuple[int, int]:
     return int(parts[0]), int(parts[1])
 
 
+def count_vulnerabilities() -> int:
+    """Count open Dependabot alerts via gh CLI (requires repo access)."""
+    try:
+        out = _run(["gh", "api", "repos/RandomCodeSpace/code-iq/dependabot/alerts?state=open&per_page=100"])
+        alerts = json.loads(out)
+        return len(alerts) if isinstance(alerts, list) else 0
+    except Exception:
+        # Fallback: try GITHUB_TOKEN env var or return -1 to skip update
+        return -1
+
+
 def fmt(n: int) -> str:
     """Format number with commas for display, URL-encoded."""
     return f"{n:,}"
@@ -64,8 +76,11 @@ def fmt(n: int) -> str:
 def badge(label: str, value: str, color: str, logo: str) -> str:
     """Generate a shields.io badge HTML snippet."""
     val_encoded = quote(value, safe="")
+    link = "https://github.com/RandomCodeSpace/code-iq"
+    if label == "vulnerabilities":
+        link += "/security/dependabot"
     return (
-        f'<a href="https://github.com/RandomCodeSpace/code-iq">'
+        f'<a href="{link}">'
         f'<img src="https://img.shields.io/badge/{label}-{val_encoded}-{color}'
         f'?style=flat-square&logo={logo}&logoColor=white" alt="{value} {label.capitalize()}">'
         f"</a>"
@@ -86,12 +101,14 @@ def main() -> None:
     loc = count_loc()
     tests = count_tests()
     detectors, languages = count_detectors_and_languages()
+    vulns = count_vulnerabilities()
 
     print(f"  Files: {files}")
     print(f"  LOC: {loc:,}")
     print(f"  Tests: {tests}")
     print(f"  Detectors: {detectors}")
     print(f"  Languages: {languages}")
+    print(f"  Vulnerabilities: {vulns if vulns >= 0 else 'skipped (no access)'}")
 
     content = README.read_text()
     original = content
@@ -116,6 +133,13 @@ def main() -> None:
         content, "loc",
         badge("LOC", fmt(loc), "informational", "codacy"),
     )
+    if vulns >= 0:
+        vuln_color = "brightgreen" if vulns == 0 else "yellow" if vulns <= 3 else "red"
+        vuln_label = "0 - clean" if vulns == 0 else str(vulns)
+        content = update_badge(
+            content, "vulnerabilities",
+            badge("vulnerabilities", vuln_label, vuln_color, "hackthebox"),
+        )
 
     if content != original:
         README.write_text(content)
