@@ -38,6 +38,14 @@ class NetworkXBackend:
         self._g.add_node(node.id, **node.model_dump())
 
     def add_edge(self, edge: GraphEdge) -> None:
+        # Only add edge if both nodes exist — prevents NetworkX from
+        # auto-creating phantom nodes for dangling references.
+        if edge.source not in self._g or edge.target not in self._g:
+            logger.debug(
+                "Skipping edge %s -> %s: missing node(s)",
+                edge.source, edge.target,
+            )
+            return
         self._g.add_edge(edge.source, edge.target, **edge.model_dump())
 
     def clear(self) -> None:

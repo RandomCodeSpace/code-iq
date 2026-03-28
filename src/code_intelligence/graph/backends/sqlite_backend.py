@@ -127,6 +127,9 @@ class SqliteGraphBackend:
             logger.exception("Failed to add node %s", node.id)
 
     def add_edge(self, edge: GraphEdge) -> None:
+        # Only add edge if both nodes exist — consistent with KuzuDB/Neo4j behavior
+        if not self.has_node(edge.source) or not self.has_node(edge.target):
+            return
         try:
             self._conn.execute(
                 "INSERT INTO edges (source, target, kind, data) VALUES (?, ?, ?, ?)",
