@@ -395,5 +395,227 @@ def bundle(
     console.print(f"   Size: {output.stat().st_size / 1024 / 1024:.1f} MB")
 
 
+def _load_graph_backend(path: Path, backend: str, config: Path | None = None):
+    """Load a graph backend from a previously analyzed project."""
+    from code_intelligence.graph.backends import create_backend
+
+    graph_dir = path.resolve() / ".code-intelligence"
+    if backend == "kuzu":
+        db_path = str(graph_dir / "graph.kuzu")
+    elif backend == "sqlite":
+        db_path = str(graph_dir / "graph.db")
+    else:
+        # NetworkX ��� load from cache
+        cfg = _load_config(config)
+        cache_path = path.resolve() / cfg.cache.directory / cfg.cache.db_name
+        if not cache_path.exists():
+            console.print("No analysis cache found. Run 'code-intelligence analyze' first.")
+            raise typer.Exit(1)
+        from code_intelligence.cache.store import CacheStore
+        cache = CacheStore(cache_path)
+        store = cache.load_full_graph()
+        return store
+
+    from pathlib import Path as P
+    if not P(db_path).exists():
+        console.print(f"No graph database found at {db_path}. Run 'code-intelligence analyze --backend {backend}' first.")
+        raise typer.Exit(1)
+
+    from code_intelligence.graph.store import GraphStore
+    return GraphStore(backend=create_backend(backend, path=db_path))
+
+
+@app.command()
+def cypher(
+    query_str: Annotated[str, typer.Argument(help="Cypher query to execute")],
+    path: Annotated[Path, typer.Argument(help="Path to analyzed codebase")] = Path("."),
+    backend: Annotated[str, typer.Option("--backend", "-b", help="Graph backend")] = "kuzu",
+    limit: Annotated[int, typer.Option("--limit", "-l", help="Max rows")] = 50,
+    config: Annotated[Optional[Path], typer.Option("--config", "-c")] = None,
+) -> None:
+    """Execute a raw Cypher query on the graph database."""
+    import time as _time
+
+    store = _load_graph_backend(path, backend, config)
+
+    if not store.supports_cypher:
+        console.print(f"Backend '{backend}' does not support Cypher. Use --backend kuzu.")
+        raise typer.Exit(1)
+
+    console.print(f"[dim]Executing: {query_str}[/dim]")
+    t0 = _time.perf_counter()
+    try:
+        results = store.query_cypher(query_str)
+    except Exception as e:
+        console.print(f"Query failed: {e}")
+        raise typer.Exit(1)
+    elapsed = _time.perf_counter() - t0
+
+    if not results:
+        console.print(f"(no results) [{elapsed*1000:.1f}ms]")
+        store.close()
+        return
+
+    # Display as table
+    from rich.table import Table
+    columns = list(results[0].keys())
+    table = Table(title=f"Results ({min(len(results), limit)} of {len(results)} rows, {elapsed*1000:.1f}ms)")
+    for col in columns:
+        table.add_column(col, overflow="fold")
+
+    for row in results[:limit]:
+        table.add_row(*[str(row.get(c, "")) for c in columns])
+
+    console.print(table)
+    store.close()
+
+
+@app.command(name="find")
+def find_cmd(
+    what: Annotated[str, typer.Argument(help="What to find: endpoints, guards, entities, components, unprotected, flow")],
+    path: Annotated[Path, typer.Argument(help="Path to analyzed codebase")] = Path("."),
+    backend: Annotated[str, typer.Option("--backend", "-b", help="Graph backend")] = "kuzu",
+    node_id: Annotated[Optional[str], typer.Option("--from", "-f", help="Starting node ID (for flow)")] = None,
+    hops: Annotated[int, typer.Option("--hops", "-h", help="Traversal depth")] = 3,
+    config: Annotated[Optional[Path], typer.Option("--config", "-c")] = None,
+) -> None:
+    """Run preset graph queries: endpoints, guards, entities, components, unprotected, flow."""
+    import time as _time
+
+    store = _load_graph_backend(path, backend, config)
+
+    _PRESETS = {
+        "endpoints": {
+            "cypher": "MATCH (e:CodeNode) WHERE e.kind = 'endpoint' RETURN e.id, e.label, e.properties ORDER BY e.label",
+            "fallback_kind": "endpoint",
+            "desc": "All API endpoints",
+        },
+        "guards": {
+            "cypher": "MATCH (g:CodeNode) WHERE g.kind = 'guard' RETURN g.id, g.label, g.properties ORDER BY g.label",
+            "fallback_kind": "guard",
+            "desc": "All auth guards",
+        },
+        "entities": {
+            "cypher": "MATCH (e:CodeNode) WHERE e.kind = 'entity' RETURN e.id, e.label, e.properties ORDER BY e.label",
+            "fallback_kind": "entity",
+            "desc": "All data entities",
+        },
+        "components": {
+            "cypher": "MATCH (c:CodeNode) WHERE c.kind = 'component' RETURN c.id, c.label, c.properties ORDER BY c.label",
+            "fallback_kind": "component",
+            "desc": "All frontend components",
+        },
+        "unprotected": {
+            "cypher": (
+                "MATCH (e:CodeNode) WHERE e.kind = 'endpoint' "
+                "AND NOT EXISTS { MATCH (g:CodeNode)-[:CODE_EDGE]->(e) WHERE g.kind = 'guard' } "
+                "RETURN e.id, e.label, e.properties ORDER BY e.label"
+            ),
+            "desc": "Endpoints without auth guards",
+        },
+        "flow": {
+            "cypher_template": (
+                "MATCH (start:CodeNode {{id: $node_id}})-[e:CODE_EDGE*1..{hops}]->(target:CodeNode) "
+                "RETURN DISTINCT target.id, target.kind, target.label"
+            ),
+            "desc": "Trace flow from a node",
+        },
+    }
+
+    if what not in _PRESETS:
+        console.print(f"Unknown query: '{what}'. Available: {', '.join(_PRESETS.keys())}")
+        raise typer.Exit(1)
+
+    preset = _PRESETS[what]
+    console.print(f"[bold]{preset['desc']}[/bold]")
+
+    t0 = _time.perf_counter()
+
+    if store.supports_cypher:
+        # Use Cypher for graph DB backends
+        if what == "flow":
+            if not node_id:
+                console.print("--from/-f required for flow query. Pass a node ID.")
+                raise typer.Exit(1)
+            cypher_q = preset["cypher_template"].format(hops=hops)
+            try:
+                results = store.query_cypher(cypher_q, {"node_id": node_id})
+            except Exception:
+                # Fallback: use neighbors traversal
+                results = _flow_fallback(store, node_id, hops)
+        elif what == "unprotected":
+            try:
+                results = store.query_cypher(preset["cypher"])
+            except Exception:
+                results = _unprotected_fallback(store)
+        else:
+            results = store.query_cypher(preset["cypher"])
+    else:
+        # Fallback for non-Cypher backends (NetworkX, SQLite)
+        from code_intelligence.models.graph import NodeKind
+        if what == "flow":
+            results = _flow_fallback(store, node_id, hops)
+        elif what == "unprotected":
+            results = _unprotected_fallback(store)
+        else:
+            kind_str = preset.get("fallback_kind", what)
+            try:
+                kind = NodeKind(kind_str)
+                nodes = store.nodes_by_kind(kind)
+                results = [{"id": n.id, "label": n.label, "properties": str(n.properties)} for n in nodes]
+            except ValueError:
+                results = []
+
+    elapsed = _time.perf_counter() - t0
+
+    if not results:
+        console.print(f"(no results) [{elapsed*1000:.1f}ms]")
+        store.close()
+        return
+
+    from rich.table import Table
+    columns = list(results[0].keys())
+    table = Table(title=f"{len(results)} results ({elapsed*1000:.1f}ms)")
+    for col in columns:
+        table.add_column(col, overflow="fold")
+    for row in results[:100]:
+        table.add_row(*[str(row.get(c, "")) for c in columns])
+    console.print(table)
+    store.close()
+
+
+def _flow_fallback(store, node_id: str | None, hops: int) -> list[dict]:
+    """Trace flow using iterative neighbor traversal (non-Cypher fallback)."""
+    if not node_id:
+        return []
+    visited: set[str] = set()
+    frontier = {node_id}
+    results = []
+    for depth in range(1, hops + 1):
+        next_frontier: set[str] = set()
+        for nid in frontier:
+            for neighbor in store.neighbors(nid, direction="out"):
+                if neighbor not in visited:
+                    visited.add(neighbor)
+                    next_frontier.add(neighbor)
+                    node = store.get_node(neighbor)
+                    if node:
+                        results.append({"id": node.id, "kind": node.kind.value, "label": node.label})
+        frontier = next_frontier
+    return results
+
+
+def _unprotected_fallback(store) -> list[dict]:
+    """Find unprotected endpoints using public API (non-Cypher fallback)."""
+    from code_intelligence.models.graph import NodeKind, EdgeKind
+    endpoints = store.nodes_by_kind(NodeKind.ENDPOINT)
+    guards = store.edges_by_kind(EdgeKind.PROTECTS)
+    protected_ids = {e.target for e in guards}
+    return [
+        {"id": e.id, "label": e.label, "properties": str(e.properties)}
+        for e in endpoints if e.id not in protected_ids
+    ]
+
+
 if __name__ == "__main__":
     app()

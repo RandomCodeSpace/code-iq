@@ -276,7 +276,11 @@ class Analyzer:
         files_cached = 0
 
         from code_intelligence.graph.backends import create_backend
-        backend = create_backend(self._config.graph.backend, path=self._config.graph.path)
+        # Ensure parent directory exists for file-based backends
+        graph_path = self._config.graph.path
+        if graph_path:
+            Path(graph_path).parent.mkdir(parents=True, exist_ok=True)
+        backend = create_backend(self._config.graph.backend, path=graph_path)
         builder = GraphBuilder(backend=backend)
 
         if cache_cfg.enabled:
