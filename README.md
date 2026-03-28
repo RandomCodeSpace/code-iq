@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="https://github.com/RandomCodeSpace/code-iq/actions"><img src="https://img.shields.io/github/actions/workflow/status/RandomCodeSpace/code-iq/ci.yml?branch=main&style=flat-square&logo=github&label=CI" alt="CI"></a>
-  <a href="https://github.com/RandomCodeSpace/code-iq/releases"><img src="https://img.shields.io/github/v/release/RandomCodeSpace/code-iq?style=flat-square&logo=github&label=Release" alt="Release"></a>
+  <a href="https://github.com/RandomCodeSpace/code-iq/releases"><img src="https://img.shields.io/badge/release-v0.1.0-blue?style=flat-square&logo=github&logoColor=white" alt="Release v0.1.0"></a>
   <a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/PyPI-coming%20soon-lightgrey?style=flat-square&logo=pypi&logoColor=white" alt="PyPI"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square&logo=python&logoColor=white" alt="Python 3.11+"></a>
   <a href="https://github.com/RandomCodeSpace/code-iq/blob/main/LICENSE"><img src="https://img.shields.io/github/license/RandomCodeSpace/code-iq?style=flat-square&label=License" alt="MIT License"></a>
@@ -17,7 +17,7 @@
   <a href="https://github.com/RandomCodeSpace/code-iq/commits/main"><img src="https://img.shields.io/github/last-commit/RandomCodeSpace/code-iq?style=flat-square&logo=github&label=Last%20Commit" alt="Last Commit"></a>
   <a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/github/repo-size/RandomCodeSpace/code-iq?style=flat-square&logo=github&label=Repo%20Size" alt="Repo Size"></a>
   <a href="https://github.com/RandomCodeSpace/code-iq/security"><img src="https://img.shields.io/badge/security-audited-purple?style=flat-square&logo=shieldsdotio&logoColor=white" alt="Security"></a>
-  <a href="https://github.com/RandomCodeSpace/code-iq/security/dependabot"><img src="https://img.shields.io/github/dependabot/RandomCodeSpace/code-iq?style=flat-square&logo=dependabot&logoColor=white&label=Dependabot" alt="Dependabot"></a>
+  <a href="https://github.com/RandomCodeSpace/code-iq/security/dependabot"><img src="https://img.shields.io/badge/dependabot-enabled-brightgreen?style=flat-square&logo=dependabot&logoColor=white" alt="Dependabot enabled"></a>
   <a href="https://github.com/RandomCodeSpace/code-iq/security/code-scanning"><img src="https://img.shields.io/github/actions/workflow/status/RandomCodeSpace/code-iq/codeql.yml?branch=main&style=flat-square&logo=github&label=CodeQL" alt="CodeQL"></a>
   <!-- DYNAMIC:vulnerabilities --><a href="https://github.com/RandomCodeSpace/code-iq/security/dependabot"><img src="https://img.shields.io/badge/vulnerabilities-1-yellow?style=flat-square&logo=hackthebox&logoColor=white" alt="1 Vulnerabilities"></a><!-- /DYNAMIC:vulnerabilities -->
   <!-- DYNAMIC:detectors --><a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/detectors-58-brightgreen?style=flat-square&logo=codefactor&logoColor=white" alt="58 Detectors"></a><!-- /DYNAMIC:detectors -->
