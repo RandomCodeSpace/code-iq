@@ -693,6 +693,10 @@ def serve(
     config: Annotated[Optional[Path], typer.Option("--config", "-c")] = None,
 ) -> None:
     """Start the OSSCodeIQ server (API + MCP on one port)."""
+    import warnings
+    warnings.filterwarnings("ignore", category=DeprecationWarning, module="websockets")
+    warnings.filterwarnings("ignore", category=DeprecationWarning, module="uvicorn")
+
     import uvicorn
     from osscodeiq.server.app import create_app
 
