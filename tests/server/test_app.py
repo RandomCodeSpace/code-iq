@@ -24,10 +24,10 @@ def test_create_app_returns_fastapi(app):
     assert isinstance(app, FastAPI)
 
 
-def test_welcome_page(client):
-    resp = client.get("/")
-    assert resp.status_code == 200
-    assert "OSSCodeIQ" in resp.text
+def test_root_redirects_to_ui(client):
+    resp = client.get("/", follow_redirects=False)
+    assert resp.status_code == 307
+    assert resp.headers["location"] == "/ui"
 
 
 def test_api_stats_route(client):
