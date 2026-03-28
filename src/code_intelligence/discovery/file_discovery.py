@@ -42,6 +42,7 @@ _EXTENSION_MAP: dict[str, str] = {
     ".gql": "graphql",
     ".proto": "proto",
     ".md": "markdown",
+    ".markdown": "markdown",
     ".bicep": "bicep",
     ".tf": "terraform",
     ".tfvars": "terraform",

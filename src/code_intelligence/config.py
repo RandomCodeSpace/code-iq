@@ -16,7 +16,7 @@ class DiscoveryConfig(BaseModel):
         ".java", ".py", ".ts", ".tsx", ".js", ".jsx",
         ".xml", ".yaml", ".yml", ".json", ".properties",
         ".gradle", ".gradle.kts", ".sql", ".graphql", ".gql",
-        ".proto", ".md",
+        ".proto", ".md", ".markdown",
         ".cs", ".go", ".tf", ".tfvars", ".hcl",
         ".cpp", ".cc", ".cxx", ".hpp", ".c", ".h",
         ".sh", ".bash", ".zsh", ".ps1", ".psm1", ".psd1",
