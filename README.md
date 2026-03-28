@@ -11,7 +11,7 @@
   <a href="https://github.com/RandomCodeSpace/code-iq/releases"><img src="https://img.shields.io/github/v/release/RandomCodeSpace/code-iq?include_prereleases&style=flat-square&logo=github&label=Release" alt="Release"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square&logo=python&logoColor=white" alt="Python 3.11+"></a>
   <a href="https://github.com/RandomCodeSpace/code-iq/blob/main/LICENSE"><img src="https://img.shields.io/github/license/RandomCodeSpace/code-iq?style=flat-square&label=License" alt="MIT License"></a>
-  <a href="https://snyk.io/test/github/RandomCodeSpace/code-iq"><img src="https://snyk.io/test/github/RandomCodeSpace/code-iq/badge.svg?style=flat-square" alt="Snyk Vulnerabilities"></a>
+  <a href="https://app.snyk.io"><img src="https://img.shields.io/snyk/vulnerabilities/github/RandomCodeSpace/code-iq?style=flat-square&logo=snyk&label=Snyk" alt="Snyk Vulnerabilities"></a>
   <a href="https://sonarcloud.io/summary/overall?id=RandomCodeSpace_code-iq"><img src="https://sonarcloud.io/api/project_badges/measure?project=RandomCodeSpace_code-iq&metric=security_rating&style=flat-square" alt="Sonarcloud Security"></a>
   <a href="https://sonarcloud.io/summary/overall?id=RandomCodeSpace_code-iq"><img src="https://sonarcloud.io/api/project_badges/measure?project=RandomCodeSpace_code-iq&metric=reliability_rating" alt="Sonarcloud Reliability"></a>
   <a href="https://sonarcloud.io/summary/overall?id=RandomCodeSpace_code-iq"><img src="https://sonarcloud.io/api/project_badges/measure?project=RandomCodeSpace_code-iq&metric=sqale_rating" alt="Sonarcloud Maintainability"></a>
