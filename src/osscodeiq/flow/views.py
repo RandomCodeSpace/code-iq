@@ -7,6 +7,9 @@ from osscodeiq.graph.store import GraphStore
 from osscodeiq.models.graph import EdgeKind, NodeKind
 
 
+_GITLAB_PREFIX = "gitlab:"
+
+
 def build_overview(store: GraphStore) -> FlowDiagram:
     """High-level overview with 4 subgraphs: CI, Infrastructure, Application, Security."""
     subgraphs = []
@@ -15,10 +18,10 @@ def build_overview(store: GraphStore) -> FlowDiagram:
     # CI/CD subgraph
     ci_nodes = []
     workflows = [n for n in store.all_nodes() if n.kind == NodeKind.MODULE and any(
-        p in n.id for p in ("gha:", "gitlab:")
+        p in n.id for p in ("gha:", _GITLAB_PREFIX)
     )]
     ci_jobs = [n for n in store.all_nodes() if n.kind == NodeKind.METHOD and any(
-        p in n.id for p in ("gha:", "gitlab:")
+        p in n.id for p in ("gha:", _GITLAB_PREFIX)
     )]
     if workflows or ci_jobs:
         ci_nodes.append(FlowNode(id="ci_pipelines", label=f"Pipelines x{len(workflows)}", kind="pipeline",
@@ -60,7 +63,7 @@ def build_overview(store: GraphStore) -> FlowDiagram:
     classes = store.nodes_by_kind(NodeKind.CLASS)
     methods = store.nodes_by_kind(NodeKind.METHOD)
     # Exclude CI methods from method count
-    app_methods = [m for m in methods if not any(p in m.id for p in ("gha:", "gitlab:"))]
+    app_methods = [m for m in methods if not any(p in m.id for p in ("gha:", _GITLAB_PREFIX))]
     components = store.nodes_by_kind(NodeKind.COMPONENT)
     topics = store.nodes_by_kind(NodeKind.TOPIC) + store.nodes_by_kind(NodeKind.QUEUE)
     db_conns = store.nodes_by_kind(NodeKind.DATABASE_CONNECTION)
@@ -140,9 +143,9 @@ def build_ci_view(store: GraphStore) -> FlowDiagram:
 
     # Find CI-related nodes
     all_nodes = store.all_nodes()
-    workflows = sorted([n for n in all_nodes if n.kind == NodeKind.MODULE and any(p in n.id for p in ("gha:", "gitlab:"))], key=lambda n: n.id)
-    jobs = sorted([n for n in all_nodes if n.kind == NodeKind.METHOD and any(p in n.id for p in ("gha:", "gitlab:"))], key=lambda n: n.id)
-    triggers = sorted([n for n in all_nodes if n.kind == NodeKind.CONFIG_KEY and any(p in n.id for p in ("gha:", "gitlab:"))], key=lambda n: n.id)
+    workflows = sorted([n for n in all_nodes if n.kind == NodeKind.MODULE and any(p in n.id for p in ("gha:", _GITLAB_PREFIX))], key=lambda n: n.id)
+    jobs = sorted([n for n in all_nodes if n.kind == NodeKind.METHOD and any(p in n.id for p in ("gha:", _GITLAB_PREFIX))], key=lambda n: n.id)
+    triggers = sorted([n for n in all_nodes if n.kind == NodeKind.CONFIG_KEY and any(p in n.id for p in ("gha:", _GITLAB_PREFIX))], key=lambda n: n.id)
 
     # Trigger nodes
     if triggers:
@@ -165,7 +168,7 @@ def build_ci_view(store: GraphStore) -> FlowDiagram:
         subgraphs.append(FlowSubgraph(id=f"wf_{wf.id.replace(':', '_')}", label=wf.label, nodes=job_nodes))
 
     # Job dependency edges
-    ci_edges = [e for e in store.all_edges() if e.kind == EdgeKind.DEPENDS_ON and any(p in e.source for p in ("gha:", "gitlab:"))]
+    ci_edges = [e for e in store.all_edges() if e.kind == EdgeKind.DEPENDS_ON and any(p in e.source for p in ("gha:", _GITLAB_PREFIX))]
     for e in sorted(ci_edges, key=lambda x: (x.source, x.target)):
         edges.append(FlowEdge(source=f"job_{e.source.replace(':', '_')}", target=f"job_{e.target.replace(':', '_')}", label="needs"))
 

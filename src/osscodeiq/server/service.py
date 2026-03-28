@@ -330,6 +330,7 @@ class CodeIQService:
             EdgeKind.CONNECTS_TO,
         }
 
+        depth = min(depth, 10)
         visited: set[str] = {node_id}
         frontier: set[str] = {node_id}
         impacted_nodes: list[GraphNode] = []

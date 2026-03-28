@@ -10,7 +10,7 @@ from osscodeiq.models.graph import GraphNode, NodeKind, SourceLocation
 
 # Depends(get_current_user) or Depends(get_current_active_user) etc.
 _DEPENDS_AUTH_RE = re.compile(
-    r'Depends\(\s*(get_current[_\w]*|require_auth[_\w]*|auth[_\w]*)\s*\)'
+    r'Depends\(\s*(get_current[\w]*|require_auth[\w]*|auth[\w]*)\s*\)'
 )
 
 # Security(oauth2_scheme) or Security(some_auth_scheme, scopes=[...])

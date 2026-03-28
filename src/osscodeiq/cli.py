@@ -1,4 +1,4 @@
-"""CLI entry point for code-intelligence."""
+"""CLI entry point for OSSCodeIQ."""
 
 from __future__ import annotations
 
@@ -17,12 +17,16 @@ app = typer.Typer(
 )
 console = Console()
 
+_GRAPH_DIR_NAME = ".code-intelligence"
+_KUZU_DB_NAME = "graph.kuzu"
+_SQLITE_DB_NAME = "graph.db"
+
 
 def _get_version() -> str:
     """Get package version from metadata."""
     try:
         from importlib.metadata import version
-        return version("code-intelligence")
+        return version("osscodeiq")
     except Exception:
         return "0.1.0"
 
@@ -63,11 +67,11 @@ def analyze(
     cfg.analysis.incremental = incremental
     cfg.graph.backend = backend
     if backend in ("kuzu", "sqlite"):
-        graph_dir = path.resolve() / ".code-intelligence"
+        graph_dir = path.resolve() / _GRAPH_DIR_NAME
         if backend == "kuzu":
-            cfg.graph.path = str(graph_dir / "graph.kuzu")
+            cfg.graph.path = str(graph_dir / _KUZU_DB_NAME)
         elif backend == "sqlite":
-            cfg.graph.path = str(graph_dir / "graph.db")
+            cfg.graph.path = str(graph_dir / _SQLITE_DB_NAME)
 
     console.print("🚀 Starting analysis…")
     analyzer = Analyzer(cfg)
@@ -145,7 +149,7 @@ def graph(
     cache_path = path.resolve() / cfg.cache.directory / cfg.cache.db_name
 
     if not cache_path.exists():
-        console.print("❌ No analysis cache found. Run 'code-intelligence analyze' first.")
+        console.print("❌ No analysis cache found. Run 'osscodeiq analyze' first.")
         raise typer.Exit(1)
 
     console.print("💾 Loading analysis cache…")
@@ -229,7 +233,7 @@ def query(
     cache_path = path.resolve() / cfg.cache.directory / cfg.cache.db_name
 
     if not cache_path.exists():
-        console.print("❌ No analysis cache found. Run 'code-intelligence analyze' first.")
+        console.print("❌ No analysis cache found. Run 'osscodeiq analyze' first.")
         raise typer.Exit(1)
 
     console.print("💾 Loading analysis cache…")
@@ -302,7 +306,7 @@ def cache(
             console.print("⚠️  No cache found.")
     elif action == "stats":
         if not cache_path.exists():
-            console.print("⚠️  No cache found. Run 'code-intelligence analyze' first.")
+            console.print("⚠️  No cache found. Run 'osscodeiq analyze' first.")
             return
         console.print("📊 Loading cache statistics…")
         from osscodeiq.cache.store import CacheStore
@@ -362,11 +366,11 @@ def bundle(
     cfg.graph.backend = backend
 
     # Set default path for file-based backends
-    graph_dir = path.resolve() / ".code-intelligence"
+    graph_dir = path.resolve() / _GRAPH_DIR_NAME
     if backend == "kuzu":
-        cfg.graph.path = str(graph_dir / "graph.kuzu")
+        cfg.graph.path = str(graph_dir / _KUZU_DB_NAME)
     elif backend == "sqlite":
-        cfg.graph.path = str(graph_dir / "graph.db")
+        cfg.graph.path = str(graph_dir / _SQLITE_DB_NAME)
 
     # Run analysis
     from osscodeiq.analyzer import Analyzer
@@ -432,17 +436,17 @@ def _load_graph_backend(path: Path, backend: str, config: Path | None = None):
     """Load a graph backend from a previously analyzed project."""
     from osscodeiq.graph.backends import create_backend
 
-    graph_dir = path.resolve() / ".code-intelligence"
+    graph_dir = path.resolve() / _GRAPH_DIR_NAME
     if backend == "kuzu":
-        db_path = str(graph_dir / "graph.kuzu")
+        db_path = str(graph_dir / _KUZU_DB_NAME)
     elif backend == "sqlite":
-        db_path = str(graph_dir / "graph.db")
+        db_path = str(graph_dir / _SQLITE_DB_NAME)
     else:
         # NetworkX ��� load from cache
         cfg = _load_config(config)
         cache_path = path.resolve() / cfg.cache.directory / cfg.cache.db_name
         if not cache_path.exists():
-            console.print("No analysis cache found. Run 'code-intelligence analyze' first.")
+            console.print("No analysis cache found. Run 'osscodeiq analyze' first.")
             raise typer.Exit(1)
         from osscodeiq.cache.store import CacheStore
         cache = CacheStore(cache_path)
@@ -451,7 +455,7 @@ def _load_graph_backend(path: Path, backend: str, config: Path | None = None):
 
     from pathlib import Path as P
     if not P(db_path).exists():
-        console.print(f"No graph database found at {db_path}. Run 'code-intelligence analyze --backend {backend}' first.")
+        console.print(f"No graph database found at {db_path}. Run 'osscodeiq analyze --backend {backend}' first.")
         raise typer.Exit(1)
 
     from osscodeiq.graph.store import GraphStore
@@ -624,7 +628,7 @@ def _flow_fallback(store, node_id: str | None, hops: int) -> list[dict]:
     visited: set[str] = set()
     frontier = {node_id}
     results = []
-    for depth in range(1, hops + 1):
+    for _ in range(1, hops + 1):
         next_frontier: set[str] = set()
         for nid in frontier:
             for neighbor in store.neighbors(nid, direction="out"):
@@ -700,7 +704,7 @@ def serve(
     import uvicorn
     from osscodeiq.server.app import create_app
 
-    console.print(f"[bold]OSSCodeIQ Server[/bold]")
+    console.print("[bold]OSSCodeIQ Server[/bold]")
     console.print(f"  Codebase: {path.resolve()}")
     console.print(f"  Backend:  {backend}")
     console.print(f"  API docs: http://{host}:{port}/docs")

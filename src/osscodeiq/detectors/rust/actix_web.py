@@ -72,7 +72,6 @@ class ActixWebDetector:
             return result
 
         lines = text.split("\n")
-        module_node_id = f"rust_web:{ctx.file_path}:module"
 
         for i, line in enumerate(lines):
             lineno = i + 1

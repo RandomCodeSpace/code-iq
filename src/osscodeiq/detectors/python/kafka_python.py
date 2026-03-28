@@ -161,7 +161,6 @@ class KafkaPythonDetector:
 
         # Detect imports -> IMPORTS edges
         for i, line in enumerate(lines):
-            lineno = i + 1
             m = _IMPORT_RE.search(line)
             if m:
                 lib = m.group(1)

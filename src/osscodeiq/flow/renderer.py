@@ -11,7 +11,7 @@ from osscodeiq.flow.models import FlowDiagram, FlowEdge, FlowNode, FlowSubgraph
 
 
 def _sanitize_id(raw: str) -> str:
-    return re.sub(r"[^a-zA-Z0-9_]", "_", raw)
+    return re.sub(r"\W", "_", raw)
 
 
 def _escape_label(text: str) -> str:

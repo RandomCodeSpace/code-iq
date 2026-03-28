@@ -113,7 +113,6 @@ class FastifyRouteDetector:
 
         # Detect fastify.register(plugin)
         for match in self._REGISTER_PATTERN.finditer(text):
-            server_var = match.group(1)
             plugin_ref = match.group(2)
             line = text[: match.start()].count("\n") + 1
 

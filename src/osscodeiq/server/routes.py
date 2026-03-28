@@ -1,6 +1,8 @@
 """REST API routes for OSSCodeIQ server."""
 from __future__ import annotations
 
+from typing import Annotated
+
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
@@ -31,12 +33,15 @@ def create_router(service: CodeIQService) -> APIRouter:
     @router.get("/nodes")
     async def list_nodes(
         kind: str | None = None,
-        limit: int = Query(100, ge=1),
-        offset: int = Query(0, ge=0),
+        limit: Annotated[int, Query(ge=1)] = 100,
+        offset: Annotated[int, Query(ge=0)] = 0,
     ):
         return service.list_nodes(kind=kind, limit=limit, offset=offset)
 
-    @router.get("/nodes/{node_id:path}")
+    @router.get(
+        "/nodes/{node_id:path}",
+        responses={404: {"description": "Node not found"}},
+    )
     async def get_node(node_id: str):
         result = service.get_node(node_id)
         if result is None:
@@ -46,8 +51,8 @@ def create_router(service: CodeIQService) -> APIRouter:
     @router.get("/edges")
     async def list_edges(
         kind: str | None = None,
-        limit: int = Query(100, ge=1),
-        offset: int = Query(0, ge=0),
+        limit: Annotated[int, Query(ge=1)] = 100,
+        offset: Annotated[int, Query(ge=0)] = 0,
     ):
         return service.list_edges(kind=kind, limit=limit, offset=offset)
 
@@ -65,7 +70,7 @@ def create_router(service: CodeIQService) -> APIRouter:
     @router.get("/ego/{center:path}")
     async def get_ego(
         center: str,
-        radius: int = Query(2, ge=1),
+        radius: Annotated[int, Query(ge=1)] = 2,
         edge_kinds: str | None = None,
     ):
         kinds = edge_kinds.split(",") if edge_kinds else None
@@ -74,13 +79,16 @@ def create_router(service: CodeIQService) -> APIRouter:
     # ── Query endpoints ──────────────────────────────────────────────────
 
     @router.get("/query/cycles")
-    async def find_cycles(limit: int = Query(100, ge=1)):
+    async def find_cycles(limit: Annotated[int, Query(ge=1)] = 100):
         return service.find_cycles(limit=limit)
 
-    @router.get("/query/shortest-path")
+    @router.get(
+        "/query/shortest-path",
+        responses={404: {"description": "No path found between source and target"}},
+    )
     async def shortest_path(
-        source: str = Query(...),
-        target: str = Query(...),
+        source: Annotated[str, Query()],
+        target: Annotated[str, Query()],
     ):
         result = service.shortest_path(source, target)
         if result is None:
@@ -128,7 +136,10 @@ def create_router(service: CodeIQService) -> APIRouter:
 
     # ── Cypher ───────────────────────────────────────────────────────────
 
-    @router.post("/cypher")
+    @router.post(
+        "/cypher",
+        responses={400: {"description": "Invalid Cypher query or backend unavailable"}},
+    )
     async def cypher(body: CypherRequest):
         try:
             return service.query_cypher(body.query, body.params)
@@ -138,30 +149,30 @@ def create_router(service: CodeIQService) -> APIRouter:
     # ── Triage ───────────────────────────────────────────────────────────
 
     @router.get("/triage/component")
-    async def find_component(file_path: str = Query(...)):
+    async def find_component(file_path: Annotated[str, Query()]):
         return service.find_component_by_file(file_path)
 
     @router.get("/triage/impact/{node_id:path}")
-    async def trace_impact(node_id: str, depth: int = Query(3, ge=1)):
+    async def trace_impact(node_id: str, depth: Annotated[int, Query(ge=1)] = 3):
         return service.trace_impact(node_id, depth=depth)
 
     @router.get("/triage/endpoints")
-    async def find_related_endpoints(identifier: str = Query(...)):
+    async def find_related_endpoints(identifier: Annotated[str, Query()]):
         return service.find_related_endpoints(identifier)
 
     # ── Search ───────────────────────────────────────────────────────────
 
     @router.get("/search")
     async def search_graph(
-        q: str = Query(...),
-        limit: int = Query(20, ge=1),
+        q: Annotated[str, Query()],
+        limit: Annotated[int, Query(ge=1)] = 20,
     ):
         return service.search_graph(q, limit=limit)
 
     # ── File ─────────────────────────────────────────────────────────────
 
     @router.get("/file")
-    async def read_file(path: str = Query(...)):
+    async def read_file(path: Annotated[str, Query()]):
         try:
             content = service.read_file(path)
         except ValueError as exc:

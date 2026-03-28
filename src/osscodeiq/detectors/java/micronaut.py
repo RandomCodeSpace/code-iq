@@ -22,6 +22,9 @@ _CLIENT_RE = re.compile(r'@Client\s*\(\s*"([^"]*)"')
 _INJECT_RE = re.compile(r"@Inject\b")
 _SCHEDULED_RE = re.compile(r'@Scheduled\s*\(\s*fixedRate\s*=\s*"([^"]+)"')
 _EVENT_LISTENER_RE = re.compile(r"@EventListener\b")
+_INJECT = "@Inject"
+_EVENT_LISTENER = "@EventListener"
+
 _CLASS_RE = re.compile(r"(?:public\s+)?class\s+(\w+)")
 _JAVA_METHOD_RE = re.compile(
     r"(?:public|protected|private)?\s*(?:static\s+)?(?:[\w<>\[\],\s]+)\s+(\w+)\s*\("
@@ -51,9 +54,9 @@ class MicronautDetector:
                 "@Prototype",
                 "@Infrastructure",
                 "@Client",
-                "@Inject",
+                _INJECT,
                 "@Scheduled",
-                "@EventListener",
+                _EVENT_LISTENER,
                 "io.micronaut",
             )
         ):
@@ -198,11 +201,11 @@ class MicronautDetector:
                     GraphNode(
                         id=node_id,
                         kind=NodeKind.MIDDLEWARE,
-                        label="@Inject",
+                        label=_INJECT,
                         fqn=f"{class_name}.inject" if class_name else "inject",
                         module=ctx.module_name,
                         location=SourceLocation(file_path=ctx.file_path, line_start=lineno),
-                        annotations=["@Inject"],
+                        annotations=[_INJECT],
                         properties={"framework": "micronaut"},
                     )
                 )
@@ -233,11 +236,11 @@ class MicronautDetector:
                     GraphNode(
                         id=node_id,
                         kind=NodeKind.EVENT,
-                        label="@EventListener",
+                        label=_EVENT_LISTENER,
                         fqn=f"{class_name}.eventListener" if class_name else "eventListener",
                         module=ctx.module_name,
                         location=SourceLocation(file_path=ctx.file_path, line_start=lineno),
-                        annotations=["@EventListener"],
+                        annotations=[_EVENT_LISTENER],
                         properties={"framework": "micronaut"},
                     )
                 )

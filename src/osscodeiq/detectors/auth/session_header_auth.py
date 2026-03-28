@@ -29,7 +29,7 @@ _SESSION_PATTERNS: list[_PatternDef] = [
 
 # -- Header patterns --
 _HEADER_PATTERNS: list[_PatternDef] = [
-    _PatternDef(re.compile(r"""['"](X-API-Key|x-api-key)['"]""", re.IGNORECASE), "header", NodeKind.GUARD),
+    _PatternDef(re.compile(r"""['"]X-API-Key['"]""", re.IGNORECASE), "header", NodeKind.GUARD),
     _PatternDef(
         re.compile(r"""(?:req|request|ctx)\.headers?\s*\[\s*['"]authorization['"]\s*\]""", re.IGNORECASE),
         "header",
@@ -49,8 +49,8 @@ _API_KEY_PATTERNS: list[_PatternDef] = [
         "api_key",
         NodeKind.GUARD,
     ),
-    _PatternDef(re.compile(r"\bapi[_-]?key\s*(?:=|:)\s*", re.IGNORECASE), "api_key", NodeKind.GUARD),
-    _PatternDef(re.compile(r"\bvalidate[_]?api[_]?key\b", re.IGNORECASE), "api_key", NodeKind.GUARD),
+    _PatternDef(re.compile(r"\bapi[_-]?key\s*[=:]\s*", re.IGNORECASE), "api_key", NodeKind.GUARD),
+    _PatternDef(re.compile(r"\bvalidate_?api_?key\b", re.IGNORECASE), "api_key", NodeKind.GUARD),
 ]
 
 # -- CSRF patterns --

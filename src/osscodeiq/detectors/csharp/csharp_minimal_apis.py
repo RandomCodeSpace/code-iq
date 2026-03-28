@@ -129,8 +129,6 @@ class CSharpMinimalApisDetector:
             lifetime = m.group(1)
             interface_name = m.group(2)
             impl_name = m.group(3)  # May be None for single-type registrations
-            line_num = find_line_number(text, m.start())
-
             if impl_name:
                 result.edges.append(GraphEdge(
                     source=f"dotnet:*:{impl_name}",

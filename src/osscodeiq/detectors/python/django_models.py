@@ -16,7 +16,7 @@ class DjangoModelDetector:
     supported_languages: tuple[str, ...] = ("python",)
 
     _DJANGO_MODEL_RE = re.compile(
-        r"^class\s+(\w+)\s*\(\s*(?:models\.Model|[\w.]*Model)\s*\)", re.MULTILINE
+        r"^class\s+(\w+)\s*\(\s*[\w.]*Model\s*\)", re.MULTILINE
     )
     _FK_RE = re.compile(
         r"(\w+)\s*=\s*models\.(?:ForeignKey|OneToOneField)\s*\(\s*[\"']?(\w+)",
@@ -29,7 +29,7 @@ class DjangoModelDetector:
     _META_TABLE_RE = re.compile(r"db_table\s*=\s*[\"'](\w+)[\"']")
     _META_ORDERING_RE = re.compile(r"ordering\s*=\s*(\[.*?\])")
     _MANAGER_RE = re.compile(
-        r"^class\s+(\w+)\s*\(\s*(?:models\.Manager|[\w.]*Manager)\s*\)", re.MULTILINE
+        r"^class\s+(\w+)\s*\(\s*[\w.]*Manager\s*\)", re.MULTILINE
     )
     _MANAGER_ASSIGNMENT_RE = re.compile(r"(\w+)\s*=\s*(\w+)\s*\(\s*\)", re.MULTILINE)
 

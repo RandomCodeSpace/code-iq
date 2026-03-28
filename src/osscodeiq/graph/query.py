@@ -159,15 +159,7 @@ class GraphQuery:
             focused_ids: set[str] = set()
             for spec in self._focus_specs:
                 ego_store = store.ego(spec.node_id, spec.hops)
-                if spec.direction != "both":
-                    # For directional focus, do a BFS in the specified direction
-                    focused_ids.update(
-                        n.id for n in ego_store.all_nodes()
-                    )
-                else:
-                    focused_ids.update(
-                        n.id for n in ego_store.all_nodes()
-                    )
+                focused_ids.update(n.id for n in ego_store.all_nodes())
             store = store.subgraph(focused_ids)
 
         # 2. Build composite node filter

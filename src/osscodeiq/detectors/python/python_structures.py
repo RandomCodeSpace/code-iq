@@ -199,7 +199,6 @@ class PythonStructuresDetector:
             from_module = m.group(1)
             import_names = m.group(2)
             if from_module:
-                # from X import Y, Z
                 result.edges.append(GraphEdge(
                     source=file_node_id,
                     target=from_module,
@@ -207,7 +206,6 @@ class PythonStructuresDetector:
                     label=f"{fp} imports {from_module}",
                 ))
             else:
-                # import X, Y
                 for name in import_names.split(","):
                     name = name.strip()
                     if name:

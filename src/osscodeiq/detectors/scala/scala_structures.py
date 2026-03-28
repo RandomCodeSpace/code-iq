@@ -16,7 +16,9 @@ from osscodeiq.models.graph import (
 
 _SCALA_IMPORT_RE = re.compile(r'^\s*import\s+([\w.]+)', re.MULTILINE)
 _SCALA_CLASS_RE = re.compile(
-    r'^\s*(?:case\s+)?class\s+(\w+)(?:\s+extends\s+(\w+))?(?:\s+with\s+([\w\s,]+))?',
+    r'^\s*(?:case\s+)?class\s+(\w+)'
+    r'(?:\s+extends\s+(\w+))?'
+    r'(?:\s+with\s+([\w\s,]+))?',
     re.MULTILINE,
 )
 _SCALA_TRAIT_RE = re.compile(r'^\s*trait\s+(\w+)', re.MULTILINE)

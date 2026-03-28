@@ -23,6 +23,8 @@ _CDI_SCOPE_RE = re.compile(
 _SCHEDULED_RE = re.compile(r'@Scheduled\s*\(\s*(?:every|cron)\s*=\s*"([^"]+)"')
 _TRANSACTIONAL_RE = re.compile(r"@Transactional\b")
 _STARTUP_RE = re.compile(r"@Startup\b")
+_TRANSACTIONAL = "@Transactional"
+
 _CLASS_RE = re.compile(r"(?:public\s+)?class\s+(\w+)")
 
 
@@ -46,7 +48,7 @@ class QuarkusDetector:
                 "@ApplicationScoped",
                 "@RequestScoped",
                 "@Scheduled",
-                "@Transactional",
+                _TRANSACTIONAL,
                 "@Startup",
                 "io.quarkus",
             )
@@ -145,11 +147,11 @@ class QuarkusDetector:
                     GraphNode(
                         id=node_id,
                         kind=NodeKind.MIDDLEWARE,
-                        label="@Transactional",
+                        label=_TRANSACTIONAL,
                         fqn=f"{class_name}.transactional" if class_name else "transactional",
                         module=ctx.module_name,
                         location=SourceLocation(file_path=ctx.file_path, line_start=lineno),
-                        annotations=["@Transactional"],
+                        annotations=[_TRANSACTIONAL],
                         properties={"framework": "quarkus"},
                     )
                 )

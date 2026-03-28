@@ -113,7 +113,6 @@ class DjangoAuthDetector:
             for base in bases:
                 if base in _AUTH_MIXINS:
                     line = _line_number(text, m.start())
-                    pattern_name = _AUTH_MIXINS[base]
                     result.nodes.append(GraphNode(
                         id=f"auth:{ctx.file_path}:{base}:{line}",
                         kind=NodeKind.GUARD,

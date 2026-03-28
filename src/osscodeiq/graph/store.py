@@ -92,6 +92,7 @@ class GraphStore:
         if not self._backend.has_node(center):
             return GraphStore(backend=type(self._backend)() if callable(type(self._backend)) else None)
 
+        radius = min(radius, 10)
         visited: set[str] = {center}
         frontier: set[str] = {center}
 

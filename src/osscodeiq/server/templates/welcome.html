@@ -40,7 +40,7 @@
 <script>
 fetch("/api/stats").then(function(r){return r.json()}).then(function(d){
   var el=document.getElementById("stats");
-  while(el.firstChild) el.removeChild(el.firstChild);
+  while(el.firstChild) el.firstChild.remove();
   var items=[{v:d.total_nodes||0,l:"Nodes"},{v:d.total_edges||0,l:"Edges"},{v:d.backend||"unknown",l:"Backend"}];
   items.forEach(function(s){
     var div=document.createElement("div");div.className="stat";
