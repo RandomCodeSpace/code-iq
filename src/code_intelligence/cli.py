@@ -668,7 +668,7 @@ def flow(
     if format == "html":
         content = engine.render_interactive(project_name=path.resolve().name)
         out_path = output or Path("flow.html")
-        out_path.write_text(content)
+        out_path.write_text(content, encoding="utf-8")
         console.print(f"Interactive flow diagram saved to [bold]{out_path}[/bold]")
         size_kb = out_path.stat().st_size / 1024
         console.print(f"   Size: {size_kb:.1f} KB — open in any browser, no server needed")
