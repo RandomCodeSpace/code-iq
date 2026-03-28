@@ -68,7 +68,7 @@ def test_render_html():
     views = {"overview": _sample_diagram()}
     html = render_html(views, {"total_nodes": 100, "total_edges": 200})
     assert "<!DOCTYPE html>" in html
-    assert "Code Intelligence" in html
+    assert "Code IQ" in html
     assert "VIEWS_MERMAID" in html or "graph LR" in html
     assert "100" in html
 
