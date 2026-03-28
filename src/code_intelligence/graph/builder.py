@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Protocol, runtime_checkable
 
+from code_intelligence.graph.backend import GraphBackend
 from code_intelligence.graph.store import GraphStore
 from code_intelligence.models.graph import GraphEdge, GraphNode, EdgeKind, NodeKind
 
@@ -195,8 +196,8 @@ class ModuleContainmentLinker:
 class GraphBuilder:
     """Aggregates detector results and runs cross-file linkers to build a graph."""
 
-    def __init__(self) -> None:
-        self._store = GraphStore()
+    def __init__(self, backend: GraphBackend | None = None) -> None:
+        self._store = GraphStore(backend=backend)
         self._linkers: list[Linker] = [
             TopicLinker(),
             EntityLinker(),

@@ -71,6 +71,13 @@ class DomainMapping(BaseModel):
     modules: list[str]
 
 
+class GraphConfig(BaseModel):
+    """Graph storage backend configuration."""
+
+    backend: str = "networkx"  # networkx | kuzu | sqlite
+    path: str | None = None    # For file-based backends (kuzu, sqlite)
+
+
 class Config(BaseModel):
     """Root configuration for code-intelligence."""
 
@@ -78,6 +85,7 @@ class Config(BaseModel):
     cache: CacheConfig = Field(default_factory=CacheConfig)
     analysis: AnalysisConfig = Field(default_factory=AnalysisConfig)
     output: OutputConfig = Field(default_factory=OutputConfig)
+    graph: GraphConfig = Field(default_factory=GraphConfig)
     domains: list[DomainMapping] = Field(default_factory=list)
 
     @classmethod

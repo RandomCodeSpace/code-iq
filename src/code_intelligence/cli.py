@@ -27,6 +27,7 @@ def analyze(
     path: Annotated[Path, typer.Argument(help="Path to the codebase to analyze")] = Path("."),
     incremental: Annotated[bool, typer.Option("--incremental/--full", help="Use incremental analysis")] = True,
     parallelism: Annotated[int, typer.Option("--parallelism", "-j", help="Number of parallel workers")] = 8,
+    backend: Annotated[str, typer.Option("--backend", "-b", help="Graph backend (networkx, kuzu, sqlite)")] = "networkx",
     config: Annotated[Optional[Path], typer.Option("--config", "-c", help="Path to config file")] = None,
 ) -> None:
     """Analyze a codebase and build the code intelligence graph."""
@@ -35,6 +36,13 @@ def analyze(
     cfg = _load_config(config)
     cfg.analysis.parallelism = parallelism
     cfg.analysis.incremental = incremental
+    cfg.graph.backend = backend
+    if backend in ("kuzu", "sqlite"):
+        graph_dir = path.resolve() / ".code-intelligence"
+        if backend == "kuzu":
+            cfg.graph.path = str(graph_dir / "graph.kuzu")
+        elif backend == "sqlite":
+            cfg.graph.path = str(graph_dir / "graph.db")
 
     console.print("🚀 Starting analysis…")
     analyzer = Analyzer(cfg)
@@ -310,6 +318,81 @@ def plugins(
             console.print(f"❌ Detector '{name}' not found.")
     else:
         console.print("⚠️  Use 'list' or 'info <name>'.")
+
+
+@app.command()
+def bundle(
+    path: Annotated[Path, typer.Argument(help="Path to analyzed codebase")] = Path("."),
+    tag: Annotated[str, typer.Option("--tag", "-t", help="Version tag")] = "latest",
+    backend: Annotated[str, typer.Option("--backend", "-b", help="Graph backend")] = "kuzu",
+    output: Annotated[Path | None, typer.Option("--output", "-o", help="Output zip path")] = None,
+    config: Annotated[Optional[Path], typer.Option("--config", "-c")] = None,
+) -> None:
+    """Analyze and package graph into a distributable bundle."""
+    import json
+    import zipfile
+    from datetime import datetime, timezone
+
+    cfg = _load_config(config)
+    cfg.graph.backend = backend
+
+    # Set default path for file-based backends
+    graph_dir = path.resolve() / ".code-intelligence"
+    if backend == "kuzu":
+        cfg.graph.path = str(graph_dir / "graph.kuzu")
+    elif backend == "sqlite":
+        cfg.graph.path = str(graph_dir / "graph.db")
+
+    # Run analysis
+    from code_intelligence.analyzer import Analyzer
+    analyzer = Analyzer(cfg)
+    result = analyzer.run(path.resolve(), incremental=False)
+
+    # Determine output path
+    project_name = path.resolve().name
+    if output is None:
+        output = Path(f"{project_name}-{tag}-codegraph.zip")
+
+    # Create bundle
+    manifest = {
+        "tag": tag,
+        "backend": backend,
+        "project": project_name,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "node_count": result.graph.node_count,
+        "edge_count": result.graph.edge_count,
+        "files_analyzed": result.total_files,
+        "code_intelligence_version": "0.1.0",
+    }
+
+    with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as zf:
+        # Write manifest
+        zf.writestr("manifest.json", json.dumps(manifest, indent=2))
+
+        # Bundle the graph database files
+        if backend == "kuzu" and cfg.graph.path:
+            graph_path = Path(cfg.graph.path)
+            if graph_path.exists():
+                for f in graph_path.rglob("*"):
+                    if f.is_file():
+                        zf.write(f, f"graph/{f.relative_to(graph_path)}")
+        elif backend == "sqlite" and cfg.graph.path:
+            graph_path = Path(cfg.graph.path)
+            if graph_path.exists():
+                zf.write(graph_path, "graph/graph.db")
+        else:
+            # NetworkX -- serialize to JSON
+            model = result.graph.to_model()
+            from code_intelligence.output.serializers import JsonSerializer
+            zf.writestr("graph/graph.json", JsonSerializer().serialize(model))
+
+    result.graph.close()
+
+    console.print(f"Bundle created: [bold]{output}[/bold]")
+    console.print(f"   Tag: {tag}")
+    console.print(f"   Backend: {backend}")
+    console.print(f"   Nodes: {manifest['node_count']}, Edges: {manifest['edge_count']}")
+    console.print(f"   Size: {output.stat().st_size / 1024 / 1024:.1f} MB")
 
 
 if __name__ == "__main__":

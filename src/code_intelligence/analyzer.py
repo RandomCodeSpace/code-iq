@@ -275,7 +275,9 @@ class Analyzer:
         files_to_analyze: list[DiscoveredFile] = all_files
         files_cached = 0
 
-        builder = GraphBuilder()
+        from code_intelligence.graph.backends import create_backend
+        backend = create_backend(self._config.graph.backend, path=self._config.graph.path)
+        builder = GraphBuilder(backend=backend)
 
         if cache_cfg.enabled:
             cache_path = repo_path / cache_cfg.directory / cache_cfg.db_name
