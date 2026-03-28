@@ -204,6 +204,7 @@ class GraphBuilder:
 
     def __init__(self, backend: GraphBackend | None = None) -> None:
         self._store = GraphStore(backend=backend)
+        self._pending_nodes: list[GraphNode] = []
         self._pending_edges: list[GraphEdge] = []
         self._linkers: list[Linker] = [
             TopicLinker(),
@@ -212,23 +213,39 @@ class GraphBuilder:
         ]
 
     def add_nodes(self, nodes: list[GraphNode]) -> None:
-        """Add a batch of nodes to the graph store."""
-        for node in nodes:
-            self._store.add_node(node)
+        """Buffer nodes for deferred insertion."""
+        self._pending_nodes.extend(nodes)
 
     def add_edges(self, edges: list[GraphEdge]) -> None:
         """Buffer edges for deferred insertion."""
         self._pending_edges.extend(edges)
 
-    def flush_edges(self) -> None:
-        """Insert all buffered edges into the store.
+    def flush(self) -> None:
+        """Insert all buffered nodes then edges into the store.
 
-        Call this after all nodes have been added so that backends
-        which validate node existence won't reject valid cross-file edges.
+        Nodes first, then edges — ensures backends that validate node
+        existence won't reject valid cross-file edges. Uses bulk insert
+        when the backend supports it (e.g. KuzuDB CSV COPY FROM).
         """
-        for edge in self._pending_edges:
-            self._store.add_edge(edge)
-        self._pending_edges.clear()
+        backend = self._store._backend
+
+        # Flush nodes
+        if self._pending_nodes:
+            if hasattr(backend, "bulk_add_nodes"):
+                backend.bulk_add_nodes(self._pending_nodes)
+            else:
+                for node in self._pending_nodes:
+                    self._store.add_node(node)
+            self._pending_nodes.clear()
+
+        # Flush edges
+        if self._pending_edges:
+            if hasattr(backend, "bulk_add_edges"):
+                backend.bulk_add_edges(self._pending_edges)
+            else:
+                for edge in self._pending_edges:
+                    self._store.add_edge(edge)
+            self._pending_edges.clear()
 
     def merge_detector_result(self, result: object) -> None:
         """Merge a DetectorResult into the graph.
@@ -242,9 +259,9 @@ class GraphBuilder:
         self.add_edges(edges)  # buffered, not inserted yet
 
     def run_linkers(self) -> None:
-        """Flush pending edges, then run all registered linkers."""
-        # Flush detector edges first so linkers see the full graph
-        self.flush_edges()
+        """Flush pending nodes and edges, then run all registered linkers."""
+        # Flush all buffered detector data so linkers see the full graph
+        self.flush()
 
         for linker in self._linkers:
             try:
@@ -268,11 +285,11 @@ class GraphBuilder:
                 )
 
         # Flush linker edges (linker-created nodes are already added above)
-        self.flush_edges()
+        self.flush()
 
     def build(self) -> GraphStore:
         """Return the assembled graph store."""
         # Safety: flush any remaining edges
         if self._pending_edges:
-            self.flush_edges()
+            self.flush()
         return self._store

@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import csv
 import json
 import logging
+import os
+import tempfile
 from typing import Any
 
 import kuzu
@@ -200,6 +203,80 @@ class KuzuBackend:
             "CREATE (a)-[:CODE_EDGE {kind: $kind, label: $label, properties: $properties}]->(b)",
             params,
         )
+
+    def bulk_add_nodes(self, nodes: list[GraphNode]) -> None:
+        """Bulk-insert nodes via CSV COPY FROM (~100x faster than per-row)."""
+        if not nodes:
+            return
+        seen: set[str] = set()
+        unique_nodes: list[GraphNode] = []
+        for n in nodes:
+            if n.id not in seen:
+                seen.add(n.id)
+                unique_nodes.append(n)
+
+        csv_path = ""
+        try:
+            fd = tempfile.NamedTemporaryFile(
+                mode="w", suffix=".csv", delete=False, newline=""
+            )
+            csv_path = fd.name
+            writer = csv.writer(fd)
+            for node in unique_nodes:
+                p = _node_to_params(node)
+                writer.writerow([
+                    p["id"], p["kind"], p["label"], p["fqn"], p["module"],
+                    p["file_path"], p["line_start"], p["line_end"],
+                    p["annotations"], p["properties"],
+                ])
+            fd.close()
+            self._conn.execute(
+                f'COPY CodeNode FROM "{csv_path}" (HEADER=false)'
+            )
+        except Exception:
+            logger.exception("Bulk node insert failed, falling back to per-row")
+            for node in unique_nodes:
+                self.add_node(node)
+        finally:
+            if csv_path:
+                try:
+                    os.unlink(csv_path)
+                except OSError:
+                    pass
+
+    def bulk_add_edges(self, edges: list[GraphEdge]) -> None:
+        """Bulk-insert edges via CSV COPY FROM (~100x faster than per-row)."""
+        if not edges:
+            return
+        csv_path = ""
+        try:
+            fd = tempfile.NamedTemporaryFile(
+                mode="w", suffix=".csv", delete=False, newline=""
+            )
+            csv_path = fd.name
+            writer = csv.writer(fd)
+            for edge in edges:
+                writer.writerow([
+                    edge.source,
+                    edge.target,
+                    edge.kind.value,
+                    edge.label or "",
+                    json.dumps(edge.properties),
+                ])
+            fd.close()
+            self._conn.execute(
+                f'COPY CODE_EDGE FROM "{csv_path}" (HEADER=false)'
+            )
+        except Exception:
+            logger.exception("Bulk edge insert failed, falling back to per-row")
+            for edge in edges:
+                self.add_edge(edge)
+        finally:
+            if csv_path:
+                try:
+                    os.unlink(csv_path)
+                except OSError:
+                    pass
 
     def clear(self) -> None:
         """Remove all data by dropping and recreating both tables."""
