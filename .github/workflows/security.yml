@@ -31,8 +31,8 @@ jobs:
           pip install -e .
           pip install pip-audit safety
 
-      - name: pip-audit (PyPI advisory DB)
-        run: pip-audit --strict --desc
+      - name: pip-audit (scan dependencies only, skip our own package)
+        run: pip-audit --strict --desc --skip-editable
 
       - name: Safety check (SafetyCLI DB)
         run: safety check --output json || true
@@ -88,11 +88,11 @@ jobs:
           pip install check-wheel-contents
           check-wheel-contents dist/*.whl
 
-      - name: Scan wheel with pip-audit
+      - name: Scan wheel dependencies with pip-audit
         run: |
           pip install pip-audit
           pip install dist/*.whl
-          pip-audit --strict --desc
+          pip-audit --strict --desc --skip-editable
 
       - name: Check for leaked secrets
         uses: trufflesecurity/trufflehog@main
