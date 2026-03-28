@@ -1,0 +1,13 @@
+# Auto-generated for Snyk scanning — source of truth is pyproject.toml
+typer>=0.9
+rich>=13.0
+tree-sitter>=0.23
+tree-sitter-java>=0.23
+tree-sitter-python>=0.23
+tree-sitter-typescript>=0.23
+tree-sitter-javascript>=0.23
+networkx>=3.2
+lxml>=5.0
+pyyaml>=6.0
+sqlparse>=0.5
+pydantic>=2.0
