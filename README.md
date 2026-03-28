@@ -20,11 +20,11 @@
   <a href="https://github.com/RandomCodeSpace/code-iq/security/dependabot"><img src="https://img.shields.io/badge/dependabot-enabled-brightgreen?style=flat-square&logo=dependabot&logoColor=white" alt="Dependabot enabled"></a>
   <a href="https://github.com/RandomCodeSpace/code-iq/security/code-scanning"><img src="https://img.shields.io/badge/CodeQL-enabled-brightgreen?style=flat-square&logo=github&logoColor=white" alt="CodeQL"></a>
   <!-- DYNAMIC:vulnerabilities --><a href="https://github.com/RandomCodeSpace/code-iq/security/dependabot"><img src="https://img.shields.io/badge/vulnerabilities-0-brightgreen?style=flat-square&logo=hackthebox&logoColor=white" alt="0 Vulnerabilities"></a><!-- /DYNAMIC:vulnerabilities -->
-  <!-- DYNAMIC:detectors --><a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/detectors-75-brightgreen?style=flat-square&logo=codefactor&logoColor=white" alt="75 Detectors"></a><!-- /DYNAMIC:detectors -->
+  <!-- DYNAMIC:detectors --><a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/detectors-76-brightgreen?style=flat-square&logo=codefactor&logoColor=white" alt="76 Detectors"></a><!-- /DYNAMIC:detectors -->
   <!-- DYNAMIC:languages --><a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/languages-35-blue?style=flat-square&logo=stackblitz&logoColor=white" alt="35 Languages"></a><!-- /DYNAMIC:languages -->
-  <!-- DYNAMIC:tests --><a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/tests-565%20passed-brightgreen?style=flat-square&logo=pytest&logoColor=white" alt="565 passed Tests"></a><!-- /DYNAMIC:tests -->
-  <!-- DYNAMIC:files --><a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/files-226-informational?style=flat-square&logo=files&logoColor=white" alt="226 Files"></a><!-- /DYNAMIC:files -->
-  <!-- DYNAMIC:loc --><a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/LOC-25%2C736-informational?style=flat-square&logo=codacy&logoColor=white" alt="25,736 Loc"></a><!-- /DYNAMIC:loc -->
+  <!-- DYNAMIC:tests --><a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/tests-639%20passed-brightgreen?style=flat-square&logo=pytest&logoColor=white" alt="639 passed Tests"></a><!-- /DYNAMIC:tests -->
+  <!-- DYNAMIC:files --><a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/files-238-informational?style=flat-square&logo=files&logoColor=white" alt="238 Files"></a><!-- /DYNAMIC:files -->
+  <!-- DYNAMIC:loc --><a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/LOC-27%2C365-informational?style=flat-square&logo=codacy&logoColor=white" alt="27,365 Loc"></a><!-- /DYNAMIC:loc -->
 </p>
 
 ---

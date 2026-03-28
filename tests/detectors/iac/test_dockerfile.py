@@ -70,3 +70,21 @@ LABEL maintainer=team@example.com
         ctx = _ctx("")
         result = self.detector.detect(ctx)
         assert isinstance(result, DetectorResult)
+
+    def test_multi_stage_build(self):
+        ctx = _ctx("FROM golang:1.21 AS builder\nRUN go build\nFROM alpine:3.19\nCOPY --from=builder /app /app")
+        r = self.detector.detect(ctx)
+        infra = [n for n in r.nodes if n.kind == NodeKind.INFRA_RESOURCE]
+        assert len(infra) == 2
+        # First stage should have build_stage property
+        builder = [n for n in infra if "builder" in str(n.properties)]
+        assert len(builder) >= 1
+        # Should have DEPENDS_ON edge for COPY --from
+        deps = [e for e in r.edges if e.kind == EdgeKind.DEPENDS_ON]
+        assert len(deps) >= 1
+
+    def test_arg_detection(self):
+        ctx = _ctx("ARG VERSION=1.0\nFROM myimage:${VERSION}")
+        r = self.detector.detect(ctx)
+        args = [n for n in r.nodes if n.kind == NodeKind.CONFIG_DEFINITION and "arg" in n.id]
+        assert len(args) >= 1

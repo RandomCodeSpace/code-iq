@@ -386,6 +386,14 @@ def bundle(
             from code_intelligence.output.serializers import JsonSerializer
             zf.writestr("graph/graph.json", JsonSerializer().serialize(model))
 
+        # Include interactive flow HTML
+        try:
+            from code_intelligence.flow.engine import FlowEngine
+            flow_html = FlowEngine(result.graph).render_interactive()
+            zf.writestr("flow.html", flow_html)
+        except Exception:
+            pass  # Flow generation is optional in bundles
+
     result.graph.close()
 
     console.print(f"Bundle created: [bold]{output}[/bold]")
@@ -615,6 +623,40 @@ def _unprotected_fallback(store) -> list[dict]:
         {"id": e.id, "label": e.label, "properties": str(e.properties)}
         for e in endpoints if e.id not in protected_ids
     ]
+
+
+@app.command()
+def flow(
+    path: Annotated[Path, typer.Argument(help="Path to analyzed codebase")] = Path("."),
+    view: Annotated[str, typer.Option("--view", "-v", help="View: overview, ci, deploy, runtime, auth")] = "overview",
+    format: Annotated[str, typer.Option("--format", "-f", help="Format: mermaid, json, html")] = "mermaid",
+    backend: Annotated[str, typer.Option("--backend", "-b", help="Graph backend")] = "networkx",
+    output: Annotated[Optional[Path], typer.Option("--output", "-o", help="Output file path")] = None,
+    config: Annotated[Optional[Path], typer.Option("--config", "-c")] = None,
+) -> None:
+    """Generate architecture flow diagrams."""
+    store = _load_graph_backend(path, backend, config)
+
+    from code_intelligence.flow.engine import FlowEngine
+    engine = FlowEngine(store)
+
+    if format == "html":
+        content = engine.render_interactive()
+        out_path = output or Path("flow.html")
+        out_path.write_text(content)
+        console.print(f"Interactive flow diagram saved to [bold]{out_path}[/bold]")
+        size_kb = out_path.stat().st_size / 1024
+        console.print(f"   Size: {size_kb:.1f} KB — open in any browser, no server needed")
+    else:
+        diagram = engine.generate(view)
+        content = engine.render(diagram, format)
+        if output:
+            output.write_text(content)
+            console.print(f"Flow diagram ({view}) saved to [bold]{output}[/bold]")
+        else:
+            console.print(content)
+
+    store.close()
 
 
 if __name__ == "__main__":
