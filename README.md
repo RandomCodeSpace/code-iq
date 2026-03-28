@@ -20,37 +20,45 @@
   <a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/github/stars/RandomCodeSpace/code-iq?style=flat-square&logo=github&label=Stars" alt="Stars"></a>
   <a href="https://github.com/RandomCodeSpace/code-iq/issues"><img src="https://img.shields.io/github/issues/RandomCodeSpace/code-iq?style=flat-square&logo=github&label=Issues" alt="Issues"></a>
   <a href="https://github.com/RandomCodeSpace/code-iq/commits/main"><img src="https://img.shields.io/github/last-commit/RandomCodeSpace/code-iq?style=flat-square&logo=github&label=Last%20Commit" alt="Last Commit"></a>
-  <a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/detectors-97-brightgreen?style=flat-square&logo=codefactor&logoColor=white" alt="97 Detectors"></a>
+  <a href="https://pypi.org/project/osscodeiq/"><img src="https://img.shields.io/pypi/v/osscodeiq?style=flat-square&logo=pypi&logoColor=white&label=PyPI" alt="PyPI"></a>
+  <a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/detectors-115-brightgreen?style=flat-square&logo=codefactor&logoColor=white" alt="115 Detectors"></a>
   <a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/languages-35-blue?style=flat-square&logo=stackblitz&logoColor=white" alt="35 Languages"></a>
-  <a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/tests-1662-brightgreen?style=flat-square&logo=pytest&logoColor=white" alt="1662 Tests"></a>
+  <a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/tests-2146-brightgreen?style=flat-square&logo=pytest&logoColor=white" alt="2146 Tests"></a>
 </p>
 
 ---
 
-**OSSCodeIQ** scans codebases to build a deterministic knowledge graph of code relationships — classes, methods, endpoints, entities, dependencies, infrastructure resources, auth patterns, and more. 97 detectors across 35 languages, 3 storage backends (NetworkX, SQLite, KuzuDB), interactive flow diagrams, and zero AI dependency.
+**OSSCodeIQ** scans codebases to build a deterministic knowledge graph of code relationships — classes, methods, endpoints, entities, dependencies, infrastructure resources, auth patterns, and more. 115 detectors across 35 languages, 3 storage backends (NetworkX, SQLite, KuzuDB), interactive web UI, REST API, MCP server, and zero AI dependency.
 
 ## Features
 
-- **97 detectors** across 35 languages — Java, Python, TypeScript, Go, C#, Rust, Kotlin, and more
+- **115 detectors** across 35 languages — Java, Python, TypeScript, Go, C#, Rust, Kotlin, and more
 - **Framework detection** — Spring Boot, Django, Flask, FastAPI, Express, NestJS, Gin, Echo, Actix-web, Axum, Quarkus, Micronaut, Prisma, Sequelize, Mongoose, Pydantic, Entity Framework Core, and 60+ more
 - **Auth/security detection** — Spring Security, Django Auth, FastAPI Auth, NestJS Guards, Passport/JWT, LDAP, Azure AD, mTLS, CSRF, session/cookie auth
 - **Frontend detection** — React, Vue, Angular, Svelte components, hooks, frontend routes (React Router, Vue Router, Next.js, Remix)
 - **Infrastructure** — Terraform, Kubernetes, Docker Compose, Helm Charts, CloudFormation, Bicep, GitLab CI, GitHub Actions
 - **Layer classification** — Every node tagged as `frontend`, `backend`, `infra`, `shared`, or `unknown`
-- **Flow diagrams** — Generate interactive Mermaid architecture diagrams with drill-down (CI, Deploy, Runtime, Auth views)
+- **Web Explorer UI** — NiceGUI-powered progressive drill-down card interface with light/dark/system themes, animations, and search
+- **MCP Tool Console** — Interactive terminal in the web UI for executing MCP graph queries
+- **Flow diagrams** — Interactive Cytoscape.js architecture diagrams with drill-down (CI, Deploy, Runtime, Auth views)
+- **REST API + MCP server** — 20+ REST endpoints and 20 MCP tools on a single port
 - **3 storage backends** — NetworkX (in-memory), SQLite (file-based), KuzuDB (Cypher queries)
-- **Bundle & distribute** — Package the graph DB + interactive HTML into a zip for sharing
+- **Bundle & distribute** — Package graph DB + source code + interactive HTML into a zip for Nexus/artifact publishing
 - **100% deterministic** — Same input, same output, every time, on every backend
 - **Plugin system** — Auto-discovered detectors + setuptools entry points for external plugins
 
 ## Quick Start
 
 ```bash
-# Install
-pip install -e .
+# Install from PyPI
+pip install osscodeiq
 
 # Analyze a codebase
 osscodeiq analyze /path/to/repo
+
+# Start the web UI + REST API + MCP server
+osscodeiq serve /path/to/repo
+# Open http://localhost:8000 — Explorer UI with drill-down cards, flow diagrams, MCP console
 
 # Generate architecture flow diagram
 osscodeiq flow /path/to/repo --format html --output flow.html
@@ -64,8 +72,8 @@ osscodeiq find unprotected /path/to/repo
 osscodeiq analyze /path/to/repo --backend kuzu
 osscodeiq cypher "MATCH (e:CodeNode {kind: 'endpoint'})-[]->(s:CodeNode) RETURN e.label, s.label LIMIT 20" /path/to/repo --backend kuzu
 
-# Bundle for distribution
-osscodeiq bundle /path/to/repo --tag v2.1.0 --backend kuzu
+# Bundle for distribution (graph DB + source code + visualizations)
+osscodeiq bundle /path/to/repo --tag v2.1.0 --backend sqlite
 ```
 
 ## Supported Languages & Frameworks
@@ -114,7 +122,7 @@ osscodeiq analyze /path/to/repo
          |
          v
 +------------------+
-| 97 Detectors     |  Auto-discovered via pkgutil, 8 parallel workers
+| 115 Detectors    |  Auto-discovered via pkgutil, adaptive parallel workers
 +--------+---------+
          |
          v
@@ -169,23 +177,53 @@ osscodeiq flow ./my-project --format html --output flow.html
 
 | Backend | Type | Cypher | Bundleable | Use Case |
 |---------|------|--------|------------|----------|
-| **NetworkX** | In-memory | No | Via JSON | Default, fastest for analysis |
-| **SQLite** | File | No | .db file | Persistent, zero dependencies |
+| **SQLite** | File | No | .db file | Default, persistent, zero dependencies |
+| **NetworkX** | In-memory | No | Via JSON | Fast in-process use |
 | **KuzuDB** | File | Yes | Directory | Cypher queries, agentic AI |
 
 ```bash
-osscodeiq analyze ./repo --backend kuzu
-osscodeiq analyze ./repo --backend sqlite
+osscodeiq analyze ./repo                   # SQLite (default)
+osscodeiq analyze ./repo --backend kuzu    # KuzuDB with Cypher
+osscodeiq analyze ./repo --backend networkx # In-memory
 ```
+
+## Web UI & Server
+
+Start a unified server with Explorer UI, REST API, and MCP server on a single port:
+
+```bash
+osscodeiq serve /path/to/repo
+```
+
+**Explorer UI** (`/ui`) — Progressive drill-down card interface:
+- Browse by node kind (Endpoints, Entities, Classes, Guards, etc.)
+- Click "Explore" to drill into individual nodes
+- Click "Details" on any card for a full modal with properties, edges, and source location
+- Client-side search filtering (no server round-trip)
+- Light, dark, and system theme support with runtime toggle
+
+**MCP Console** — Interactive terminal tab for executing MCP tools:
+- 20 tools: `get_stats`, `search_graph`, `trace_impact`, `find_cycles`, etc.
+- Type `help` to see all available commands
+
+**REST API** (`/api`) — 20+ endpoints for programmatic access:
+- `/api/kinds` — Node kinds with counts
+- `/api/kinds/{kind}` — Paginated nodes by kind
+- `/api/nodes/{id}/detail` — Full node detail with edges
+- `/api/stats`, `/api/nodes`, `/api/edges`, `/api/search`, `/api/flow` and more
+- Full OpenAPI docs at `/docs`
+
+**MCP Server** (`/mcp`) — 20 tools via streamable HTTP for AI-powered triage
 
 ## Development
 
 ```bash
 git clone https://github.com/RandomCodeSpace/code-iq.git
-cd osscodeiq
+cd code-iq
 pip install -e ".[dev]"
-pytest                    # 1,662 tests
-osscodeiq analyze . # Analyze this repo
+pytest                    # 2,146 tests
+osscodeiq analyze .       # Analyze this repo
+osscodeiq serve .         # Start the web UI
 ```
 
 ### Adding a New Detector
@@ -212,7 +250,7 @@ class MyDetector:
 ## Requirements
 
 - Python 3.11+
-- Dependencies: typer, rich, tree-sitter, networkx, lxml, pyyaml, sqlparse, pydantic
+- Dependencies: typer, rich, tree-sitter, networkx, lxml, pyyaml, sqlparse, pydantic, fastapi, uvicorn, fastmcp, nicegui
 - Optional: `pip install kuzu` for KuzuDB backend
 
 ## License
