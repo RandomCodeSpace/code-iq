@@ -138,6 +138,12 @@ jobs:
     needs: [test-os, test-container]
     runs-on: ubuntu-latest
     if: inputs.dry_run == false
+    environment:
+      name: pypi
+      url: https://pypi.org/p/osscodeiq
+    permissions:
+      id-token: write
+      attestations: write
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
