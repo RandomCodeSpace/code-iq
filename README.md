@@ -23,11 +23,11 @@
   <!-- DYNAMIC:detectors --><a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/detectors-82-brightgreen?style=flat-square&logo=codefactor&logoColor=white" alt="82 Detectors"></a><!-- /DYNAMIC:detectors -->
   <!-- DYNAMIC:languages --><a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/languages-35-blue?style=flat-square&logo=stackblitz&logoColor=white" alt="35 Languages"></a><!-- /DYNAMIC:languages -->
 <<<<<<< HEAD
-  <!-- DYNAMIC:tests --><a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/tests-1360%20passed-brightgreen?style=flat-square&logo=pytest&logoColor=white" alt="1360 passed Tests"></a><!-- /DYNAMIC:tests -->
+  <!-- DYNAMIC:tests --><a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/tests-1359%20passed-brightgreen?style=flat-square&logo=pytest&logoColor=white" alt="1359 passed Tests"></a><!-- /DYNAMIC:tests -->
   <!-- DYNAMIC:files --><a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/files-254-informational?style=flat-square&logo=files&logoColor=white" alt="254 Files"></a><!-- /DYNAMIC:files -->
   <!-- DYNAMIC:loc --><a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/LOC-30%2C566-informational?style=flat-square&logo=codacy&logoColor=white" alt="30,566 Loc"></a><!-- /DYNAMIC:loc -->
 =======
-  <!-- DYNAMIC:tests --><a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/tests-1360%20passed-brightgreen?style=flat-square&logo=pytest&logoColor=white" alt="1360 passed Tests"></a><!-- /DYNAMIC:tests -->
+  <!-- DYNAMIC:tests --><a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/tests-1359%20passed-brightgreen?style=flat-square&logo=pytest&logoColor=white" alt="1359 passed Tests"></a><!-- /DYNAMIC:tests -->
   <!-- DYNAMIC:files --><a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/files-254-informational?style=flat-square&logo=files&logoColor=white" alt="254 Files"></a><!-- /DYNAMIC:files -->
   <!-- DYNAMIC:loc --><a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/LOC-30%2C566-informational?style=flat-square&logo=codacy&logoColor=white" alt="30,566 Loc"></a><!-- /DYNAMIC:loc -->
 >>>>>>> edb98b7 (Phase 4a: 6 high-impact structure + framework detectors)
