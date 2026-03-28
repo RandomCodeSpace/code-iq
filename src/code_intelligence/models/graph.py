@@ -38,6 +38,10 @@ class NodeKind(str, Enum):
     AZURE_FUNCTION = "azure_function"
     MESSAGE_QUEUE = "message_queue"
     INFRA_RESOURCE = "infra_resource"
+    COMPONENT = "component"
+    GUARD = "guard"
+    MIDDLEWARE = "middleware"
+    HOOK = "hook"
 
 
 class EdgeKind(str, Enum):
@@ -68,6 +72,8 @@ class EdgeKind(str, Enum):
     PROVISIONS = "provisions"
     SENDS_TO = "sends_to"
     RECEIVES_FROM = "receives_from"
+    PROTECTS = "protects"
+    RENDERS = "renders"
 
 
 class SourceLocation(BaseModel):
