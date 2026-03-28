@@ -16,11 +16,11 @@
   <a href="https://github.com/RandomCodeSpace/code-iq/pulls"><img src="https://img.shields.io/github/issues-pr/RandomCodeSpace/code-iq?style=flat-square&logo=github&label=PRs" alt="Pull Requests"></a>
   <a href="https://github.com/RandomCodeSpace/code-iq/commits/main"><img src="https://img.shields.io/github/last-commit/RandomCodeSpace/code-iq?style=flat-square&logo=github&label=Last%20Commit" alt="Last Commit"></a>
   <a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/github/repo-size/RandomCodeSpace/code-iq?style=flat-square&logo=github&label=Repo%20Size" alt="Repo Size"></a>
-  <a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/detectors-58-brightgreen?style=flat-square&logo=codefactor&logoColor=white" alt="58 Detectors"></a>
-  <a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/languages-33-blue?style=flat-square&logo=stackblitz&logoColor=white" alt="33 Languages"></a>
-  <a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/tests-113%20passed-brightgreen?style=flat-square&logo=pytest&logoColor=white" alt="113 Tests"></a>
-  <a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/files-137-informational?style=flat-square&logo=files&logoColor=white" alt="137 Files"></a>
-  <a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/LOC-15%2C277-informational?style=flat-square&logo=codacy&logoColor=white" alt="15,277 LOC"></a>
+  <!-- DYNAMIC:detectors --><a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/detectors-58-brightgreen?style=flat-square&logo=codefactor&logoColor=white" alt="58 Detectors"></a><!-- /DYNAMIC:detectors -->
+  <!-- DYNAMIC:languages --><a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/languages-33-blue?style=flat-square&logo=stackblitz&logoColor=white" alt="33 Languages"></a><!-- /DYNAMIC:languages -->
+  <!-- DYNAMIC:tests --><a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/tests-113%20passed-brightgreen?style=flat-square&logo=pytest&logoColor=white" alt="113 passed Tests"></a><!-- /DYNAMIC:tests -->
+  <!-- DYNAMIC:files --><a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/files-137-informational?style=flat-square&logo=files&logoColor=white" alt="137 Files"></a><!-- /DYNAMIC:files -->
+  <!-- DYNAMIC:loc --><a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/LOC-15%2C277-informational?style=flat-square&logo=codacy&logoColor=white" alt="15,277 Loc"></a><!-- /DYNAMIC:loc -->
 </p>
 
 ---
