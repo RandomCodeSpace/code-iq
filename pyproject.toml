@@ -20,13 +20,6 @@ classifiers = [
     "Topic :: Software Development :: Quality Assurance",
 ]
 requires-python = ">=3.11"
-
-[project.urls]
-Homepage = "https://github.com/RandomCodeSpace/code-iq"
-Documentation = "https://github.com/RandomCodeSpace/code-iq#readme"
-Repository = "https://github.com/RandomCodeSpace/code-iq"
-Issues = "https://github.com/RandomCodeSpace/code-iq/issues"
-Changelog = "https://github.com/RandomCodeSpace/code-iq/releases"
 dependencies = [
     "typer>=0.9",
     "rich>=13.0",
@@ -45,6 +38,13 @@ dependencies = [
     "uvicorn[standard]>=0.34",
     "fastmcp>=2.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/RandomCodeSpace/code-iq"
+Documentation = "https://github.com/RandomCodeSpace/code-iq#readme"
+Repository = "https://github.com/RandomCodeSpace/code-iq"
+Issues = "https://github.com/RandomCodeSpace/code-iq/issues"
+Changelog = "https://github.com/RandomCodeSpace/code-iq/releases"
 
 [project.optional-dependencies]
 dev = [
