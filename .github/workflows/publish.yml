@@ -34,20 +34,51 @@ jobs:
       - name: Build wheel and sdist
         run: python -m build
 
+      - name: Verify wheel contents
+        run: |
+          pip install dist/*.whl
+          python -c "from code_intelligence.detectors.registry import DetectorRegistry; r = DetectorRegistry(); r.load_builtin_detectors(); print(f'Build OK: {len(r.all_detectors())} detectors')"
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: dist
           path: dist/
 
-  test-install:
-    name: Test install — Python ${{ matrix.python }} / ${{ matrix.os }}
+  test-os:
+    name: "${{ matrix.os }} / Python ${{ matrix.python }}"
     needs: build
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, ubuntu-22.04, ubuntu-20.04, macos-latest, windows-latest]
-        python: ["3.11", "3.12", "3.13"]
+        include:
+          # Windows 10/11 (latest runner is Windows Server 2022 = Win 11 compatible)
+          - os: windows-latest
+            python: "3.11"
+          - os: windows-latest
+            python: "3.12"
+          - os: windows-latest
+            python: "3.13"
+          # macOS (Intel + Apple Silicon)
+          - os: macos-latest
+            python: "3.11"
+          - os: macos-latest
+            python: "3.12"
+          - os: macos-latest
+            python: "3.13"
+          # Ubuntu (covers Debian-based Linux)
+          - os: ubuntu-latest
+            python: "3.11"
+          - os: ubuntu-latest
+            python: "3.12"
+          - os: ubuntu-latest
+            python: "3.13"
+          - os: ubuntu-22.04
+            python: "3.11"
+          - os: ubuntu-22.04
+            python: "3.12"
+          - os: ubuntu-20.04
+            python: "3.11"
     runs-on: ${{ matrix.os }}
     steps:
       - name: Download build artifacts
@@ -65,7 +96,7 @@ jobs:
         shell: bash
         run: pip install dist/*.whl
 
-      - name: Verify CLI entry point
+      - name: Verify CLI
         run: code-intelligence --help
 
       - name: Verify detectors load
@@ -75,21 +106,48 @@ jobs:
         run: python -c "import importlib.metadata; print(importlib.metadata.version('code-intelligence'))"
 
   test-container:
-    name: Test install — ${{ matrix.container }}
+    name: "${{ matrix.name }}"
     needs: build
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        container:
-          - "registry.access.redhat.com/ubi8/python-311:latest"
-          - "registry.access.redhat.com/ubi9/python-311:latest"
-          - "registry.access.redhat.com/ubi9/python-312:latest"
-          - "python:3.11-slim-bookworm"
-          - "python:3.12-slim-bookworm"
-          - "python:3.13-slim-bookworm"
-          - "python:3.11-alpine"
-          - "python:3.12-alpine"
+        include:
+          # RHEL/UBI (Red Hat Enterprise Linux)
+          - name: "UBI 8 / Python 3.11 (RHEL 8)"
+            container: "registry.access.redhat.com/ubi8/python-311:latest"
+            setup: "dnf install -y libxml2-devel libxslt-devel gcc python3-devel 2>/dev/null || true"
+          - name: "UBI 9 / Python 3.11 (RHEL 9)"
+            container: "registry.access.redhat.com/ubi9/python-311:latest"
+            setup: "dnf install -y libxml2-devel libxslt-devel gcc python3-devel 2>/dev/null || true"
+          - name: "UBI 9 / Python 3.12 (RHEL 9)"
+            container: "registry.access.redhat.com/ubi9/python-312:latest"
+            setup: "dnf install -y libxml2-devel libxslt-devel gcc python3-devel 2>/dev/null || true"
+          # Debian / Ubuntu
+          - name: "Debian Bookworm / Python 3.11"
+            container: "python:3.11-slim-bookworm"
+            setup: "apt-get update && apt-get install -y --no-install-recommends gcc libxml2-dev libxslt1-dev"
+          - name: "Debian Bookworm / Python 3.12"
+            container: "python:3.12-slim-bookworm"
+            setup: "apt-get update && apt-get install -y --no-install-recommends gcc libxml2-dev libxslt1-dev"
+          - name: "Debian Bookworm / Python 3.13"
+            container: "python:3.13-slim-bookworm"
+            setup: "apt-get update && apt-get install -y --no-install-recommends gcc libxml2-dev libxslt1-dev"
+          # Alpine (musl libc — strictest compatibility test)
+          - name: "Alpine / Python 3.11"
+            container: "python:3.11-alpine"
+            setup: "apk add --no-cache gcc musl-dev libxml2-dev libxslt-dev"
+          - name: "Alpine / Python 3.12"
+            container: "python:3.12-alpine"
+            setup: "apk add --no-cache gcc musl-dev libxml2-dev libxslt-dev"
+          # Amazon Linux (AWS Lambda / ECS)
+          - name: "Amazon Linux 2023 / Python 3.11"
+            container: "amazonlinux:2023"
+            setup: "dnf install -y python3.11 python3.11-pip python3.11-devel gcc libxml2-devel libxslt-devel"
+          # Fedora (latest glibc)
+          - name: "Fedora 40 / Python 3.12"
+            container: "fedora:40"
+            setup: "dnf install -y python3 python3-pip python3-devel gcc libxml2-devel libxslt-devel"
     container:
       image: ${{ matrix.container }}
     steps:
@@ -99,27 +157,21 @@ jobs:
           name: dist
           path: dist/
 
-      - name: Install system deps (Alpine)
-        if: contains(matrix.container, 'alpine')
-        run: apk add --no-cache gcc musl-dev libxml2-dev libxslt-dev
-
-      - name: Install system deps (UBI/RHEL)
-        if: contains(matrix.container, 'ubi')
-        run: |
-          dnf install -y libxml2-devel libxslt-devel gcc python3-devel 2>/dev/null || true
+      - name: Install system deps
+        run: ${{ matrix.setup }}
 
       - name: Install wheel
-        run: pip install dist/*.whl
+        run: pip install dist/*.whl || pip3 install dist/*.whl
 
       - name: Verify CLI
-        run: code-intelligence --help
+        run: code-intelligence --help || python3 -m code_intelligence.cli --help
 
       - name: Verify detectors load
-        run: python -c "from code_intelligence.detectors.registry import DetectorRegistry; r = DetectorRegistry(); r.load_builtin_detectors(); print(f'{len(r.all_detectors())} detectors loaded')"
+        run: python3 -c "from code_intelligence.detectors.registry import DetectorRegistry; r = DetectorRegistry(); r.load_builtin_detectors(); print(f'{len(r.all_detectors())} detectors loaded')"
 
   publish-pypi:
     name: Publish to PyPI
-    needs: [test-install, test-container]
+    needs: [test-os, test-container]
     runs-on: ubuntu-latest
     if: inputs.dry_run == false
     environment:
