@@ -267,9 +267,11 @@ public class McpTools {
         return toJson(queryService.searchGraph(query, limit != null ? limit : 20));
     }
 
-    @Tool(name = "read_file", description = "Read a source file's content for deep analysis. Path is relative to the codebase root.")
+    @Tool(name = "read_file", description = "Read a source file from the codebase, optionally a specific line range")
     public String readFile(
-            @ToolParam(description = "File path relative to codebase root") String filePath) {
+            @ToolParam(description = "File path relative to codebase root") String filePath,
+            @ToolParam(description = "Start line (1-based, optional)", required = false) Integer startLine,
+            @ToolParam(description = "End line (1-based, inclusive, optional)", required = false) Integer endLine) {
         try {
             Path root = Path.of(config.getRootPath()).toAbsolutePath().normalize();
             Path resolved = root.resolve(filePath).normalize();
@@ -277,7 +279,22 @@ public class McpTools {
             if (!resolved.startsWith(root)) {
                 return "Error: Path traversal detected";
             }
-            return java.nio.file.Files.readString(resolved, java.nio.charset.StandardCharsets.UTF_8);
+            String content = java.nio.file.Files.readString(resolved, java.nio.charset.StandardCharsets.UTF_8);
+            if (startLine != null || endLine != null) {
+                String[] lines = content.split("\n", -1);
+                int start = (startLine != null ? startLine : 1);
+                int end = (endLine != null ? endLine : lines.length);
+                // Clamp bounds
+                start = Math.max(1, Math.min(start, lines.length));
+                end = Math.max(start, Math.min(end, lines.length));
+                StringBuilder sb = new StringBuilder();
+                for (int i = start - 1; i < end; i++) {
+                    if (i > start - 1) sb.append('\n');
+                    sb.append(lines[i]);
+                }
+                return sb.toString();
+            }
+            return content;
         } catch (Exception e) {
             return "Error: " + e.getMessage();
         }

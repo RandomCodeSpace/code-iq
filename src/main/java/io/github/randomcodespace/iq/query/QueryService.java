@@ -4,14 +4,10 @@ import io.github.randomcodespace.iq.config.CodeIqConfig;
 import io.github.randomcodespace.iq.graph.GraphStore;
 import io.github.randomcodespace.iq.model.CodeEdge;
 import io.github.randomcodespace.iq.model.CodeNode;
-import io.github.randomcodespace.iq.model.EdgeKind;
-import io.github.randomcodespace.iq.model.NodeKind;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;

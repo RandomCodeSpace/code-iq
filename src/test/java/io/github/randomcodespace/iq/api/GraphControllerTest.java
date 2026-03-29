@@ -456,6 +456,34 @@ class GraphControllerTest {
                 .andExpect(content().string("Path traversal blocked"));
     }
 
+    @Test
+    void readFileShouldReturnLineRange(@TempDir Path tempDir) throws Exception {
+        Files.writeString(tempDir.resolve("multi.txt"), "line1\nline2\nline3\nline4\nline5",
+                StandardCharsets.UTF_8);
+        config.setRootPath(tempDir.toAbsolutePath().toString());
+        var controller = new GraphController(queryService, analyzer, config, statsService);
+        var fileMvc = MockMvcBuilders.standaloneSetup(controller).build();
+
+        fileMvc.perform(get("/api/file")
+                        .param("path", "multi.txt")
+                        .param("startLine", "2")
+                        .param("endLine", "4"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("line2\nline3\nline4"));
+    }
+
+    @Test
+    void readFileShouldReturnFullContentWithoutLineParams(@TempDir Path tempDir) throws Exception {
+        Files.writeString(tempDir.resolve("full.txt"), "aaa\nbbb\nccc", StandardCharsets.UTF_8);
+        config.setRootPath(tempDir.toAbsolutePath().toString());
+        var controller = new GraphController(queryService, analyzer, config, statsService);
+        var fileMvc = MockMvcBuilders.standaloneSetup(controller).build();
+
+        fileMvc.perform(get("/api/file").param("path", "full.txt"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("aaa\nbbb\nccc"));
+    }
+
     // --- /api/analyze ---
 
     @Test

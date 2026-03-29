@@ -485,7 +485,7 @@ class McpToolsTest {
         Path file = tempDir.resolve("test.txt");
         Files.writeString(file, "Hello, World!");
 
-        String result = mcpTools.readFile("test.txt");
+        String result = mcpTools.readFile("test.txt", null, null);
 
         assertEquals("Hello, World!", result);
     }
@@ -494,7 +494,7 @@ class McpToolsTest {
     void readFileShouldRejectPathTraversal(@TempDir Path tempDir) {
         config.setRootPath(tempDir.toString());
 
-        String result = mcpTools.readFile("../../etc/passwd");
+        String result = mcpTools.readFile("../../etc/passwd", null, null);
 
         assertEquals("Error: Path traversal detected", result);
     }
@@ -503,8 +503,52 @@ class McpToolsTest {
     void readFileShouldHandleMissingFile(@TempDir Path tempDir) {
         config.setRootPath(tempDir.toString());
 
-        String result = mcpTools.readFile("nonexistent.txt");
+        String result = mcpTools.readFile("nonexistent.txt", null, null);
 
         assertTrue(result.startsWith("Error:"));
+    }
+
+    @Test
+    void readFileShouldReturnLineRange(@TempDir Path tempDir) throws IOException {
+        config.setRootPath(tempDir.toString());
+        Path file = tempDir.resolve("lines.txt");
+        Files.writeString(file, "line1\nline2\nline3\nline4\nline5");
+
+        String result = mcpTools.readFile("lines.txt", 2, 4);
+
+        assertEquals("line2\nline3\nline4", result);
+    }
+
+    @Test
+    void readFileShouldReturnFromStartLineToEnd(@TempDir Path tempDir) throws IOException {
+        config.setRootPath(tempDir.toString());
+        Path file = tempDir.resolve("lines.txt");
+        Files.writeString(file, "line1\nline2\nline3\nline4\nline5");
+
+        String result = mcpTools.readFile("lines.txt", 3, null);
+
+        assertEquals("line3\nline4\nline5", result);
+    }
+
+    @Test
+    void readFileShouldReturnFromStartToEndLine(@TempDir Path tempDir) throws IOException {
+        config.setRootPath(tempDir.toString());
+        Path file = tempDir.resolve("lines.txt");
+        Files.writeString(file, "line1\nline2\nline3\nline4\nline5");
+
+        String result = mcpTools.readFile("lines.txt", null, 2);
+
+        assertEquals("line1\nline2", result);
+    }
+
+    @Test
+    void readFileShouldClampOutOfBoundsLineRange(@TempDir Path tempDir) throws IOException {
+        config.setRootPath(tempDir.toString());
+        Path file = tempDir.resolve("lines.txt");
+        Files.writeString(file, "line1\nline2\nline3");
+
+        String result = mcpTools.readFile("lines.txt", 2, 100);
+
+        assertEquals("line2\nline3", result);
     }
 }

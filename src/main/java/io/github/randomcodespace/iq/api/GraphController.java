@@ -201,7 +201,10 @@ public class GraphController {
     }
 
     @GetMapping("/file")
-    public ResponseEntity<String> readFile(@RequestParam String path) {
+    public ResponseEntity<String> readFile(
+            @RequestParam String path,
+            @RequestParam(required = false) Integer startLine,
+            @RequestParam(required = false) Integer endLine) {
         Path codebasePath = Path.of(config.getRootPath()).toAbsolutePath().normalize();
         Path resolved = codebasePath.resolve(path).normalize();
         if (!resolved.startsWith(codebasePath)) {
@@ -214,6 +217,19 @@ public class GraphController {
         }
         try {
             String content = Files.readString(resolved, StandardCharsets.UTF_8);
+            if (startLine != null || endLine != null) {
+                String[] lines = content.split("\n", -1);
+                int start = (startLine != null ? startLine : 1);
+                int end = (endLine != null ? endLine : lines.length);
+                start = Math.max(1, Math.min(start, lines.length));
+                end = Math.max(start, Math.min(end, lines.length));
+                StringBuilder sb = new StringBuilder();
+                for (int i = start - 1; i < end; i++) {
+                    if (i > start - 1) sb.append('\n');
+                    sb.append(lines[i]);
+                }
+                content = sb.toString();
+            }
             return ResponseEntity.ok()
                     .contentType(MediaType.TEXT_PLAIN)
                     .body(content);

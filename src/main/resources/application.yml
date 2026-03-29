@@ -25,6 +25,7 @@ codeiq:
     path: ".osscodeiq/graph.db"
   max-depth: 10
   max-radius: 10
+  batch-size: 500
 
 spring.ai.mcp.server:
   name: code-iq
@@ -36,9 +37,15 @@ spring:
   config:
     activate:
       on-profile: indexing
+  main:
+    lazy-initialization: true
   autoconfigure:
     exclude:
       - org.springframework.ai.mcp.server.autoconfigure.McpServerAutoConfiguration
+
+codeiq:
+  neo4j:
+    enabled: false
 
 ---
 spring:
