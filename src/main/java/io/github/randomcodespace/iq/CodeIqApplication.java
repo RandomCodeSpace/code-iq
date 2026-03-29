@@ -48,12 +48,24 @@ public class CodeIqApplication implements CommandLineRunner, ExitCodeGenerator {
         var app = new SpringApplication(CodeIqApplication.class);
         app.setBannerMode(org.springframework.boot.Banner.Mode.OFF);
 
-        // Detect if "serve" is among the arguments
+        // Detect command from arguments
         boolean isServe = Arrays.stream(args)
                 .anyMatch(arg -> "serve".equalsIgnoreCase(arg));
+        boolean isIndex = Arrays.stream(args)
+                .anyMatch(arg -> "index".equalsIgnoreCase(arg));
+        boolean isEnrich = Arrays.stream(args)
+                .anyMatch(arg -> "enrich".equalsIgnoreCase(arg));
 
         if (isServe) {
             app.setAdditionalProfiles("serving");
+        } else if (isIndex) {
+            app.setAdditionalProfiles("indexing");
+            // Index command: no web server, no Neo4j
+            app.setWebApplicationType(org.springframework.boot.WebApplicationType.NONE);
+        } else if (isEnrich) {
+            // Enrich command: no web server, Neo4j started programmatically
+            app.setAdditionalProfiles("indexing");
+            app.setWebApplicationType(org.springframework.boot.WebApplicationType.NONE);
         } else {
             app.setAdditionalProfiles("indexing");
             // Disable web server for non-serve commands

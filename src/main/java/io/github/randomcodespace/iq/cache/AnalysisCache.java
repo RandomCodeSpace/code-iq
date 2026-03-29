@@ -464,6 +464,46 @@ public class AnalysisCache implements Closeable {
     }
 
     /**
+     * Return the total number of cached nodes.
+     */
+    public long getNodeCount() {
+        try {
+            return countTable("nodes");
+        } catch (SQLException e) {
+            log.debug("Failed to count nodes", e);
+            return 0;
+        }
+    }
+
+    /**
+     * Return the total number of cached edges.
+     */
+    public long getEdgeCount() {
+        try {
+            return countTable("edges");
+        } catch (SQLException e) {
+            log.debug("Failed to count edges", e);
+            return 0;
+        }
+    }
+
+    /**
+     * Store a batch of nodes and edges from the analyzer, keyed by a synthetic batch hash.
+     * Used during batched indexing where the Analyzer flushes results per batch
+     * rather than per file content hash.
+     *
+     * @param batchId   unique batch identifier
+     * @param filePath  representative file path for the batch
+     * @param language  representative language
+     * @param nodes     nodes to store
+     * @param edges     edges to store
+     */
+    public void storeBatchResults(String batchId, String filePath, String language,
+                                  List<CodeNode> nodes, List<CodeEdge> edges) {
+        storeResults(batchId, filePath, language, nodes, edges);
+    }
+
+    /**
      * Load all cached nodes across all files.
      *
      * @return list of all cached nodes

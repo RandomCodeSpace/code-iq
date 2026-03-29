@@ -12,6 +12,7 @@ import io.github.randomcodespace.iq.detector.DetectorRegistry;
 import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.detector.DetectorUtils;
 import io.github.randomcodespace.iq.grammar.AntlrParserFactory;
+import io.github.randomcodespace.iq.model.CodeEdge;
 import io.github.randomcodespace.iq.model.CodeNode;
 import io.github.randomcodespace.iq.model.NodeKind;
 import org.slf4j.Logger;
@@ -339,6 +340,249 @@ public class Analyzer {
                 filesAnalyzed,
                 nodeCount,
                 edgeCount,
+                languageBreakdown,
+                nodeBreakdown,
+                edgeBreakdown,
+                frameworkBreakdown,
+                elapsed
+        );
+    }
+
+    /**
+     * Execute the indexing pipeline with batched streaming to H2.
+     * <p>
+     * Unlike {@link #run}, this method does NOT hold all nodes/edges in memory.
+     * It processes files in batches and flushes each batch to H2, then releases
+     * the batch memory. No linkers, layer classification, or Neo4j are used.
+     *
+     * @param repoPath     root of the repository to analyze
+     * @param parallelism  max parallel threads, or null for adaptive (virtual threads)
+     * @param batchSize    number of files per H2 flush batch
+     * @param incremental  if true, use file content hashing to skip unchanged files
+     * @param onProgress   optional callback for progress reporting (may be null)
+     * @return the analysis result containing graph data and statistics
+     */
+    public AnalysisResult runBatchedIndex(Path repoPath, Integer parallelism, int batchSize,
+                                          boolean incremental, Consumer<String> onProgress) {
+        Instant start = Instant.now();
+        Consumer<String> report = onProgress != null ? onProgress : msg -> {};
+
+        final Path root = repoPath.toAbsolutePath().normalize();
+
+        // Always use H2 cache as the primary store during indexing
+        Path cachePath = root.resolve(config.getCacheDir()).resolve("analysis-cache.db");
+        AnalysisCache cache;
+        try {
+            cache = new AnalysisCache(cachePath);
+        } catch (Exception e) {
+            log.error("Failed to open H2 store at {}", cachePath, e);
+            return new AnalysisResult(0, 0, 0, 0,
+                    Map.of(), Map.of(), Map.of(), Map.of(), Duration.ZERO);
+        }
+
+        try {
+            return runBatchedWithCache(root, parallelism, batchSize, incremental, cache, report, start);
+        } finally {
+            cache.close();
+        }
+    }
+
+    private AnalysisResult runBatchedWithCache(Path root, Integer parallelism, int batchSize,
+                                                boolean incremental, AnalysisCache cache,
+                                                Consumer<String> report, Instant start) {
+        // 0. Load project config for pipeline filtering
+        ProjectConfig projectConfig = ProjectConfigLoader.loadProjectConfig(root);
+        DetectorRegistry effectiveRegistry = registry;
+
+        if (projectConfig.hasDetectorCategoryFilter()) {
+            effectiveRegistry = effectiveRegistry.filterByCategories(
+                    projectConfig.getDetectorCategories());
+            report.accept("Detector categories: " + projectConfig.getDetectorCategories());
+        }
+        if (projectConfig.hasDetectorIncludeFilter()) {
+            effectiveRegistry = effectiveRegistry.filterByNames(
+                    projectConfig.getDetectorInclude());
+            report.accept("Detector include: " + projectConfig.getDetectorInclude());
+        }
+        if (parallelism == null && projectConfig.getPipelineParallelism() != null) {
+            parallelism = projectConfig.getPipelineParallelism();
+            report.accept("Pipeline parallelism: " + parallelism + " (from config)");
+        }
+
+        // 1. Discover files
+        report.accept("Discovering files...");
+        List<DiscoveredFile> files = fileDiscovery.discover(root);
+
+        if (projectConfig.hasLanguageFilter()) {
+            Set<String> allowedLanguages = new HashSet<>(projectConfig.getLanguages());
+            files = files.stream()
+                    .filter(f -> allowedLanguages.contains(f.language()))
+                    .toList();
+            report.accept("Language filter active: " + projectConfig.getLanguages());
+        }
+        if (projectConfig.hasExcludePatterns()) {
+            List<String> excludes = projectConfig.getExclude();
+            files = files.stream()
+                    .filter(f -> !matchesAnyExclude(f.path().toString(), excludes))
+                    .toList();
+            report.accept("Exclude patterns: " + excludes);
+        }
+
+        int totalFiles = files.size();
+        report.accept("Found " + totalFiles + " files");
+
+        // Compute language breakdown
+        Map<String, Integer> languageBreakdown = new HashMap<>();
+        for (DiscoveredFile f : files) {
+            languageBreakdown.merge(f.language(), 1, Integer::sum);
+        }
+
+        // 2. Process files in batches
+        report.accept("Indexing " + totalFiles + " files in batches of " + batchSize + "...");
+
+        final DetectorRegistry detectorRegistry = effectiveRegistry;
+        int totalNodesWritten = 0;
+        int totalEdgesWritten = 0;
+        int filesAnalyzed = 0;
+        int cacheHits = 0;
+        int batchNumber = 0;
+        Map<String, Integer> nodeBreakdown = new HashMap<>();
+        Map<String, Integer> edgeBreakdown = new HashMap<>();
+        Map<String, Integer> frameworkBreakdown = new HashMap<>();
+
+        // Clear previous index data if not incremental
+        if (!incremental) {
+            cache.clear();
+        }
+
+        List<DiscoveredFile> batch = new ArrayList<>(batchSize);
+        for (int fileIdx = 0; fileIdx < files.size(); fileIdx++) {
+            batch.add(files.get(fileIdx));
+
+            if (batch.size() >= batchSize || fileIdx == files.size() - 1) {
+                batchNumber++;
+                report.accept("Processing batch " + batchNumber + " (" + batch.size() + " files)...");
+
+                // Analyze batch in parallel
+                DetectorResult[] resultSlots = new DetectorResult[batch.size()];
+                int[] batchCacheHits = {0};
+
+                var executorService = parallelism != null && parallelism > 0
+                        ? Executors.newFixedThreadPool(parallelism)
+                        : Executors.newVirtualThreadPerTaskExecutor();
+                try (var executor = executorService) {
+                    List<Future<?>> futures = new ArrayList<>(batch.size());
+                    for (int i = 0; i < batch.size(); i++) {
+                        final int idx = i;
+                        final DiscoveredFile file = batch.get(idx);
+                        futures.add(executor.submit(() -> {
+                            if (incremental) {
+                                try {
+                                    Path absPath = root.resolve(file.path());
+                                    String hash = FileHasher.hash(absPath);
+                                    if (cache.isCached(hash)) {
+                                        var cached = cache.loadCachedResults(hash);
+                                        if (cached != null) {
+                                            resultSlots[idx] = DetectorResult.of(cached.nodes(), cached.edges());
+                                            synchronized (batchCacheHits) {
+                                                batchCacheHits[0]++;
+                                            }
+                                            return null;
+                                        }
+                                    }
+                                    DetectorResult result = analyzeFile(file, root, detectorRegistry);
+                                    resultSlots[idx] = result;
+                                    if (result != null && (!result.nodes().isEmpty() || !result.edges().isEmpty())) {
+                                        cache.storeResults(hash, file.path().toString(), file.language(),
+                                                result.nodes(), result.edges());
+                                    }
+                                } catch (IOException e) {
+                                    log.debug("Could not hash file {}", file.path(), e);
+                                    resultSlots[idx] = analyzeFile(file, root, detectorRegistry);
+                                }
+                            } else {
+                                resultSlots[idx] = analyzeFile(file, root, detectorRegistry);
+                            }
+                            return null;
+                        }));
+                    }
+
+                    // Collect in order
+                    for (int i = 0; i < futures.size(); i++) {
+                        try {
+                            futures.get(i).get();
+                        } catch (ExecutionException e) {
+                            log.warn("Analysis failed for {}", batch.get(i).path(), e.getCause());
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            log.warn("Analysis interrupted for {}", batch.get(i).path());
+                        }
+                    }
+                }
+
+                cacheHits += batchCacheHits[0];
+
+                // Collect batch results and flush non-cached to H2
+                List<CodeNode> batchNodes = new ArrayList<>();
+                List<CodeEdge> batchEdges = new ArrayList<>();
+                int batchFilesAnalyzed = 0;
+
+                for (int i = 0; i < resultSlots.length; i++) {
+                    DetectorResult result = resultSlots[i];
+                    if (result != null && (!result.nodes().isEmpty() || !result.edges().isEmpty())) {
+                        batchFilesAnalyzed++;
+                        // Only store non-incremental results (incremental already stored above)
+                        if (!incremental) {
+                            batchNodes.addAll(result.nodes());
+                            batchEdges.addAll(result.edges());
+                        }
+                        // Track breakdowns
+                        for (CodeNode node : result.nodes()) {
+                            nodeBreakdown.merge(node.getKind().getValue(), 1, Integer::sum);
+                            Object fw = node.getProperties().get("framework");
+                            if (fw != null && !fw.toString().isEmpty()) {
+                                frameworkBreakdown.merge(fw.toString(), 1, Integer::sum);
+                            }
+                        }
+                        for (var edge : result.edges()) {
+                            edgeBreakdown.merge(edge.getKind().getValue(), 1, Integer::sum);
+                        }
+                        totalNodesWritten += result.nodes().size();
+                        totalEdgesWritten += result.edges().size();
+                    }
+                }
+
+                filesAnalyzed += batchFilesAnalyzed;
+
+                // For non-incremental mode, batch-flush to H2
+                if (!incremental && (!batchNodes.isEmpty() || !batchEdges.isEmpty())) {
+                    String batchId = "batch:" + batchNumber + ":" + System.nanoTime();
+                    cache.storeBatchResults(batchId, "batch-" + batchNumber,
+                            "mixed", batchNodes, batchEdges);
+                }
+
+                // Release batch memory
+                batch.clear();
+            }
+        }
+
+        if (cacheHits > 0) {
+            report.accept("Cache hits: " + cacheHits + " / " + totalFiles + " files");
+        }
+
+        // Record run
+        String commitSha = getGitHead(root);
+        cache.recordRun(commitSha, filesAnalyzed);
+
+        Duration elapsed = Duration.between(start, Instant.now());
+        report.accept("Index complete - " + totalNodesWritten + " nodes, "
+                + totalEdgesWritten + " edges written to H2");
+
+        return new AnalysisResult(
+                totalFiles,
+                filesAnalyzed,
+                totalNodesWritten,
+                totalEdgesWritten,
                 languageBreakdown,
                 nodeBreakdown,
                 edgeBreakdown,

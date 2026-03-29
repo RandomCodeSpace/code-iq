@@ -22,6 +22,9 @@ public class CodeIqConfig {
     /** Maximum radius for ego graph queries. */
     private int maxRadius = 10;
 
+    /** Batch size for file processing during indexing (files per H2 flush). */
+    private int batchSize = 500;
+
     // --- Getters and Setters ---
 
     public String getRootPath() {
@@ -54,5 +57,13 @@ public class CodeIqConfig {
 
     public void setMaxRadius(int maxRadius) {
         this.maxRadius = maxRadius;
+    }
+
+    public int getBatchSize() {
+        return batchSize;
+    }
+
+    public void setBatchSize(int batchSize) {
+        this.batchSize = Math.max(1, batchSize);
     }
 }

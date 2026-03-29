@@ -16,21 +16,22 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 
 /**
- * Scan a codebase and build a knowledge graph.
+ * Index a codebase: scan files, run detectors, write results to H2.
  * <p>
- * This is the legacy command that uses in-memory graph building with Neo4j.
- * For memory-efficient indexing, use {@code index} instead.
- * Kept as backward-compatible alias.
+ * This command does NOT start Neo4j. It uses H2 as the primary store,
+ * processing files in batches to keep memory bounded.
+ * <p>
+ * Use {@code enrich} after indexing to load data into Neo4j for graph queries.
  */
 @Component
-@Command(name = "analyze", mixinStandardHelpOptions = true,
-        description = "Scan codebase and build knowledge graph (legacy; prefer 'index' for large codebases)")
-public class AnalyzeCommand implements Callable<Integer> {
+@Command(name = "index", mixinStandardHelpOptions = true,
+        description = "Index codebase to H2 (no Neo4j, memory-efficient batched processing)")
+public class IndexCommand implements Callable<Integer> {
 
     @Parameters(index = "0", defaultValue = ".", description = "Path to codebase root")
     private Path path;
 
-    @Option(names = {"--no-cache"}, description = "Skip incremental cache (full re-analysis)")
+    @Option(names = {"--no-cache"}, description = "Skip incremental cache (full re-index)")
     private boolean noCache;
 
     @Option(names = {"--incremental"}, defaultValue = "true", negatable = true,
@@ -41,10 +42,14 @@ public class AnalyzeCommand implements Callable<Integer> {
             description = "Max parallel threads (default: auto-detect from CPU)")
     private Integer parallelism;
 
+    @Option(names = {"--batch-size", "-b"}, defaultValue = "500",
+            description = "Files per H2 flush batch (default: 500)")
+    private int batchSize;
+
     private final Analyzer analyzer;
     private final CodeIqConfig config;
 
-    public AnalyzeCommand(Analyzer analyzer, CodeIqConfig config) {
+    public IndexCommand(Analyzer analyzer, CodeIqConfig config) {
         this.analyzer = analyzer;
         this.config = config;
     }
@@ -56,35 +61,33 @@ public class AnalyzeCommand implements Callable<Integer> {
         // Load project-level config overrides from .osscodeiq.yml if present
         ProjectConfigLoader.loadIfPresent(root, config);
 
+        // Use configured batch size if not overridden on command line
+        int effectiveBatchSize = batchSize > 0 ? batchSize : config.getBatchSize();
+
         NumberFormat nf = NumberFormat.getIntegerInstance(Locale.US);
         int cores = parallelism != null ? parallelism : Runtime.getRuntime().availableProcessors();
 
         // --no-cache overrides --incremental
         boolean useIncremental = incremental && !noCache;
 
-        CliOutput.step("\uD83D\uDD0D", "Scanning " + root + " ...");
+        CliOutput.step("\uD83D\uDD0D", "Indexing " + root + " ...");
+        CliOutput.info("  (batch size: " + effectiveBatchSize + " files, "
+                + cores + " cores, H2 store)");
         if (useIncremental) {
-            CliOutput.info("  (incremental mode — use --no-cache for full re-analysis)");
+            CliOutput.info("  (incremental mode -- use --no-cache for full re-index)");
         }
 
-        AnalysisResult result = analyzer.run(root, parallelism, useIncremental, msg -> {
+        AnalysisResult result = analyzer.runBatchedIndex(root, parallelism, effectiveBatchSize,
+                useIncremental, msg -> {
             if (msg.startsWith("Discovering")) {
                 CliOutput.step("\uD83D\uDD0D", msg);
             } else if (msg.startsWith("Found")) {
                 CliOutput.step("\uD83D\uDCC1", "@|cyan " + msg + "|@");
-            } else if (msg.startsWith("Analyzing")) {
-                CliOutput.step("\u2699\uFE0F", msg.replace("files...", "files using " + cores + " cores..."));
-            } else if (msg.startsWith("Building")) {
-                CliOutput.step("\uD83C\uDFD7\uFE0F", msg);
-            } else if (msg.startsWith("Linking")) {
-                CliOutput.step("\uD83D\uDD17", msg);
-            } else if (msg.startsWith("Classifying")) {
-                CliOutput.step("\uD83C\uDFF7\uFE0F", msg);
+            } else if (msg.startsWith("Indexing") || msg.startsWith("Processing batch")) {
+                CliOutput.step("\u2699\uFE0F", msg);
             } else if (msg.startsWith("Cache hits")) {
                 CliOutput.step("\u26A1", "@|green " + msg + "|@");
-            } else if (msg.startsWith("Incremental")) {
-                CliOutput.step("\u26A1", msg);
-            } else if (msg.startsWith("Analysis complete")) {
+            } else if (msg.startsWith("Index complete")) {
                 // handled below
             } else {
                 CliOutput.info(msg);
@@ -95,7 +98,7 @@ public class AnalyzeCommand implements Callable<Integer> {
         String timeStr = secs > 0 ? secs + "s" : result.elapsed().toMillis() + "ms";
 
         System.out.println();
-        CliOutput.success("\u2705 Analysis complete \u2014 "
+        CliOutput.success("\u2705 Index complete -- "
                 + nf.format(result.nodeCount()) + " nodes, "
                 + nf.format(result.edgeCount()) + " edges in " + timeStr);
         System.out.println();
@@ -104,6 +107,7 @@ public class AnalyzeCommand implements Callable<Integer> {
         CliOutput.cyan("  Nodes:   " + nf.format(result.nodeCount()));
         CliOutput.cyan("  Edges:   " + nf.format(result.edgeCount()));
         CliOutput.info("  Time:    " + timeStr);
+        CliOutput.info("  Store:   H2 (.code-intelligence/analysis-cache)");
 
         if (!result.nodeBreakdown().isEmpty()) {
             System.out.println();
@@ -128,16 +132,8 @@ public class AnalyzeCommand implements Callable<Integer> {
             CliOutput.info(langs.toString());
         }
 
-        if (result.frameworkBreakdown() != null && !result.frameworkBreakdown().isEmpty()) {
-            StringBuilder fws = new StringBuilder("  Frameworks: ");
-            result.frameworkBreakdown().entrySet().stream()
-                    .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
-                    .limit(15)
-                    .forEach(e -> fws.append(e.getKey()).append(" (")
-                            .append(nf.format(e.getValue())).append("), "));
-            if (fws.length() > 2) fws.setLength(fws.length() - 2);
-            CliOutput.info(fws.toString());
-        }
+        System.out.println();
+        CliOutput.info("  Next step: code-iq enrich " + root);
 
         return 0;
     }

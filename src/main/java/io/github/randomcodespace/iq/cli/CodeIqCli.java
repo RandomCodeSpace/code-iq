@@ -16,6 +16,8 @@ import picocli.CommandLine.Command;
         description = "Intelligent code graph discovery and analysis CLI",
         subcommands = {
                 AnalyzeCommand.class,
+                IndexCommand.class,
+                EnrichCommand.class,
                 ServeCommand.class,
                 GraphCommand.class,
                 QueryCommand.class,
