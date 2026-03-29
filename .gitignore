@@ -60,3 +60,13 @@ docs/superpowers/
 *.tar.gz
 *.zip
 pytest-of-dev/
+
+# Java build
+target/
+*.class
+.classpath
+.project
+.settings/
+.factorypath
+*.iml
+.idea/
