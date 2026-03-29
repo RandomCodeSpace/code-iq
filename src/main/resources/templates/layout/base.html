@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en"
+      x-data="themeManager()" :class="{ 'dark': dark }">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${pageTitle != null ? pageTitle + ' | OSSCodeIQ' : 'OSSCodeIQ Explorer'}">OSSCodeIQ Explorer</title>
+
+    <!-- Tailwind CSS via CDN (play script for zero-build setup) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { 50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 800: '#1e40af', 900: '#1e3a5f' },
+                        surface: { DEFAULT: '#f8fafc', dark: '#0f172a' },
+                        card: { DEFAULT: '#ffffff', dark: '#1e293b' },
+                        muted: { DEFAULT: '#64748b', dark: '#94a3b8' }
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.3s ease-out',
+                        'slide-up': 'slideUp 0.3s ease-out',
+                    },
+                    keyframes: {
+                        fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
+                        slideUp: { '0%': { opacity: '0', transform: 'translateY(8px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- HTMX (vendored locally) -->
+    <script th:src="@{/js/htmx.min.js}"></script>
+    <!-- Alpine.js (vendored locally) -->
+    <script defer th:src="@{/js/alpine.min.js}"></script>
+
+    <style>
+        [x-cloak] { display: none !important; }
+        .htmx-indicator { display: none; }
+        .htmx-request .htmx-indicator { display: inline-block; }
+        .htmx-request.htmx-indicator { display: inline-block; }
+        /* Staggered card animation */
+        .card-enter { animation: slideUp 0.3s ease-out both; }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+    </style>
+
+    <script>
+        function themeManager() {
+            return {
+                dark: localStorage.getItem('codeiq-theme') === 'dark' ||
+                      (!localStorage.getItem('codeiq-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches),
+                toggle() {
+                    this.dark = !this.dark;
+                    localStorage.setItem('codeiq-theme', this.dark ? 'dark' : 'light');
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-surface dark:bg-surface-dark text-slate-900 dark:text-slate-100 min-h-screen transition-colors duration-200">
+
+    <!-- Header -->
+    <header class="sticky top-0 z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-700">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-14">
+                <!-- Left: Logo + Title -->
+                <div class="flex items-center gap-3">
+                    <a th:href="@{/ui}" class="flex items-center gap-2 text-lg font-bold text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 transition-colors">
+                        <svg class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M8 12h8M12 8v8"/>
+                        </svg>
+                        OSSCodeIQ
+                    </a>
+
+                    <!-- Stats badges -->
+                    <div th:if="${stats != null}" class="hidden sm:flex items-center gap-2 ml-4">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-brand-100 dark:bg-brand-900 text-brand-700 dark:text-brand-300"
+                              th:text="${stats['node_count'] + ' nodes'}">0 nodes</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300"
+                              th:text="${stats['edge_count'] + ' edges'}">0 edges</span>
+                    </div>
+                </div>
+
+                <!-- Right: Actions -->
+                <div class="flex items-center gap-2">
+                    <a href="/docs" target="_blank"
+                       class="text-sm text-muted dark:text-muted-dark hover:text-slate-900 dark:hover:text-slate-100 transition-colors px-2 py-1 rounded">
+                        API Docs
+                    </a>
+                    <a href="/api/stats" target="_blank"
+                       class="text-sm text-muted dark:text-muted-dark hover:text-slate-900 dark:hover:text-slate-100 transition-colors px-2 py-1 rounded">
+                        JSON
+                    </a>
+                    <!-- Theme toggle -->
+                    <button @click="toggle()"
+                            class="p-2 rounded-lg text-muted dark:text-muted-dark hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            aria-label="Toggle theme">
+                        <svg x-show="!dark" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+                        </svg>
+                        <svg x-show="dark" x-cloak class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <!-- Breadcrumb placeholder -->
+        <div id="breadcrumb" th:replace="${breadcrumbFragment != null} ? ~{${breadcrumbFragment}} : ~{}"></div>
+
+        <!-- Content area (HTMX target) -->
+        <div id="content" class="animate-fade-in">
+            <th:block th:replace="~{${contentTemplate != null ? contentTemplate : 'explorer/fragments/empty'}}"/>
+        </div>
+    </main>
+
+    <!-- Modal overlay -->
+    <div id="modal"></div>
+
+    <!-- HTMX loading indicator -->
+    <div class="htmx-indicator fixed top-14 left-0 right-0 z-50">
+        <div class="h-0.5 bg-brand-500 animate-pulse"></div>
+    </div>
+
+</body>
+</html>

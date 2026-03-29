@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="content">
+
+    <!-- Back to kinds link (for HTMX fragment loads) -->
+    <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-3">
+            <button hx-get="/ui/fragments/kinds" hx-target="#content" hx-swap="innerHTML"
+                    class="text-sm text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"/></svg>
+                All Kinds
+            </button>
+            <h2 class="text-lg font-semibold capitalize" th:text="${kind}">kind</h2>
+        </div>
+        <span th:if="${result != null}" class="text-sm text-muted dark:text-muted-dark"
+              th:text="${result['total'] + ' nodes'}">0 nodes</span>
+    </div>
+
+    <div th:if="${result != null and result['nodes'] != null}" class="space-y-3">
+        <div th:each="node, iterStat : ${result['nodes']}"
+             th:attr="style='animation-delay: ' + ${iterStat.index * 20} + 'ms'"
+             class="bg-card dark:bg-card-dark rounded-lg border border-slate-200 dark:border-slate-700 hover:border-brand-300 dark:hover:border-brand-600 p-4 transition-all duration-200 animate-slide-up">
+
+            <div class="flex items-start justify-between gap-4">
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 mb-1">
+                        <a th:href="@{/ui/node/{id}(id=${node['id']})}"
+                           class="font-medium text-brand-600 dark:text-brand-400 hover:underline truncate"
+                           th:text="${node['label']}">label</a>
+                        <span th:if="${node['layer'] != null}"
+                              class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide"
+                              th:classappend="${node['layer'] == 'backend' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' :
+                                               node['layer'] == 'frontend' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' :
+                                               node['layer'] == 'infra' ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300' :
+                                               'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'}"
+                              th:text="${node['layer']}">layer</span>
+                    </div>
+                    <div th:if="${node['module'] != null}" class="text-xs text-muted dark:text-muted-dark mb-1"
+                         th:text="${node['module']}">module</div>
+                    <div th:if="${node['file_path'] != null}" class="text-xs text-muted dark:text-muted-dark font-mono truncate"
+                         th:text="${node['file_path'] + (node['line_start'] != null ? ':' + node['line_start'] : '')}">file:line</div>
+                </div>
+
+                <div class="flex items-center gap-2 shrink-0">
+                    <!-- Properties badges -->
+                    <div th:if="${node['annotations'] != null and !node['annotations'].isEmpty()}" class="hidden sm:flex gap-1">
+                        <span th:each="ann, annIter : ${node['annotations']}" th:if="${annIter.index < 3}"
+                              class="text-[10px] px-1.5 py-0.5 rounded bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 font-mono"
+                              th:text="${ann}">@ann</span>
+                    </div>
+                    <button th:attr="hx-get='/ui/fragments/detail/' + ${node['id']}"
+                            hx-target="#content" hx-swap="innerHTML"
+                            class="text-xs font-medium px-3 py-1.5 rounded-md text-muted dark:text-muted-dark hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors whitespace-nowrap">
+                        Details
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    <div th:if="${result != null and result['total'] != null}" class="flex items-center justify-between mt-6">
+        <div class="text-sm text-muted dark:text-muted-dark"
+             th:text="'Showing ' + ${result['offset']} + '-' + (${result['offset']} + ${#lists.size(result['nodes'])}) + ' of ' + ${result['total']}">
+            Showing 0-50 of 100
+        </div>
+        <div class="flex gap-2">
+            <button th:if="${result['offset'] != null and result['offset'] > 0}"
+                    th:attr="hx-get='/ui/fragments/nodes/' + ${kind} + '?offset=' + ${result['offset'] - result['limit']} + '&amp;limit=' + ${result['limit']}"
+                    hx-target="#content" hx-swap="innerHTML"
+                    class="text-sm font-medium px-3 py-1.5 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                Previous
+            </button>
+            <button th:if="${result['offset'] != null and (result['offset'] + result['limit']) < result['total']}"
+                    th:attr="hx-get='/ui/fragments/nodes/' + ${kind} + '?offset=' + (${result['offset']} + ${result['limit']}) + '&amp;limit=' + ${result['limit']}"
+                    hx-target="#content" hx-swap="innerHTML"
+                    class="text-sm font-medium px-3 py-1.5 rounded-md bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 hover:bg-brand-100 dark:hover:bg-brand-900/50 transition-colors">
+                Next
+            </button>
+        </div>
+    </div>
+
+    <!-- Empty state -->
+    <div th:if="${result == null or result['nodes'] == null or result['nodes'].isEmpty()}"
+         class="text-center py-12">
+        <p class="text-muted dark:text-muted-dark">No nodes found for this kind.</p>
+    </div>
+</div>
+</body>
+</html>
