@@ -259,6 +259,19 @@ public class Analyzer {
             edgeBreakdown.merge(kindValue, 1, Integer::sum);
         }
 
+        // 7b. Compute framework breakdown from node properties
+        Map<String, Integer> frameworkBreakdown = new HashMap<>();
+        for (CodeNode node : allNodes) {
+            Object fw = node.getProperties().get("framework");
+            if (fw != null && !fw.toString().isEmpty()) {
+                frameworkBreakdown.merge(fw.toString(), 1, Integer::sum);
+            }
+            Object authType = node.getProperties().get("auth_type");
+            if (authType != null && !authType.toString().isEmpty()) {
+                frameworkBreakdown.merge("auth:" + authType, 1, Integer::sum);
+            }
+        }
+
         // 8. Record analysis run in cache
         if (cache != null) {
             String commitSha = getGitHead(root);
@@ -281,6 +294,7 @@ public class Analyzer {
                 languageBreakdown,
                 nodeBreakdown,
                 edgeBreakdown,
+                frameworkBreakdown,
                 elapsed
         );
     }

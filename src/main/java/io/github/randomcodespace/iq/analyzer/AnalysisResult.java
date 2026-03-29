@@ -11,8 +11,9 @@ import java.util.Map;
  * @param nodeCount         total graph nodes produced
  * @param edgeCount         total graph edges produced
  * @param languageBreakdown count of files per language
- * @param nodeBreakdown     count of nodes per NodeKind value
- * @param elapsed           wall-clock duration of the analysis
+ * @param nodeBreakdown       count of nodes per NodeKind value
+ * @param frameworkBreakdown  count of nodes per detected framework
+ * @param elapsed             wall-clock duration of the analysis
  */
 public record AnalysisResult(
         int totalFiles,
@@ -22,5 +23,6 @@ public record AnalysisResult(
         Map<String, Integer> languageBreakdown,
         Map<String, Integer> nodeBreakdown,
         Map<String, Integer> edgeBreakdown,
+        Map<String, Integer> frameworkBreakdown,
         Duration elapsed
 ) {}

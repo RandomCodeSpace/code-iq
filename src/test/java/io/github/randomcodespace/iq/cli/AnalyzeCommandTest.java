@@ -51,7 +51,7 @@ class AnalyzeCommandTest {
                 42, 38, 120, 85,
                 Map.of("java", 20, "python", 15, "yaml", 7),
                 Map.of("class", 50, "method", 40, "endpoint", 30),
-                Map.of("calls", 50, "contains", 35),
+                Map.of("calls", 50, "contains", 35), Map.of("spring", 30),
                 Duration.ofMillis(1234)
         );
         when(analyzer.run(any(Path.class), any(), anyBoolean(), any(Consumer.class))).thenReturn(result);
@@ -79,7 +79,7 @@ class AnalyzeCommandTest {
                 10, 8, 20, 15,
                 Map.of("java", 10),
                 Map.of("class", 20),
-                Map.of("calls", 15),
+                Map.of("calls", 15), Map.of(),
                 Duration.ofMillis(500)
         );
         when(analyzer.run(any(Path.class), any(), anyBoolean(), any(Consumer.class))).thenReturn(result);
@@ -102,7 +102,7 @@ class AnalyzeCommandTest {
                 10, 8, 20, 15,
                 Map.of("java", 10),
                 Map.of("class", 20),
-                Map.of("calls", 15),
+                Map.of("calls", 15), Map.of(),
                 Duration.ofMillis(500)
         );
         when(analyzer.run(any(Path.class), any(), anyBoolean(), any(Consumer.class))).thenReturn(result);
@@ -123,7 +123,7 @@ class AnalyzeCommandTest {
 
         var result = new AnalysisResult(
                 0, 0, 0, 0,
-                Map.of(), Map.of(), Map.of(), Duration.ZERO
+                Map.of(), Map.of(), Map.of(), Map.of(), Duration.ZERO
         );
         when(analyzer.run(any(Path.class), any(), anyBoolean(), any(Consumer.class))).thenReturn(result);
 
@@ -144,7 +144,7 @@ class AnalyzeCommandTest {
                 5, 5, 10, 5,
                 Map.of("java", 5),
                 Map.of("class", 10),
-                Map.of("calls", 5),
+                Map.of("calls", 5), Map.of(),
                 Duration.ofMillis(200)
         );
         when(analyzer.run(any(Path.class), any(), anyBoolean(), any(Consumer.class))).thenReturn(result);

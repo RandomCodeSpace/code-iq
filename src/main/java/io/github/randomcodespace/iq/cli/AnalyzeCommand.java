@@ -124,6 +124,17 @@ public class AnalyzeCommand implements Callable<Integer> {
             CliOutput.info(langs.toString());
         }
 
+        if (result.frameworkBreakdown() != null && !result.frameworkBreakdown().isEmpty()) {
+            StringBuilder fws = new StringBuilder("  Frameworks: ");
+            result.frameworkBreakdown().entrySet().stream()
+                    .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                    .limit(15)
+                    .forEach(e -> fws.append(e.getKey()).append(" (")
+                            .append(nf.format(e.getValue())).append("), "));
+            if (fws.length() > 2) fws.setLength(fws.length() - 2);
+            CliOutput.info(fws.toString());
+        }
+
         return 0;
     }
 }

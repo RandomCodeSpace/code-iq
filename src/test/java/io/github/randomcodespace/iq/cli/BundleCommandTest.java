@@ -63,7 +63,7 @@ class BundleCommandTest {
         var config = new CodeIqConfig();
         config.setCacheDir(".code-intelligence");
 
-        var result = new AnalysisResult(10, 8, 50, 20, Map.of(), Map.of(), Map.of(), Duration.ofMillis(500));
+        var result = new AnalysisResult(10, 8, 50, 20, Map.of(), Map.of(), Map.of(), Map.of(), Duration.ofMillis(500));
         when(analyzer.run(any(), any())).thenReturn(result);
         when(flowEngine.renderInteractive(anyString())).thenReturn("<html>flow</html>");
 
