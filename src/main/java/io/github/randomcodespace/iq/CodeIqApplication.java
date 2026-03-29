@@ -46,6 +46,7 @@ public class CodeIqApplication implements CommandLineRunner, ExitCodeGenerator {
 
     public static void main(String[] args) {
         var app = new SpringApplication(CodeIqApplication.class);
+        app.setBannerMode(org.springframework.boot.Banner.Mode.OFF);
 
         // Detect if "serve" is among the arguments
         boolean isServe = Arrays.stream(args)

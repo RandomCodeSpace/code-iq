@@ -61,7 +61,7 @@ public class FileDiscovery {
 
         // Sort for deterministic ordering
         result.sort(Comparator.comparing(f -> f.path().toString()));
-        log.info("Discovered {} files in {}", result.size(), root);
+        log.debug("Discovered {} files in {}", result.size(), root);
         return result;
     }
 

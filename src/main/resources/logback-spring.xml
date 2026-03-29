@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!-- Console appender with minimal format (our app uses System.out directly for CLI output) -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Suppress noisy third-party loggers -->
+    <logger name="org.neo4j" level="ERROR" />
+    <logger name="org.springframework.data.neo4j" level="ERROR" />
+    <logger name="org.springframework.ai.mcp" level="OFF" />
+    <logger name="org.springframework.boot" level="ERROR" />
+    <logger name="org.springframework.core.env" level="ERROR" />
+    <logger name="org.springframework.web" level="WARN" />
+    <logger name="io.netty" level="ERROR" />
+    <logger name="org.jctools" level="ERROR" />
+    <logger name="io.micrometer" level="WARN" />
+    <logger name="com.hazelcast" level="WARN" />
+    <logger name="org.apache.catalina" level="WARN" />
+    <logger name="org.apache.coyote" level="WARN" />
+
+    <!-- Our app loggers — suppress Spring's startup messages from our main class -->
+    <logger name="io.github.randomcodespace.iq.CodeIqApplication" level="WARN" />
+    <logger name="io.github.randomcodespace.iq" level="INFO" />
+
+    <!-- Indexing profile: minimal logging (CLI mode) -->
+    <springProfile name="indexing">
+        <root level="ERROR">
+            <appender-ref ref="CONSOLE" />
+        </root>
+        <logger name="io.github.randomcodespace.iq" level="INFO" />
+        <logger name="io.github.randomcodespace.iq.CodeIqApplication" level="WARN" />
+    </springProfile>
+
+    <!-- Serving profile: normal logging (server mode) -->
+    <springProfile name="serving">
+        <root level="WARN">
+            <appender-ref ref="CONSOLE" />
+        </root>
+        <logger name="io.github.randomcodespace.iq" level="INFO" />
+    </springProfile>
+
+    <!-- Default (no profile active) -->
+    <springProfile name="default">
+        <root level="WARN">
+            <appender-ref ref="CONSOLE" />
+        </root>
+        <logger name="io.github.randomcodespace.iq" level="INFO" />
+        <logger name="io.github.randomcodespace.iq.CodeIqApplication" level="WARN" />
+    </springProfile>
+
+</configuration>

@@ -72,6 +72,13 @@
             <groupId>org.neo4j</groupId>
             <artifactId>neo4j</artifactId>
             <version>${neo4j.version}</version>
+            <exclusions>
+                <!-- Exclude neo4j's SLF4J provider to avoid "multiple SLF4J providers" warning -->
+                <exclusion>
+                    <groupId>org.neo4j</groupId>
+                    <artifactId>neo4j-slf4j-provider</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <!-- Spring AI MCP Server (WebMVC, stateless streamable HTTP) -->

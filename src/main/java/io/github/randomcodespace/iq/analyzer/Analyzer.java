@@ -174,7 +174,7 @@ public class Analyzer {
         int edgeCount = builder.getEdgeCount();
 
         report.accept("Analysis complete - " + nodeCount + " nodes, " + edgeCount + " edges");
-        log.info("Analysis complete: {} nodes, {} edges in {}ms",
+        log.debug("Analysis complete: {} nodes, {} edges in {}ms",
                 nodeCount, edgeCount, elapsed.toMillis());
 
         return new AnalysisResult(

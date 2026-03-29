@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.yaml.snakeyaml.Yaml;
 
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.ByteArrayInputStream;
 import java.io.StringReader;
@@ -89,9 +90,19 @@ public class StructuredParser {
 
     private Object parseXml(String content, String filePath) throws Exception {
         var factory = DocumentBuilderFactory.newInstance();
-        // Disable external entities for security
-        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        // Allow DOCTYPE but prevent XXE attacks (avoids [Fatal Error] on stderr)
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", false);
+        factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
         var builder = factory.newDocumentBuilder();
+        // Suppress parse warnings/errors from printing to stderr
+        builder.setErrorHandler(new org.xml.sax.ErrorHandler() {
+            @Override public void warning(org.xml.sax.SAXParseException e) {}
+            @Override public void error(org.xml.sax.SAXParseException e) {}
+            @Override public void fatalError(org.xml.sax.SAXParseException e) throws org.xml.sax.SAXException { throw e; }
+        });
         var doc = builder.parse(new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)));
         var root = doc.getDocumentElement();
         // Return a simple map with root element info for structured detectors
