@@ -41,4 +41,5 @@ jobs:
         with:
           tag_name: v${{ inputs.version }}
           generate_release_notes: true
-          files: target/code-iq-*.jar
+          files: |
+            target/code-iq-*-cli.jar

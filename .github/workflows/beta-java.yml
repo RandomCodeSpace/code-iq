@@ -1,18 +1,17 @@
-name: Snapshot Deploy (Java)
+name: Beta Release (Java)
 on:
-  push:
-    branches: [java]
-    paths: ['src/**', 'pom.xml']
-  workflow_dispatch:
+  workflow_dispatch:    # Manual trigger ONLY
 
 jobs:
-  snapshot:
+  beta:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-java@v4
         with:
@@ -22,12 +21,48 @@ jobs:
           server-id: central
           server-username: MAVEN_USERNAME
           server-password: MAVEN_PASSWORD
+          gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+
+      - name: Determine beta version
+        id: version
+        run: |
+          LATEST_BETA=$(git tag -l 'v0.0.1-beta.*' | sort -V | tail -1)
+          if [ -z "$LATEST_BETA" ]; then
+            NEXT_NUM=0
+          else
+            CURRENT_NUM=$(echo "$LATEST_BETA" | grep -oP 'beta\.\K[0-9]+')
+            NEXT_NUM=$((CURRENT_NUM + 1))
+          fi
+          VERSION="0.0.1-beta.${NEXT_NUM}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+          echo "Next beta version: $VERSION"
+
+      - name: Set version in pom.xml
+        run: mvn versions:set -DnewVersion=${{ steps.version.outputs.version }} -B
 
       - name: Build and test
         run: mvn clean verify -B
 
-      - name: Deploy SNAPSHOT to OSSRH
+      - name: Deploy to Maven Central
         env:
           MAVEN_USERNAME: ${{ secrets.OSS_NEXUS_USER }}
           MAVEN_PASSWORD: ${{ secrets.OSS_NEXUS_PASS }}
-        run: mvn deploy -DskipTests -Dgpg.skip=true -B
+        run: mvn deploy -P release -DskipTests -B
+
+      - name: Create git tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a ${{ steps.version.outputs.tag }} -m "Beta release ${{ steps.version.outputs.version }}"
+          git push origin ${{ steps.version.outputs.tag }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "Beta ${{ steps.version.outputs.version }}"
+          prerelease: true
+          generate_release_notes: true
+          files: |
+            target/code-iq-*-cli.jar

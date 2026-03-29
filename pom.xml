@@ -32,14 +32,6 @@
         <checkstyle-plugin.version>3.6.0</checkstyle-plugin.version>
     </properties>
 
-    <!-- SNAPSHOTs go to OSSRH, releases go via Central Publishing Plugin -->
-    <distributionManagement>
-        <snapshotRepository>
-            <id>central</id>
-            <url>https://central.sonatype.com/repository/maven-snapshots/</url>
-        </snapshotRepository>
-    </distributionManagement>
-
     <dependencyManagement>
         <dependencies>
             <dependency>
@@ -167,6 +159,9 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <classifier>cli</classifier>
+                </configuration>
             </plugin>
 
             <plugin>
