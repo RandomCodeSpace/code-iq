@@ -48,7 +48,7 @@ jobs:
       - name: Build and test
         run: mvn clean verify -B
 
-      - name: Deploy to Maven Central (OSSRH)
+      - name: Deploy to Maven Central
         env:
           MAVEN_USERNAME: ${{ secrets.OSS_NEXUS_USER }}
           MAVEN_PASSWORD: ${{ secrets.OSS_NEXUS_PASS }}
