@@ -11,6 +11,7 @@ import io.github.randomcodespace.iq.flow.FlowModels.FlowEdge;
 import io.github.randomcodespace.iq.flow.FlowModels.FlowNode;
 import io.github.randomcodespace.iq.flow.FlowModels.FlowSubgraph;
 import io.github.randomcodespace.iq.query.QueryService;
+import io.github.randomcodespace.iq.query.StatsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,6 +50,9 @@ class McpToolsTest {
     @Mock
     private GraphDatabaseService graphDb;
 
+    @Mock
+    private StatsService statsService;
+
     private CodeIqConfig config;
     private ObjectMapper objectMapper;
     private McpTools mcpTools;
@@ -58,7 +62,7 @@ class McpToolsTest {
         config = new CodeIqConfig();
         config.setRootPath(".");
         objectMapper = new ObjectMapper();
-        mcpTools = new McpTools(queryService, analyzer, config, objectMapper, flowEngine, graphDb);
+        mcpTools = new McpTools(queryService, analyzer, config, objectMapper, flowEngine, graphDb, statsService);
     }
 
     private Map<String, Object> parseJson(String json) throws IOException {
@@ -337,7 +341,7 @@ class McpToolsTest {
     @Test
     void analyzeCodebaseShouldReturnResult() throws IOException {
         var analysisResult = new AnalysisResult(
-                100, 80, 500, 200, Map.of(), Map.of(), Map.of(), Duration.ofMillis(1500)
+                100, 80, 500, 200, Map.of(), Map.of(), Map.of(), Map.of(), Duration.ofMillis(1500)
         );
         when(analyzer.run(any(), any())).thenReturn(analysisResult);
 

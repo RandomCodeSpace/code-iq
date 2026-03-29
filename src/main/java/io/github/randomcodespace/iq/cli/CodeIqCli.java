@@ -24,6 +24,7 @@ import picocli.CommandLine.Command;
                 FlowCommand.class,
                 BundleCommand.class,
                 CacheCommand.class,
+                StatsCommand.class,
                 PluginsCommand.class,
                 VersionCommand.class
         }

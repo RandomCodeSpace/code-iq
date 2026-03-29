@@ -468,6 +468,42 @@ public class AnalysisCache implements Closeable {
     }
 
     /**
+     * Load all cached nodes across all files.
+     *
+     * @return list of all cached nodes
+     */
+    public List<CodeNode> loadAllNodes() {
+        List<CodeNode> nodes = new ArrayList<>();
+        try (var stmt = conn.prepareStatement("SELECT data FROM nodes")) {
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                nodes.add(deserializeNode(rs.getString(1)));
+            }
+        } catch (SQLException e) {
+            log.debug("Failed to load all nodes", e);
+        }
+        return nodes;
+    }
+
+    /**
+     * Load all cached edges across all files.
+     *
+     * @return list of all cached edges
+     */
+    public List<CodeEdge> loadAllEdges() {
+        List<CodeEdge> edges = new ArrayList<>();
+        try (var stmt = conn.prepareStatement("SELECT data FROM edges")) {
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                edges.add(deserializeEdge(rs.getString(1)));
+            }
+        } catch (SQLException e) {
+            log.debug("Failed to load all edges", e);
+        }
+        return edges;
+    }
+
+    /**
      * Cached nodes and edges for a single file.
      */
     public record CachedResult(List<CodeNode> nodes, List<CodeEdge> edges) {}

@@ -4,10 +4,14 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.randomcodespace.iq.analyzer.AnalysisResult;
 import io.github.randomcodespace.iq.analyzer.Analyzer;
+import io.github.randomcodespace.iq.cache.AnalysisCache;
 import io.github.randomcodespace.iq.config.CodeIqConfig;
 import io.github.randomcodespace.iq.flow.FlowEngine;
 import io.github.randomcodespace.iq.flow.FlowModels.FlowDiagram;
+import io.github.randomcodespace.iq.model.CodeEdge;
+import io.github.randomcodespace.iq.model.CodeNode;
 import io.github.randomcodespace.iq.query.QueryService;
+import io.github.randomcodespace.iq.query.StatsService;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Result;
 import org.springframework.ai.tool.annotation.Tool;
@@ -35,21 +39,58 @@ public class McpTools {
     private final ObjectMapper objectMapper;
     private final FlowEngine flowEngine;
     private final GraphDatabaseService graphDb;
+    private final StatsService statsService;
 
     public McpTools(QueryService queryService, Analyzer analyzer,
                     CodeIqConfig config, ObjectMapper objectMapper,
-                    FlowEngine flowEngine, GraphDatabaseService graphDb) {
+                    FlowEngine flowEngine, GraphDatabaseService graphDb,
+                    StatsService statsService) {
         this.queryService = queryService;
         this.analyzer = analyzer;
         this.config = config;
         this.objectMapper = objectMapper;
         this.flowEngine = flowEngine;
         this.graphDb = graphDb;
+        this.statsService = statsService;
     }
 
     @Tool(name = "get_stats", description = "Get project graph statistics - node counts, edge counts, backend info.")
     public String getStats() {
         return toJson(queryService.getStats());
+    }
+
+    @Tool(name = "get_detailed_stats", description = "Get rich categorized statistics: frameworks, infra, connections, auth, architecture. Category: all, graph, languages, frameworks, infra, connections, auth, architecture.")
+    public String getDetailedStats(
+            @ToolParam(description = "Category filter (default: all)", required = false) String category) {
+        try {
+            java.nio.file.Path root = java.nio.file.Path.of(config.getRootPath()).toAbsolutePath().normalize();
+            java.nio.file.Path cachePath = root.resolve(config.getCacheDir()).resolve("analysis-cache.db");
+
+            if (!java.nio.file.Files.exists(cachePath)) {
+                return toJson(Map.of("error", "No analysis cache found. Run analyze first."));
+            }
+
+            List<CodeNode> nodes;
+            List<CodeEdge> edges;
+            try (AnalysisCache cache = new AnalysisCache(cachePath)) {
+                nodes = cache.loadAllNodes();
+                edges = cache.loadAllEdges();
+            }
+
+            String cat = category != null ? category : "all";
+            if ("all".equalsIgnoreCase(cat)) {
+                return toJson(statsService.computeStats(nodes, edges));
+            }
+            Map<String, Object> catStats = statsService.computeCategory(nodes, edges, cat);
+            if (catStats == null) {
+                return toJson(Map.of("error", "Unknown category: " + cat));
+            }
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put(cat.toLowerCase(), catStats);
+            return toJson(result);
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
+        }
     }
 
     @Tool(name = "query_nodes", description = "Query nodes in the code graph. Filter by kind (endpoint, entity, guard, class, method, component, module, etc.).")

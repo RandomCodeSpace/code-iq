@@ -4,6 +4,7 @@ import io.github.randomcodespace.iq.analyzer.AnalysisResult;
 import io.github.randomcodespace.iq.analyzer.Analyzer;
 import io.github.randomcodespace.iq.config.CodeIqConfig;
 import io.github.randomcodespace.iq.query.QueryService;
+import io.github.randomcodespace.iq.query.StatsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,6 +45,9 @@ class GraphControllerTest {
     @Mock
     private Analyzer analyzer;
 
+    @Mock
+    private StatsService statsService;
+
     private CodeIqConfig config;
 
     @BeforeEach
@@ -52,7 +56,7 @@ class GraphControllerTest {
         config.setMaxDepth(10);
         config.setMaxRadius(10);
         config.setRootPath(".");
-        var controller = new GraphController(queryService, analyzer, config);
+        var controller = new GraphController(queryService, analyzer, config, statsService);
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
 
@@ -423,7 +427,7 @@ class GraphControllerTest {
     void readFileShouldReturnContent(@TempDir Path tempDir) throws Exception {
         Files.writeString(tempDir.resolve("hello.txt"), "Hello World", StandardCharsets.UTF_8);
         config.setRootPath(tempDir.toAbsolutePath().toString());
-        var controller = new GraphController(queryService, analyzer, config);
+        var controller = new GraphController(queryService, analyzer, config, statsService);
         var fileMvc = MockMvcBuilders.standaloneSetup(controller).build();
 
         fileMvc.perform(get("/api/file").param("path", "hello.txt"))
@@ -434,7 +438,7 @@ class GraphControllerTest {
     @Test
     void readFileShouldReturn404ForMissing(@TempDir Path tempDir) throws Exception {
         config.setRootPath(tempDir.toAbsolutePath().toString());
-        var controller = new GraphController(queryService, analyzer, config);
+        var controller = new GraphController(queryService, analyzer, config, statsService);
         var fileMvc = MockMvcBuilders.standaloneSetup(controller).build();
 
         fileMvc.perform(get("/api/file").param("path", "nonexistent.txt"))
@@ -444,7 +448,7 @@ class GraphControllerTest {
     @Test
     void readFileShouldBlockPathTraversal(@TempDir Path tempDir) throws Exception {
         config.setRootPath(tempDir.toAbsolutePath().toString());
-        var controller = new GraphController(queryService, analyzer, config);
+        var controller = new GraphController(queryService, analyzer, config, statsService);
         var fileMvc = MockMvcBuilders.standaloneSetup(controller).build();
 
         fileMvc.perform(get("/api/file").param("path", "../../../etc/passwd"))
@@ -457,7 +461,7 @@ class GraphControllerTest {
     @Test
     void triggerAnalysisShouldReturnResult() throws Exception {
         var analysisResult = new AnalysisResult(
-                100, 80, 500, 200, Map.of(), Map.of(), Map.of(), Duration.ofMillis(1500)
+                100, 80, 500, 200, Map.of(), Map.of(), Map.of(), Map.of(), Duration.ofMillis(1500)
         );
         when(analyzer.run(any(), any())).thenReturn(analysisResult);
 

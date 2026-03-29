@@ -2,8 +2,12 @@ package io.github.randomcodespace.iq.api;
 
 import io.github.randomcodespace.iq.analyzer.AnalysisResult;
 import io.github.randomcodespace.iq.analyzer.Analyzer;
+import io.github.randomcodespace.iq.cache.AnalysisCache;
 import io.github.randomcodespace.iq.config.CodeIqConfig;
+import io.github.randomcodespace.iq.model.CodeEdge;
+import io.github.randomcodespace.iq.model.CodeNode;
 import io.github.randomcodespace.iq.query.QueryService;
+import io.github.randomcodespace.iq.query.StatsService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -33,16 +37,50 @@ public class GraphController {
     private final QueryService queryService;
     private final Analyzer analyzer;
     private final CodeIqConfig config;
+    private final StatsService statsService;
 
-    public GraphController(QueryService queryService, Analyzer analyzer, CodeIqConfig config) {
+    public GraphController(QueryService queryService, Analyzer analyzer,
+                           CodeIqConfig config, StatsService statsService) {
         this.queryService = queryService;
         this.analyzer = analyzer;
         this.config = config;
+        this.statsService = statsService;
     }
 
     @GetMapping("/stats")
     public Map<String, Object> getStats() {
         return queryService.getStats();
+    }
+
+    @GetMapping("/stats/detailed")
+    public Map<String, Object> getDetailedStats(
+            @RequestParam(defaultValue = "all") String category) {
+        Path root = Path.of(config.getRootPath()).toAbsolutePath().normalize();
+        Path cachePath = root.resolve(config.getCacheDir()).resolve("analysis-cache.db");
+
+        if (!Files.exists(cachePath)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "No analysis cache found. Run analyze first.");
+        }
+
+        List<CodeNode> nodes;
+        List<CodeEdge> edges;
+        try (AnalysisCache cache = new AnalysisCache(cachePath)) {
+            nodes = cache.loadAllNodes();
+            edges = cache.loadAllEdges();
+        }
+
+        if ("all".equalsIgnoreCase(category)) {
+            return statsService.computeStats(nodes, edges);
+        }
+        Map<String, Object> catStats = statsService.computeCategory(nodes, edges, category);
+        if (catStats == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Unknown category: " + category);
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put(category.toLowerCase(), catStats);
+        return result;
     }
 
     @GetMapping("/kinds")

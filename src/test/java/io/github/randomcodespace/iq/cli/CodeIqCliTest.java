@@ -24,14 +24,15 @@ class CodeIqCliTest {
 
         String[] expectedNames = {
                 "analyze", "serve", "graph", "query", "find",
-                "cypher", "flow", "bundle", "cache", "plugins", "version"
+                "cypher", "flow", "bundle", "cache", "stats",
+                "plugins", "version"
         };
 
         for (String name : expectedNames) {
             assertNotNull(subcommands.get(name),
                     "Missing subcommand: " + name);
         }
-        assertEquals(11, expectedNames.length);
+        assertEquals(12, expectedNames.length);
     }
 
     @Test
