@@ -1,6 +1,8 @@
 package io.github.randomcodespace.iq.detector.typescript;
 
-import io.github.randomcodespace.iq.detector.AbstractRegexDetector;
+import io.github.randomcodespace.iq.detector.AbstractAntlrDetector;
+import io.github.randomcodespace.iq.grammar.AntlrParserFactory;
+import org.antlr.v4.runtime.tree.ParseTree;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.model.CodeNode;
@@ -14,7 +16,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Component
-public class RemixRouteDetector extends AbstractRegexDetector {
+public class RemixRouteDetector extends AbstractAntlrDetector {
 
     private static final Pattern LOADER_PATTERN = Pattern.compile(
             "export\\s+(?:async\\s+)?function\\s+loader\\s*\\("
@@ -51,7 +53,17 @@ public class RemixRouteDetector extends AbstractRegexDetector {
     }
 
     @Override
-    public DetectorResult detect(DetectorContext ctx) {
+    protected ParseTree parse(DetectorContext ctx) {
+        return AntlrParserFactory.parse(ctx.language(), ctx.content());
+    }
+
+    @Override
+    protected DetectorResult detectWithAst(ParseTree tree, DetectorContext ctx) {
+        return detectWithRegex(ctx);
+    }
+
+    @Override
+    protected DetectorResult detectWithRegex(DetectorContext ctx) {
         List<CodeNode> nodes = new ArrayList<>();
         String text = ctx.content();
         String filePath = ctx.filePath();

@@ -1,6 +1,8 @@
 package io.github.randomcodespace.iq.detector.typescript;
 
-import io.github.randomcodespace.iq.detector.AbstractRegexDetector;
+import io.github.randomcodespace.iq.detector.AbstractAntlrDetector;
+import io.github.randomcodespace.iq.grammar.AntlrParserFactory;
+import org.antlr.v4.runtime.tree.ParseTree;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.model.CodeEdge;
@@ -14,7 +16,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Component
-public class PrismaORMDetector extends AbstractRegexDetector {
+public class PrismaORMDetector extends AbstractAntlrDetector {
 
     private static final Pattern PRISMA_OP_RE = Pattern.compile(
             "prisma\\.(\\w+)\\.(findMany|findFirst|findUnique|create|update|delete|upsert|count|aggregate|groupBy)\\s*\\("
@@ -43,7 +45,17 @@ public class PrismaORMDetector extends AbstractRegexDetector {
     }
 
     @Override
-    public DetectorResult detect(DetectorContext ctx) {
+    protected ParseTree parse(DetectorContext ctx) {
+        return AntlrParserFactory.parse(ctx.language(), ctx.content());
+    }
+
+    @Override
+    protected DetectorResult detectWithAst(ParseTree tree, DetectorContext ctx) {
+        return detectWithRegex(ctx);
+    }
+
+    @Override
+    protected DetectorResult detectWithRegex(DetectorContext ctx) {
         List<CodeNode> nodes = new ArrayList<>();
         List<CodeEdge> edges = new ArrayList<>();
         String text = ctx.content();

@@ -1,6 +1,8 @@
 package io.github.randomcodespace.iq.detector.typescript;
 
-import io.github.randomcodespace.iq.detector.AbstractRegexDetector;
+import io.github.randomcodespace.iq.detector.AbstractAntlrDetector;
+import io.github.randomcodespace.iq.grammar.AntlrParserFactory;
+import org.antlr.v4.runtime.tree.ParseTree;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.model.CodeEdge;
@@ -14,7 +16,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Component
-public class KafkaJSDetector extends AbstractRegexDetector {
+public class KafkaJSDetector extends AbstractAntlrDetector {
 
     private static final Pattern KAFKA_NEW_RE = Pattern.compile("new\\s+Kafka\\s*\\(\\s*\\{");
     private static final Pattern PRODUCER_RE = Pattern.compile("\\.producer\\s*\\(\\s*\\)");
@@ -42,7 +44,19 @@ public class KafkaJSDetector extends AbstractRegexDetector {
     }
 
     @Override
-    public DetectorResult detect(DetectorContext ctx) {
+    protected ParseTree parse(DetectorContext ctx) {
+        String text = ctx.content();
+        if (!text.contains("Kafka") && !text.contains("kafka")) return null;
+        return AntlrParserFactory.parse(ctx.language(), text);
+    }
+
+    @Override
+    protected DetectorResult detectWithAst(ParseTree tree, DetectorContext ctx) {
+        return detectWithRegex(ctx);
+    }
+
+    @Override
+    protected DetectorResult detectWithRegex(DetectorContext ctx) {
         List<CodeNode> nodes = new ArrayList<>();
         List<CodeEdge> edges = new ArrayList<>();
         String text = ctx.content();
