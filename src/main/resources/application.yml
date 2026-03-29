@@ -1,8 +1,6 @@
 spring:
   application:
     name: code-iq
-  profiles:
-    active: indexing
   threads:
     virtual:
       enabled: true

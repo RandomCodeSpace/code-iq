@@ -25,6 +25,7 @@
         <neo4j.version>2026.02.3</neo4j.version>
         <hazelcast.version>5.6.0</hazelcast.version>
         <spring-ai.version>1.1.4</spring-ai.version>
+        <picocli.version>4.7.7</picocli.version>
         <jacoco.version>0.8.14</jacoco.version>
         <spotbugs.version>4.9.8.3</spotbugs.version>
         <owasp.dependency-check.version>12.2.0</owasp.dependency-check.version>
@@ -80,6 +81,18 @@
             <groupId>com.hazelcast</groupId>
             <artifactId>hazelcast</artifactId>
             <version>${hazelcast.version}</version>
+        </dependency>
+
+        <!-- Picocli CLI framework -->
+        <dependency>
+            <groupId>info.picocli</groupId>
+            <artifactId>picocli-spring-boot-starter</artifactId>
+            <version>${picocli.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>info.picocli</groupId>
+            <artifactId>picocli</artifactId>
+            <version>${picocli.version}</version>
         </dependency>
 
         <!-- JavaParser for AST-based Java detection -->
