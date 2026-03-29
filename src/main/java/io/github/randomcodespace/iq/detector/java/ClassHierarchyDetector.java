@@ -1,6 +1,10 @@
 package io.github.randomcodespace.iq.detector.java;
 
-import io.github.randomcodespace.iq.detector.AbstractRegexDetector;
+import com.github.javaparser.ast.CompilationUnit;
+import com.github.javaparser.ast.body.AnnotationDeclaration;
+import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
+import com.github.javaparser.ast.body.EnumDeclaration;
+import com.github.javaparser.ast.type.ClassOrInterfaceType;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.model.CodeEdge;
@@ -14,11 +18,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Detects Java class hierarchies using regex (port of tree-sitter-based Python detector).
+ * Detects Java class hierarchies using JavaParser AST with regex fallback.
+ * Finds classes, interfaces, enums, annotation types, and their inheritance relationships.
  */
 @Component
-public class ClassHierarchyDetector extends AbstractRegexDetector {
+public class ClassHierarchyDetector extends AbstractJavaParserDetector {
 
+    // ---- Regex patterns for fallback ----
     private static final Pattern CLASS_DECL_RE = Pattern.compile(
             "(public\\s+|protected\\s+|private\\s+)?(abstract\\s+)?(final\\s+)?class\\s+(\\w+)"
                     + "(?:\\s+extends\\s+(\\w+))?"
@@ -47,6 +53,201 @@ public class ClassHierarchyDetector extends AbstractRegexDetector {
         String text = ctx.content();
         if (text == null || text.isEmpty()) return DetectorResult.empty();
 
+        Optional<CompilationUnit> cu = parse(ctx);
+        if (cu.isPresent()) {
+            return detectWithAst(cu.get(), ctx);
+        }
+        return detectWithRegex(ctx);
+    }
+
+    // ==================== AST-based detection ====================
+
+    private DetectorResult detectWithAst(CompilationUnit cu, DetectorContext ctx) {
+        List<CodeNode> nodes = new ArrayList<>();
+        List<CodeEdge> edges = new ArrayList<>();
+
+        // Process all class/interface declarations (including inner classes)
+        cu.findAll(ClassOrInterfaceDeclaration.class).forEach(decl -> {
+            String name = decl.getNameAsString();
+            String fqn = resolveFqn(cu, name);
+            String nodeId = ctx.filePath() + ":" + name;
+            int line = decl.getBegin().map(p -> p.line).orElse(1);
+            int lineEnd = decl.getEnd().map(p -> p.line).orElse(line);
+
+            boolean isInterface = decl.isInterface();
+            boolean isAbstract = decl.isAbstract();
+            boolean isFinal = decl.isFinal();
+            String visibility = resolveVisibility(decl);
+
+            NodeKind kind;
+            if (isInterface) {
+                kind = NodeKind.INTERFACE;
+            } else if (isAbstract) {
+                kind = NodeKind.ABSTRACT_CLASS;
+            } else {
+                kind = NodeKind.CLASS;
+            }
+
+            Map<String, Object> props = new LinkedHashMap<>();
+            props.put("visibility", visibility);
+            props.put("is_abstract", isAbstract);
+            props.put("is_final", isFinal);
+
+            // Extended types
+            List<String> extendedTypes = new ArrayList<>();
+            for (ClassOrInterfaceType ext : decl.getExtendedTypes()) {
+                extendedTypes.add(ext.getNameAsString());
+            }
+            if (!extendedTypes.isEmpty()) {
+                if (isInterface) {
+                    props.put("interfaces", extendedTypes);
+                } else {
+                    props.put("superclass", extendedTypes.get(0));
+                }
+            }
+
+            // Implemented types
+            List<String> implementedTypes = new ArrayList<>();
+            for (ClassOrInterfaceType impl : decl.getImplementedTypes()) {
+                implementedTypes.add(impl.getNameAsString());
+            }
+            if (!implementedTypes.isEmpty()) {
+                props.put("interfaces", implementedTypes);
+            }
+
+            CodeNode node = new CodeNode();
+            node.setId(nodeId);
+            node.setKind(kind);
+            node.setLabel(name);
+            node.setFqn(fqn);
+            node.setFilePath(ctx.filePath());
+            node.setLineStart(line);
+            node.setLineEnd(lineEnd);
+            node.setProperties(props);
+            nodes.add(node);
+
+            // EXTENDS edges
+            if (!isInterface) {
+                for (String superclass : extendedTypes) {
+                    CodeEdge edge = new CodeEdge();
+                    edge.setId(nodeId + "->extends->*:" + superclass);
+                    edge.setKind(EdgeKind.EXTENDS);
+                    edge.setSourceId(nodeId);
+                    edge.setTarget(new CodeNode("*:" + superclass, NodeKind.CLASS, superclass));
+                    edges.add(edge);
+                }
+            } else {
+                // Interfaces extend other interfaces
+                for (String ext : extendedTypes) {
+                    CodeEdge edge = new CodeEdge();
+                    edge.setId(nodeId + "->extends->*:" + ext);
+                    edge.setKind(EdgeKind.EXTENDS);
+                    edge.setSourceId(nodeId);
+                    edge.setTarget(new CodeNode("*:" + ext, NodeKind.INTERFACE, ext));
+                    edges.add(edge);
+                }
+            }
+
+            // IMPLEMENTS edges
+            for (String iface : implementedTypes) {
+                CodeEdge edge = new CodeEdge();
+                edge.setId(nodeId + "->implements->*:" + iface);
+                edge.setKind(EdgeKind.IMPLEMENTS);
+                edge.setSourceId(nodeId);
+                edge.setTarget(new CodeNode("*:" + iface, NodeKind.INTERFACE, iface));
+                edges.add(edge);
+            }
+        });
+
+        // Process enum declarations
+        cu.findAll(EnumDeclaration.class).forEach(decl -> {
+            String name = decl.getNameAsString();
+            String fqn = resolveFqn(cu, name);
+            String nodeId = ctx.filePath() + ":" + name;
+            int line = decl.getBegin().map(p -> p.line).orElse(1);
+            int lineEnd = decl.getEnd().map(p -> p.line).orElse(line);
+
+            String visibility = decl.isPublic() ? "public"
+                    : decl.isProtected() ? "protected"
+                    : decl.isPrivate() ? "private"
+                    : "package-private";
+
+            List<String> interfaces = new ArrayList<>();
+            for (ClassOrInterfaceType impl : decl.getImplementedTypes()) {
+                interfaces.add(impl.getNameAsString());
+            }
+
+            Map<String, Object> props = new LinkedHashMap<>();
+            props.put("visibility", visibility);
+            props.put("is_abstract", false);
+            props.put("is_final", false);
+            if (!interfaces.isEmpty()) props.put("interfaces", interfaces);
+
+            CodeNode node = new CodeNode();
+            node.setId(nodeId);
+            node.setKind(NodeKind.ENUM);
+            node.setLabel(name);
+            node.setFqn(fqn);
+            node.setFilePath(ctx.filePath());
+            node.setLineStart(line);
+            node.setLineEnd(lineEnd);
+            node.setProperties(props);
+            nodes.add(node);
+
+            for (String iface : interfaces) {
+                CodeEdge edge = new CodeEdge();
+                edge.setId(nodeId + "->implements->*:" + iface);
+                edge.setKind(EdgeKind.IMPLEMENTS);
+                edge.setSourceId(nodeId);
+                edge.setTarget(new CodeNode("*:" + iface, NodeKind.INTERFACE, iface));
+                edges.add(edge);
+            }
+        });
+
+        // Process annotation type declarations
+        cu.findAll(AnnotationDeclaration.class).forEach(decl -> {
+            String name = decl.getNameAsString();
+            String fqn = resolveFqn(cu, name);
+            String nodeId = ctx.filePath() + ":" + name;
+            int line = decl.getBegin().map(p -> p.line).orElse(1);
+            int lineEnd = decl.getEnd().map(p -> p.line).orElse(line);
+
+            String visibility = decl.isPublic() ? "public"
+                    : decl.isProtected() ? "protected"
+                    : decl.isPrivate() ? "private"
+                    : "package-private";
+
+            Map<String, Object> props = new LinkedHashMap<>();
+            props.put("visibility", visibility);
+            props.put("is_abstract", false);
+            props.put("is_final", false);
+
+            CodeNode node = new CodeNode();
+            node.setId(nodeId);
+            node.setKind(NodeKind.ANNOTATION_TYPE);
+            node.setLabel(name);
+            node.setFqn(fqn);
+            node.setFilePath(ctx.filePath());
+            node.setLineStart(line);
+            node.setLineEnd(lineEnd);
+            node.setProperties(props);
+            nodes.add(node);
+        });
+
+        return DetectorResult.of(nodes, edges);
+    }
+
+    private String resolveVisibility(ClassOrInterfaceDeclaration decl) {
+        if (decl.isPublic()) return "public";
+        if (decl.isProtected()) return "protected";
+        if (decl.isPrivate()) return "private";
+        return "package-private";
+    }
+
+    // ==================== Regex fallback ====================
+
+    private DetectorResult detectWithRegex(DetectorContext ctx) {
+        String text = ctx.content();
         String[] lines = text.split("\n", -1);
         List<CodeNode> nodes = new ArrayList<>();
         List<CodeEdge> edges = new ArrayList<>();
