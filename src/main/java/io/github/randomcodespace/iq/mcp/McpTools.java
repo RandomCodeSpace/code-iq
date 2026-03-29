@@ -8,6 +8,7 @@ import io.github.randomcodespace.iq.config.CodeIqConfig;
 import io.github.randomcodespace.iq.query.QueryService;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
@@ -20,6 +21,7 @@ import java.util.Map;
  * Tool names match the Python MCP implementation exactly.
  */
 @Component
+@Profile("serving")
 public class McpTools {
 
     private final QueryService queryService;
