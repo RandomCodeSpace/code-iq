@@ -36,7 +36,7 @@
     <distributionManagement>
         <snapshotRepository>
             <id>central</id>
-            <url>https://s01.oss.sonatype.org/content/repositories/snapshots/</url>
+            <url>https://central.sonatype.com/repository/maven-snapshots/</url>
         </snapshotRepository>
     </distributionManagement>
 
@@ -306,17 +306,6 @@
                 </configuration>
             </plugin>
 
-            <plugin>
-                <groupId>org.sonatype.central</groupId>
-                <artifactId>central-publishing-maven-plugin</artifactId>
-                <version>0.10.0</version>
-                <extensions>true</extensions>
-                <configuration>
-                    <publishingServerId>central</publishingServerId>
-                    <autoPublish>true</autoPublish>
-                </configuration>
-            </plugin>
-
             <!-- Source JAR (required by Maven Central) -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -356,6 +345,17 @@
             <id>release</id>
             <build>
                 <plugins>
+                    <!-- Central Publishing Plugin — only for releases, NOT snapshots -->
+                    <plugin>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>0.10.0</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <publishingServerId>central</publishingServerId>
+                            <autoPublish>true</autoPublish>
+                        </configuration>
+                    </plugin>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-source-plugin</artifactId>
