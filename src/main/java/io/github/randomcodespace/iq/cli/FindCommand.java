@@ -3,6 +3,7 @@ package io.github.randomcodespace.iq.cli;
 import io.github.randomcodespace.iq.graph.GraphStore;
 import io.github.randomcodespace.iq.model.CodeNode;
 import io.github.randomcodespace.iq.model.NodeKind;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -10,6 +11,7 @@ import picocli.CommandLine.Parameters;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 
 /**
@@ -35,12 +37,22 @@ public class FindCommand implements Callable<Integer> {
 
     private final GraphStore graphStore;
 
-    public FindCommand(GraphStore graphStore) {
+    @Autowired
+    public FindCommand(Optional<GraphStore> graphStore) {
+        this.graphStore = graphStore.orElse(null);
+    }
+
+    /** Convenience constructor for tests. */
+    FindCommand(GraphStore graphStore) {
         this.graphStore = graphStore;
     }
 
     @Override
     public Integer call() {
+        if (graphStore == null) {
+            CliOutput.error("Find queries require Neo4j. Run 'code-iq enrich' first, then 'code-iq serve'.");
+            return 1;
+        }
         NodeKind kind = resolveKind(what);
         if (kind == null) {
             CliOutput.error("Unknown find target: " + what);

@@ -1,6 +1,7 @@
 package io.github.randomcodespace.iq.cli;
 
 import io.github.randomcodespace.iq.query.QueryService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -9,6 +10,7 @@ import picocli.CommandLine.Parameters;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 
 /**
@@ -48,12 +50,22 @@ public class QueryCommand implements Callable<Integer> {
 
     private final QueryService queryService;
 
-    public QueryCommand(QueryService queryService) {
+    @Autowired
+    public QueryCommand(Optional<QueryService> queryService) {
+        this.queryService = queryService.orElse(null);
+    }
+
+    /** Convenience constructor for tests. */
+    QueryCommand(QueryService queryService) {
         this.queryService = queryService;
     }
 
     @Override
     public Integer call() {
+        if (queryService == null) {
+            CliOutput.error("Graph queries require Neo4j. Run 'code-iq enrich' first, then 'code-iq serve'.");
+            return 1;
+        }
         if (consumersOf != null) {
             return printResult("Consumers of " + consumersOf, queryService.consumersOf(consumersOf));
         }

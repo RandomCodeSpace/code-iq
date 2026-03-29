@@ -1,6 +1,7 @@
 package io.github.randomcodespace.iq.health;
 
 import io.github.randomcodespace.iq.graph.GraphStore;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.HealthIndicator;
 import org.springframework.stereotype.Component;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Component;
  * has been populated with nodes.
  */
 @Component
+@ConditionalOnBean(GraphStore.class)
 public class GraphHealthIndicator implements HealthIndicator {
 
     private final GraphStore graphStore;

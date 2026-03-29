@@ -7,6 +7,7 @@ import io.github.randomcodespace.iq.analyzer.Analyzer;
 import io.github.randomcodespace.iq.config.CodeIqConfig;
 import io.github.randomcodespace.iq.flow.FlowEngine;
 import io.github.randomcodespace.iq.graph.GraphStore;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -19,6 +20,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
@@ -46,8 +48,18 @@ public class BundleCommand implements Callable<Integer> {
     private final GraphStore graphStore;
     private final FlowEngine flowEngine;
 
+    @Autowired
     public BundleCommand(CodeIqConfig config, Analyzer analyzer,
-                         GraphStore graphStore, FlowEngine flowEngine) {
+                         Optional<GraphStore> graphStore, Optional<FlowEngine> flowEngine) {
+        this.config = config;
+        this.analyzer = analyzer;
+        this.graphStore = graphStore.orElse(null);
+        this.flowEngine = flowEngine.orElse(null);
+    }
+
+    /** Convenience constructor for tests. */
+    BundleCommand(CodeIqConfig config, Analyzer analyzer,
+                  GraphStore graphStore, FlowEngine flowEngine) {
         this.config = config;
         this.analyzer = analyzer;
         this.graphStore = graphStore;
@@ -88,11 +100,15 @@ public class BundleCommand implements Callable<Integer> {
                 nodeCount = analysisResult.nodeCount();
                 edgeCount = analysisResult.edgeCount();
                 filesAnalyzed = analysisResult.totalFiles();
-            } else {
+            } else if (graphStore != null) {
                 nodeCount = graphStore.count();
                 edgeCount = graphStore.findAll().stream()
                         .mapToLong(n -> n.getEdges().size())
                         .sum();
+                filesAnalyzed = 0;
+            } else {
+                nodeCount = 0;
+                edgeCount = 0;
                 filesAnalyzed = 0;
             }
 
@@ -119,13 +135,15 @@ public class BundleCommand implements Callable<Integer> {
             }
 
             // 3. Generate interactive flow HTML
-            try {
-                String flowHtml = flowEngine.renderInteractive(projectName);
-                zos.putNextEntry(new ZipEntry("flow.html"));
-                zos.write(flowHtml.getBytes(StandardCharsets.UTF_8));
-                zos.closeEntry();
-            } catch (Exception e) {
-                CliOutput.warn("Could not generate flow.html: " + e.getMessage());
+            if (flowEngine != null) {
+                try {
+                    String flowHtml = flowEngine.renderInteractive(projectName);
+                    zos.putNextEntry(new ZipEntry("flow.html"));
+                    zos.write(flowHtml.getBytes(StandardCharsets.UTF_8));
+                    zos.closeEntry();
+                } catch (Exception e) {
+                    CliOutput.warn("Could not generate flow.html: " + e.getMessage());
+                }
             }
 
             // 4. Bundle source files

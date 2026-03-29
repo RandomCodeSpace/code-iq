@@ -4,6 +4,7 @@ import io.github.randomcodespace.iq.config.CodeIqConfig;
 import io.github.randomcodespace.iq.graph.GraphStore;
 import io.github.randomcodespace.iq.model.CodeEdge;
 import io.github.randomcodespace.iq.model.CodeNode;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
@@ -18,6 +19,7 @@ import java.util.stream.Collectors;
  * All methods return simple Map/List structures for JSON serialization.
  */
 @Service
+@ConditionalOnBean(GraphStore.class)
 public class QueryService {
 
     private final GraphStore graphStore;

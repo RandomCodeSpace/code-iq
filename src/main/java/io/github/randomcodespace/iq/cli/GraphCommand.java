@@ -2,6 +2,7 @@ package io.github.randomcodespace.iq.cli;
 
 import io.github.randomcodespace.iq.graph.GraphStore;
 import io.github.randomcodespace.iq.model.CodeNode;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -16,6 +17,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 
@@ -50,12 +52,22 @@ public class GraphCommand implements Callable<Integer> {
 
     private final GraphStore graphStore;
 
-    public GraphCommand(GraphStore graphStore) {
+    @Autowired
+    public GraphCommand(Optional<GraphStore> graphStore) {
+        this.graphStore = graphStore.orElse(null);
+    }
+
+    /** Convenience constructor for tests. */
+    GraphCommand(GraphStore graphStore) {
         this.graphStore = graphStore;
     }
 
     @Override
     public Integer call() {
+        if (graphStore == null) {
+            CliOutput.error("Graph export requires Neo4j. Run 'code-iq enrich' first, then 'code-iq serve'.");
+            return 1;
+        }
         List<CodeNode> nodes;
         if (focus != null && !focus.isBlank()) {
             nodes = graphStore.findEgoGraph(focus, hops);

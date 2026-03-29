@@ -2,6 +2,7 @@ package io.github.randomcodespace.iq.cli;
 
 import io.github.randomcodespace.iq.flow.FlowEngine;
 import io.github.randomcodespace.iq.flow.FlowModels.FlowDiagram;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -11,6 +12,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Optional;
 import java.util.concurrent.Callable;
 
 /**
@@ -38,12 +40,22 @@ public class FlowCommand implements Callable<Integer> {
 
     private final FlowEngine flowEngine;
 
-    public FlowCommand(FlowEngine flowEngine) {
+    @Autowired
+    public FlowCommand(Optional<FlowEngine> flowEngine) {
+        this.flowEngine = flowEngine.orElse(null);
+    }
+
+    /** Convenience constructor for tests. */
+    FlowCommand(FlowEngine flowEngine) {
         this.flowEngine = flowEngine;
     }
 
     @Override
     public Integer call() {
+        if (flowEngine == null) {
+            CliOutput.error("Flow diagrams require Neo4j. Run 'code-iq enrich' first, then 'code-iq serve'.");
+            return 1;
+        }
         try {
             String content;
 
