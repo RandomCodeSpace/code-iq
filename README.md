@@ -1,128 +1,131 @@
 <p align="center">
   <h1 align="center">OSSCodeIQ</h1>
   <p align="center">
-    <strong>Deterministic code graph discovery and analysis CLI — no AI, pure pattern matching</strong>
+    <strong>Deterministic code knowledge graph -- scans codebases to build a graph of services, endpoints, entities, infrastructure, auth patterns, and framework usage. No AI, pure static analysis.</strong>
   </p>
 </p>
 
 <p align="center">
-  <a href="https://github.com/RandomCodeSpace/code-iq/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/RandomCodeSpace/code-iq/ci.yml?branch=main&style=flat-square&logo=github&label=CI" alt="CI"></a>
-  <a href="https://github.com/RandomCodeSpace/code-iq/actions/workflows/beta.yml"><img src="https://img.shields.io/github/actions/workflow/status/RandomCodeSpace/code-iq/beta.yml?branch=main&style=flat-square&logo=github&label=Beta" alt="Beta Build"></a>
-  <a href="https://github.com/RandomCodeSpace/code-iq/releases"><img src="https://img.shields.io/github/v/release/RandomCodeSpace/code-iq?include_prereleases&style=flat-square&logo=github&label=Release" alt="Release"></a>
-  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square&logo=python&logoColor=white" alt="Python 3.11+"></a>
-  <a href="https://github.com/RandomCodeSpace/code-iq/blob/main/LICENSE"><img src="https://img.shields.io/github/license/RandomCodeSpace/code-iq?style=flat-square&label=License" alt="MIT License"></a>
-  <a href="https://github.com/RandomCodeSpace/code-iq/actions/workflows/sbom.yml"><img src="https://img.shields.io/github/actions/workflow/status/RandomCodeSpace/code-iq/sbom.yml?branch=main&style=flat-square&logo=shieldsdotio&logoColor=white&label=SBOM%20%2B%20Audit" alt="SBOM + Dependency Audit"></a>
-  <a href="https://sonarcloud.io/summary/overall?id=RandomCodeSpace_code-iq"><img src="https://sonarcloud.io/api/project_badges/measure?project=RandomCodeSpace_code-iq&metric=security_rating&style=flat-square" alt="Sonarcloud Security"></a>
-  <a href="https://sonarcloud.io/summary/overall?id=RandomCodeSpace_code-iq"><img src="https://sonarcloud.io/api/project_badges/measure?project=RandomCodeSpace_code-iq&metric=reliability_rating" alt="Sonarcloud Reliability"></a>
-  <a href="https://sonarcloud.io/summary/overall?id=RandomCodeSpace_code-iq"><img src="https://sonarcloud.io/api/project_badges/measure?project=RandomCodeSpace_code-iq&metric=sqale_rating" alt="Sonarcloud Maintainability"></a>
-  <a href="https://sonarcloud.io/summary/overall?id=RandomCodeSpace_code-iq"><img src="https://sonarcloud.io/api/project_badges/measure?project=RandomCodeSpace_code-iq&metric=bugs" alt="Sonarcloud Bugs"></a>
-  <a href="https://sonarcloud.io/summary/overall?id=RandomCodeSpace_code-iq"><img src="https://sonarcloud.io/api/project_badges/measure?project=RandomCodeSpace_code-iq&metric=vulnerabilities" alt="Sonarcloud Vulnerabilities"></a>
-  <a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/github/stars/RandomCodeSpace/code-iq?style=flat-square&logo=github&label=Stars" alt="Stars"></a>
-  <a href="https://github.com/RandomCodeSpace/code-iq/issues"><img src="https://img.shields.io/github/issues/RandomCodeSpace/code-iq?style=flat-square&logo=github&label=Issues" alt="Issues"></a>
-  <a href="https://github.com/RandomCodeSpace/code-iq/commits/main"><img src="https://img.shields.io/github/last-commit/RandomCodeSpace/code-iq?style=flat-square&logo=github&label=Last%20Commit" alt="Last Commit"></a>
-  <a href="https://pypi.org/project/osscodeiq/"><img src="https://img.shields.io/pypi/v/osscodeiq?style=flat-square&logo=pypi&logoColor=white&label=PyPI" alt="PyPI"></a>
-  <a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/detectors-115-brightgreen?style=flat-square&logo=codefactor&logoColor=white" alt="115 Detectors"></a>
-  <a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/languages-35-blue?style=flat-square&logo=stackblitz&logoColor=white" alt="35 Languages"></a>
-  <a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/tests-2146-brightgreen?style=flat-square&logo=pytest&logoColor=white" alt="2146 Tests"></a>
+  <a href="https://central.sonatype.com/artifact/io.github.randomcodespace.iq/code-iq"><img src="https://img.shields.io/maven-central/v/io.github.randomcodespace.iq/code-iq?style=flat-square&logo=apachemaven&label=Maven%20Central" alt="Maven Central"></a>
+  <a href="https://github.com/RandomCodeSpace/code-iq/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/RandomCodeSpace/code-iq/ci.yml?branch=java&style=flat-square&logo=github&label=CI" alt="CI"></a>
+  <a href="https://www.oracle.com/java/technologies/downloads/"><img src="https://img.shields.io/badge/Java-25-orange?style=flat-square&logo=openjdk&logoColor=white" alt="Java 25"></a>
+  <a href="https://github.com/RandomCodeSpace/code-iq/blob/java/LICENSE"><img src="https://img.shields.io/github/license/RandomCodeSpace/code-iq?style=flat-square&label=License" alt="MIT License"></a>
+  <a href="https://sonarcloud.io/summary/overall?id=RandomCodeSpace_code-iq"><img src="https://sonarcloud.io/api/project_badges/measure?project=RandomCodeSpace_code-iq&metric=security_rating" alt="Security"></a>
+  <a href="https://sonarcloud.io/summary/overall?id=RandomCodeSpace_code-iq"><img src="https://sonarcloud.io/api/project_badges/measure?project=RandomCodeSpace_code-iq&metric=reliability_rating" alt="Reliability"></a>
+  <a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/detectors-106-brightgreen?style=flat-square&logo=codefactor&logoColor=white" alt="106 Detectors"></a>
+  <a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/languages-35%2B-blue?style=flat-square&logo=stackblitz&logoColor=white" alt="35+ Languages"></a>
 </p>
 
 ---
 
-**OSSCodeIQ** scans codebases to build a deterministic knowledge graph of code relationships — classes, methods, endpoints, entities, dependencies, infrastructure resources, auth patterns, and more. 115 detectors across 35 languages, 3 storage backends (NetworkX, SQLite, KuzuDB), interactive web UI, REST API, MCP server, and zero AI dependency.
-
-## Features
-
-- **115 detectors** across 35 languages — Java, Python, TypeScript, Go, C#, Rust, Kotlin, and more
-- **Framework detection** — Spring Boot, Django, Flask, FastAPI, Express, NestJS, Gin, Echo, Actix-web, Axum, Quarkus, Micronaut, Prisma, Sequelize, Mongoose, Pydantic, Entity Framework Core, and 60+ more
-- **Auth/security detection** — Spring Security, Django Auth, FastAPI Auth, NestJS Guards, Passport/JWT, LDAP, Azure AD, mTLS, CSRF, session/cookie auth
-- **Frontend detection** — React, Vue, Angular, Svelte components, hooks, frontend routes (React Router, Vue Router, Next.js, Remix)
-- **Infrastructure** — Terraform, Kubernetes, Docker Compose, Helm Charts, CloudFormation, Bicep, GitLab CI, GitHub Actions
-- **Layer classification** — Every node tagged as `frontend`, `backend`, `infra`, `shared`, or `unknown`
-- **Web Explorer UI** — NiceGUI-powered progressive drill-down card interface with light/dark/system themes, animations, and search
-- **MCP Tool Console** — Interactive terminal in the web UI for executing MCP graph queries
-- **Flow diagrams** — Interactive Cytoscape.js architecture diagrams with drill-down (CI, Deploy, Runtime, Auth views)
-- **REST API + MCP server** — 20+ REST endpoints and 20 MCP tools on a single port
-- **3 storage backends** — NetworkX (in-memory), SQLite (file-based), KuzuDB (Cypher queries)
-- **Bundle & distribute** — Package graph DB + source code + interactive HTML into a zip for Nexus/artifact publishing
-- **100% deterministic** — Same input, same output, every time, on every backend
-- **Plugin system** — Auto-discovered detectors + setuptools entry points for external plugins
+**OSSCodeIQ** scans codebases to build a deterministic knowledge graph of code relationships -- classes, methods, endpoints, entities, dependencies, infrastructure resources, auth patterns, and more. 106 detectors across 35+ languages, Neo4j Embedded graph database, Hazelcast distributed cache, Spring AI MCP server, REST API, web UI, and zero AI dependency.
 
 ## Quick Start
 
 ```bash
-# Install from PyPI
-pip install osscodeiq
+# From Maven Central
+mvn dependency:resolve -DgroupId=io.github.randomcodespace.iq -DartifactId=code-iq
+
+# Or build from source
+git clone https://github.com/RandomCodeSpace/code-iq.git
+cd code-iq && git checkout java
+mvn clean package -DskipTests
 
 # Analyze a codebase
-osscodeiq analyze /path/to/repo
+java -jar target/code-iq-*.jar analyze /path/to/repo
 
-# Start the web UI + REST API + MCP server
-osscodeiq serve /path/to/repo
-# Open http://localhost:8000 — Explorer UI with drill-down cards, flow diagrams, MCP console
+# View rich statistics
+java -jar target/code-iq-*.jar stats /path/to/repo
 
-# Generate architecture flow diagram
-osscodeiq flow /path/to/repo --format html --output flow.html
-
-# Query the graph
-osscodeiq find endpoints /path/to/repo
-osscodeiq find guards /path/to/repo
-osscodeiq find unprotected /path/to/repo
-
-# Use Cypher queries (KuzuDB backend)
-osscodeiq analyze /path/to/repo --backend kuzu
-osscodeiq cypher "MATCH (e:CodeNode {kind: 'endpoint'})-[]->(s:CodeNode) RETURN e.label, s.label LIMIT 20" /path/to/repo --backend kuzu
-
-# Bundle for distribution (graph DB + source code + visualizations)
-osscodeiq bundle /path/to/repo --tag v2.1.0 --backend sqlite
+# Start server (REST + MCP + UI)
+java -jar target/code-iq-*.jar serve /path/to/repo
+# Open http://localhost:8080 -- Explorer UI with drill-down cards, flow diagrams, MCP console
 ```
 
-## Supported Languages & Frameworks
+## Features
 
-### Java (28 detectors)
-Spring REST, Spring Security, JPA/Hibernate, Kafka, RabbitMQ, JMS, gRPC, JAX-RS, WebSocket, Azure Functions, Cosmos DB, IBM MQ, TIBCO EMS, Quarkus, Micronaut
+- **106 detectors** across 35+ languages -- Java, Python, TypeScript, Go, C#, Rust, Kotlin, Scala, C++, and more
+- **JavaParser AST** for deep Java analysis (Spring, JPA, Kafka, gRPC, JAX-RS, etc.)
+- **ANTLR grammars** for 6 languages (TypeScript/JavaScript, Python, Go, C#, Rust, C++)
+- **Neo4j Embedded** graph database -- full Cypher query support, no external server needed
+- **Hazelcast distributed cache** -- K8s-ready, multi-node incremental analysis
+- **Spring AI MCP server** -- 21 tools via streamable HTTP for AI-powered triage
+- **REST API** -- 23+ endpoints for programmatic access
+- **Web UI** -- Thymeleaf + HTMX progressive drill-down explorer with search
+- **CLI with 12 commands** -- analyze, stats, graph, query, find, cypher, flow, serve, bundle, cache, plugins, version
+- **Virtual threads** (Java 25) -- adaptive parallelism across all available cores
+- **Flow diagrams** -- interactive Cytoscape.js architecture diagrams (CI, Deploy, Runtime, Auth views)
+- **Bundle & distribute** -- package graph DB + source + interactive HTML into a ZIP
+- **100% deterministic** -- same input, same output, every time
+- **Incremental analysis** -- SQLite-backed file hash cache, only re-analyzes changed files
 
-### Python (12 detectors)
-Flask, Django (views + models), FastAPI, SQLAlchemy, Celery, Pydantic, Kafka (confluent/aiokafka), general structures (classes, functions, imports)
+## Frameworks Detected
 
-### TypeScript/JavaScript (22 detectors)
-Express, NestJS, Fastify, Remix, GraphQL, TypeORM, Prisma, Sequelize, Mongoose, KafkaJS, React, Vue, Angular, Svelte, frontend routes
+### Java
+Spring REST, Spring Security, JPA/Hibernate, Kafka, RabbitMQ, JMS, gRPC, JAX-RS, WebSocket, Azure Functions, Cosmos DB, IBM MQ, TIBCO EMS, Quarkus, Micronaut, Spring Events, RMI
 
-### Go (3 detectors)
-Gin, Echo, Chi, gorilla/mux, net/http endpoints + GORM, sqlx, database/sql + general structures
+### Python
+Flask, Django (views + models + auth), FastAPI (routes + auth), SQLAlchemy, Celery, Pydantic, Kafka (confluent/aiokafka)
 
-### C# (4 detectors)
+### TypeScript / JavaScript
+Express, NestJS (controllers + guards), Fastify, Remix, GraphQL resolvers, TypeORM, Prisma, Sequelize, Mongoose, KafkaJS, Passport/JWT
+
+### Frontend
+React, Vue, Angular, Svelte components, frontend routes (React Router, Vue Router, Next.js, Remix)
+
+### Go
+Gin, Echo, Chi, gorilla/mux, net/http, GORM, sqlx, database/sql
+
+### C#
 Entity Framework Core, Minimal APIs, ASP.NET Core, Azure Functions
 
-### Rust (2 detectors)
-Actix-web, Axum + general structures (traits, impls, macros)
+### Rust
+Actix-web, Axum, traits, impls, macros
 
-### Kotlin (2 detectors)
-Ktor + general structures (sealed/enum/annotation classes, extension functions)
+### Kotlin
+Ktor routes, sealed/enum/annotation classes, extension functions
 
-### Infrastructure & Config (16 detectors)
-Terraform, Kubernetes, K8s RBAC, Docker Compose, Dockerfile, Bicep, GitHub Actions, GitLab CI, Helm Charts, CloudFormation, JSON, YAML, TOML, INI, Properties, Markdown, Proto
+### Infrastructure & Config
+Terraform, Kubernetes, K8s RBAC, Docker Compose, Dockerfile, Bicep, GitHub Actions, GitLab CI, Helm Charts, CloudFormation, OpenAPI, JSON, YAML, TOML, INI, Properties, SQL, Markdown, Proto
 
-### Auth & Security (9 detectors)
+### Auth & Security
 Spring Security, Django Auth, FastAPI Auth, NestJS Guards, Passport/JWT, K8s RBAC, LDAP, TLS/Certificate/Azure AD, Session/Header/CSRF
+
+## CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `analyze [path]` | Scan codebase and build knowledge graph |
+| `stats [path]` | Show rich categorized statistics from analyzed graph |
+| `graph [path]` | Export graph in various formats (JSON, YAML, Mermaid, DOT) |
+| `query [path]` | Query graph relationships (consumers, producers, callers, etc.) |
+| `find [what] [path]` | Preset queries (endpoints, guards, entities, topics, etc.) |
+| `cypher [query]` | Execute raw Cypher queries against Neo4j |
+| `flow [path]` | Generate architecture flow diagrams |
+| `serve [path]` | Start web UI + REST API + MCP server |
+| `bundle [path]` | Package graph + source into distributable ZIP |
+| `cache [action]` | Manage analysis cache (status, clear, rebuild) |
+| `plugins [action]` | List and inspect detectors |
+| `version` | Show version info |
 
 ## Architecture
 
 ```
-osscodeiq analyze /path/to/repo
+code-iq analyze /path/to/repo
         |
         v
 +------------------+
-| File Discovery   |  git ls-files + extension/filename mapping (35 languages)
+| File Discovery   |  git ls-files + extension/filename mapping (35+ languages)
 +--------+---------+
          |
          v
 +------------------+
-| Parsing Layer    |  Tree-sitter (Java/Python/TS/JS) + structured parsers
+| Parsing Layer    |  JavaParser AST (Java) + ANTLR (TS/Py/Go/C#/Rust/C++) + regex
 +--------+---------+
          |
          v
 +------------------+
-| 115 Detectors    |  Auto-discovered via pkgutil, adaptive parallel workers
+| 106 Detectors    |  Spring-managed beans, virtual thread parallelism
 +--------+---------+
          |
          v
@@ -138,32 +141,63 @@ osscodeiq analyze /path/to/repo
          |
          v
 +------------------+
-| Graph Backend    |  NetworkX (memory) | SQLite (file) | KuzuDB (Cypher)
+| Graph Builder    |  Buffered flush: nodes first, then edges (determinism)
++--------+---------+
+         |
+         v
++------------------+
+| Neo4j Embedded   |  Full Cypher support, embedded in process, no server needed
 +------------------+
          |
          v
 +------------------+
-| Output           |  JSON | YAML | Mermaid | DOT | Interactive HTML
+| Output           |  REST API + MCP + Web UI + CLI + Flow Diagrams
 +------------------+
 ```
 
-## Flow Diagrams
+## Server
 
-Generate architecture flow diagrams with drill-down views:
+Start a unified server with Explorer UI, REST API, and MCP server on a single port:
 
 ```bash
-# High-level overview
-osscodeiq flow ./my-project --format mermaid
-
-# Drill into specific layers
-osscodeiq flow ./my-project --view ci       # CI/CD pipeline
-osscodeiq flow ./my-project --view deploy   # Deployment topology
-osscodeiq flow ./my-project --view runtime  # Service architecture
-osscodeiq flow ./my-project --view auth     # Security coverage
-
-# Interactive HTML with click-to-drill
-osscodeiq flow ./my-project --format html --output flow.html
+java -jar target/code-iq-*.jar serve /path/to/repo --port 8080
 ```
+
+### Web UI (`/`)
+Thymeleaf + HTMX progressive drill-down explorer:
+- Browse by node kind (Endpoints, Entities, Classes, Guards, etc.)
+- Click to drill into individual nodes with full detail modals
+- Client-side search filtering
+- Architecture flow diagrams
+
+### REST API (`/api`)
+23+ endpoints for programmatic access:
+- `/api/stats` -- Graph statistics
+- `/api/stats/detailed` -- Rich categorized statistics
+- `/api/kinds` -- Node kinds with counts
+- `/api/kinds/{kind}` -- Paginated nodes by kind
+- `/api/nodes`, `/api/edges` -- Paginated queries with `?kind=&limit=&offset=`
+- `/api/nodes/{id}/detail` -- Full node detail with edges
+- `/api/nodes/{id}/neighbors` -- Neighbor traversal
+- `/api/ego/{center}` -- Ego subgraph
+- `/api/query/cycles`, `/shortest-path`, `/consumers/{id}`, `/producers/{id}`, `/callers/{id}`, `/dependencies/{id}`, `/dependents/{id}`
+- `/api/triage/component`, `/impact/{id}` -- Agentic triage tools
+- `/api/search?q=` -- Free-text graph search
+- `/api/file?path=` -- Serve source files (path traversal protected)
+- `/api/flow/{view}` -- Flow diagrams
+- `POST /api/analyze` -- Trigger analysis
+- OpenAPI docs at `/swagger-ui.html`
+
+### MCP Server (`/mcp`)
+21 tools via Spring AI streamable HTTP for AI-powered code triage:
+- `get_stats`, `get_detailed_stats`, `query_nodes`, `query_edges`
+- `get_node_neighbors`, `get_ego_graph`
+- `find_cycles`, `find_shortest_path`
+- `find_consumers`, `find_producers`, `find_callers`
+- `find_dependencies`, `find_dependents`
+- `generate_flow`, `analyze_codebase`, `run_cypher`
+- `find_component_by_file`, `trace_impact`, `find_related_endpoints`
+- `search_graph`, `read_file`
 
 ## Graph Model
 
@@ -173,85 +207,79 @@ osscodeiq flow ./my-project --format html --output flow.html
 ### Edge Types (26)
 `depends_on` `imports` `extends` `implements` `calls` `injects` `exposes` `queries` `maps_to` `produces` `consumes` `publishes` `listens` `invokes_rmi` `exports_rmi` `reads_config` `migrates` `contains` `defines` `overrides` `connects_to` `triggers` `provisions` `sends_to` `receives_from` `protects` `renders`
 
-## Storage Backends
+## Maven Coordinates
 
-| Backend | Type | Cypher | Bundleable | Use Case |
-|---------|------|--------|------------|----------|
-| **SQLite** | File | No | .db file | Default, persistent, zero dependencies |
-| **NetworkX** | In-memory | No | Via JSON | Fast in-process use |
-| **KuzuDB** | File | Yes | Directory | Cypher queries, agentic AI |
-
-```bash
-osscodeiq analyze ./repo                   # SQLite (default)
-osscodeiq analyze ./repo --backend kuzu    # KuzuDB with Cypher
-osscodeiq analyze ./repo --backend networkx # In-memory
+```xml
+<dependency>
+    <groupId>io.github.randomcodespace.iq</groupId>
+    <artifactId>code-iq</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+</dependency>
 ```
 
-## Web UI & Server
-
-Start a unified server with Explorer UI, REST API, and MCP server on a single port:
+## Docker
 
 ```bash
-osscodeiq serve /path/to/repo
+# Build
+docker build -t code-iq .
+
+# Analyze a codebase
+docker run -v /path/to/repo:/data code-iq analyze /data
+
+# Start server
+docker run -p 8080:8080 -v /path/to/repo:/data code-iq serve /data
 ```
 
-**Explorer UI** (`/ui`) — Progressive drill-down card interface:
-- Browse by node kind (Endpoints, Entities, Classes, Guards, etc.)
-- Click "Explore" to drill into individual nodes
-- Click "Details" on any card for a full modal with properties, edges, and source location
-- Client-side search filtering (no server round-trip)
-- Light, dark, and system theme support with runtime toggle
+The Docker image uses Eclipse Temurin JDK 25, ZGC garbage collector, and Spring AOT cache for fast startup.
 
-**MCP Console** — Interactive terminal tab for executing MCP tools:
-- 20 tools: `get_stats`, `search_graph`, `trace_impact`, `find_cycles`, etc.
-- Type `help` to see all available commands
+## Benchmark Results
 
-**REST API** (`/api`) — 20+ endpoints for programmatic access:
-- `/api/kinds` — Node kinds with counts
-- `/api/kinds/{kind}` — Paginated nodes by kind
-- `/api/nodes/{id}/detail` — Full node detail with edges
-- `/api/stats`, `/api/nodes`, `/api/edges`, `/api/search`, `/api/flow` and more
-- Full OpenAPI docs at `/docs`
+Benchmarked against the Python implementation (OSSCodeIQ on PyPI). 3 runs per project, all deterministic.
 
-**MCP Server** (`/mcp`) — 20 tools via streamable HTTP for AI-powered triage
+| Project | Files | Java Nodes | Java Edges | Java Time (analysis) | Python Time (wall) | Speedup |
+|---------|-------|-----------|------------|---------------------|--------------------|---------|
+| spring-boot | 10,524 | 27,987 | 39,776 | 47.8s avg | 56.8s | 1.2x |
+| kafka | 6,919 | 62,671 | 120,376 | 63.5s avg | 96.8s | 1.5x |
+| contoso-real-estate | 484 | 4,034 | 4,039 | 1.3s avg | 7.6s | 5.8x |
+
+Java consistently finds more nodes (+2-8%) and edges (+20-39%) than the Python version due to deeper AST-based detection. Results are fully deterministic across all 3 runs per project.
 
 ## Development
 
 ```bash
+# Prerequisites: Java 25+, Maven 3.9+
 git clone https://github.com/RandomCodeSpace/code-iq.git
-cd code-iq
-pip install -e ".[dev]"
-pytest                    # 2,146 tests
-osscodeiq analyze .       # Analyze this repo
-osscodeiq serve .         # Start the web UI
+cd code-iq && git checkout java
+
+# Build
+mvn clean package
+
+# Run tests
+mvn test
+
+# Analyze this repo
+java -jar target/code-iq-*.jar analyze .
+
+# Start dev server
+java -jar target/code-iq-*.jar serve .
 ```
 
-### Adding a New Detector
+## Tech Stack
 
-Just create a file — auto-discovered, zero registration:
-
-```python
-# src/osscodeiq/detectors/python/my_detector.py
-from osscodeiq.detectors.base import DetectorContext, DetectorResult
-from osscodeiq.detectors.utils import decode_text
-from osscodeiq.models.graph import GraphNode, NodeKind, SourceLocation
-
-class MyDetector:
-    name = "my_detector"
-    supported_languages = ("python",)
-
-    def detect(self, ctx: DetectorContext) -> DetectorResult:
-        result = DetectorResult()
-        text = decode_text(ctx)
-        # Your detection logic here
-        return result
-```
-
-## Requirements
-
-- Python 3.11+
-- Dependencies: typer, rich, tree-sitter, networkx, lxml, pyyaml, sqlparse, pydantic, fastapi, uvicorn, fastmcp, nicegui
-- Optional: `pip install kuzu` for KuzuDB backend
+| Component | Technology |
+|-----------|-----------|
+| Language | Java 25 (virtual threads, pattern matching, records) |
+| Framework | Spring Boot 4.0.5 |
+| Graph DB | Neo4j Embedded 2026.02.3 (Community Edition) |
+| Cache | Hazelcast 5.6.0 (distributed, K8s auto-discovery) |
+| MCP | Spring AI 1.1.4 (streamable HTTP) |
+| Java AST | JavaParser 3.28.0 |
+| Multi-lang AST | ANTLR 4.13.2 (6 grammars) |
+| CLI | Picocli 4.7.7 |
+| Web UI | Thymeleaf + HTMX |
+| Incremental cache | SQLite (via sqlite-jdbc) |
+| Build | Maven + Spring Boot Plugin |
+| Docker | Eclipse Temurin 25, ZGC, Spring AOT |
 
 ## License
 
