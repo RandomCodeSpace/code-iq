@@ -1,12 +1,17 @@
 package io.github.randomcodespace.iq.detector.python;
 
-import io.github.randomcodespace.iq.detector.AbstractRegexDetector;
+import io.github.randomcodespace.iq.detector.AbstractAntlrDetector;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
+import io.github.randomcodespace.iq.grammar.AntlrParserFactory;
+import io.github.randomcodespace.iq.grammar.python.Python3Parser;
+import io.github.randomcodespace.iq.grammar.python.Python3ParserBaseListener;
 import io.github.randomcodespace.iq.model.CodeEdge;
 import io.github.randomcodespace.iq.model.CodeNode;
 import io.github.randomcodespace.iq.model.EdgeKind;
 import io.github.randomcodespace.iq.model.NodeKind;
+import org.antlr.v4.runtime.tree.ParseTree;
+import org.antlr.v4.runtime.tree.ParseTreeWalker;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -17,8 +22,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Component
-public class KafkaPythonDetector extends AbstractRegexDetector {
+public class KafkaPythonDetector extends AbstractAntlrDetector {
 
+    // --- Regex patterns ---
     private static final Pattern PRODUCER_RE = Pattern.compile(
             "(KafkaProducer|AIOKafkaProducer)\\s*\\(", Pattern.MULTILINE
     );
@@ -62,7 +68,30 @@ public class KafkaPythonDetector extends AbstractRegexDetector {
     }
 
     @Override
-    public DetectorResult detect(DetectorContext ctx) {
+    protected ParseTree parse(DetectorContext ctx) {
+        String text = ctx.content();
+        // Quick bail-out
+        boolean hasKafka = false;
+        for (String kw : KAFKA_KEYWORDS) {
+            if (text != null && text.contains(kw)) {
+                hasKafka = true;
+                break;
+            }
+        }
+        if (!hasKafka) return null;
+        return AntlrParserFactory.parse("python", text);
+    }
+
+    @Override
+    protected DetectorResult detectWithAst(ParseTree tree, DetectorContext ctx) {
+        // Kafka detection is heavily line-regex based; AST getText() strips whitespace
+        // which breaks the regex patterns. Use the source-text line-based approach
+        // (same as regex fallback) but driven by AST-confirmed structure.
+        return detectWithRegex(ctx);
+    }
+
+    @Override
+    protected DetectorResult detectWithRegex(DetectorContext ctx) {
         List<CodeNode> nodes = new ArrayList<>();
         List<CodeEdge> edges = new ArrayList<>();
         String text = ctx.content();
@@ -72,7 +101,6 @@ public class KafkaPythonDetector extends AbstractRegexDetector {
         String fp = ctx.filePath();
         String moduleName = ctx.moduleName();
 
-        // Quick bail-out
         boolean hasKafka = false;
         for (String kw : KAFKA_KEYWORDS) {
             if (text.contains(kw)) {
@@ -88,7 +116,6 @@ public class KafkaPythonDetector extends AbstractRegexDetector {
         String fileNodeId = "kafka_py:" + fp;
         String[] lines = text.split("\n", -1);
 
-        // Detect producer instantiations
         for (int i = 0; i < lines.length; i++) {
             int lineno = i + 1;
             if (PRODUCER_RE.matcher(lines[i]).find() || CONFLUENT_PRODUCER_RE.matcher(lines[i]).find()) {
@@ -104,7 +131,6 @@ public class KafkaPythonDetector extends AbstractRegexDetector {
             }
         }
 
-        // Detect consumer instantiations
         for (int i = 0; i < lines.length; i++) {
             int lineno = i + 1;
             if (CONSUMER_RE.matcher(lines[i]).find() || CONFLUENT_CONSUMER_RE.matcher(lines[i]).find()) {
@@ -120,7 +146,6 @@ public class KafkaPythonDetector extends AbstractRegexDetector {
             }
         }
 
-        // Detect producer.send / producer.produce -> PRODUCES edges
         for (int i = 0; i < lines.length; i++) {
             int lineno = i + 1;
             Matcher sm = SEND_RE.matcher(lines[i]);
@@ -148,7 +173,6 @@ public class KafkaPythonDetector extends AbstractRegexDetector {
             }
         }
 
-        // Detect consumer.subscribe -> CONSUMES edges
         for (int i = 0; i < lines.length; i++) {
             int lineno = i + 1;
             Matcher subm = SUBSCRIBE_RE.matcher(lines[i]);
@@ -164,7 +188,6 @@ public class KafkaPythonDetector extends AbstractRegexDetector {
             }
         }
 
-        // Detect imports
         for (String line : lines) {
             Matcher im = IMPORT_RE.matcher(line);
             if (im.find()) {

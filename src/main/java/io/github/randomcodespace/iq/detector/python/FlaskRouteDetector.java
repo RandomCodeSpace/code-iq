@@ -1,12 +1,17 @@
 package io.github.randomcodespace.iq.detector.python;
 
-import io.github.randomcodespace.iq.detector.AbstractRegexDetector;
+import io.github.randomcodespace.iq.detector.AbstractAntlrDetector;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
+import io.github.randomcodespace.iq.grammar.AntlrParserFactory;
+import io.github.randomcodespace.iq.grammar.python.Python3Parser;
+import io.github.randomcodespace.iq.grammar.python.Python3ParserBaseListener;
 import io.github.randomcodespace.iq.model.CodeEdge;
 import io.github.randomcodespace.iq.model.CodeNode;
 import io.github.randomcodespace.iq.model.EdgeKind;
 import io.github.randomcodespace.iq.model.NodeKind;
+import org.antlr.v4.runtime.tree.ParseTree;
+import org.antlr.v4.runtime.tree.ParseTreeWalker;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -16,8 +21,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Component
-public class FlaskRouteDetector extends AbstractRegexDetector {
+public class FlaskRouteDetector extends AbstractAntlrDetector {
 
+    // --- Regex fallback patterns ---
     private static final Pattern ROUTE_PATTERN = Pattern.compile(
             "@(\\w+)\\.(route)\\(\\s*['\"]([^'\"]+)['\"]"
             + "(?:.*?methods\\s*=\\s*\\[([^\\]]+)\\])?"
@@ -36,7 +42,86 @@ public class FlaskRouteDetector extends AbstractRegexDetector {
     }
 
     @Override
-    public DetectorResult detect(DetectorContext ctx) {
+    protected ParseTree parse(DetectorContext ctx) {
+        return AntlrParserFactory.parse("python", ctx.content());
+    }
+
+    @Override
+    protected DetectorResult detectWithAst(ParseTree tree, DetectorContext ctx) {
+        List<CodeNode> nodes = new ArrayList<>();
+        List<CodeEdge> edges = new ArrayList<>();
+        String filePath = ctx.filePath();
+        String moduleName = ctx.moduleName();
+
+        ParseTreeWalker.DEFAULT.walk(new Python3ParserBaseListener() {
+            @Override
+            public void enterDecorated(Python3Parser.DecoratedContext decorated) {
+                if (decorated.decorators() == null) return;
+                // Get the function name
+                String funcName = null;
+                if (decorated.funcdef() != null && decorated.funcdef().name() != null) {
+                    funcName = decorated.funcdef().name().getText();
+                } else if (decorated.async_funcdef() != null
+                        && decorated.async_funcdef().funcdef() != null
+                        && decorated.async_funcdef().funcdef().name() != null) {
+                    funcName = decorated.async_funcdef().funcdef().name().getText();
+                }
+                if (funcName == null) return;
+
+                for (var dec : decorated.decorators().decorator()) {
+                    if (dec.dotted_name() == null) continue;
+                    var names = dec.dotted_name().name();
+                    if (names.size() != 2) continue;
+
+                    String blueprint = names.get(0).getText();
+                    String methodName = names.get(1).getText();
+                    if (!"route".equals(methodName)) continue;
+
+                    // Extract path from first argument
+                    String path = extractFirstStringArg(dec.arglist());
+                    if (path == null) continue;
+
+                    // Extract methods from methods=[...] keyword argument
+                    List<String> methods = extractMethodsArg(dec.arglist());
+                    if (methods.isEmpty()) {
+                        methods.add("GET");
+                    }
+
+                    int line = lineOf(dec);
+
+                    for (String method : methods) {
+                        String nodeId = "endpoint:" + (moduleName != null ? moduleName : "") + ":" + method + ":" + path;
+                        CodeNode node = new CodeNode();
+                        node.setId(nodeId);
+                        node.setKind(NodeKind.ENDPOINT);
+                        node.setLabel(method + " " + path);
+                        node.setFqn(filePath + "::" + funcName);
+                        node.setModule(moduleName);
+                        node.setFilePath(filePath);
+                        node.setLineStart(line);
+                        node.getProperties().put("protocol", "REST");
+                        node.getProperties().put("http_method", method);
+                        node.getProperties().put("path_pattern", path);
+                        node.getProperties().put("framework", "flask");
+                        node.getProperties().put("blueprint", blueprint);
+                        nodes.add(node);
+
+                        String classId = "class:" + filePath + "::" + blueprint;
+                        CodeEdge edge = new CodeEdge();
+                        edge.setId(classId + "->exposes->" + nodeId);
+                        edge.setKind(EdgeKind.EXPOSES);
+                        edge.setSourceId(classId);
+                        edges.add(edge);
+                    }
+                }
+            }
+        }, tree);
+
+        return DetectorResult.of(nodes, edges);
+    }
+
+    @Override
+    protected DetectorResult detectWithRegex(DetectorContext ctx) {
         List<CodeNode> nodes = new ArrayList<>();
         List<CodeEdge> edges = new ArrayList<>();
         String text = ctx.content();
@@ -91,5 +176,43 @@ public class FlaskRouteDetector extends AbstractRegexDetector {
         }
 
         return DetectorResult.of(nodes, edges);
+    }
+
+    private static String extractFirstStringArg(Python3Parser.ArglistContext arglist) {
+        if (arglist == null) return null;
+        for (var arg : arglist.argument()) {
+            // Skip keyword arguments (containing '=')
+            if (arg.ASSIGN() != null) continue;
+            String argText = arg.getText();
+            if ((argText.startsWith("\"") && argText.endsWith("\""))
+                    || (argText.startsWith("'") && argText.endsWith("'"))) {
+                return argText.substring(1, argText.length() - 1);
+            }
+        }
+        return null;
+    }
+
+    private static List<String> extractMethodsArg(Python3Parser.ArglistContext arglist) {
+        List<String> methods = new ArrayList<>();
+        if (arglist == null) return methods;
+        for (var arg : arglist.argument()) {
+            String argText = arg.getText();
+            // Look for methods=[...] pattern
+            if (argText.startsWith("methods=")) {
+                // Extract content between [ and ]
+                int open = argText.indexOf('[');
+                int close = argText.indexOf(']');
+                if (open >= 0 && close > open) {
+                    String inner = argText.substring(open + 1, close);
+                    for (String m : inner.split(",")) {
+                        String cleaned = m.trim().replace("'", "").replace("\"", "");
+                        if (!cleaned.isEmpty()) {
+                            methods.add(cleaned);
+                        }
+                    }
+                }
+            }
+        }
+        return methods;
     }
 }
