@@ -1,0 +1,11 @@
+apiVersion: v2
+name: code-iq
+description: OSSCodeIQ — deterministic code knowledge graph server
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+maintainers:
+  - name: RandomCodeSpace
+    url: https://github.com/RandomCodeSpace
+sources:
+  - https://github.com/RandomCodeSpace/code-iq

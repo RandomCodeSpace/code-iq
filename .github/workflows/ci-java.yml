@@ -1,0 +1,30 @@
+name: Java CI
+on:
+  push:
+    branches: [java]
+    paths: ['src/**', 'pom.xml']
+  pull_request:
+    branches: [java]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        java: ['25']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ matrix.java }}
+          cache: 'maven'
+      - run: mvn clean verify -B
+      - uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: target/surefire-reports/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: target/site/jacoco/

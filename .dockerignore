@@ -1,0 +1,9 @@
+.git
+target
+node_modules
+*.md
+docs/
+tests/
+.github/
+helm/
+src/osscodeiq/
