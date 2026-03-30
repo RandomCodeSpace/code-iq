@@ -21,6 +21,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Path;
+import java.util.Optional;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -46,13 +47,13 @@ public class McpTools {
 
     public McpTools(QueryService queryService, Analyzer analyzer,
                     CodeIqConfig config, ObjectMapper objectMapper,
-                    FlowEngine flowEngine, GraphDatabaseService graphDb,
+                    Optional<FlowEngine> flowEngine, GraphDatabaseService graphDb,
                     StatsService statsService, TopologyService topologyService) {
         this.queryService = queryService;
         this.analyzer = analyzer;
         this.config = config;
         this.objectMapper = objectMapper;
-        this.flowEngine = flowEngine;
+        this.flowEngine = flowEngine.orElse(null);
         this.graphDb = graphDb;
         this.statsService = statsService;
         this.topologyService = topologyService;
@@ -181,8 +182,12 @@ public class McpTools {
         String viewName = view != null ? view : "overview";
         String fmt = format != null ? format : "json";
         try {
-            FlowDiagram diagram = flowEngine.generate(viewName);
-            String rendered = flowEngine.render(diagram, fmt);
+            FlowEngine engine = resolveFlowEngine();
+            if (engine == null) {
+                return toJson(Map.of("error", "No analysis data available. Run 'code-iq analyze' first."));
+            }
+            FlowDiagram diagram = engine.generate(viewName);
+            String rendered = engine.render(diagram, fmt);
             return rendered;
         } catch (IllegalArgumentException e) {
             Map<String, Object> error = new LinkedHashMap<>();
@@ -419,6 +424,20 @@ public class McpTools {
             return toJson(topologyService.findNode(query, data.nodes));
         } catch (Exception e) {
             return toJson(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * Resolve FlowEngine: use injected instance if available, otherwise create from H2 cache.
+     */
+    private FlowEngine resolveFlowEngine() {
+        if (flowEngine != null) return flowEngine;
+        try {
+            CacheData data = loadCacheData();
+            if (data.nodes().isEmpty()) return null;
+            return FlowEngine.fromCache(data.nodes());
+        } catch (RuntimeException e) {
+            return null;
         }
     }
 
