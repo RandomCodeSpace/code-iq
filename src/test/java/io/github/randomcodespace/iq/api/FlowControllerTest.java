@@ -36,7 +36,7 @@ class FlowControllerTest {
 
     @BeforeEach
     void setUp() {
-        var controller = new FlowController(flowEngine);
+        var controller = new FlowController(java.util.Optional.of(flowEngine), new io.github.randomcodespace.iq.config.CodeIqConfig());
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
 

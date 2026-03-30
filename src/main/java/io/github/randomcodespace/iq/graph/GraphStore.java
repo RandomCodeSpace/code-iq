@@ -1,5 +1,6 @@
 package io.github.randomcodespace.iq.graph;
 
+import io.github.randomcodespace.iq.flow.FlowDataSource;
 import io.github.randomcodespace.iq.model.CodeNode;
 import io.github.randomcodespace.iq.model.NodeKind;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -15,7 +16,7 @@ import java.util.Optional;
  */
 @Service
 @ConditionalOnBean(GraphRepository.class)
-public class GraphStore {
+public class GraphStore implements FlowDataSource {
 
     private final GraphRepository repository;
 

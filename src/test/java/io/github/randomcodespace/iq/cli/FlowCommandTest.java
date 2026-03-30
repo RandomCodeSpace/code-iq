@@ -41,7 +41,7 @@ class FlowCommandTest {
         var store = mockStoreWithEndpoint();
         var engine = new FlowEngine(store);
 
-        var cmd = new FlowCommand(engine);
+        var cmd = new FlowCommand(engine, null);
         var cmdLine = new picocli.CommandLine(cmd);
         int exitCode = cmdLine.execute(".");
 
@@ -55,7 +55,7 @@ class FlowCommandTest {
         var store = mockStoreWithEndpoint();
         var engine = new FlowEngine(store);
 
-        var cmd = new FlowCommand(engine);
+        var cmd = new FlowCommand(engine, null);
         var cmdLine = new picocli.CommandLine(cmd);
         int exitCode = cmdLine.execute(".", "--format", "json");
 
@@ -69,7 +69,7 @@ class FlowCommandTest {
         var store = mockStoreWithEndpoint();
         var engine = new FlowEngine(store);
 
-        var cmd = new FlowCommand(engine);
+        var cmd = new FlowCommand(engine, null);
         var cmdLine = new picocli.CommandLine(cmd);
         int exitCode = cmdLine.execute(".", "--view", "ci");
 
@@ -81,7 +81,7 @@ class FlowCommandTest {
         var store = mockStoreWithEndpoint();
         var engine = new FlowEngine(store);
 
-        var cmd = new FlowCommand(engine);
+        var cmd = new FlowCommand(engine, null);
         var cmdLine = new picocli.CommandLine(cmd);
         int exitCode = cmdLine.execute(".", "--view", "deploy");
 
@@ -93,7 +93,7 @@ class FlowCommandTest {
         var store = mockStoreWithEndpoint();
         var engine = new FlowEngine(store);
 
-        var cmd = new FlowCommand(engine);
+        var cmd = new FlowCommand(engine, null);
         var cmdLine = new picocli.CommandLine(cmd);
         int exitCode = cmdLine.execute(".", "--view", "runtime");
 
@@ -105,7 +105,7 @@ class FlowCommandTest {
         var store = mockStoreWithEndpoint();
         var engine = new FlowEngine(store);
 
-        var cmd = new FlowCommand(engine);
+        var cmd = new FlowCommand(engine, null);
         var cmdLine = new picocli.CommandLine(cmd);
         int exitCode = cmdLine.execute(".", "--view", "auth");
 
@@ -117,7 +117,7 @@ class FlowCommandTest {
         var store = mockStoreWithEndpoint();
         var engine = new FlowEngine(store);
 
-        var cmd = new FlowCommand(engine);
+        var cmd = new FlowCommand(engine, null);
         var cmdLine = new picocli.CommandLine(cmd);
         int exitCode = cmdLine.execute(".", "--view", "nonexistent");
 

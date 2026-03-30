@@ -77,7 +77,7 @@ class CliExtendedTest {
         void overviewViewMermaid() {
             var engine = createEngine();
 
-            var cmd = new FlowCommand(engine);
+            var cmd = new FlowCommand(engine, null);
             var cmdLine = new picocli.CommandLine(cmd);
             int exitCode = cmdLine.execute(".", "--view", "overview");
 
@@ -90,7 +90,7 @@ class CliExtendedTest {
         void ciViewMermaid() {
             var engine = createEngine();
 
-            var cmd = new FlowCommand(engine);
+            var cmd = new FlowCommand(engine, null);
             var cmdLine = new picocli.CommandLine(cmd);
             int exitCode = cmdLine.execute(".", "--view", "ci");
 
@@ -101,7 +101,7 @@ class CliExtendedTest {
         void overviewViewJson() {
             var engine = createEngine();
 
-            var cmd = new FlowCommand(engine);
+            var cmd = new FlowCommand(engine, null);
             var cmdLine = new picocli.CommandLine(cmd);
             int exitCode = cmdLine.execute(".", "--view", "overview", "--format", "json");
 
@@ -114,7 +114,7 @@ class CliExtendedTest {
         void deployViewJson() {
             var engine = createEngine();
 
-            var cmd = new FlowCommand(engine);
+            var cmd = new FlowCommand(engine, null);
             var cmdLine = new picocli.CommandLine(cmd);
             int exitCode = cmdLine.execute(".", "--view", "deploy", "--format", "json");
 
@@ -128,7 +128,7 @@ class CliExtendedTest {
             var engine = createEngine();
 
             Path outFile = tmpDir.resolve("flow.md");
-            var cmd = new FlowCommand(engine);
+            var cmd = new FlowCommand(engine, null);
             var cmdLine = new picocli.CommandLine(cmd);
             int exitCode = cmdLine.execute(".", "--output", outFile.toString());
 

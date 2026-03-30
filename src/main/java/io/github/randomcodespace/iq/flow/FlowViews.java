@@ -4,7 +4,6 @@ import io.github.randomcodespace.iq.flow.FlowModels.FlowDiagram;
 import io.github.randomcodespace.iq.flow.FlowModels.FlowEdge;
 import io.github.randomcodespace.iq.flow.FlowModels.FlowNode;
 import io.github.randomcodespace.iq.flow.FlowModels.FlowSubgraph;
-import io.github.randomcodespace.iq.graph.GraphStore;
 import io.github.randomcodespace.iq.model.CodeEdge;
 import io.github.randomcodespace.iq.model.CodeNode;
 import io.github.randomcodespace.iq.model.EdgeKind;
@@ -33,7 +32,7 @@ public final class FlowViews {
     /**
      * High-level overview with 4 subgraphs: CI, Infrastructure, Application, Security.
      */
-    public static FlowDiagram buildOverview(GraphStore store) {
+    public static FlowDiagram buildOverview(FlowDataSource store) {
         var subgraphs = new ArrayList<FlowSubgraph>();
         var edges = new ArrayList<FlowEdge>();
 
@@ -198,7 +197,7 @@ public final class FlowViews {
     /**
      * CI/CD pipeline detail -- shows workflows, jobs, dependencies.
      */
-    public static FlowDiagram buildCiView(GraphStore store) {
+    public static FlowDiagram buildCiView(FlowDataSource store) {
         var subgraphs = new ArrayList<FlowSubgraph>();
         var edges = new ArrayList<FlowEdge>();
 
@@ -288,7 +287,7 @@ public final class FlowViews {
     /**
      * Deployment topology -- K8s, Docker, Terraform resources.
      */
-    public static FlowDiagram buildDeployView(GraphStore store) {
+    public static FlowDiagram buildDeployView(FlowDataSource store) {
         var subgraphs = new ArrayList<FlowSubgraph>();
         var edges = new ArrayList<FlowEdge>();
 
@@ -363,7 +362,7 @@ public final class FlowViews {
     /**
      * Runtime architecture -- modules, endpoints, entities, messaging, grouped by layer.
      */
-    public static FlowDiagram buildRuntimeView(GraphStore store) {
+    public static FlowDiagram buildRuntimeView(FlowDataSource store) {
         var subgraphs = new ArrayList<FlowSubgraph>();
         var edges = new ArrayList<FlowEdge>();
 
@@ -441,7 +440,7 @@ public final class FlowViews {
     /**
      * Auth overview -- guards, endpoints, protection coverage.
      */
-    public static FlowDiagram buildAuthView(GraphStore store) {
+    public static FlowDiagram buildAuthView(FlowDataSource store) {
         var subgraphs = new ArrayList<FlowSubgraph>();
         var edges = new ArrayList<FlowEdge>();
 
