@@ -38,6 +38,10 @@ Thumbs.db
 # Logs
 *.log
 
+# Frontend
+src/main/frontend/node_modules/
+src/main/frontend/node/
+
 # Distribution
 *.tar.gz
 *.zip
