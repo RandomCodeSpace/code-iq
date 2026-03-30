@@ -22,6 +22,7 @@ jobs:
           server-username: MAVEN_USERNAME
           server-password: MAVEN_PASSWORD
           gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
 
       - name: Determine beta version
         id: version
@@ -48,6 +49,7 @@ jobs:
         env:
           MAVEN_USERNAME: ${{ secrets.OSS_NEXUS_USER }}
           MAVEN_PASSWORD: ${{ secrets.OSS_NEXUS_PASS }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
         run: mvn deploy -P release -DskipTests -B
 
       - name: Create git tag
