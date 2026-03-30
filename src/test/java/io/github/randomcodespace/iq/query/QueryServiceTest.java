@@ -59,11 +59,13 @@ class QueryServiceTest {
 
     @Test
     void getStatsShouldReturnNodeAndEdgeCounts() {
-        var n1 = makeNodeWithEdge("n1", NodeKind.ENDPOINT, "getUsers",
-                "n2", EdgeKind.CALLS);
-        var n2 = makeNode("n2", NodeKind.CLASS, "UserService");
         when(graphStore.count()).thenReturn(2L);
-        when(graphStore.findAll()).thenReturn(List.of(n1, n2));
+        when(graphStore.countEdges()).thenReturn(1L);
+        when(graphStore.countNodesByKind()).thenReturn(List.of(
+                Map.of("kind", "endpoint", "cnt", 1L),
+                Map.of("kind", "class", "cnt", 1L)));
+        when(graphStore.countNodesByLayer()).thenReturn(List.of(
+                Map.of("layer", "backend", "cnt", 2L)));
 
         Map<String, Object> stats = service.getStats();
 
@@ -77,15 +79,14 @@ class QueryServiceTest {
 
     @Test
     void listKindsShouldReturnKindCounts() {
-        var n1 = makeNode("n1", NodeKind.ENDPOINT, "getUsers");
-        var n2 = makeNode("n2", NodeKind.ENDPOINT, "createUser");
-        var n3 = makeNode("n3", NodeKind.CLASS, "UserService");
-        when(graphStore.findAll()).thenReturn(List.of(n1, n2, n3));
+        when(graphStore.countNodesByKind()).thenReturn(List.of(
+                Map.of("kind", "endpoint", "cnt", 2L),
+                Map.of("kind", "class", "cnt", 1L)));
 
         Map<String, Object> result = service.listKinds();
 
         assertNotNull(result.get("kinds"));
-        assertEquals(3, result.get("total"));
+        assertEquals(3L, result.get("total"));
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> kinds = (List<Map<String, Object>>) result.get("kinds");
         // endpoint has 2 nodes, should be first (sorted by count desc)
@@ -137,9 +138,9 @@ class QueryServiceTest {
 
     @Test
     void listEdgesShouldFilterByKind() {
-        var n1 = makeNodeWithEdge("n1", NodeKind.ENDPOINT, "getUsers",
-                "n2", EdgeKind.CALLS);
-        when(graphStore.findAll()).thenReturn(List.of(n1));
+        when(graphStore.findEdgesByKindPaginated("calls", 0, 100)).thenReturn(List.of(
+                Map.of("id", "e1", "kind", "calls", "sourceId", "n1", "targetId", "n2")));
+        when(graphStore.countEdgesByKind("calls")).thenReturn(1L);
 
         Map<String, Object> result = service.listEdges("calls", 100, 0);
 
@@ -150,9 +151,8 @@ class QueryServiceTest {
 
     @Test
     void listEdgesShouldExcludeNonMatchingKind() {
-        var n1 = makeNodeWithEdge("n1", NodeKind.ENDPOINT, "getUsers",
-                "n2", EdgeKind.CALLS);
-        when(graphStore.findAll()).thenReturn(List.of(n1));
+        when(graphStore.findEdgesByKindPaginated("imports", 0, 100)).thenReturn(List.of());
+        when(graphStore.countEdgesByKind("imports")).thenReturn(0L);
 
         Map<String, Object> result = service.listEdges("imports", 100, 0);
 

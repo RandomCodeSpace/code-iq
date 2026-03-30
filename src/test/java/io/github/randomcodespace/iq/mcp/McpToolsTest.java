@@ -54,6 +54,9 @@ class McpToolsTest {
     @Mock
     private StatsService statsService;
 
+    @Mock
+    private io.github.randomcodespace.iq.graph.GraphStore graphStore;
+
     private CodeIqConfig config;
     private ObjectMapper objectMapper;
     private McpTools mcpTools;
@@ -63,7 +66,7 @@ class McpToolsTest {
         config = new CodeIqConfig();
         config.setRootPath(".");
         objectMapper = new ObjectMapper();
-        mcpTools = new McpTools(queryService, analyzer, config, objectMapper, java.util.Optional.ofNullable(flowEngine), graphDb, statsService, new io.github.randomcodespace.iq.query.TopologyService());
+        mcpTools = new McpTools(queryService, analyzer, config, objectMapper, java.util.Optional.ofNullable(flowEngine), graphDb, statsService, new io.github.randomcodespace.iq.query.TopologyService(), graphStore);
     }
 
     private Map<String, Object> parseJson(String json) throws IOException {
