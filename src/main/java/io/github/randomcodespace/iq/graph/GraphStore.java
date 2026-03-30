@@ -386,6 +386,92 @@ public class GraphStore implements FlowDataSource {
                 Map.of("kinds", kinds, "offset", offset, "limit", limit));
     }
 
+    // --- Topology queries ---
+
+    /**
+     * Build an AppDynamics-style service topology map using Cypher queries.
+     * <p>
+     * Returns three lists:
+     * <ul>
+     *   <li>{@code services} — all nodes with kind=service, with a count of sibling nodes in the same module</li>
+     *   <li>{@code infrastructure} — database/topic/queue/infra nodes</li>
+     *   <li>{@code connections} — RELATES_TO edges from services to infra nodes, grouped by source/target/kind</li>
+     * </ul>
+     */
+    public Map<String, Object> getTopology() {
+        List<String> infraKinds = List.of(
+                "database_connection", "topic", "queue", "message_queue", "infra_resource");
+
+        List<Map<String, Object>> services = new ArrayList<>();
+        try (Transaction tx = graphDb.beginTx()) {
+            var result = tx.execute(
+                    "MATCH (s:CodeNode) WHERE s.kind = 'service' "
+                            + "OPTIONAL MATCH (m:CodeNode) WHERE m.module = s.module AND m.id <> s.id "
+                            + "RETURN s.id AS id, s.label AS label, s.layer AS layer, s.kind AS kind, "
+                            + "count(m) AS node_count");
+            while (result.hasNext()) {
+                var row = result.next();
+                Map<String, Object> svc = new LinkedHashMap<>();
+                svc.put("id", row.get("id"));
+                svc.put("label", row.get("label"));
+                svc.put("kind", row.get("kind"));
+                svc.put("layer", row.get("layer"));
+                Object nc = row.get("node_count");
+                svc.put("node_count", nc instanceof Number n ? n.longValue() : 0L);
+                services.add(svc);
+            }
+        }
+
+        List<Map<String, Object>> infrastructure = new ArrayList<>();
+        try (Transaction tx = graphDb.beginTx()) {
+            var result = tx.execute(
+                    "MATCH (n:CodeNode) WHERE n.kind IN $kinds "
+                            + "RETURN n.id AS id, n.label AS label, n.kind AS kind",
+                    Map.of("kinds", infraKinds));
+            while (result.hasNext()) {
+                var row = result.next();
+                String id = (String) row.get("id");
+                String kind = (String) row.get("kind");
+                Map<String, Object> infra = new LinkedHashMap<>();
+                infra.put("id", id);
+                infra.put("label", row.get("label"));
+                infra.put("kind", kind);
+                // Derive type from id prefix (e.g., "postgresql:orders-db" → "postgresql")
+                if (id != null && id.contains(":")) {
+                    infra.put("type", id.split(":", 2)[0]);
+                } else {
+                    infra.put("type", kind);
+                }
+                infrastructure.add(infra);
+            }
+        }
+
+        List<Map<String, Object>> connections = new ArrayList<>();
+        try (Transaction tx = graphDb.beginTx()) {
+            var result = tx.execute(
+                    "MATCH (s:CodeNode)-[r:RELATES_TO]->(t:CodeNode) "
+                            + "WHERE s.kind = 'service' AND t.kind IN $kinds "
+                            + "RETURN s.id AS source, t.id AS target, r.kind AS kind, count(r) AS cnt",
+                    Map.of("kinds", infraKinds));
+            while (result.hasNext()) {
+                var row = result.next();
+                Map<String, Object> conn = new LinkedHashMap<>();
+                conn.put("source", row.get("source"));
+                conn.put("target", row.get("target"));
+                conn.put("kind", row.get("kind"));
+                Object cnt = row.get("cnt");
+                conn.put("count", cnt instanceof Number n ? n.longValue() : 0L);
+                connections.add(conn);
+            }
+        }
+
+        Map<String, Object> topology = new LinkedHashMap<>();
+        topology.put("services", services);
+        topology.put("infrastructure", infrastructure);
+        topology.put("connections", connections);
+        return topology;
+    }
+
     // --- Internal helpers ---
 
     /**

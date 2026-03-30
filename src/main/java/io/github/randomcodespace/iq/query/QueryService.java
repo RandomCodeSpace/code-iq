@@ -352,6 +352,13 @@ public class QueryService {
         return results.stream().map(this::nodeToMap).toList();
     }
 
+    // --- Topology ---
+
+    @Cacheable("topology")
+    public Map<String, Object> getTopology() {
+        return graphStore.getTopology();
+    }
+
     // --- Dead code detection ---
 
     @Cacheable(value = "dead-code", key = "#kind + ':' + #limit")

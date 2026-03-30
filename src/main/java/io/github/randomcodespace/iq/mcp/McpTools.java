@@ -393,11 +393,10 @@ public class McpTools {
 
     // --- Topology tools ---
 
-    @Tool(name = "get_topology", description = "Get service topology map — all services and their connections")
+    @Tool(name = "get_topology", description = "Get service topology map — services, infrastructure nodes (databases, queues, caches), and connections between them.")
     public String getTopology() {
         try {
-            var data = getCachedData();
-            return toJson(topologyService.getTopology(data.nodes(), data.edges()));
+            return toJson(queryService.getTopology());
         } catch (Exception e) {
             return toJson(Map.of("error", e.getMessage()));
         }
