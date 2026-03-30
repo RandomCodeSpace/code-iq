@@ -4,13 +4,12 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.randomcodespace.iq.analyzer.AnalysisResult;
 import io.github.randomcodespace.iq.analyzer.Analyzer;
-import io.github.randomcodespace.iq.cache.AnalysisCache;
 import io.github.randomcodespace.iq.config.CodeIqConfig;
 import io.github.randomcodespace.iq.flow.FlowEngine;
 import io.github.randomcodespace.iq.flow.FlowModels.FlowDiagram;
+import io.github.randomcodespace.iq.graph.GraphStore;
 import io.github.randomcodespace.iq.model.CodeEdge;
 import io.github.randomcodespace.iq.model.CodeNode;
-import io.github.randomcodespace.iq.model.NodeKind;
 import io.github.randomcodespace.iq.query.QueryService;
 import io.github.randomcodespace.iq.query.StatsService;
 import io.github.randomcodespace.iq.query.TopologyService;
@@ -24,7 +23,6 @@ import org.springframework.stereotype.Component;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,13 +45,13 @@ public class McpTools {
     private final GraphDatabaseService graphDb;
     private final StatsService statsService;
     private final TopologyService topologyService;
-    private volatile List<CodeNode> cachedNodes;
-    private volatile List<CodeEdge> cachedEdges;
+    private final GraphStore graphStore;
 
     public McpTools(QueryService queryService, Analyzer analyzer,
                     CodeIqConfig config, ObjectMapper objectMapper,
                     Optional<FlowEngine> flowEngine, GraphDatabaseService graphDb,
-                    StatsService statsService, TopologyService topologyService) {
+                    StatsService statsService, TopologyService topologyService,
+                    GraphStore graphStore) {
         this.queryService = queryService;
         this.analyzer = analyzer;
         this.config = config;
@@ -62,42 +60,25 @@ public class McpTools {
         this.graphDb = graphDb;
         this.statsService = statsService;
         this.topologyService = topologyService;
-    }
-
-    // --- H2 in-memory cache: load once, reuse across MCP tool calls ---
-
-    /**
-     * Ensure the H2 cache is loaded into memory. Thread-safe via synchronized.
-     */
-    private synchronized void ensureCacheLoaded() {
-        if (cachedNodes != null) return;
-        Path root = Path.of(config.getRootPath()).toAbsolutePath().normalize();
-        Path cachePath = root.resolve(config.getCacheDir()).resolve("analysis-cache.db");
-        Path h2File = root.resolve(config.getCacheDir()).resolve("analysis-cache.mv.db");
-        if (!java.nio.file.Files.exists(h2File)) return;
-        try (AnalysisCache cache = new AnalysisCache(cachePath)) {
-            cachedNodes = cache.loadAllNodes();
-            cachedEdges = cache.loadAllEdges();
-        }
+        this.graphStore = graphStore;
     }
 
     /**
-     * Invalidate the in-memory cache (e.g. after re-analysis).
-     */
-    private void invalidateCache() {
-        cachedNodes = null;
-        cachedEdges = null;
-    }
-
-    /**
-     * Get cached data, throwing if not available.
+     * Load graph data on-demand from Neo4j. Data is GC'd after each request
+     * instead of being held permanently in heap.
+     * <p>
+     * TODO: Refactor TopologyService to use Cypher queries instead of in-memory traversal
+     * so that topology tools don't need to load the full graph per request.
      */
     private CacheData getCachedData() {
-        ensureCacheLoaded();
-        if (cachedNodes == null) {
-            throw new RuntimeException("No analysis cache found. Run analyze first.");
+        List<CodeNode> nodes = graphStore.findAll();
+        List<CodeEdge> edges = nodes.stream()
+                .flatMap(n -> n.getEdges().stream())
+                .toList();
+        if (nodes.isEmpty()) {
+            throw new RuntimeException("No analysis data available. Run 'code-iq analyze' first.");
         }
-        return new CacheData(cachedNodes, cachedEdges);
+        return new CacheData(nodes, edges);
     }
 
     @Tool(name = "get_stats", description = "Get project graph statistics - node counts, edge counts, backend info.")
@@ -113,19 +94,7 @@ public class McpTools {
     public String getDetailedStats(
             @ToolParam(description = "Category filter (default: all)", required = false) String category) {
         try {
-            var data = getCachedData();
-
-            String cat = category != null ? category : "all";
-            if ("all".equalsIgnoreCase(cat)) {
-                return toJson(statsService.computeStats(data.nodes(), data.edges()));
-            }
-            Map<String, Object> catStats = statsService.computeCategory(data.nodes(), data.edges(), cat);
-            if (catStats == null) {
-                return toJson(Map.of("error", "Unknown category: " + cat));
-            }
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put(cat.toLowerCase(), catStats);
-            return toJson(result);
+            return toJson(queryService.getStats());
         } catch (Exception e) {
             return toJson(Map.of("error", e.getMessage()));
         }
@@ -256,46 +225,6 @@ public class McpTools {
             @ToolParam(description = "Max results", required = false) Integer limit) {
         try {
             int safeLimit = limit != null ? Math.min(limit, 1000) : 100;
-
-            // Try H2 cache first
-            ensureCacheLoaded();
-            if (cachedNodes != null && cachedEdges != null) {
-                List<CodeNode> candidates = cachedNodes;
-                if (kind != null && !kind.isBlank()) {
-                    NodeKind nodeKind = NodeKind.fromValue(kind);
-                    candidates = candidates.stream()
-                            .filter(n -> n.getKind() == nodeKind)
-                            .toList();
-                }
-
-                Set<String> nodesWithIncoming = new HashSet<>();
-                for (CodeEdge edge : cachedEdges) {
-                    if (edge.getTarget() != null) {
-                        nodesWithIncoming.add(edge.getTarget().getId());
-                    }
-                }
-
-                List<Map<String, Object>> deadCode = candidates.stream()
-                        .filter(n -> !nodesWithIncoming.contains(n.getId()))
-                        .filter(n -> n.getKind() == NodeKind.CLASS || n.getKind() == NodeKind.METHOD || n.getKind() == NodeKind.INTERFACE)
-                        .limit(safeLimit)
-                        .map(n -> {
-                            Map<String, Object> m = new LinkedHashMap<>();
-                            m.put("id", n.getId());
-                            m.put("kind", n.getKind().getValue());
-                            m.put("label", n.getLabel());
-                            m.put("file", n.getFilePath());
-                            return m;
-                        })
-                        .toList();
-
-                Map<String, Object> result = new LinkedHashMap<>();
-                result.put("dead_code", deadCode);
-                result.put("count", deadCode.size());
-                return toJson(result);
-            }
-
-            // Fall back to QueryService (Neo4j)
             return toJson(queryService.findDeadCode(kind, safeLimit));
         } catch (Exception e) {
             return toJson(Map.of("error", e.getMessage()));
@@ -329,9 +258,6 @@ public class McpTools {
         try {
             boolean useIncremental = incremental != null ? incremental : true;
             AnalysisResult result = analyzer.run(Path.of(config.getRootPath()), null, useIncremental, null);
-
-            // Invalidate cached H2 data so next tool call picks up fresh results
-            invalidateCache();
 
             Map<String, Object> response = new LinkedHashMap<>();
             response.put("status", "complete");
