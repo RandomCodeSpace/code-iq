@@ -351,6 +351,86 @@ public class AnalysisCache implements Closeable {
         }
     }
 
+    /**
+     * Replace all cached nodes and edges with the given enriched data.
+     * <p>
+     * This is used after enrichment (linkers, layer classifier, service detection)
+     * to write the enriched graph back to H2 so that {@code serve} picks up the
+     * full enriched data without requiring Neo4j.
+     * <p>
+     * Uses a synthetic content hash ({@code __enriched__}) so the data is stored
+     * under a single batch key. Existing nodes and edges are cleared first.
+     *
+     * @param nodes enriched nodes (including new SERVICE nodes, layer classifications, etc.)
+     * @param edges enriched edges (including linker edges, CONTAINS edges, etc.)
+     */
+    public synchronized void replaceAll(List<CodeNode> nodes, List<CodeEdge> edges) {
+        try {
+            conn.setAutoCommit(false);
+
+            // Clear existing nodes and edges (but preserve analysis_runs metadata)
+            try (var stmt = conn.createStatement()) {
+                stmt.execute("DELETE FROM edges");
+                stmt.execute("DELETE FROM nodes");
+                stmt.execute("DELETE FROM files");
+            }
+
+            String now = Instant.now().toString();
+            String syntheticHash = "__enriched__";
+
+            // Insert synthetic file record
+            try (var stmt = conn.prepareStatement(
+                    "MERGE INTO files (content_hash, path, language, parsed_at) KEY (content_hash) VALUES (?, ?, ?, ?)")) {
+                stmt.setString(1, syntheticHash);
+                stmt.setString(2, "__enriched__");
+                stmt.setString(3, "enriched");
+                stmt.setString(4, now);
+                stmt.execute();
+            }
+
+            // Batch-insert all nodes
+            try (var stmt = conn.prepareStatement(
+                    "INSERT INTO nodes (id, content_hash, kind, data) VALUES (?, ?, ?, ?)")) {
+                for (CodeNode node : nodes) {
+                    stmt.setString(1, node.getId());
+                    stmt.setString(2, syntheticHash);
+                    stmt.setString(3, node.getKind().getValue());
+                    stmt.setString(4, serializeNode(node));
+                    stmt.addBatch();
+                }
+                stmt.executeBatch();
+            }
+
+            // Batch-insert all edges
+            try (var stmt = conn.prepareStatement(
+                    "INSERT INTO edges (source, target, content_hash, kind, data) VALUES (?, ?, ?, ?, ?)")) {
+                for (CodeEdge edge : edges) {
+                    stmt.setString(1, edge.getSourceId());
+                    stmt.setString(2, edge.getTarget() != null ? edge.getTarget().getId() : "");
+                    stmt.setString(3, syntheticHash);
+                    stmt.setString(4, edge.getKind().getValue());
+                    stmt.setString(5, serializeEdge(edge));
+                    stmt.addBatch();
+                }
+                stmt.executeBatch();
+            }
+
+            conn.commit();
+            log.info("Replaced H2 cache with enriched data: {} nodes, {} edges", nodes.size(), edges.size());
+        } catch (SQLException e) {
+            try {
+                conn.rollback();
+            } catch (SQLException ignored) {
+            }
+            log.warn("Failed to replace cache with enriched data", e);
+        } finally {
+            try {
+                conn.setAutoCommit(true);
+            } catch (SQLException ignored) {
+            }
+        }
+    }
+
     @Override
     public void close() {
         try {

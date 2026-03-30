@@ -2,9 +2,11 @@ package io.github.randomcodespace.iq.api;
 
 import io.github.randomcodespace.iq.cache.AnalysisCache;
 import io.github.randomcodespace.iq.config.CodeIqConfig;
+import io.github.randomcodespace.iq.graph.GraphStore;
 import io.github.randomcodespace.iq.model.CodeEdge;
 import io.github.randomcodespace.iq.model.CodeNode;
 import io.github.randomcodespace.iq.query.TopologyService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,22 +30,54 @@ import java.util.Map;
 public class TopologyController {
 
     private final TopologyService topologyService;
+    private final GraphStore graphStore;
     private final CodeIqConfig config;
     private volatile List<CodeNode> cachedNodes;
     private volatile List<CodeEdge> cachedEdges;
 
-    public TopologyController(TopologyService topologyService, CodeIqConfig config) {
+    public TopologyController(TopologyService topologyService,
+                              @Autowired(required = false) GraphStore graphStore,
+                              CodeIqConfig config) {
         this.topologyService = topologyService;
+        this.graphStore = graphStore;
         this.config = config;
     }
 
-    // --- H2 in-memory cache: load once, reuse across requests ---
+    // --- Data loading: Neo4j first, H2 fallback ---
 
     /**
-     * Ensure the H2 cache is loaded into memory. Thread-safe via synchronized.
+     * Check whether Neo4j has data available.
      */
-    private synchronized void ensureCacheLoaded() {
+    private volatile Boolean neo4jHasData;
+
+    private boolean hasNeo4jData() {
+        if (graphStore == null) return false;
+        if (neo4jHasData != null) return neo4jHasData;
+        try {
+            neo4jHasData = graphStore.count() > 0;
+        } catch (Exception e) {
+            neo4jHasData = false;
+        }
+        return neo4jHasData;
+    }
+
+    /**
+     * Load data from Neo4j if available, otherwise from H2 cache.
+     */
+    private synchronized void ensureDataLoaded() {
         if (cachedNodes != null) return;
+
+        // Try Neo4j first (has enriched data with SERVICE nodes)
+        if (hasNeo4jData()) {
+            cachedNodes = graphStore.findAll();
+            // Collect edges from all nodes' relationship lists
+            cachedEdges = cachedNodes.stream()
+                    .flatMap(n -> n.getEdges().stream())
+                    .toList();
+            return;
+        }
+
+        // Fall back to H2 cache
         Path root = Path.of(config.getRootPath()).toAbsolutePath().normalize();
         Path cachePath = root.resolve(config.getCacheDir()).resolve("analysis-cache.db");
         Path h2File = root.resolve(config.getCacheDir()).resolve("analysis-cache.mv.db");
@@ -60,39 +94,40 @@ public class TopologyController {
     public void invalidateCache() {
         cachedNodes = null;
         cachedEdges = null;
+        neo4jHasData = null;
     }
 
     @GetMapping
     public Map<String, Object> getTopology() {
-        ensureCacheLoaded();
+        ensureDataLoaded();
         requireCache();
         return topologyService.getTopology(cachedNodes, cachedEdges);
     }
 
     @GetMapping("/services/{name}")
     public Map<String, Object> serviceDetail(@PathVariable String name) {
-        ensureCacheLoaded();
+        ensureDataLoaded();
         requireCache();
         return topologyService.serviceDetail(name, cachedNodes, cachedEdges);
     }
 
     @GetMapping("/services/{name}/deps")
     public Map<String, Object> serviceDependencies(@PathVariable String name) {
-        ensureCacheLoaded();
+        ensureDataLoaded();
         requireCache();
         return topologyService.serviceDependencies(name, cachedNodes, cachedEdges);
     }
 
     @GetMapping("/services/{name}/dependents")
     public Map<String, Object> serviceDependents(@PathVariable String name) {
-        ensureCacheLoaded();
+        ensureDataLoaded();
         requireCache();
         return topologyService.serviceDependents(name, cachedNodes, cachedEdges);
     }
 
     @GetMapping("/blast-radius/{nodeId}")
     public Map<String, Object> blastRadius(@PathVariable String nodeId) {
-        ensureCacheLoaded();
+        ensureDataLoaded();
         requireCache();
         return topologyService.blastRadius(nodeId, cachedNodes, cachedEdges);
     }
@@ -101,28 +136,28 @@ public class TopologyController {
     public List<Map<String, Object>> findPath(
             @RequestParam("from") String source,
             @RequestParam("to") String target) {
-        ensureCacheLoaded();
+        ensureDataLoaded();
         requireCache();
         return topologyService.findPath(source, target, cachedNodes, cachedEdges);
     }
 
     @GetMapping("/bottlenecks")
     public List<Map<String, Object>> findBottlenecks() {
-        ensureCacheLoaded();
+        ensureDataLoaded();
         requireCache();
         return topologyService.findBottlenecks(cachedNodes, cachedEdges);
     }
 
     @GetMapping("/circular")
     public List<List<String>> findCircularDeps() {
-        ensureCacheLoaded();
+        ensureDataLoaded();
         requireCache();
         return topologyService.findCircularDeps(cachedNodes, cachedEdges);
     }
 
     @GetMapping("/dead")
     public List<Map<String, Object>> findDeadServices() {
-        ensureCacheLoaded();
+        ensureDataLoaded();
         requireCache();
         return topologyService.findDeadServices(cachedNodes, cachedEdges);
     }

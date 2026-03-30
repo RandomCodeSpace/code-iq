@@ -4,7 +4,9 @@ import io.github.randomcodespace.iq.cache.AnalysisCache;
 import io.github.randomcodespace.iq.config.CodeIqConfig;
 import io.github.randomcodespace.iq.flow.FlowEngine;
 import io.github.randomcodespace.iq.flow.FlowModels.FlowDiagram;
+import io.github.randomcodespace.iq.graph.GraphStore;
 import io.github.randomcodespace.iq.model.CodeNode;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -33,10 +35,14 @@ import java.util.Optional;
 public class FlowController {
 
     private final FlowEngine flowEngine;
+    private final GraphStore graphStore;
     private final CodeIqConfig config;
 
-    public FlowController(Optional<FlowEngine> flowEngine, CodeIqConfig config) {
+    public FlowController(Optional<FlowEngine> flowEngine,
+                          @Autowired(required = false) GraphStore graphStore,
+                          CodeIqConfig config) {
         this.flowEngine = flowEngine.orElse(null);
+        this.graphStore = graphStore;
         this.config = config;
     }
 
@@ -104,6 +110,11 @@ public class FlowController {
     private FlowEngine resolveEngine() {
         if (flowEngine != null) {
             return flowEngine;
+        }
+
+        // Prefer GraphStore (Neo4j) when available and populated
+        if (graphStore != null && graphStore.count() > 0) {
+            return new FlowEngine(graphStore);
         }
 
         // Fall back to H2 cache

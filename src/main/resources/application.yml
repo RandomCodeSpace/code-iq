@@ -53,8 +53,17 @@ spring:
   config:
     activate:
       on-profile: serving
+  main:
+    log-startup-info: false
   cache:
     type: hazelcast
+
+logging:
+  level:
+    # Suppress noisy startup warnings from Spring AI MCP internals
+    org.springframework.ai.mcp: WARN
+    # Suppress "Bean not eligible for BeanPostProcessors" INFO noise
+    org.springframework.context.support.PostProcessorRegistrationDelegate: WARN
 
 management:
   endpoint:

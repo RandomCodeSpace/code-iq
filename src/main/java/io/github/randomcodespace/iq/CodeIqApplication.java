@@ -66,6 +66,32 @@ public class CodeIqApplication implements CommandLineRunner, ExitCodeGenerator {
             if (portStr != null) {
                 System.setProperty("server.port", portStr);
             }
+
+            // Resolve codebase root so Neo4j points to the correct graph.db
+            String codebasePath = extractPositionalArg(args, "serve");
+            java.nio.file.Path root = java.nio.file.Path.of(
+                    codebasePath != null ? codebasePath : "."
+            ).toAbsolutePath().normalize();
+            System.setProperty("codeiq.root-path", root.toString());
+
+            // Check if enrich has been run (graph.db exists), otherwise
+            // check for the --graph flag override
+            String graphOverride = extractFlag(args, "--graph");
+            java.nio.file.Path graphDbPath;
+            if (graphOverride != null) {
+                graphDbPath = java.nio.file.Path.of(graphOverride).toAbsolutePath().normalize();
+            } else {
+                graphDbPath = root.resolve(".osscodeiq/graph.db");
+            }
+
+            if (java.nio.file.Files.isDirectory(graphDbPath)) {
+                // Enriched Neo4j graph exists -- point Neo4j config to it
+                System.setProperty("codeiq.graph.path", graphDbPath.toString());
+            } else {
+                // No enriched graph -- Neo4j will start with an empty db,
+                // GraphBootstrapper will auto-load from H2 cache if available
+                System.setProperty("codeiq.graph.path", graphDbPath.toString());
+            }
         } else if (isIndex) {
             app.setAdditionalProfiles("indexing");
             // Index command: no web server, no Neo4j

@@ -4,6 +4,7 @@ import io.github.randomcodespace.iq.analyzer.AnalysisResult;
 import io.github.randomcodespace.iq.analyzer.Analyzer;
 import io.github.randomcodespace.iq.cache.AnalysisCache;
 import io.github.randomcodespace.iq.config.CodeIqConfig;
+import io.github.randomcodespace.iq.graph.GraphStore;
 import io.github.randomcodespace.iq.model.CodeEdge;
 import io.github.randomcodespace.iq.model.CodeNode;
 import io.github.randomcodespace.iq.model.NodeKind;
@@ -42,6 +43,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class GraphController {
 
     private final QueryService queryService;
+    private final GraphStore graphStore;
     private final Analyzer analyzer;
     private final CodeIqConfig config;
     private final StatsService statsService;
@@ -51,10 +53,12 @@ public class GraphController {
     private volatile List<CodeEdge> cachedEdges;
 
     public GraphController(@org.springframework.beans.factory.annotation.Autowired(required = false) QueryService queryService,
+                           @org.springframework.beans.factory.annotation.Autowired(required = false) GraphStore graphStore,
                            Analyzer analyzer,
                            CodeIqConfig config, StatsService statsService,
                            TopologyService topologyService) {
         this.queryService = queryService;
+        this.graphStore = graphStore;
         this.analyzer = analyzer;
         this.config = config;
         this.statsService = statsService;
@@ -87,14 +91,41 @@ public class GraphController {
         cachedEdges = null;
     }
 
+    /**
+     * Get nodes from the best available source: Neo4j first, H2 fallback.
+     * Returns null if neither source has data.
+     */
+    private List<CodeNode> getEffectiveNodes() {
+        if (graphStore != null && useNeo4j()) {
+            return graphStore.findAll();
+        }
+        ensureCacheLoaded();
+        return cachedNodes;
+    }
+
+    /**
+     * Get edges from the best available source: Neo4j first, H2 fallback.
+     * Returns null if neither source has data.
+     */
+    private List<CodeEdge> getEffectiveEdges() {
+        if (graphStore != null && useNeo4j()) {
+            // Collect all edges from Neo4j nodes
+            return graphStore.findAll().stream()
+                    .flatMap(n -> n.getEdges().stream())
+                    .toList();
+        }
+        ensureCacheLoaded();
+        return cachedEdges;
+    }
+
     @GetMapping("/stats")
     public Map<String, Object> getStats() {
+        if (useNeo4j()) {
+            return queryService.getStats();
+        }
         ensureCacheLoaded();
         if (cachedNodes != null) {
             return statsService.computeStats(cachedNodes, cachedEdges);
-        }
-        if (queryService != null) {
-            return queryService.getStats();
         }
         throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                 "No analysis data available. Run analyze first.");
@@ -103,16 +134,18 @@ public class GraphController {
     @GetMapping("/stats/detailed")
     public Map<String, Object> getDetailedStats(
             @RequestParam(defaultValue = "all") String category) {
-        ensureCacheLoaded();
-        if (cachedNodes == null) {
+        // Use Neo4j-backed stats if available, fall back to H2
+        List<CodeNode> nodes = getEffectiveNodes();
+        List<CodeEdge> edges = getEffectiveEdges();
+        if (nodes == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND,
-                    "No analysis cache found. Run analyze first.");
+                    "No analysis data found. Run analyze first.");
         }
 
         if ("all".equalsIgnoreCase(category)) {
-            return statsService.computeStats(cachedNodes, cachedEdges);
+            return statsService.computeStats(nodes, edges);
         }
-        Map<String, Object> catStats = statsService.computeCategory(cachedNodes, cachedEdges, category);
+        Map<String, Object> catStats = statsService.computeCategory(nodes, edges, category);
         if (catStats == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Unknown category: " + category);
@@ -124,6 +157,9 @@ public class GraphController {
 
     @GetMapping("/kinds")
     public Map<String, Object> listKinds() {
+        if (useNeo4j()) {
+            return queryService.listKinds();
+        }
         ensureCacheLoaded();
         if (cachedNodes != null) {
             Map<String, Long> kindCounts = cachedNodes.stream()
@@ -144,7 +180,6 @@ public class GraphController {
             result.put("total", cachedNodes.size());
             return result;
         }
-        if (queryService != null) return queryService.listKinds();
         throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                 "No data available. Run analyze first.");
     }
@@ -155,6 +190,9 @@ public class GraphController {
             @RequestParam(defaultValue = "50") int limit,
             @RequestParam(defaultValue = "0") int offset) {
         int safeLimit = Math.min(limit, 1000);
+        if (useNeo4j()) {
+            return queryService.nodesByKind(kind, safeLimit, offset);
+        }
         ensureCacheLoaded();
         if (cachedNodes != null) {
             List<CodeNode> filtered = cachedNodes.stream()
@@ -170,7 +208,6 @@ public class GraphController {
             result.put("nodes", filtered.subList(start, end).stream().map(this::nodeToMap).toList());
             return result;
         }
-        if (queryService != null) return queryService.nodesByKind(kind, safeLimit, offset);
         throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                 "No data available. Run analyze first.");
     }
@@ -181,6 +218,9 @@ public class GraphController {
             @RequestParam(defaultValue = "100") int limit,
             @RequestParam(defaultValue = "0") int offset) {
         int safeLimit = Math.min(limit, 1000);
+        if (useNeo4j()) {
+            return queryService.listNodes(kind, safeLimit, offset);
+        }
         ensureCacheLoaded();
         if (cachedNodes != null) {
             List<CodeNode> filtered = cachedNodes;
@@ -198,13 +238,15 @@ public class GraphController {
             result.put("limit", safeLimit);
             return result;
         }
-        if (queryService != null) return queryService.listNodes(kind, safeLimit, offset);
         throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                 "No data available. Run analyze first.");
     }
 
     @GetMapping("/nodes/find")
     public List<Map<String, Object>> findNode(@RequestParam String q) {
+        if (graphStore != null && useNeo4j()) {
+            return topologyService.findNode(q, graphStore.findAll());
+        }
         ensureCacheLoaded();
         if (cachedNodes == null) {
             return List.of();
@@ -214,7 +256,12 @@ public class GraphController {
 
     @GetMapping("/nodes/{nodeId}/detail")
     public Map<String, Object> nodeDetail(@PathVariable String nodeId) {
-        // Try H2 cache first
+        // Try Neo4j first for rich detail with edges
+        if (useNeo4j()) {
+            Map<String, Object> result = queryService.nodeDetailWithEdges(nodeId);
+            if (result != null) return result;
+        }
+        // Fall back to H2 cache
         ensureCacheLoaded();
         if (cachedNodes != null) {
             return cachedNodes.stream()
@@ -223,12 +270,7 @@ public class GraphController {
                     .map(this::nodeToMap)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Node not found: " + nodeId));
         }
-        if (queryService == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Node not found: " + nodeId);
-        Map<String, Object> result = queryService.nodeDetailWithEdges(nodeId);
-        if (result == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Node not found: " + nodeId);
-        }
-        return result;
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Node not found: " + nodeId);
     }
 
     @GetMapping("/nodes/{nodeId}/neighbors")
@@ -245,6 +287,9 @@ public class GraphController {
             @RequestParam(defaultValue = "100") int limit,
             @RequestParam(defaultValue = "0") int offset) {
         int safeLimit = Math.min(limit, 1000);
+        if (useNeo4j()) {
+            return queryService.listEdges(kind, safeLimit, offset);
+        }
         ensureCacheLoaded();
         if (cachedEdges != null) {
             List<CodeEdge> filtered = cachedEdges;
@@ -261,8 +306,8 @@ public class GraphController {
             result.put("total", filtered.size());
             return result;
         }
-        requireQueryService();
-        return queryService.listEdges(kind, safeLimit, offset);
+        throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                "No data available. Run analyze first.");
     }
 
     @GetMapping("/ego/{center}")
@@ -329,7 +374,12 @@ public class GraphController {
             @RequestParam(defaultValue = "100") int limit) {
         int safeLimit = Math.min(limit, 1000);
 
-        // Try H2 cache first for dead code analysis
+        // Try Neo4j first
+        if (useNeo4j()) {
+            return ResponseEntity.ok(queryService.findDeadCode(kind, safeLimit));
+        }
+
+        // Fall back to H2 cache
         ensureCacheLoaded();
         if (cachedNodes != null && cachedEdges != null) {
             List<CodeNode> candidates = cachedNodes;
@@ -368,10 +418,6 @@ public class GraphController {
             return ResponseEntity.ok(result);
         }
 
-        // Fall back to QueryService (Neo4j)
-        if (queryService != null) {
-            return ResponseEntity.ok(queryService.findDeadCode(kind, safeLimit));
-        }
         throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                 "No data available. Run analyze first.");
     }
@@ -396,14 +442,27 @@ public class GraphController {
             @RequestParam String q,
             @RequestParam(defaultValue = "50") int limit) {
         int safeLimit = Math.min(limit, 1000);
-        // Search from H2 cache
+        // Search via Neo4j first
+        if (useNeo4j()) {
+            return queryService.searchGraph(q, safeLimit);
+        }
+        // Fall back to H2 cache
         ensureCacheLoaded();
         if (cachedNodes != null) {
             return topologyService.findNode(q, cachedNodes);
         }
-        if (queryService != null) return queryService.searchGraph(q, safeLimit);
         throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                 "No data available. Run analyze first.");
+    }
+
+    /**
+     * Check whether Neo4j (via QueryService/GraphStore) is available for queries.
+     * When true, Neo4j is the primary data source (enriched graph with SERVICE
+     * nodes, layer classifications, linker edges).
+     * When false, falls back to H2 cache (basic indexed data only).
+     */
+    private boolean useNeo4j() {
+        return queryService != null;
     }
 
     private void requireQueryService() {

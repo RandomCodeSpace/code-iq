@@ -56,7 +56,7 @@ class GraphControllerTest {
         config.setMaxDepth(10);
         config.setMaxRadius(10);
         config.setRootPath(".");
-        var controller = new GraphController(queryService, analyzer, config, statsService, new io.github.randomcodespace.iq.query.TopologyService());
+        var controller = new GraphController(queryService, null, analyzer, config, statsService, new io.github.randomcodespace.iq.query.TopologyService());
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
 
@@ -427,7 +427,7 @@ class GraphControllerTest {
     void readFileShouldReturnContent(@TempDir Path tempDir) throws Exception {
         Files.writeString(tempDir.resolve("hello.txt"), "Hello World", StandardCharsets.UTF_8);
         config.setRootPath(tempDir.toAbsolutePath().toString());
-        var controller = new GraphController(queryService, analyzer, config, statsService, new io.github.randomcodespace.iq.query.TopologyService());
+        var controller = new GraphController(queryService, null, analyzer, config, statsService, new io.github.randomcodespace.iq.query.TopologyService());
         var fileMvc = MockMvcBuilders.standaloneSetup(controller).build();
 
         fileMvc.perform(get("/api/file").param("path", "hello.txt"))
@@ -438,7 +438,7 @@ class GraphControllerTest {
     @Test
     void readFileShouldReturn404ForMissing(@TempDir Path tempDir) throws Exception {
         config.setRootPath(tempDir.toAbsolutePath().toString());
-        var controller = new GraphController(queryService, analyzer, config, statsService, new io.github.randomcodespace.iq.query.TopologyService());
+        var controller = new GraphController(queryService, null, analyzer, config, statsService, new io.github.randomcodespace.iq.query.TopologyService());
         var fileMvc = MockMvcBuilders.standaloneSetup(controller).build();
 
         fileMvc.perform(get("/api/file").param("path", "nonexistent.txt"))
@@ -448,7 +448,7 @@ class GraphControllerTest {
     @Test
     void readFileShouldBlockPathTraversal(@TempDir Path tempDir) throws Exception {
         config.setRootPath(tempDir.toAbsolutePath().toString());
-        var controller = new GraphController(queryService, analyzer, config, statsService, new io.github.randomcodespace.iq.query.TopologyService());
+        var controller = new GraphController(queryService, null, analyzer, config, statsService, new io.github.randomcodespace.iq.query.TopologyService());
         var fileMvc = MockMvcBuilders.standaloneSetup(controller).build();
 
         fileMvc.perform(get("/api/file").param("path", "../../../etc/passwd"))
@@ -461,7 +461,7 @@ class GraphControllerTest {
         Files.writeString(tempDir.resolve("multi.txt"), "line1\nline2\nline3\nline4\nline5",
                 StandardCharsets.UTF_8);
         config.setRootPath(tempDir.toAbsolutePath().toString());
-        var controller = new GraphController(queryService, analyzer, config, statsService, new io.github.randomcodespace.iq.query.TopologyService());
+        var controller = new GraphController(queryService, null, analyzer, config, statsService, new io.github.randomcodespace.iq.query.TopologyService());
         var fileMvc = MockMvcBuilders.standaloneSetup(controller).build();
 
         fileMvc.perform(get("/api/file")
@@ -476,7 +476,7 @@ class GraphControllerTest {
     void readFileShouldReturnFullContentWithoutLineParams(@TempDir Path tempDir) throws Exception {
         Files.writeString(tempDir.resolve("full.txt"), "aaa\nbbb\nccc", StandardCharsets.UTF_8);
         config.setRootPath(tempDir.toAbsolutePath().toString());
-        var controller = new GraphController(queryService, analyzer, config, statsService, new io.github.randomcodespace.iq.query.TopologyService());
+        var controller = new GraphController(queryService, null, analyzer, config, statsService, new io.github.randomcodespace.iq.query.TopologyService());
         var fileMvc = MockMvcBuilders.standaloneSetup(controller).build();
 
         fileMvc.perform(get("/api/file").param("path", "full.txt"))
