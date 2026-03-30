@@ -28,6 +28,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * REST API controller matching the Python OSSCodeIQ API paths.
@@ -42,6 +43,7 @@ public class GraphController {
     private final CodeIqConfig config;
     private final StatsService statsService;
     private final TopologyService topologyService;
+    private final AtomicBoolean analysisRunning = new AtomicBoolean(false);
 
     public GraphController(@org.springframework.beans.factory.annotation.Autowired(required = false) QueryService queryService,
                            Analyzer analyzer,
@@ -389,18 +391,26 @@ public class GraphController {
     }
 
     @PostMapping("/analyze")
-    public Map<String, Object> triggerAnalysis(
+    public ResponseEntity<?> triggerAnalysis(
             @RequestParam(defaultValue = "false") boolean incremental) {
-        AnalysisResult result = analyzer.run(Path.of(config.getRootPath()), null);
+        if (!analysisRunning.compareAndSet(false, true)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("error", "Analysis already in progress"));
+        }
+        try {
+            AnalysisResult result = analyzer.run(Path.of(config.getRootPath()), null);
 
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("status", "complete");
-        response.put("total_files", result.totalFiles());
-        response.put("files_analyzed", result.filesAnalyzed());
-        response.put("node_count", result.nodeCount());
-        response.put("edge_count", result.edgeCount());
-        response.put("elapsed_ms", result.elapsed().toMillis());
-        return response;
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("status", "complete");
+            response.put("total_files", result.totalFiles());
+            response.put("files_analyzed", result.filesAnalyzed());
+            response.put("node_count", result.nodeCount());
+            response.put("edge_count", result.edgeCount());
+            response.put("elapsed_ms", result.elapsed().toMillis());
+            return ResponseEntity.ok(response);
+        } finally {
+            analysisRunning.set(false);
+        }
     }
 
     // --- H2 cache helpers ---

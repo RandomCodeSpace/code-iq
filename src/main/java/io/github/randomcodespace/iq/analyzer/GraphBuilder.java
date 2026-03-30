@@ -32,6 +32,7 @@ public class GraphBuilder {
     private final List<CodeNode> allNodes = new ArrayList<>();
     private final List<CodeEdge> allEdges = new ArrayList<>();
     private final List<CodeEdge> deferredEdges = new ArrayList<>();
+    private int droppedEdgeCount = 0;
     private final int batchSize;
 
     public GraphBuilder() {
@@ -126,6 +127,7 @@ public class GraphBuilder {
         int dropped = deferredEdges.size() - recovered.size();
         if (dropped > 0) {
             log.debug("Dropped {} edges with permanently missing nodes", dropped);
+            droppedEdgeCount += dropped;
         }
         deferredEdges.clear();
         return recovered;
@@ -172,7 +174,7 @@ public class GraphBuilder {
     }
 
     public int getEdgeCount() {
-        return allEdges.size();
+        return allEdges.size() - droppedEdgeCount;
     }
 
     /**

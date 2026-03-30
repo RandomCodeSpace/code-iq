@@ -29,7 +29,7 @@ public abstract class AbstractAntlrDetector extends AbstractRegexDetector {
             if (tree != null) {
                 return detectWithAst(tree, ctx);
             }
-        } catch (Exception e) {
+        } catch (Throwable e) {
             log.warn("ANTLR parse failed for {}, falling back to regex: {}",
                     ctx.filePath(), e.getMessage());
         }

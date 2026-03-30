@@ -14,6 +14,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 /**
  * Links classes to their owning modules via CONTAINS edges.
@@ -37,7 +38,7 @@ public class ModuleContainmentLinker implements Linker {
         }
 
         // Group non-MODULE nodes by module name
-        Map<String, List<CodeNode>> nodesByModule = new HashMap<>();
+        Map<String, List<CodeNode>> nodesByModule = new TreeMap<>();
         for (CodeNode node : nodes) {
             if (node.getModule() != null && !node.getModule().isEmpty()
                     && node.getKind() != NodeKind.MODULE) {

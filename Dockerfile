@@ -12,6 +12,8 @@ WORKDIR /app
 
 RUN groupadd -r appuser && useradd -r -g appuser -d /app appuser
 
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+
 COPY --from=builder /build/target/code-iq-*.jar app.jar
 
 # Training run for AOT cache — fail loudly so broken images are not published

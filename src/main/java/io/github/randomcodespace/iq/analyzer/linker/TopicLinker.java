@@ -14,6 +14,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 /**
@@ -31,7 +32,7 @@ public class TopicLinker implements Linker {
     @Override
     public LinkResult link(List<CodeNode> nodes, List<CodeEdge> edges) {
         // Collect topic/queue nodes by label
-        Map<String, List<String>> topicIdsByLabel = new HashMap<>();
+        Map<String, List<String>> topicIdsByLabel = new TreeMap<>();
         for (CodeNode node : nodes) {
             if (node.getKind() == NodeKind.TOPIC || node.getKind() == NodeKind.QUEUE) {
                 topicIdsByLabel
@@ -45,9 +46,9 @@ public class TopicLinker implements Linker {
         }
 
         // Map topic_id -> producer node ids
-        Map<String, List<String>> producersByTopic = new HashMap<>();
+        Map<String, List<String>> producersByTopic = new TreeMap<>();
         // Map topic_id -> consumer node ids
-        Map<String, List<String>> consumersByTopic = new HashMap<>();
+        Map<String, List<String>> consumersByTopic = new TreeMap<>();
 
         for (CodeEdge edge : edges) {
             if (edge.getKind() == EdgeKind.PRODUCES && edge.getTarget() != null) {

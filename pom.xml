@@ -151,7 +151,7 @@
     <scm>
         <connection>scm:git:git://github.com/RandomCodeSpace/code-iq.git</connection>
         <developerConnection>scm:git:ssh://github.com:RandomCodeSpace/code-iq.git</developerConnection>
-        <url>https://github.com/RandomCodeSpace/code-iq/tree/java</url>
+        <url>https://github.com/RandomCodeSpace/code-iq/tree/main</url>
     </scm>
 
     <build>

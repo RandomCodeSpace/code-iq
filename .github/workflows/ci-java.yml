@@ -1,10 +1,10 @@
 name: Java CI
 on:
   push:
-    branches: [main, java]
+    branches: [main]
     paths: ['src/**', 'pom.xml']
   pull_request:
-    branches: [main, java]
+    branches: [main]
 
 jobs:
   build:

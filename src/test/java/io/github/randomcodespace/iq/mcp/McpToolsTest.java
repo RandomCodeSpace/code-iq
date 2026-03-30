@@ -383,7 +383,8 @@ class McpToolsTest {
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> rows = (List<Map<String, Object>>) parsed.get("rows");
         assertEquals(42, rows.getFirst().get("cnt"));
-        verify(tx).commit();
+        // Read-only transaction: commit is intentionally NOT called (defense-in-depth)
+        verify(tx, never()).commit();
     }
 
     @Test

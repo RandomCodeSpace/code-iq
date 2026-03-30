@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * MCP tool definitions using Spring AI annotations.
@@ -218,13 +219,13 @@ public class McpTools {
     @Tool(name = "run_cypher", description = "Execute a read-only Cypher query against the Neo4j graph database.")
     public String runCypher(
             @ToolParam(description = "Cypher query string") String query) {
-        // Block mutating queries
+        // Block any mutation keywords anywhere in the query (defense-in-depth)
+        Set<String> BLOCKED = Set.of("CREATE", "DELETE", "DETACH", "SET ", "REMOVE", "MERGE", "DROP", "FOREACH", "LOAD CSV");
         String upper = query.trim().toUpperCase();
-        if (upper.startsWith("DELETE") || upper.startsWith("REMOVE") || upper.startsWith("SET ")
-                || upper.startsWith("CREATE") || upper.startsWith("MERGE") || upper.startsWith("DROP")
-                || upper.contains("DETACH DELETE")
-                || (upper.contains("SET ") && !upper.startsWith("MATCH"))) {
-            return "{\"error\": \"Only read-only queries allowed. Mutating operations (CREATE, DELETE, SET, MERGE, DROP) are blocked.\"}";
+        for (String blocked : BLOCKED) {
+            if (upper.contains(blocked)) {
+                return toJson(Map.of("error", "Read-only queries only. Mutation keyword found: " + blocked.trim()));
+            }
         }
         try {
             List<Map<String, Object>> rows = new ArrayList<>();
@@ -240,7 +241,7 @@ public class McpTools {
                     }
                     rows.add(serializable);
                 }
-                tx.commit();
+                // Do NOT call tx.commit() — read-only, just let it close
             }
             Map<String, Object> response = new LinkedHashMap<>();
             response.put("rows", rows);

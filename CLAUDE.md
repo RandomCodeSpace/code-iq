@@ -2,13 +2,13 @@
 
 ## What This Project Is
 
-**OSSCodeIQ** -- a CLI tool + server that scans codebases to build a deterministic code knowledge graph. No AI, no external APIs -- pure static analysis. 106 detectors, 35+ languages, Neo4j Embedded graph database, Hazelcast distributed cache, Spring AI MCP server, REST API, web UI.
+**OSSCodeIQ** -- a CLI tool + server that scans codebases to build a deterministic code knowledge graph. No AI, no external APIs -- pure static analysis. 97 detectors, 35+ languages, Neo4j Embedded graph database, Hazelcast distributed cache, Spring AI MCP server, REST API, web UI.
 
 - **Maven coordinates:** `io.github.randomcodespace.iq:code-iq`
 - **CLI command:** `code-iq` (via `java -jar`)
 - **Java package:** `io.github.randomcodespace.iq` (under `src/main/java/`)
 - **GitHub repo:** `RandomCodeSpace/code-iq` (branch: `java`)
-- **Cache directory on disk:** `.code-intelligence` (SQLite analysis cache)
+- **Cache directory on disk:** `.code-intelligence` (H2 analysis cache)
 - **Config file:** `.osscodeiq.yml` (project-level overrides)
 
 ## Tech Stack
@@ -22,7 +22,7 @@
 - ANTLR 4.13.2 (TypeScript/JavaScript, Python, Go, C#, Rust, C++ grammars)
 - Picocli 4.7.7 (CLI framework, integrated with Spring Boot)
 - Thymeleaf + HTMX (web UI)
-- SQLite JDBC (incremental analysis cache)
+- H2 (incremental analysis cache)
 
 ## Architecture
 
@@ -43,7 +43,7 @@ FileDiscovery --> Parsers --> Detectors (virtual threads) --> GraphBuilder (buff
 - **Linkers** -- run after all detectors: `TopicLinker`, `EntityLinker`, `ModuleContainmentLinker`
 - **LayerClassifier** -- sets `layer` property on every node: `frontend | backend | infra | shared | unknown`
 - **GraphStore** -- facade over Neo4j, delegates Cypher operations
-- **AnalysisCache** -- SQLite-backed file hash cache for incremental analysis
+- **AnalysisCache** -- H2-backed file hash cache for incremental analysis
 
 ### Spring Profiles
 - **`indexing`** -- active during CLI analyze/stats/graph/query/find/flow/bundle/cache/plugins commands. Starts Neo4j Embedded, runs analysis pipeline.
@@ -57,8 +57,8 @@ io.github.randomcodespace.iq
   |-- analyzer/                    # Pipeline: Analyzer, FileDiscovery, GraphBuilder, LayerClassifier
   |   |-- linker/                  # Cross-file linkers: TopicLinker, EntityLinker, ModuleContainmentLinker
   |-- api/                         # REST controllers: GraphController, FlowController
-  |-- cache/                       # AnalysisCache (SQLite), FileHasher
-  |-- cli/                         # Picocli commands (12 commands + CodeIqCli parent + CliOutput helper)
+  |-- cache/                       # AnalysisCache (H2), FileHasher
+  |-- cli/                         # Picocli commands (14 commands + CodeIqCli parent + CliOutput helper)
   |-- config/                      # Spring config: Neo4jConfig, HazelcastConfig, CodeIqConfig, JacksonConfig
   |-- detector/                    # Detector interface + 97 concrete detectors
   |   |-- auth/                    # LDAP, certificate, session/header auth
@@ -84,7 +84,7 @@ io.github.randomcodespace.iq
   |-- graph/                       # GraphStore (facade), GraphRepository (Spring Data Neo4j)
   |-- health/                      # GraphHealthIndicator (Spring Actuator)
   |-- mcp/                         # McpTools (21 Spring AI @Tool methods)
-  |-- model/                       # CodeNode, CodeEdge, NodeKind (31), EdgeKind (26)
+  |-- model/                       # CodeNode, CodeEdge, NodeKind (32), EdgeKind (27)
   |-- query/                       # QueryService (graph queries), StatsService (categorized stats)
   |-- web/                         # ExplorerController (Thymeleaf web UI)
 ```
@@ -104,7 +104,7 @@ io.github.randomcodespace.iq
 
 ### Virtual Thread Safety
 - All file I/O and Neo4j operations run on virtual threads
-- The SQLite analysis cache uses `synchronized` blocks for thread safety
+- The H2 analysis cache uses `synchronized` blocks for thread safety
 - Hazelcast cache operations are thread-safe by design
 - Detectors MUST be stateless -- Spring `@Component` beans are singletons
 
@@ -239,8 +239,8 @@ mvn checkstyle:check
 | `detector/AbstractRegexDetector.java` | Base class for regex detectors |
 | `detector/AbstractJavaParserDetector.java` | Base class for JavaParser-based detectors |
 | `detector/AbstractAntlrDetector.java` | Base class for ANTLR-based detectors |
-| `model/NodeKind.java` | 31 node types enum |
-| `model/EdgeKind.java` | 26 edge types enum |
+| `model/NodeKind.java` | 32 node types enum |
+| `model/EdgeKind.java` | 27 edge types enum |
 | `model/CodeNode.java` | Graph node entity (Spring Data Neo4j) |
 | `model/CodeEdge.java` | Graph edge entity (Spring Data Neo4j) |
 | `graph/GraphStore.java` | Neo4j facade |
@@ -249,7 +249,7 @@ mvn checkstyle:check
 | `config/HazelcastConfig.java` | Hazelcast cache configuration |
 | `config/CodeIqConfig.java` | Application configuration properties |
 | `config/ProjectConfigLoader.java` | Loads .osscodeiq.yml overrides |
-| `cache/AnalysisCache.java` | SQLite incremental cache |
+| `cache/AnalysisCache.java` | H2 incremental cache |
 | `api/GraphController.java` | REST API endpoints |
 | `api/FlowController.java` | Flow diagram endpoints |
 | `mcp/McpTools.java` | 21 MCP tool definitions (Spring AI @Tool) |
@@ -291,7 +291,7 @@ Placed in the codebase root, loaded by `ProjectConfigLoader` before analysis.
 - **Neo4j deprecation warnings**: `CodeEdge` uses Long IDs (deprecated). Plan to migrate to external IDs.
 - **MCP warnings in CLI mode**: "No tool/resource/prompt/complete methods found" -- expected when not in `serving` profile.
 - **XML DOCTYPE warnings**: Non-fatal stderr from XML parser encountering DOCTYPE declarations.
-- **Virtual thread pinning**: SQLite JDBC operations can pin carrier threads. Use `synchronized` blocks (not `ReentrantLock`) for virtual thread compatibility.
+- **Virtual thread pinning**: H2 JDBC operations can pin carrier threads. Use `synchronized` blocks (not `ReentrantLock`) for virtual thread compatibility.
 - **ANTLR generated sources**: Generated during `mvn generate-sources` from `.g4` files. Do not edit generated code in `grammar/` subdirectories.
 - **Graph builder determinism**: Uses indexed result slots (not append order) to ensure virtual thread completion order does not affect output.
 

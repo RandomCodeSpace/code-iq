@@ -10,8 +10,8 @@
   <a href="https://github.com/RandomCodeSpace/code-iq/actions/workflows/ci-java.yml"><img src="https://img.shields.io/github/actions/workflow/status/RandomCodeSpace/code-iq/ci-java.yml?branch=main&style=flat-square&logo=github&label=CI" alt="CI"></a>
   <a href="https://www.oracle.com/java/technologies/downloads/"><img src="https://img.shields.io/badge/Java-25-orange?style=flat-square&logo=openjdk&logoColor=white" alt="Java 25"></a>
   <a href="https://github.com/RandomCodeSpace/code-iq/blob/main/LICENSE"><img src="https://img.shields.io/github/license/RandomCodeSpace/code-iq?style=flat-square&label=License" alt="MIT License"></a>
-  <a href="https://sonarcloud.io/summary/overall?id=RandomCodeSpace_code-iq"><img src="https://sonarcloud.io/api/project_badges/measure?project=RandomCodeSpace_code-iq&metric=security_rating" alt="Security"></a>
-  <a href="https://sonarcloud.io/summary/overall?id=RandomCodeSpace_code-iq"><img src="https://sonarcloud.io/api/project_badges/measure?project=RandomCodeSpace_code-iq&metric=reliability_rating" alt="Reliability"></a>
+  <a href="https://sonarcloud.io/summary/overall?id=RandomCodeSpace_code-iq-java"><img src="https://sonarcloud.io/api/project_badges/measure?project=RandomCodeSpace_code-iq-java&metric=security_rating" alt="Security"></a>
+  <a href="https://sonarcloud.io/summary/overall?id=RandomCodeSpace_code-iq-java"><img src="https://sonarcloud.io/api/project_badges/measure?project=RandomCodeSpace_code-iq-java&metric=reliability_rating" alt="Reliability"></a>
   <a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/detectors-97-brightgreen?style=flat-square&logo=codefactor&logoColor=white" alt="97 Detectors"></a>
   <a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/languages-35%2B-blue?style=flat-square&logo=stackblitz&logoColor=white" alt="35+ Languages"></a>
 </p>

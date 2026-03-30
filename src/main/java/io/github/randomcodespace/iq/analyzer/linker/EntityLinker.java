@@ -14,6 +14,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 /**
  * Links JPA entities to repositories that query them.
@@ -47,7 +48,7 @@ public class EntityLinker implements Linker {
         }
 
         // Build entity lookup by simple name (lowercase)
-        Map<String, CodeNode> entityByName = new HashMap<>();
+        Map<String, CodeNode> entityByName = new TreeMap<>();
         for (CodeNode entity : entities) {
             entityByName.put(entity.getLabel().toLowerCase(), entity);
             if (entity.getFqn() != null) {

@@ -465,6 +465,9 @@ public class Analyzer {
             cache.clear();
         }
 
+        var batchExecutorService = parallelism != null && parallelism > 0
+                ? Executors.newFixedThreadPool(parallelism)
+                : Executors.newVirtualThreadPerTaskExecutor();
         List<DiscoveredFile> batch = new ArrayList<>(batchSize);
         for (int fileIdx = 0; fileIdx < files.size(); fileIdx++) {
             batch.add(files.get(fileIdx));
@@ -477,15 +480,12 @@ public class Analyzer {
                 DetectorResult[] resultSlots = new DetectorResult[batch.size()];
                 int[] batchCacheHits = {0};
 
-                var executorService = parallelism != null && parallelism > 0
-                        ? Executors.newFixedThreadPool(parallelism)
-                        : Executors.newVirtualThreadPerTaskExecutor();
-                try (var executor = executorService) {
+                {
                     List<Future<?>> futures = new ArrayList<>(batch.size());
                     for (int i = 0; i < batch.size(); i++) {
                         final int idx = i;
                         final DiscoveredFile file = batch.get(idx);
-                        futures.add(executor.submit(() -> {
+                        futures.add(batchExecutorService.submit(() -> {
                             if (incremental) {
                                 try {
                                     Path absPath = root.resolve(file.path());
@@ -582,6 +582,7 @@ public class Analyzer {
                 batch.clear();
             }
         }
+        batchExecutorService.close();
 
         if (cacheHits > 0) {
             report.accept("Cache hits: " + cacheHits + " / " + totalFiles + " files");
@@ -710,7 +711,7 @@ public class Analyzer {
                 }
                 allNodes.addAll(result.nodes());
                 allEdges.addAll(result.edges());
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 log.debug("Detector {} failed on {}: {}",
                         detector.getName(), file.path(), e.getMessage());
             }
