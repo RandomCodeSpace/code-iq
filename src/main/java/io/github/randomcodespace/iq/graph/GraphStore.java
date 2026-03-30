@@ -7,6 +7,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -136,5 +137,33 @@ public class GraphStore implements FlowDataSource {
 
     public long countByKind(String kind) {
         return repository.countByKind(kind);
+    }
+
+    public long countEdges() {
+        return repository.countEdges();
+    }
+
+    public List<Map<String, Object>> countNodesByKind() {
+        return repository.countNodesByKind();
+    }
+
+    public List<Map<String, Object>> countNodesByLayer() {
+        return repository.countNodesByLayer();
+    }
+
+    public List<Map<String, Object>> findEdgesPaginated(int offset, int limit) {
+        return repository.findEdgesPaginated(offset, limit);
+    }
+
+    public List<Map<String, Object>> findEdgesByKindPaginated(String kind, int offset, int limit) {
+        return repository.findEdgesByKindPaginated(kind, offset, limit);
+    }
+
+    public long countEdgesByKind(String kind) {
+        return repository.countEdgesByKind(kind);
+    }
+
+    public List<CodeNode> findNodesWithoutIncoming(List<String> kinds, int offset, int limit) {
+        return repository.findNodesWithoutIncoming(kinds, offset, limit);
     }
 }
