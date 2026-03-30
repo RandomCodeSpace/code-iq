@@ -18,7 +18,7 @@
 
 ---
 
-**OSSCodeIQ** scans codebases to build a deterministic knowledge graph of code relationships -- classes, methods, endpoints, entities, dependencies, infrastructure resources, auth patterns, service topology, and more. 97 detectors across 35+ languages, Neo4j Embedded graph database, Hazelcast distributed cache, Spring AI MCP server (31 tools), REST API (32+ endpoints), React web UI, and zero AI dependency.
+**OSSCodeIQ** scans codebases to build a deterministic knowledge graph of code relationships -- classes, methods, endpoints, entities, dependencies, infrastructure resources, auth patterns, service topology, and more. 97 detectors across 35+ languages, Neo4j Embedded graph database, Spring AI MCP server (31 tools), REST API (32+ endpoints), React web UI, and zero AI dependency.
 
 ## Quick Start
 
@@ -49,7 +49,6 @@ java -jar target/code-iq-*-cli.jar serve /path/to/repo
 - **ANTLR grammars** for 10 languages (TypeScript, JavaScript, Python, Go, C#, Rust, Kotlin, Scala, C++)
 - **Neo4j Embedded** graph database -- full Cypher query support, no external server needed
 - **H2 analysis cache** -- batched streaming for memory-efficient indexing on CI runners
-- **Hazelcast distributed cache** -- K8s-ready, multi-pod query caching with near-cache
 - **Spring AI MCP server** -- 31 tools via streamable HTTP for AI-powered triage
 - **REST API** -- 32+ endpoints for programmatic access
 - **React UI** -- Dashboard, Topology (Cytoscape.js), Explorer, Flow, MCP Console (Monaco Editor), API Docs
@@ -348,7 +347,7 @@ The Docker image uses Eclipse Temurin 25, ZGC garbage collector, Spring AOT cach
 
 ## Kubernetes
 
-Helm chart included for K8s deployment with HPA auto-scaling and Hazelcast clustering:
+Helm chart included for K8s deployment with HPA auto-scaling:
 
 ```bash
 helm install code-iq helm/code-iq \
@@ -356,7 +355,6 @@ helm install code-iq helm/code-iq \
   --set persistence.graphPath=/data/graph.db
 ```
 
-- Hazelcast auto-discovery via K8s service DNS
 - HPA scales pods based on query load
 - Readiness/liveness health probes
 - Near-cache per pod for hot query data
@@ -399,7 +397,7 @@ java -jar target/code-iq-*-cli.jar serve .
 | Framework | Spring Boot 4.0.5 |
 | Graph DB | Neo4j Embedded 2026.02.3 (Community Edition) |
 | Analysis Cache | H2 (pure Java, virtual thread safe) |
-| Distributed Cache | Hazelcast 5.6.0 (K8s auto-discovery, near-cache) |
+| Cache | Spring Cache (simple in-memory, @Cacheable on query methods) |
 | MCP | Spring AI 1.1.4 (streamable HTTP) |
 | Java AST | JavaParser 3.28.0 |
 | Multi-lang AST | ANTLR 4.13.2 (10 grammars) |

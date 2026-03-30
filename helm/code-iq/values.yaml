@@ -17,10 +17,6 @@ resources:
     cpu: 2000m
     memory: 4Gi
 
-hazelcast:
-  clusterName: code-iq
-  serviceName: code-iq-hazelcast
-
 autoscaling:
   enabled: true
   minReplicas: 2

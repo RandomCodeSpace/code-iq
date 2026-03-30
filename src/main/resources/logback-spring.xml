@@ -18,7 +18,6 @@
     <logger name="io.netty" level="ERROR" />
     <logger name="org.jctools" level="ERROR" />
     <logger name="io.micrometer" level="WARN" />
-    <logger name="com.hazelcast" level="WARN" />
     <logger name="org.apache.catalina" level="WARN" />
     <logger name="org.apache.coyote" level="WARN" />
 

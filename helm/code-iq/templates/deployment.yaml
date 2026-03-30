@@ -29,10 +29,6 @@ spec:
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
-            - name: HAZELCAST_CLUSTER_NAME
-              value: {{ .Values.hazelcast.clusterName | quote }}
-            - name: HAZELCAST_SERVICE_NAME
-              value: {{ .Values.hazelcast.serviceName | quote }}
           readinessProbe:
             httpGet:
               path: {{ .Values.probes.readiness.path }}

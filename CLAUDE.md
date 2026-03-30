@@ -2,7 +2,7 @@
 
 ## What This Project Is
 
-**OSSCodeIQ** -- a CLI tool + server that scans codebases to build a deterministic code knowledge graph. No AI, no external APIs -- pure static analysis. 97 detectors, 35+ languages, Neo4j Embedded graph database, Hazelcast distributed cache, Spring AI MCP server, REST API, web UI.
+**OSSCodeIQ** -- a CLI tool + server that scans codebases to build a deterministic code knowledge graph. No AI, no external APIs -- pure static analysis. 97 detectors, 35+ languages, Neo4j Embedded graph database, Spring AI MCP server, REST API, web UI.
 
 - **Maven coordinates:** `io.github.randomcodespace.iq:code-iq`
 - **CLI command:** `code-iq` (via `java -jar`)
@@ -16,7 +16,6 @@
 - Java 25 (virtual threads, pattern matching, records, sealed classes)
 - Spring Boot 4.0.5
 - Neo4j Embedded 2026.02.3 (Community Edition, no external server)
-- Hazelcast 5.6.0 (distributed cache, K8s auto-discovery)
 - Spring AI 1.1.4 (MCP server, streamable HTTP)
 - JavaParser 3.28.0 (Java AST analysis)
 - ANTLR 4.13.2 (TypeScript/JavaScript, Python, Go, C#, Rust, C++ grammars)
@@ -59,7 +58,7 @@ io.github.randomcodespace.iq
   |-- api/                         # REST controllers: GraphController, FlowController
   |-- cache/                       # AnalysisCache (H2), FileHasher
   |-- cli/                         # Picocli commands (14 commands + CodeIqCli parent + CliOutput helper)
-  |-- config/                      # Spring config: Neo4jConfig, HazelcastConfig, CodeIqConfig, JacksonConfig
+  |-- config/                      # Spring config: Neo4jConfig, CodeIqConfig, JacksonConfig
   |-- detector/                    # Detector interface + 97 concrete detectors
   |   |-- auth/                    # LDAP, certificate, session/header auth
   |   |-- config/                  # YAML, JSON, TOML, INI, properties, K8s, Helm, GHA, etc.
@@ -105,7 +104,6 @@ io.github.randomcodespace.iq
 ### Virtual Thread Safety
 - All file I/O and Neo4j operations run on virtual threads
 - The H2 analysis cache uses `synchronized` blocks for thread safety
-- Hazelcast cache operations are thread-safe by design
 - Detectors MUST be stateless -- Spring `@Component` beans are singletons
 
 ## CLI Commands
@@ -246,7 +244,6 @@ mvn checkstyle:check
 | `graph/GraphStore.java` | Neo4j facade |
 | `graph/GraphRepository.java` | Spring Data Neo4j repository |
 | `config/Neo4jConfig.java` | Embedded Neo4j configuration |
-| `config/HazelcastConfig.java` | Hazelcast cache configuration |
 | `config/CodeIqConfig.java` | Application configuration properties |
 | `config/ProjectConfigLoader.java` | Loads .osscodeiq.yml overrides |
 | `cache/AnalysisCache.java` | H2 incremental cache |
