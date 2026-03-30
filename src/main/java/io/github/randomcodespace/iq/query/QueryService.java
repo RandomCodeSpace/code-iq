@@ -10,12 +10,9 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * High-level query service wrapping GraphStore with caching.
@@ -33,26 +30,20 @@ public class QueryService {
         this.config = config;
     }
 
-    // TODO: Replace findAll() with Cypher aggregation queries for node/edge counts
-    //       to avoid loading entire graph into memory. Requires Neo4j to be running.
     @Cacheable("graph-stats")
     public Map<String, Object> getStats() {
         long nodeCount = graphStore.count();
-        List<CodeNode> allNodes = graphStore.findAll();
-        long edgeCount = allNodes.stream()
-                .mapToLong(n -> n.getEdges().size())
-                .sum();
+        long edgeCount = graphStore.countEdges();
 
-        Map<String, Long> nodesByKind = allNodes.stream()
-                .collect(Collectors.groupingBy(
-                        n -> n.getKind().getValue(),
-                        Collectors.counting()));
+        Map<String, Long> nodesByKind = new LinkedHashMap<>();
+        for (Map<String, Object> row : graphStore.countNodesByKind()) {
+            nodesByKind.put((String) row.get("kind"), ((Number) row.get("cnt")).longValue());
+        }
 
-        Map<String, Long> nodesByLayer = allNodes.stream()
-                .filter(n -> n.getLayer() != null)
-                .collect(Collectors.groupingBy(
-                        CodeNode::getLayer,
-                        Collectors.counting()));
+        Map<String, Long> nodesByLayer = new LinkedHashMap<>();
+        for (Map<String, Object> row : graphStore.countNodesByLayer()) {
+            nodesByLayer.put((String) row.get("layer"), ((Number) row.get("cnt")).longValue());
+        }
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("node_count", nodeCount);
@@ -64,25 +55,26 @@ public class QueryService {
 
     @Cacheable("kinds-list")
     public Map<String, Object> listKinds() {
-        List<CodeNode> allNodes = graphStore.findAll();
-        Map<String, Long> kindCounts = allNodes.stream()
-                .collect(Collectors.groupingBy(
-                        n -> n.getKind().getValue(),
-                        Collectors.counting()));
+        List<Map<String, Object>> rawCounts = graphStore.countNodesByKind();
 
-        List<Map<String, Object>> kinds = kindCounts.entrySet().stream()
-                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
-                .map(e -> {
+        List<Map<String, Object>> kinds = new ArrayList<>();
+        rawCounts.stream()
+                .sorted((a, b) -> Long.compare(
+                        ((Number) b.get("cnt")).longValue(),
+                        ((Number) a.get("cnt")).longValue()))
+                .forEach(row -> {
                     Map<String, Object> m = new LinkedHashMap<>();
-                    m.put("kind", e.getKey());
-                    m.put("count", e.getValue());
-                    return m;
-                })
-                .toList();
+                    m.put("kind", row.get("kind"));
+                    m.put("count", ((Number) row.get("cnt")).longValue());
+                    kinds.add(m);
+                });
+        long totalNodes = rawCounts.stream()
+                .mapToLong(r -> ((Number) r.get("cnt")).longValue())
+                .sum();
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("kinds", kinds);
-        result.put("total", allNodes.size());
+        result.put("total", totalNodes);
         return result;
     }
 
@@ -117,27 +109,29 @@ public class QueryService {
     }
 
     public Map<String, Object> listEdges(String kind, int limit, int offset) {
-        List<CodeNode> allNodes = graphStore.findAll();
-        List<Map<String, Object>> edges = new ArrayList<>();
-
-        for (CodeNode node : allNodes) {
-            for (CodeEdge edge : node.getEdges()) {
-                if (kind != null && !kind.isBlank()
-                        && !edge.getKind().getValue().equals(kind)) {
-                    continue;
-                }
-                edges.add(edgeToMap(edge));
-            }
+        List<Map<String, Object>> rawEdges;
+        long total;
+        if (kind != null && !kind.isBlank()) {
+            rawEdges = graphStore.findEdgesByKindPaginated(kind, offset, limit);
+            total = graphStore.countEdgesByKind(kind);
+        } else {
+            rawEdges = graphStore.findEdgesPaginated(offset, limit);
+            total = graphStore.countEdges();
         }
 
-        int start = Math.min(offset, edges.size());
-        int end = Math.min(start + limit, edges.size());
-        List<Map<String, Object>> page = edges.subList(start, end);
+        List<Map<String, Object>> edges = rawEdges.stream().map(row -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", row.get("id"));
+            m.put("kind", row.get("kind"));
+            m.put("source", row.get("sourceId"));
+            m.put("target", row.get("targetId"));
+            return m;
+        }).toList();
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("edges", page);
-        result.put("count", page.size());
-        result.put("total", edges.size());
+        result.put("edges", edges);
+        result.put("count", edges.size());
+        result.put("total", total);
         return result;
     }
 
@@ -305,24 +299,19 @@ public class QueryService {
 
     @Cacheable(value = "dead-code", key = "#kind + ':' + #limit")
     public Map<String, Object> findDeadCode(String kind, int limit) {
-        // Find nodes with no incoming CALLS, IMPORTS, or EXTENDS edges
-        List<CodeNode> candidates = kind != null && !kind.isBlank() ?
-                graphStore.findByKind(NodeKind.fromValue(kind)) :
-                graphStore.findAll();
-
-        Set<String> nodesWithIncoming = new HashSet<>();
-        for (CodeNode node : graphStore.findAll()) {
-            for (CodeEdge edge : node.getEdges()) {
-                if (edge.getTarget() != null) {
-                    nodesWithIncoming.add(edge.getTarget().getId());
-                }
-            }
+        List<String> kinds;
+        if (kind != null && !kind.isBlank()) {
+            kinds = List.of(kind);
+        } else {
+            kinds = List.of(
+                    NodeKind.CLASS.getValue(),
+                    NodeKind.METHOD.getValue(),
+                    NodeKind.INTERFACE.getValue());
         }
 
-        List<Map<String, Object>> deadCode = candidates.stream()
-                .filter(n -> !nodesWithIncoming.contains(n.getId()))
-                .filter(n -> n.getKind() == NodeKind.CLASS || n.getKind() == NodeKind.METHOD || n.getKind() == NodeKind.INTERFACE)
-                .limit(limit)
+        List<CodeNode> deadNodes = graphStore.findNodesWithoutIncoming(kinds, 0, limit);
+
+        List<Map<String, Object>> deadCode = deadNodes.stream()
                 .map(n -> {
                     Map<String, Object> m = new LinkedHashMap<>();
                     m.put("id", n.getId());
