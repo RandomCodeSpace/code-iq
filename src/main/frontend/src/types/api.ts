@@ -1,24 +1,46 @@
-export interface StatsResponse {
-  total_nodes: number;
-  total_edges: number;
-  total_files: number;
+// Matches StatsService.computeStats() output (primary, from H2 cache)
+export interface ComputedStatsResponse {
+  graph: { nodes: number; edges: number; files: number };
   languages: Record<string, number>;
-  node_kinds: Record<string, number>;
-  edge_kinds: Record<string, number>;
-  layers: Record<string, number>;
-  frameworks?: string[];
-  infrastructure?: Record<string, number>;
-  auth?: Record<string, number>;
-  connections?: Record<string, number>;
-  [key: string]: unknown;
+  frameworks: Record<string, number>;
+  infra: {
+    databases: Record<string, number>;
+    messaging: Record<string, number>;
+    cloud: Record<string, number>;
+  };
+  connections: {
+    rest: { total: number; by_method: Record<string, number> };
+    grpc: number;
+    websocket: number;
+    producers: number;
+    consumers: number;
+  };
+  auth: Record<string, number>;
+  architecture: Record<string, number>;
+}
+
+// Matches QueryService.getStats() output (fallback, from Neo4j)
+export interface QueryStatsResponse {
+  node_count: number;
+  edge_count: number;
+  nodes_by_kind: Record<string, number>;
+  nodes_by_layer: Record<string, number>;
+}
+
+// Union type -- the /api/stats endpoint may return either format
+export type StatsResponse = ComputedStatsResponse | QueryStatsResponse;
+
+// Type guard
+export function isComputedStats(s: StatsResponse): s is ComputedStatsResponse {
+  return 'graph' in s;
 }
 
 export interface DetailedStatsResponse {
-  architecture?: CategoryStats;
-  frameworks?: CategoryStats;
-  infrastructure?: CategoryStats;
-  auth?: CategoryStats;
-  connections?: CategoryStats;
+  architecture?: Record<string, unknown>;
+  frameworks?: Record<string, unknown>;
+  infrastructure?: Record<string, unknown>;
+  auth?: Record<string, unknown>;
+  connections?: Record<string, unknown>;
   [key: string]: unknown;
 }
 
