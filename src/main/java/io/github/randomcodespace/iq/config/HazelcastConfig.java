@@ -6,6 +6,8 @@ import com.hazelcast.config.EvictionPolicy;
 import com.hazelcast.config.MapConfig;
 import com.hazelcast.config.MaxSizePolicy;
 import com.hazelcast.config.NearCacheConfig;
+import com.hazelcast.core.Hazelcast;
+import com.hazelcast.core.HazelcastInstance;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -32,6 +34,10 @@ public class HazelcastConfig {
     private String k8sServiceDns;
 
     @Bean
+    HazelcastInstance hazelcastInstance() {
+        return Hazelcast.newHazelcastInstance(hazelcastConfig());
+    }
+
     Config hazelcastConfig() {
         var config = new Config();
         config.setInstanceName("code-iq-cache");
