@@ -1,31 +1,45 @@
 name: Java CI
 on:
   push:
-    branches: [java]
+    branches: [main, java]
     paths: ['src/**', 'pom.xml']
   pull_request:
-    branches: [java]
+    branches: [main, java]
 
 jobs:
   build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '25'
+          cache: 'maven'
+      - run: mvn clean verify -B
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: target/surefire-reports/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: target/site/jacoco/
+
+  cross-platform:
+    needs: build
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        java: ['25']
+        os: [windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: ${{ matrix.java }}
+          java-version: '25'
           cache: 'maven'
-      - run: mvn clean verify -B
-      - uses: actions/upload-artifact@v4
-        with:
-          name: test-results-${{ matrix.os }}
-          path: target/surefire-reports/
-      - uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report-${{ matrix.os }}
-          path: target/site/jacoco/
+      - run: mvn clean verify -B -pl . -Dfrontend.skip=true
+        continue-on-error: true

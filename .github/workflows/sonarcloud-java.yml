@@ -1,10 +1,10 @@
 name: SonarCloud Java
 on:
   push:
-    branches: [java]
+    branches: [main, java]
     paths: ['src/**', 'pom.xml']
   pull_request:
-    branches: [java]
+    branches: [main, java]
 
 jobs:
   sonar:
