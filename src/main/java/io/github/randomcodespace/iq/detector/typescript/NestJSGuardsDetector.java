@@ -20,7 +20,7 @@ import io.github.randomcodespace.iq.detector.ParserType;
     name = "typescript.nestjs_guards",
     category = "auth",
     description = "Detects NestJS guards (AuthGuard, RolesGuard, custom guards)",
-    parser = ParserType.ANTLR,
+    parser = ParserType.REGEX,
     languages = {"typescript"},
     nodeKinds = {NodeKind.GUARD},
     properties = {"auth_type", "roles", "strategy"}

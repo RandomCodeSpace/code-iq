@@ -22,7 +22,7 @@ import io.github.randomcodespace.iq.detector.ParserType;
     name = "kafka_python",
     category = "messaging",
     description = "Detects Python Kafka producers and consumers (kafka-python, confluent-kafka)",
-    parser = ParserType.ANTLR,
+    parser = ParserType.REGEX,
     languages = {"python"},
     nodeKinds = {NodeKind.TOPIC},
     edgeKinds = {EdgeKind.CONSUMES, EdgeKind.IMPORTS, EdgeKind.PRODUCES},

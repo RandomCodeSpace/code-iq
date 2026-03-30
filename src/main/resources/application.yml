@@ -54,7 +54,7 @@ spring:
     activate:
       on-profile: serving
   cache:
-    type: simple
+    type: hazelcast
 
 management:
   endpoint:
@@ -66,6 +66,12 @@ management:
       enabled: true
     readinessstate:
       enabled: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
 
 codeiq:
   neo4j:

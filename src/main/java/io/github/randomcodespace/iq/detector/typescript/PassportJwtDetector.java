@@ -20,7 +20,7 @@ import io.github.randomcodespace.iq.detector.ParserType;
     name = "typescript.passport_jwt",
     category = "auth",
     description = "Detects Passport.js JWT and OAuth strategies",
-    parser = ParserType.ANTLR,
+    parser = ParserType.REGEX,
     languages = {"typescript", "javascript"},
     nodeKinds = {NodeKind.GUARD, NodeKind.MIDDLEWARE},
     properties = {"auth_type", "strategy"}

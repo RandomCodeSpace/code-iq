@@ -4,14 +4,17 @@ import io.github.randomcodespace.iq.config.CodeIqConfig;
 import io.github.randomcodespace.iq.graph.GraphStore;
 import io.github.randomcodespace.iq.model.CodeEdge;
 import io.github.randomcodespace.iq.model.CodeNode;
+import io.github.randomcodespace.iq.model.NodeKind;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -296,6 +299,44 @@ public class QueryService {
         int cappedLimit = Math.min(limit, 200);
         List<CodeNode> results = graphStore.search(query, cappedLimit);
         return results.stream().map(this::nodeToMap).toList();
+    }
+
+    // --- Dead code detection ---
+
+    @Cacheable(value = "dead-code", key = "#kind + ':' + #limit")
+    public Map<String, Object> findDeadCode(String kind, int limit) {
+        // Find nodes with no incoming CALLS, IMPORTS, or EXTENDS edges
+        List<CodeNode> candidates = kind != null && !kind.isBlank() ?
+                graphStore.findByKind(NodeKind.fromValue(kind)) :
+                graphStore.findAll();
+
+        Set<String> nodesWithIncoming = new HashSet<>();
+        for (CodeNode node : graphStore.findAll()) {
+            for (CodeEdge edge : node.getEdges()) {
+                if (edge.getTarget() != null) {
+                    nodesWithIncoming.add(edge.getTarget().getId());
+                }
+            }
+        }
+
+        List<Map<String, Object>> deadCode = candidates.stream()
+                .filter(n -> !nodesWithIncoming.contains(n.getId()))
+                .filter(n -> n.getKind() == NodeKind.CLASS || n.getKind() == NodeKind.METHOD || n.getKind() == NodeKind.INTERFACE)
+                .limit(limit)
+                .map(n -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("id", n.getId());
+                    m.put("kind", n.getKind().getValue());
+                    m.put("label", n.getLabel());
+                    m.put("file", n.getFilePath());
+                    return m;
+                })
+                .toList();
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("dead_code", deadCode);
+        result.put("count", deadCode.size());
+        return result;
     }
 
     // --- Serialization helpers ---

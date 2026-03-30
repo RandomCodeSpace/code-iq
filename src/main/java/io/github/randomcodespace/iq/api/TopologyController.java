@@ -29,87 +29,108 @@ public class TopologyController {
 
     private final TopologyService topologyService;
     private final CodeIqConfig config;
+    private volatile List<CodeNode> cachedNodes;
+    private volatile List<CodeEdge> cachedEdges;
 
     public TopologyController(TopologyService topologyService, CodeIqConfig config) {
         this.topologyService = topologyService;
         this.config = config;
     }
 
+    // --- H2 in-memory cache: load once, reuse across requests ---
+
+    /**
+     * Ensure the H2 cache is loaded into memory. Thread-safe via synchronized.
+     */
+    private synchronized void ensureCacheLoaded() {
+        if (cachedNodes != null) return;
+        Path root = Path.of(config.getRootPath()).toAbsolutePath().normalize();
+        Path cachePath = root.resolve(config.getCacheDir()).resolve("analysis-cache.db");
+        Path h2File = root.resolve(config.getCacheDir()).resolve("analysis-cache.mv.db");
+        if (!Files.exists(h2File)) return;
+        try (AnalysisCache cache = new AnalysisCache(cachePath)) {
+            cachedNodes = cache.loadAllNodes();
+            cachedEdges = cache.loadAllEdges();
+        }
+    }
+
+    /**
+     * Invalidate the in-memory cache (e.g. after re-analysis).
+     */
+    public void invalidateCache() {
+        cachedNodes = null;
+        cachedEdges = null;
+    }
+
     @GetMapping
     public Map<String, Object> getTopology() {
-        var data = loadData();
-        return topologyService.getTopology(data.nodes(), data.edges());
+        ensureCacheLoaded();
+        requireCache();
+        return topologyService.getTopology(cachedNodes, cachedEdges);
     }
 
     @GetMapping("/services/{name}")
     public Map<String, Object> serviceDetail(@PathVariable String name) {
-        var data = loadData();
-        return topologyService.serviceDetail(name, data.nodes(), data.edges());
+        ensureCacheLoaded();
+        requireCache();
+        return topologyService.serviceDetail(name, cachedNodes, cachedEdges);
     }
 
     @GetMapping("/services/{name}/deps")
     public Map<String, Object> serviceDependencies(@PathVariable String name) {
-        var data = loadData();
-        return topologyService.serviceDependencies(name, data.nodes(), data.edges());
+        ensureCacheLoaded();
+        requireCache();
+        return topologyService.serviceDependencies(name, cachedNodes, cachedEdges);
     }
 
     @GetMapping("/services/{name}/dependents")
     public Map<String, Object> serviceDependents(@PathVariable String name) {
-        var data = loadData();
-        return topologyService.serviceDependents(name, data.nodes(), data.edges());
+        ensureCacheLoaded();
+        requireCache();
+        return topologyService.serviceDependents(name, cachedNodes, cachedEdges);
     }
 
     @GetMapping("/blast-radius/{nodeId}")
     public Map<String, Object> blastRadius(@PathVariable String nodeId) {
-        var data = loadData();
-        return topologyService.blastRadius(nodeId, data.nodes(), data.edges());
+        ensureCacheLoaded();
+        requireCache();
+        return topologyService.blastRadius(nodeId, cachedNodes, cachedEdges);
     }
 
     @GetMapping("/path")
     public List<Map<String, Object>> findPath(
             @RequestParam("from") String source,
             @RequestParam("to") String target) {
-        var data = loadData();
-        return topologyService.findPath(source, target, data.nodes(), data.edges());
+        ensureCacheLoaded();
+        requireCache();
+        return topologyService.findPath(source, target, cachedNodes, cachedEdges);
     }
 
     @GetMapping("/bottlenecks")
     public List<Map<String, Object>> findBottlenecks() {
-        var data = loadData();
-        return topologyService.findBottlenecks(data.nodes(), data.edges());
+        ensureCacheLoaded();
+        requireCache();
+        return topologyService.findBottlenecks(cachedNodes, cachedEdges);
     }
 
     @GetMapping("/circular")
     public List<List<String>> findCircularDeps() {
-        var data = loadData();
-        return topologyService.findCircularDeps(data.nodes(), data.edges());
+        ensureCacheLoaded();
+        requireCache();
+        return topologyService.findCircularDeps(cachedNodes, cachedEdges);
     }
 
     @GetMapping("/dead")
     public List<Map<String, Object>> findDeadServices() {
-        var data = loadData();
-        return topologyService.findDeadServices(data.nodes(), data.edges());
+        ensureCacheLoaded();
+        requireCache();
+        return topologyService.findDeadServices(cachedNodes, cachedEdges);
     }
 
-    /**
-     * Load nodes and edges from the analysis cache.
-     */
-    private GraphData loadData() {
-        Path root = Path.of(config.getRootPath()).toAbsolutePath().normalize();
-        Path cachePath = root.resolve(config.getCacheDir()).resolve("analysis-cache.db");
-        Path h2File = root.resolve(config.getCacheDir()).resolve("analysis-cache.mv.db");
-
-        if (!Files.exists(h2File)) {
+    private void requireCache() {
+        if (cachedNodes == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND,
                     "No analysis cache found. Run analyze first.");
         }
-
-        try (AnalysisCache cache = new AnalysisCache(cachePath)) {
-            List<CodeNode> nodes = cache.loadAllNodes();
-            List<CodeEdge> edges = cache.loadAllEdges();
-            return new GraphData(nodes, edges);
-        }
     }
-
-    private record GraphData(List<CodeNode> nodes, List<CodeEdge> edges) {}
 }

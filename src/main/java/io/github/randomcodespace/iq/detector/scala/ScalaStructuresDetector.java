@@ -22,7 +22,7 @@ import io.github.randomcodespace.iq.detector.ParserType;
     name = "scala_structures",
     category = "structures",
     description = "Detects Scala classes, traits, objects, case classes, and imports",
-    parser = ParserType.ANTLR,
+    parser = ParserType.REGEX,
     languages = {"scala"},
     nodeKinds = {NodeKind.CLASS, NodeKind.INTERFACE, NodeKind.METHOD, NodeKind.MODULE},
     edgeKinds = {EdgeKind.EXTENDS, EdgeKind.IMPLEMENTS, EdgeKind.IMPORTS}

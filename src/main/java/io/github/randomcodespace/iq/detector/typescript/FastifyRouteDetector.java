@@ -23,7 +23,7 @@ import io.github.randomcodespace.iq.detector.ParserType;
     name = "fastify_routes",
     category = "endpoints",
     description = "Detects Fastify route definitions and plugin registrations",
-    parser = ParserType.ANTLR,
+    parser = ParserType.REGEX,
     languages = {"typescript", "javascript"},
     nodeKinds = {NodeKind.ENDPOINT, NodeKind.MIDDLEWARE},
     edgeKinds = {EdgeKind.IMPORTS},

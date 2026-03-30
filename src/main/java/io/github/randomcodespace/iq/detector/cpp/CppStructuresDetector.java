@@ -22,7 +22,7 @@ import io.github.randomcodespace.iq.detector.ParserType;
     name = "cpp_structures",
     category = "structures",
     description = "Detects C/C++ classes, structs, functions, namespaces, and includes",
-    parser = ParserType.ANTLR,
+    parser = ParserType.REGEX,
     languages = {"cpp", "c"},
     nodeKinds = {NodeKind.CLASS, NodeKind.ENUM, NodeKind.METHOD, NodeKind.MODULE},
     edgeKinds = {EdgeKind.EXTENDS, EdgeKind.IMPORTS}

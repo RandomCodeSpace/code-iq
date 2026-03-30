@@ -22,7 +22,7 @@ import io.github.randomcodespace.iq.detector.ParserType;
     name = "ktor_routes",
     category = "endpoints",
     description = "Detects Ktor route definitions and authentication blocks",
-    parser = ParserType.ANTLR,
+    parser = ParserType.REGEX,
     languages = {"kotlin"},
     nodeKinds = {NodeKind.ENDPOINT, NodeKind.GUARD, NodeKind.MIDDLEWARE, NodeKind.MODULE},
     properties = {"framework", "http_method", "protocol"}

@@ -20,7 +20,7 @@ import io.github.randomcodespace.iq.detector.ParserType;
     name = "sequelize_orm",
     category = "database",
     description = "Detects Sequelize ORM models, associations, and connections",
-    parser = ParserType.ANTLR,
+    parser = ParserType.REGEX,
     languages = {"typescript", "javascript"},
     nodeKinds = {NodeKind.DATABASE_CONNECTION, NodeKind.ENTITY},
     edgeKinds = {EdgeKind.DEPENDS_ON, EdgeKind.QUERIES},

@@ -20,7 +20,7 @@ import io.github.randomcodespace.iq.detector.ParserType;
     name = "remix_routes",
     category = "frontend",
     description = "Detects Remix route modules (loaders, actions, components)",
-    parser = ParserType.ANTLR,
+    parser = ParserType.REGEX,
     languages = {"typescript", "javascript"},
     nodeKinds = {NodeKind.COMPONENT, NodeKind.ENDPOINT},
     properties = {"framework", "http_method", "route_path"}

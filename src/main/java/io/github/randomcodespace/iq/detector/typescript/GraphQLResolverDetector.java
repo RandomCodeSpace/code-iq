@@ -20,7 +20,7 @@ import io.github.randomcodespace.iq.detector.ParserType;
     name = "typescript.graphql_resolvers",
     category = "endpoints",
     description = "Detects TypeScript/JS GraphQL resolvers (Apollo, type-graphql, Nexus)",
-    parser = ParserType.ANTLR,
+    parser = ParserType.REGEX,
     languages = {"typescript", "javascript"},
     nodeKinds = {NodeKind.CLASS, NodeKind.ENDPOINT},
     properties = {"framework", "protocol"}

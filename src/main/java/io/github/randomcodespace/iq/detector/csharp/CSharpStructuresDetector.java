@@ -20,7 +20,7 @@ import io.github.randomcodespace.iq.detector.ParserType;
     name = "csharp_structures",
     category = "structures",
     description = "Detects C# classes, interfaces, enums, records, and controller endpoints",
-    parser = ParserType.ANTLR,
+    parser = ParserType.REGEX,
     languages = {"csharp"},
     nodeKinds = {NodeKind.ABSTRACT_CLASS, NodeKind.CLASS, NodeKind.ENDPOINT, NodeKind.ENUM, NodeKind.INTERFACE, NodeKind.MODULE},
     edgeKinds = {EdgeKind.EXTENDS, EdgeKind.IMPLEMENTS, EdgeKind.IMPORTS},

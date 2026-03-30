@@ -22,7 +22,7 @@ import io.github.randomcodespace.iq.detector.ParserType;
     name = "csharp_minimal_apis",
     category = "endpoints",
     description = "Detects C# minimal API endpoints (MapGet, MapPost, etc.)",
-    parser = ParserType.ANTLR,
+    parser = ParserType.REGEX,
     languages = {"csharp"},
     nodeKinds = {NodeKind.ENDPOINT, NodeKind.GUARD, NodeKind.MODULE},
     edgeKinds = {EdgeKind.EXPOSES},

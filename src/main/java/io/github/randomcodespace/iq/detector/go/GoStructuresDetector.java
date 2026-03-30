@@ -20,7 +20,7 @@ import io.github.randomcodespace.iq.detector.ParserType;
     name = "go_structures",
     category = "structures",
     description = "Detects Go structs, interfaces, functions, and imports",
-    parser = ParserType.ANTLR,
+    parser = ParserType.REGEX,
     languages = {"go"},
     nodeKinds = {NodeKind.CLASS, NodeKind.INTERFACE, NodeKind.METHOD, NodeKind.MODULE},
     edgeKinds = {EdgeKind.DEFINES, EdgeKind.IMPORTS}

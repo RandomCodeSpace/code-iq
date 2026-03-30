@@ -22,7 +22,7 @@ import io.github.randomcodespace.iq.detector.ParserType;
     name = "go_orm",
     category = "database",
     description = "Detects Go ORM usage (GORM models, queries, migrations, connections)",
-    parser = ParserType.ANTLR,
+    parser = ParserType.REGEX,
     languages = {"go"},
     nodeKinds = {NodeKind.DATABASE_CONNECTION, NodeKind.ENTITY, NodeKind.MIGRATION, NodeKind.QUERY},
     edgeKinds = {EdgeKind.QUERIES},

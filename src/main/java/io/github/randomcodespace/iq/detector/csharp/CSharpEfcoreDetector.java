@@ -22,7 +22,7 @@ import io.github.randomcodespace.iq.detector.ParserType;
     name = "csharp_efcore",
     category = "entities",
     description = "Detects Entity Framework Core DbContexts, entities, and migrations",
-    parser = ParserType.ANTLR,
+    parser = ParserType.REGEX,
     languages = {"csharp"},
     nodeKinds = {NodeKind.ENTITY, NodeKind.MIGRATION, NodeKind.REPOSITORY},
     edgeKinds = {EdgeKind.QUERIES},

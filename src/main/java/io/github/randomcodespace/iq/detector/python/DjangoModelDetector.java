@@ -189,24 +189,26 @@ public class DjangoModelDetector extends AbstractAntlrDetector {
                 // FK / OneToOne edges
                 Matcher fkMatcher = FK_RE.matcher(classBody);
                 while (fkMatcher.find()) {
-                    String target = fkMatcher.group(2);
-                    String targetId = "django:" + filePath + ":model:" + target;
+                    String targetClassName = fkMatcher.group(2);
+                    String targetId = "django:" + filePath + ":model:" + targetClassName;
                     CodeEdge edge = new CodeEdge();
                     edge.setId(nodeId + "->depends_on->" + targetId);
                     edge.setKind(EdgeKind.DEPENDS_ON);
                     edge.setSourceId(nodeId);
+                    edge.setTarget(new CodeNode("*:" + targetClassName, NodeKind.ENTITY, targetClassName));
                     edges.add(edge);
                 }
 
                 // M2M edges
                 Matcher m2mMatcher = M2M_RE.matcher(classBody);
                 while (m2mMatcher.find()) {
-                    String target = m2mMatcher.group(2);
-                    String targetId = "django:" + filePath + ":model:" + target;
+                    String targetClassName = m2mMatcher.group(2);
+                    String targetId = "django:" + filePath + ":model:" + targetClassName;
                     CodeEdge edge = new CodeEdge();
                     edge.setId(nodeId + "->depends_on->" + targetId);
                     edge.setKind(EdgeKind.DEPENDS_ON);
                     edge.setSourceId(nodeId);
+                    edge.setTarget(new CodeNode("*:" + targetClassName, NodeKind.ENTITY, targetClassName));
                     edges.add(edge);
                 }
 
@@ -324,23 +326,25 @@ public class DjangoModelDetector extends AbstractAntlrDetector {
 
             Matcher fkMatcher = FK_RE.matcher(classBody);
             while (fkMatcher.find()) {
-                String target = fkMatcher.group(2);
-                String targetId = "django:" + filePath + ":model:" + target;
+                String targetClassName = fkMatcher.group(2);
+                String targetId = "django:" + filePath + ":model:" + targetClassName;
                 CodeEdge edge = new CodeEdge();
                 edge.setId(nodeId + "->depends_on->" + targetId);
                 edge.setKind(EdgeKind.DEPENDS_ON);
                 edge.setSourceId(nodeId);
+                edge.setTarget(new CodeNode("*:" + targetClassName, NodeKind.ENTITY, targetClassName));
                 edges.add(edge);
             }
 
             Matcher m2mMatcher = M2M_RE.matcher(classBody);
             while (m2mMatcher.find()) {
-                String target = m2mMatcher.group(2);
-                String targetId = "django:" + filePath + ":model:" + target;
+                String targetClassName = m2mMatcher.group(2);
+                String targetId = "django:" + filePath + ":model:" + targetClassName;
                 CodeEdge edge = new CodeEdge();
                 edge.setId(nodeId + "->depends_on->" + targetId);
                 edge.setKind(EdgeKind.DEPENDS_ON);
                 edge.setSourceId(nodeId);
+                edge.setTarget(new CodeNode("*:" + targetClassName, NodeKind.ENTITY, targetClassName));
                 edges.add(edge);
             }
 

@@ -26,7 +26,7 @@ import io.github.randomcodespace.iq.detector.ParserType;
     name = "kotlin_structures",
     category = "structures",
     description = "Detects Kotlin classes, interfaces, objects, functions, and imports",
-    parser = ParserType.ANTLR,
+    parser = ParserType.REGEX,
     languages = {"kotlin"},
     nodeKinds = {NodeKind.CLASS, NodeKind.INTERFACE, NodeKind.METHOD, NodeKind.MODULE},
     edgeKinds = {EdgeKind.EXTENDS, EdgeKind.IMPORTS}

@@ -10,6 +10,7 @@ import io.github.randomcodespace.iq.flow.FlowEngine;
 import io.github.randomcodespace.iq.flow.FlowModels.FlowDiagram;
 import io.github.randomcodespace.iq.model.CodeEdge;
 import io.github.randomcodespace.iq.model.CodeNode;
+import io.github.randomcodespace.iq.model.NodeKind;
 import io.github.randomcodespace.iq.query.QueryService;
 import io.github.randomcodespace.iq.query.StatsService;
 import io.github.randomcodespace.iq.query.TopologyService;
@@ -23,6 +24,7 @@ import org.springframework.stereotype.Component;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +47,8 @@ public class McpTools {
     private final GraphDatabaseService graphDb;
     private final StatsService statsService;
     private final TopologyService topologyService;
+    private volatile List<CodeNode> cachedNodes;
+    private volatile List<CodeEdge> cachedEdges;
 
     public McpTools(QueryService queryService, Analyzer analyzer,
                     CodeIqConfig config, ObjectMapper objectMapper,
@@ -60,36 +64,62 @@ public class McpTools {
         this.topologyService = topologyService;
     }
 
+    // --- H2 in-memory cache: load once, reuse across MCP tool calls ---
+
+    /**
+     * Ensure the H2 cache is loaded into memory. Thread-safe via synchronized.
+     */
+    private synchronized void ensureCacheLoaded() {
+        if (cachedNodes != null) return;
+        Path root = Path.of(config.getRootPath()).toAbsolutePath().normalize();
+        Path cachePath = root.resolve(config.getCacheDir()).resolve("analysis-cache.db");
+        Path h2File = root.resolve(config.getCacheDir()).resolve("analysis-cache.mv.db");
+        if (!java.nio.file.Files.exists(h2File)) return;
+        try (AnalysisCache cache = new AnalysisCache(cachePath)) {
+            cachedNodes = cache.loadAllNodes();
+            cachedEdges = cache.loadAllEdges();
+        }
+    }
+
+    /**
+     * Invalidate the in-memory cache (e.g. after re-analysis).
+     */
+    private void invalidateCache() {
+        cachedNodes = null;
+        cachedEdges = null;
+    }
+
+    /**
+     * Get cached data, throwing if not available.
+     */
+    private CacheData getCachedData() {
+        ensureCacheLoaded();
+        if (cachedNodes == null) {
+            throw new RuntimeException("No analysis cache found. Run analyze first.");
+        }
+        return new CacheData(cachedNodes, cachedEdges);
+    }
+
     @Tool(name = "get_stats", description = "Get project graph statistics - node counts, edge counts, backend info.")
     public String getStats() {
-        return toJson(queryService.getStats());
+        try {
+            return toJson(queryService.getStats());
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
+        }
     }
 
     @Tool(name = "get_detailed_stats", description = "Get rich categorized statistics: frameworks, infra, connections, auth, architecture. Category: all, graph, languages, frameworks, infra, connections, auth, architecture.")
     public String getDetailedStats(
             @ToolParam(description = "Category filter (default: all)", required = false) String category) {
         try {
-            java.nio.file.Path root = java.nio.file.Path.of(config.getRootPath()).toAbsolutePath().normalize();
-            java.nio.file.Path cachePath = root.resolve(config.getCacheDir()).resolve("analysis-cache.db");
-            // H2 stores data in analysis-cache.mv.db — check for that file on disk
-            java.nio.file.Path h2File = root.resolve(config.getCacheDir()).resolve("analysis-cache.mv.db");
-
-            if (!java.nio.file.Files.exists(h2File)) {
-                return toJson(Map.of("error", "No analysis cache found. Run analyze first."));
-            }
-
-            List<CodeNode> nodes;
-            List<CodeEdge> edges;
-            try (AnalysisCache cache = new AnalysisCache(cachePath)) {
-                nodes = cache.loadAllNodes();
-                edges = cache.loadAllEdges();
-            }
+            var data = getCachedData();
 
             String cat = category != null ? category : "all";
             if ("all".equalsIgnoreCase(cat)) {
-                return toJson(statsService.computeStats(nodes, edges));
+                return toJson(statsService.computeStats(data.nodes(), data.edges()));
             }
-            Map<String, Object> catStats = statsService.computeCategory(nodes, edges, cat);
+            Map<String, Object> catStats = statsService.computeCategory(data.nodes(), data.edges(), cat);
             if (catStats == null) {
                 return toJson(Map.of("error", "Unknown category: " + cat));
             }
@@ -105,75 +135,171 @@ public class McpTools {
     public String queryNodes(
             @ToolParam(description = "Node kind filter", required = false) String kind,
             @ToolParam(description = "Max results", required = false) Integer limit) {
-        return toJson(queryService.listNodes(kind, limit != null ? limit : 50, 0));
+        try {
+            return toJson(queryService.listNodes(kind, limit != null ? limit : 50, 0));
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
+        }
     }
 
     @Tool(name = "query_edges", description = "Query edges in the code graph. Filter by kind (calls, imports, depends_on, queries, protects, etc.).")
     public String queryEdges(
             @ToolParam(description = "Edge kind filter", required = false) String kind,
             @ToolParam(description = "Max results", required = false) Integer limit) {
-        return toJson(queryService.listEdges(kind, limit != null ? limit : 50, 0));
+        try {
+            return toJson(queryService.listEdges(kind, limit != null ? limit : 50, 0));
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
+        }
     }
 
     @Tool(name = "get_node_neighbors", description = "Get all nodes connected to a given node. Direction: both, in, out.")
     public String getNodeNeighbors(
             @ToolParam(description = "Node ID") String nodeId,
             @ToolParam(description = "Direction: both, in, out", required = false) String direction) {
-        return toJson(queryService.getNeighbors(nodeId, direction != null ? direction : "both"));
+        try {
+            return toJson(queryService.getNeighbors(nodeId, direction != null ? direction : "both"));
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
+        }
     }
 
     @Tool(name = "get_ego_graph", description = "Get the subgraph within N hops of a center node. Returns all nodes and edges in the neighborhood.")
     public String getEgoGraph(
             @ToolParam(description = "Center node ID") String center,
             @ToolParam(description = "Radius (max hops)", required = false) Integer radius) {
-        return toJson(queryService.egoGraph(center, radius != null ? radius : 2));
+        try {
+            return toJson(queryService.egoGraph(center, radius != null ? radius : 2));
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
+        }
     }
 
     @Tool(name = "find_cycles", description = "Find circular dependency cycles in the graph.")
     public String findCycles(
             @ToolParam(description = "Max cycles to return", required = false) Integer limit) {
-        return toJson(queryService.findCycles(limit != null ? limit : 100));
+        try {
+            return toJson(queryService.findCycles(limit != null ? limit : 100));
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
+        }
     }
 
     @Tool(name = "find_shortest_path", description = "Find the shortest path between two nodes.")
     public String findShortestPath(
             @ToolParam(description = "Source node ID") String source,
             @ToolParam(description = "Target node ID") String target) {
-        Map<String, Object> result = queryService.shortestPath(source, target);
-        if (result == null) {
-            return toJson(Map.of("error", "No path found between " + source + " and " + target));
+        try {
+            Map<String, Object> result = queryService.shortestPath(source, target);
+            if (result == null) {
+                return toJson(Map.of("error", "No path found between " + source + " and " + target));
+            }
+            return toJson(result);
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
         }
-        return toJson(result);
     }
 
     @Tool(name = "find_consumers", description = "Find nodes that consume from a target (CONSUMES/LISTENS edges).")
     public String findConsumers(
             @ToolParam(description = "Target node ID") String targetId) {
-        return toJson(queryService.consumersOf(targetId));
+        try {
+            return toJson(queryService.consumersOf(targetId));
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
+        }
     }
 
     @Tool(name = "find_producers", description = "Find nodes that produce to a target (PRODUCES/PUBLISHES edges).")
     public String findProducers(
             @ToolParam(description = "Target node ID") String targetId) {
-        return toJson(queryService.producersOf(targetId));
+        try {
+            return toJson(queryService.producersOf(targetId));
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
+        }
     }
 
     @Tool(name = "find_callers", description = "Find nodes that call a target (CALLS edges).")
     public String findCallers(
             @ToolParam(description = "Target node ID") String targetId) {
-        return toJson(queryService.callersOf(targetId));
+        try {
+            return toJson(queryService.callersOf(targetId));
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
+        }
     }
 
     @Tool(name = "find_dependencies", description = "Find modules that a given module depends on.")
     public String findDependencies(
             @ToolParam(description = "Module node ID") String moduleId) {
-        return toJson(queryService.dependenciesOf(moduleId));
+        try {
+            return toJson(queryService.dependenciesOf(moduleId));
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
+        }
     }
 
     @Tool(name = "find_dependents", description = "Find modules that depend on a given module.")
     public String findDependents(
             @ToolParam(description = "Module node ID") String moduleId) {
-        return toJson(queryService.dependentsOf(moduleId));
+        try {
+            return toJson(queryService.dependentsOf(moduleId));
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @Tool(name = "find_dead_code", description = "Find potentially dead code - classes, methods, or interfaces with no incoming calls, imports, or references.")
+    public String findDeadCode(
+            @ToolParam(description = "Filter by node kind (class, method, interface)", required = false) String kind,
+            @ToolParam(description = "Max results", required = false) Integer limit) {
+        try {
+            int safeLimit = limit != null ? Math.min(limit, 1000) : 100;
+
+            // Try H2 cache first
+            ensureCacheLoaded();
+            if (cachedNodes != null && cachedEdges != null) {
+                List<CodeNode> candidates = cachedNodes;
+                if (kind != null && !kind.isBlank()) {
+                    NodeKind nodeKind = NodeKind.fromValue(kind);
+                    candidates = candidates.stream()
+                            .filter(n -> n.getKind() == nodeKind)
+                            .toList();
+                }
+
+                Set<String> nodesWithIncoming = new HashSet<>();
+                for (CodeEdge edge : cachedEdges) {
+                    if (edge.getTarget() != null) {
+                        nodesWithIncoming.add(edge.getTarget().getId());
+                    }
+                }
+
+                List<Map<String, Object>> deadCode = candidates.stream()
+                        .filter(n -> !nodesWithIncoming.contains(n.getId()))
+                        .filter(n -> n.getKind() == NodeKind.CLASS || n.getKind() == NodeKind.METHOD || n.getKind() == NodeKind.INTERFACE)
+                        .limit(safeLimit)
+                        .map(n -> {
+                            Map<String, Object> m = new LinkedHashMap<>();
+                            m.put("id", n.getId());
+                            m.put("kind", n.getKind().getValue());
+                            m.put("label", n.getLabel());
+                            m.put("file", n.getFilePath());
+                            return m;
+                        })
+                        .toList();
+
+                Map<String, Object> result = new LinkedHashMap<>();
+                result.put("dead_code", deadCode);
+                result.put("count", deadCode.size());
+                return toJson(result);
+            }
+
+            // Fall back to QueryService (Neo4j)
+            return toJson(queryService.findDeadCode(kind, safeLimit));
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
+        }
     }
 
     @Tool(name = "generate_flow", description = "Generate an architecture flow diagram. Views: overview, ci, deploy, runtime, auth. Formats: json, mermaid.")
@@ -203,6 +329,10 @@ public class McpTools {
         try {
             boolean useIncremental = incremental != null ? incremental : true;
             AnalysisResult result = analyzer.run(Path.of(config.getRootPath()), null, useIncremental, null);
+
+            // Invalidate cached H2 data so next tool call picks up fresh results
+            invalidateCache();
+
             Map<String, Object> response = new LinkedHashMap<>();
             response.put("status", "complete");
             response.put("total_files", result.totalFiles());
@@ -257,33 +387,49 @@ public class McpTools {
     @Tool(name = "find_component_by_file", description = "Given a file path, find the component/module it belongs to, its layer, and all connected nodes.")
     public String findComponentByFile(
             @ToolParam(description = "File path (relative to codebase root)") String filePath) {
-        return toJson(queryService.findComponentByFile(filePath));
+        try {
+            return toJson(queryService.findComponentByFile(filePath));
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
+        }
     }
 
     @Tool(name = "trace_impact", description = "Trace downstream impact of a node - what depends on it, what breaks if it fails.")
     public String traceImpact(
             @ToolParam(description = "Node ID") String nodeId,
             @ToolParam(description = "Max depth", required = false) Integer depth) {
-        return toJson(queryService.traceImpact(nodeId, depth != null ? depth : 3));
+        try {
+            return toJson(queryService.traceImpact(nodeId, depth != null ? depth : 3));
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
+        }
     }
 
     @Tool(name = "find_related_endpoints", description = "Given a file, class, or entity name, find all API endpoints that interact with it.")
     public String findRelatedEndpoints(
             @ToolParam(description = "File, class, or entity identifier") String identifier) {
-        // Search for the identifier, then find endpoints connected to the results
-        List<Map<String, Object>> results = queryService.searchGraph(identifier, 50);
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("identifier", identifier);
-        response.put("related_nodes", results);
-        response.put("count", results.size());
-        return toJson(response);
+        try {
+            // Search for the identifier, then find endpoints connected to the results
+            List<Map<String, Object>> results = queryService.searchGraph(identifier, 50);
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("identifier", identifier);
+            response.put("related_nodes", results);
+            response.put("count", results.size());
+            return toJson(response);
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
+        }
     }
 
     @Tool(name = "search_graph", description = "Free-text search across node labels, IDs, and properties.")
     public String searchGraph(
             @ToolParam(description = "Search query") String query,
             @ToolParam(description = "Max results", required = false) Integer limit) {
-        return toJson(queryService.searchGraph(query, limit != null ? limit : 20));
+        try {
+            return toJson(queryService.searchGraph(query, limit != null ? limit : 20));
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
+        }
     }
 
     @Tool(name = "read_file", description = "Read a source file from the codebase, optionally a specific line range")
@@ -324,8 +470,8 @@ public class McpTools {
     @Tool(name = "get_topology", description = "Get service topology map — all services and their connections")
     public String getTopology() {
         try {
-            var data = loadCacheData();
-            return toJson(topologyService.getTopology(data.nodes, data.edges));
+            var data = getCachedData();
+            return toJson(topologyService.getTopology(data.nodes(), data.edges()));
         } catch (Exception e) {
             return toJson(Map.of("error", e.getMessage()));
         }
@@ -335,8 +481,8 @@ public class McpTools {
     public String serviceDetail(
             @ToolParam(description = "Service name") String serviceName) {
         try {
-            var data = loadCacheData();
-            return toJson(topologyService.serviceDetail(serviceName, data.nodes, data.edges));
+            var data = getCachedData();
+            return toJson(topologyService.serviceDetail(serviceName, data.nodes(), data.edges()));
         } catch (Exception e) {
             return toJson(Map.of("error", e.getMessage()));
         }
@@ -346,8 +492,8 @@ public class McpTools {
     public String serviceDependencies(
             @ToolParam(description = "Service name") String serviceName) {
         try {
-            var data = loadCacheData();
-            return toJson(topologyService.serviceDependencies(serviceName, data.nodes, data.edges));
+            var data = getCachedData();
+            return toJson(topologyService.serviceDependencies(serviceName, data.nodes(), data.edges()));
         } catch (Exception e) {
             return toJson(Map.of("error", e.getMessage()));
         }
@@ -357,8 +503,8 @@ public class McpTools {
     public String serviceDependents(
             @ToolParam(description = "Service name") String serviceName) {
         try {
-            var data = loadCacheData();
-            return toJson(topologyService.serviceDependents(serviceName, data.nodes, data.edges));
+            var data = getCachedData();
+            return toJson(topologyService.serviceDependents(serviceName, data.nodes(), data.edges()));
         } catch (Exception e) {
             return toJson(Map.of("error", e.getMessage()));
         }
@@ -368,8 +514,8 @@ public class McpTools {
     public String blastRadius(
             @ToolParam(description = "Node ID") String nodeId) {
         try {
-            var data = loadCacheData();
-            return toJson(topologyService.blastRadius(nodeId, data.nodes, data.edges));
+            var data = getCachedData();
+            return toJson(topologyService.blastRadius(nodeId, data.nodes(), data.edges()));
         } catch (Exception e) {
             return toJson(Map.of("error", e.getMessage()));
         }
@@ -380,8 +526,8 @@ public class McpTools {
             @ToolParam(description = "Source service") String source,
             @ToolParam(description = "Target service") String target) {
         try {
-            var data = loadCacheData();
-            return toJson(topologyService.findPath(source, target, data.nodes, data.edges));
+            var data = getCachedData();
+            return toJson(topologyService.findPath(source, target, data.nodes(), data.edges()));
         } catch (Exception e) {
             return toJson(Map.of("error", e.getMessage()));
         }
@@ -390,8 +536,8 @@ public class McpTools {
     @Tool(name = "find_bottlenecks", description = "Find bottleneck services with most connections")
     public String findBottlenecks() {
         try {
-            var data = loadCacheData();
-            return toJson(topologyService.findBottlenecks(data.nodes, data.edges));
+            var data = getCachedData();
+            return toJson(topologyService.findBottlenecks(data.nodes(), data.edges()));
         } catch (Exception e) {
             return toJson(Map.of("error", e.getMessage()));
         }
@@ -400,8 +546,8 @@ public class McpTools {
     @Tool(name = "find_circular_deps", description = "Find circular service-to-service dependencies")
     public String findCircularDeps() {
         try {
-            var data = loadCacheData();
-            return toJson(topologyService.findCircularDeps(data.nodes, data.edges));
+            var data = getCachedData();
+            return toJson(topologyService.findCircularDeps(data.nodes(), data.edges()));
         } catch (Exception e) {
             return toJson(Map.of("error", e.getMessage()));
         }
@@ -410,8 +556,8 @@ public class McpTools {
     @Tool(name = "find_dead_services", description = "Find dead services with no incoming connections")
     public String findDeadServices() {
         try {
-            var data = loadCacheData();
-            return toJson(topologyService.findDeadServices(data.nodes, data.edges));
+            var data = getCachedData();
+            return toJson(topologyService.findDeadServices(data.nodes(), data.edges()));
         } catch (Exception e) {
             return toJson(Map.of("error", e.getMessage()));
         }
@@ -421,8 +567,8 @@ public class McpTools {
     public String findNode(
             @ToolParam(description = "Search query") String query) {
         try {
-            var data = loadCacheData();
-            return toJson(topologyService.findNode(query, data.nodes));
+            var data = getCachedData();
+            return toJson(topologyService.findNode(query, data.nodes()));
         } catch (Exception e) {
             return toJson(Map.of("error", e.getMessage()));
         }
@@ -434,7 +580,7 @@ public class McpTools {
     private FlowEngine resolveFlowEngine() {
         if (flowEngine != null) return flowEngine;
         try {
-            CacheData data = loadCacheData();
+            CacheData data = getCachedData();
             if (data.nodes().isEmpty()) return null;
             return FlowEngine.fromCache(data.nodes());
         } catch (RuntimeException e) {
@@ -442,25 +588,7 @@ public class McpTools {
         }
     }
 
-    /**
-     * Load nodes and edges from the H2 analysis cache.
-     */
-    private CacheData loadCacheData() {
-        Path root = Path.of(config.getRootPath()).toAbsolutePath().normalize();
-        Path cachePath = root.resolve(config.getCacheDir()).resolve("analysis-cache.db");
-        Path h2File = root.resolve(config.getCacheDir()).resolve("analysis-cache.mv.db");
-
-        if (!java.nio.file.Files.exists(h2File)) {
-            throw new RuntimeException("No analysis cache found. Run analyze first.");
-        }
-
-        try (AnalysisCache cache = new AnalysisCache(cachePath)) {
-            return new CacheData(cache.loadAllNodes(), cache.loadAllEdges());
-        }
-    }
-
-    private record CacheData(java.util.List<io.github.randomcodespace.iq.model.CodeNode> nodes,
-                              java.util.List<io.github.randomcodespace.iq.model.CodeEdge> edges) {}
+    private record CacheData(List<CodeNode> nodes, List<CodeEdge> edges) {}
 
     /**
      * Convert Neo4j node/relationship values to JSON-serializable types.

@@ -22,7 +22,7 @@ import io.github.randomcodespace.iq.detector.ParserType;
     name = "rust_structures",
     category = "structures",
     description = "Detects Rust structs, traits, impls, functions, enums, and use statements",
-    parser = ParserType.ANTLR,
+    parser = ParserType.REGEX,
     languages = {"rust"},
     nodeKinds = {NodeKind.CLASS, NodeKind.ENUM, NodeKind.INTERFACE, NodeKind.METHOD, NodeKind.MODULE},
     edgeKinds = {EdgeKind.DEFINES, EdgeKind.IMPLEMENTS, EdgeKind.IMPORTS}

@@ -18,7 +18,7 @@ import io.github.randomcodespace.iq.detector.ParserType;
     name = "go_web",
     category = "endpoints",
     description = "Detects Go web endpoints (Gin, Echo, Chi, net/http)",
-    parser = ParserType.ANTLR,
+    parser = ParserType.REGEX,
     languages = {"go"},
     nodeKinds = {NodeKind.ENDPOINT, NodeKind.MIDDLEWARE},
     properties = {"framework", "http_method", "method", "path"}

@@ -24,7 +24,7 @@ import io.github.randomcodespace.iq.detector.ParserType;
     name = "typescript.express_routes",
     category = "endpoints",
     description = "Detects Express.js route definitions (app.get, router.post, etc.)",
-    parser = ParserType.ANTLR,
+    parser = ParserType.REGEX,
     languages = {"typescript", "javascript"},
     nodeKinds = {NodeKind.ENDPOINT},
     properties = {"framework", "http_method", "protocol"}

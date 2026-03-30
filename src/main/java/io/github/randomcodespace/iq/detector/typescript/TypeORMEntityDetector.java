@@ -22,7 +22,7 @@ import io.github.randomcodespace.iq.detector.ParserType;
     name = "typescript.typeorm_entities",
     category = "entities",
     description = "Detects TypeORM entity definitions and column mappings",
-    parser = ParserType.ANTLR,
+    parser = ParserType.REGEX,
     languages = {"typescript"},
     nodeKinds = {NodeKind.ENTITY},
     edgeKinds = {EdgeKind.MAPS_TO},

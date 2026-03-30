@@ -123,6 +123,7 @@ public class SQLAlchemyModelDetector extends AbstractAntlrDetector {
                     edge.setId(nodeId + "->maps_to->" + targetId);
                     edge.setKind(EdgeKind.MAPS_TO);
                     edge.setSourceId(nodeId);
+                    edge.setTarget(new CodeNode("*:" + targetClass, NodeKind.ENTITY, targetClass));
                     edges.add(edge);
                 }
             }
@@ -187,6 +188,7 @@ public class SQLAlchemyModelDetector extends AbstractAntlrDetector {
                 edge.setId(nodeId + "->maps_to->" + targetId);
                 edge.setKind(EdgeKind.MAPS_TO);
                 edge.setSourceId(nodeId);
+                edge.setTarget(new CodeNode("*:" + targetClass, NodeKind.ENTITY, targetClass));
                 edges.add(edge);
             }
         }

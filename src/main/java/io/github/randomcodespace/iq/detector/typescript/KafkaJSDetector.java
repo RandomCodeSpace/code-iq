@@ -20,7 +20,7 @@ import io.github.randomcodespace.iq.detector.ParserType;
     name = "kafka_js",
     category = "messaging",
     description = "Detects KafkaJS producers, consumers, and admin operations",
-    parser = ParserType.ANTLR,
+    parser = ParserType.REGEX,
     languages = {"typescript", "javascript"},
     nodeKinds = {NodeKind.DATABASE_CONNECTION, NodeKind.EVENT, NodeKind.TOPIC},
     edgeKinds = {EdgeKind.CONSUMES, EdgeKind.PRODUCES},

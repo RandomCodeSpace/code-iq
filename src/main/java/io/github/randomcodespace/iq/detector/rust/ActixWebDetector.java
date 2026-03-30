@@ -20,7 +20,7 @@ import io.github.randomcodespace.iq.detector.ParserType;
     name = "actix_web",
     category = "endpoints",
     description = "Detects Actix-web route handlers and middleware",
-    parser = ParserType.ANTLR,
+    parser = ParserType.REGEX,
     languages = {"rust"},
     nodeKinds = {NodeKind.ENDPOINT, NodeKind.MIDDLEWARE, NodeKind.MODULE},
     properties = {"framework", "http_method", "path"}

@@ -6,6 +6,7 @@ import io.github.randomcodespace.iq.cache.AnalysisCache;
 import io.github.randomcodespace.iq.config.CodeIqConfig;
 import io.github.randomcodespace.iq.model.CodeEdge;
 import io.github.randomcodespace.iq.model.CodeNode;
+import io.github.randomcodespace.iq.model.NodeKind;
 import io.github.randomcodespace.iq.query.QueryService;
 import io.github.randomcodespace.iq.query.StatsService;
 import io.github.randomcodespace.iq.query.TopologyService;
@@ -25,9 +26,11 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -44,6 +47,8 @@ public class GraphController {
     private final StatsService statsService;
     private final TopologyService topologyService;
     private final AtomicBoolean analysisRunning = new AtomicBoolean(false);
+    private volatile List<CodeNode> cachedNodes;
+    private volatile List<CodeEdge> cachedEdges;
 
     public GraphController(@org.springframework.beans.factory.annotation.Autowired(required = false) QueryService queryService,
                            Analyzer analyzer,
@@ -56,43 +61,58 @@ public class GraphController {
         this.topologyService = topologyService;
     }
 
+    // --- H2 in-memory cache: load once, reuse across requests ---
+
+    /**
+     * Ensure the H2 cache is loaded into memory. Thread-safe via synchronized.
+     * Loads all nodes and edges from the H2 analysis cache exactly once.
+     */
+    private synchronized void ensureCacheLoaded() {
+        if (cachedNodes != null) return;
+        Path root = Path.of(config.getRootPath()).toAbsolutePath().normalize();
+        Path cachePath = root.resolve(config.getCacheDir()).resolve("analysis-cache.db");
+        Path h2File = root.resolve(config.getCacheDir()).resolve("analysis-cache.mv.db");
+        if (!Files.exists(h2File)) return;
+        try (AnalysisCache cache = new AnalysisCache(cachePath)) {
+            cachedNodes = cache.loadAllNodes();
+            cachedEdges = cache.loadAllEdges();
+        }
+    }
+
+    /**
+     * Invalidate the in-memory cache (e.g. after re-analysis).
+     */
+    private void invalidateCache() {
+        cachedNodes = null;
+        cachedEdges = null;
+    }
+
     @GetMapping("/stats")
     public Map<String, Object> getStats() {
-        // Use H2 cache for stats — more memory-efficient than loading entire Neo4j graph
-        var data = loadFromH2();
-        if (data != null) {
-            return statsService.computeStats(data.nodes(), data.edges());
+        ensureCacheLoaded();
+        if (cachedNodes != null) {
+            return statsService.computeStats(cachedNodes, cachedEdges);
         }
         if (queryService != null) {
             return queryService.getStats();
         }
-        return Map.of("error", "No analysis data available. Run analyze first.");
+        throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                "No analysis data available. Run analyze first.");
     }
 
     @GetMapping("/stats/detailed")
     public Map<String, Object> getDetailedStats(
             @RequestParam(defaultValue = "all") String category) {
-        Path root = Path.of(config.getRootPath()).toAbsolutePath().normalize();
-        Path cachePath = root.resolve(config.getCacheDir()).resolve("analysis-cache.db");
-        // H2 stores data in analysis-cache.mv.db — check for that file on disk
-        Path h2File = root.resolve(config.getCacheDir()).resolve("analysis-cache.mv.db");
-
-        if (!Files.exists(h2File)) {
+        ensureCacheLoaded();
+        if (cachedNodes == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND,
                     "No analysis cache found. Run analyze first.");
         }
 
-        List<CodeNode> nodes;
-        List<CodeEdge> edges;
-        try (AnalysisCache cache = new AnalysisCache(cachePath)) {
-            nodes = cache.loadAllNodes();
-            edges = cache.loadAllEdges();
-        }
-
         if ("all".equalsIgnoreCase(category)) {
-            return statsService.computeStats(nodes, edges);
+            return statsService.computeStats(cachedNodes, cachedEdges);
         }
-        Map<String, Object> catStats = statsService.computeCategory(nodes, edges, category);
+        Map<String, Object> catStats = statsService.computeCategory(cachedNodes, cachedEdges, category);
         if (catStats == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Unknown category: " + category);
@@ -104,9 +124,9 @@ public class GraphController {
 
     @GetMapping("/kinds")
     public Map<String, Object> listKinds() {
-        var data = loadFromH2();
-        if (data != null) {
-            Map<String, Long> kindCounts = data.nodes().stream()
+        ensureCacheLoaded();
+        if (cachedNodes != null) {
+            Map<String, Long> kindCounts = cachedNodes.stream()
                     .collect(java.util.stream.Collectors.groupingBy(
                             n -> n.getKind().getValue(),
                             java.util.stream.Collectors.counting()));
@@ -121,11 +141,12 @@ public class GraphController {
                     .toList();
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("kinds", kinds);
-            result.put("total", data.nodes().size());
+            result.put("total", cachedNodes.size());
             return result;
         }
         if (queryService != null) return queryService.listKinds();
-        return Map.of("error", "No data available");
+        throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                "No data available. Run analyze first.");
     }
 
     @GetMapping("/kinds/{kind}")
@@ -133,23 +154,25 @@ public class GraphController {
             @PathVariable String kind,
             @RequestParam(defaultValue = "50") int limit,
             @RequestParam(defaultValue = "0") int offset) {
-        var data = loadFromH2();
-        if (data != null) {
-            List<CodeNode> filtered = data.nodes().stream()
+        int safeLimit = Math.min(limit, 1000);
+        ensureCacheLoaded();
+        if (cachedNodes != null) {
+            List<CodeNode> filtered = cachedNodes.stream()
                     .filter(n -> n.getKind().getValue().equals(kind))
                     .toList();
             int start = Math.min(offset, filtered.size());
-            int end = Math.min(start + limit, filtered.size());
+            int end = Math.min(start + safeLimit, filtered.size());
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("kind", kind);
             result.put("total", filtered.size());
             result.put("offset", offset);
-            result.put("limit", limit);
+            result.put("limit", safeLimit);
             result.put("nodes", filtered.subList(start, end).stream().map(this::nodeToMap).toList());
             return result;
         }
-        if (queryService != null) return queryService.nodesByKind(kind, limit, offset);
-        return Map.of("error", "No data available");
+        if (queryService != null) return queryService.nodesByKind(kind, safeLimit, offset);
+        throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                "No data available. Run analyze first.");
     }
 
     @GetMapping("/nodes")
@@ -157,49 +180,44 @@ public class GraphController {
             @RequestParam(required = false) String kind,
             @RequestParam(defaultValue = "100") int limit,
             @RequestParam(defaultValue = "0") int offset) {
-        var data = loadFromH2();
-        if (data != null) {
-            List<CodeNode> filtered = data.nodes();
+        int safeLimit = Math.min(limit, 1000);
+        ensureCacheLoaded();
+        if (cachedNodes != null) {
+            List<CodeNode> filtered = cachedNodes;
             if (kind != null && !kind.isBlank()) {
                 filtered = filtered.stream()
                         .filter(n -> n.getKind().getValue().equals(kind))
                         .toList();
             }
             int start = Math.min(offset, filtered.size());
-            int end = Math.min(start + limit, filtered.size());
+            int end = Math.min(start + safeLimit, filtered.size());
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("nodes", filtered.subList(start, end).stream().map(this::nodeToMap).toList());
             result.put("count", end - start);
             result.put("offset", offset);
-            result.put("limit", limit);
+            result.put("limit", safeLimit);
             return result;
         }
-        if (queryService != null) return queryService.listNodes(kind, limit, offset);
-        return Map.of("error", "No data available");
+        if (queryService != null) return queryService.listNodes(kind, safeLimit, offset);
+        throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                "No data available. Run analyze first.");
     }
 
     @GetMapping("/nodes/find")
     public List<Map<String, Object>> findNode(@RequestParam String q) {
-        Path root = Path.of(config.getRootPath()).toAbsolutePath().normalize();
-        Path cachePath = root.resolve(config.getCacheDir()).resolve("analysis-cache.db");
-        Path h2File = root.resolve(config.getCacheDir()).resolve("analysis-cache.mv.db");
-
-        if (!Files.exists(h2File)) {
+        ensureCacheLoaded();
+        if (cachedNodes == null) {
             return List.of();
         }
-
-        try (AnalysisCache cache = new AnalysisCache(cachePath)) {
-            List<CodeNode> nodes = cache.loadAllNodes();
-            return topologyService.findNode(q, nodes);
-        }
+        return topologyService.findNode(q, cachedNodes);
     }
 
     @GetMapping("/nodes/{nodeId}/detail")
     public Map<String, Object> nodeDetail(@PathVariable String nodeId) {
-        // Try H2 first
-        var data = loadFromH2();
-        if (data != null) {
-            return data.nodes().stream()
+        // Try H2 cache first
+        ensureCacheLoaded();
+        if (cachedNodes != null) {
+            return cachedNodes.stream()
                     .filter(n -> nodeId.equals(n.getId()))
                     .findFirst()
                     .map(this::nodeToMap)
@@ -226,16 +244,17 @@ public class GraphController {
             @RequestParam(required = false) String kind,
             @RequestParam(defaultValue = "100") int limit,
             @RequestParam(defaultValue = "0") int offset) {
-        var data = loadFromH2();
-        if (data != null) {
-            List<CodeEdge> filtered = data.edges();
+        int safeLimit = Math.min(limit, 1000);
+        ensureCacheLoaded();
+        if (cachedEdges != null) {
+            List<CodeEdge> filtered = cachedEdges;
             if (kind != null && !kind.isBlank()) {
                 filtered = filtered.stream()
                         .filter(e -> e.getKind().getValue().equals(kind))
                         .toList();
             }
             int start = Math.min(offset, filtered.size());
-            int end = Math.min(start + limit, filtered.size());
+            int end = Math.min(start + safeLimit, filtered.size());
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("edges", filtered.subList(start, end).stream().map(this::edgeToMap).toList());
             result.put("count", end - start);
@@ -243,7 +262,7 @@ public class GraphController {
             return result;
         }
         requireQueryService();
-        return queryService.listEdges(kind, limit, offset);
+        return queryService.listEdges(kind, safeLimit, offset);
     }
 
     @GetMapping("/ego/{center}")
@@ -304,6 +323,59 @@ public class GraphController {
         return queryService.dependentsOf(moduleId);
     }
 
+    @GetMapping("/query/dead-code")
+    public ResponseEntity<?> findDeadCode(
+            @RequestParam(required = false) String kind,
+            @RequestParam(defaultValue = "100") int limit) {
+        int safeLimit = Math.min(limit, 1000);
+
+        // Try H2 cache first for dead code analysis
+        ensureCacheLoaded();
+        if (cachedNodes != null && cachedEdges != null) {
+            List<CodeNode> candidates = cachedNodes;
+            if (kind != null && !kind.isBlank()) {
+                NodeKind nodeKind = NodeKind.fromValue(kind);
+                candidates = candidates.stream()
+                        .filter(n -> n.getKind() == nodeKind)
+                        .toList();
+            }
+
+            // Build set of node IDs that have incoming edges
+            Set<String> nodesWithIncoming = new HashSet<>();
+            for (CodeEdge edge : cachedEdges) {
+                if (edge.getTarget() != null) {
+                    nodesWithIncoming.add(edge.getTarget().getId());
+                }
+            }
+
+            List<Map<String, Object>> deadCode = candidates.stream()
+                    .filter(n -> !nodesWithIncoming.contains(n.getId()))
+                    .filter(n -> n.getKind() == NodeKind.CLASS || n.getKind() == NodeKind.METHOD || n.getKind() == NodeKind.INTERFACE)
+                    .limit(safeLimit)
+                    .map(n -> {
+                        Map<String, Object> m = new LinkedHashMap<>();
+                        m.put("id", n.getId());
+                        m.put("kind", n.getKind().getValue());
+                        m.put("label", n.getLabel());
+                        m.put("file", n.getFilePath());
+                        return m;
+                    })
+                    .toList();
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("dead_code", deadCode);
+            result.put("count", deadCode.size());
+            return ResponseEntity.ok(result);
+        }
+
+        // Fall back to QueryService (Neo4j)
+        if (queryService != null) {
+            return ResponseEntity.ok(queryService.findDeadCode(kind, safeLimit));
+        }
+        throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                "No data available. Run analyze first.");
+    }
+
     @GetMapping("/triage/component")
     public Map<String, Object> findComponent(@RequestParam String file) {
         requireQueryService();
@@ -323,13 +395,15 @@ public class GraphController {
     public List<Map<String, Object>> searchGraph(
             @RequestParam String q,
             @RequestParam(defaultValue = "50") int limit) {
-        // Search from H2
-        var data = loadFromH2();
-        if (data != null) {
-            return topologyService.findNode(q, data.nodes());
+        int safeLimit = Math.min(limit, 1000);
+        // Search from H2 cache
+        ensureCacheLoaded();
+        if (cachedNodes != null) {
+            return topologyService.findNode(q, cachedNodes);
         }
-        if (queryService != null) return queryService.searchGraph(q, limit);
-        return List.of();
+        if (queryService != null) return queryService.searchGraph(q, safeLimit);
+        throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                "No data available. Run analyze first.");
     }
 
     private void requireQueryService() {
@@ -400,6 +474,9 @@ public class GraphController {
         try {
             AnalysisResult result = analyzer.run(Path.of(config.getRootPath()), null);
 
+            // Invalidate cached H2 data so next request picks up fresh results
+            invalidateCache();
+
             Map<String, Object> response = new LinkedHashMap<>();
             response.put("status", "complete");
             response.put("total_files", result.totalFiles());
@@ -410,29 +487,6 @@ public class GraphController {
             return ResponseEntity.ok(response);
         } finally {
             analysisRunning.set(false);
-        }
-    }
-
-    // --- H2 cache helpers ---
-
-    private record H2Data(List<CodeNode> nodes, List<CodeEdge> edges) {}
-
-    /**
-     * Load nodes and edges from the H2 analysis cache, or null if not available.
-     */
-    private H2Data loadFromH2() {
-        Path root = Path.of(config.getRootPath()).toAbsolutePath().normalize();
-        Path cachePath = root.resolve(config.getCacheDir()).resolve("analysis-cache.db");
-        Path h2File = root.resolve(config.getCacheDir()).resolve("analysis-cache.mv.db");
-
-        if (!Files.exists(h2File)) {
-            return null;
-        }
-
-        try (AnalysisCache cache = new AnalysisCache(cachePath)) {
-            List<CodeNode> nodes = cache.loadAllNodes();
-            List<CodeEdge> edges = cache.loadAllEdges();
-            return new H2Data(nodes, edges);
         }
     }
 

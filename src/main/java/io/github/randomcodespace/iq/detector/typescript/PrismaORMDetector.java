@@ -20,7 +20,7 @@ import io.github.randomcodespace.iq.detector.ParserType;
     name = "prisma_orm",
     category = "database",
     description = "Detects Prisma ORM client usage, models, and database connections",
-    parser = ParserType.ANTLR,
+    parser = ParserType.REGEX,
     languages = {"typescript", "javascript"},
     nodeKinds = {NodeKind.DATABASE_CONNECTION, NodeKind.ENTITY},
     edgeKinds = {EdgeKind.IMPORTS, EdgeKind.QUERIES},

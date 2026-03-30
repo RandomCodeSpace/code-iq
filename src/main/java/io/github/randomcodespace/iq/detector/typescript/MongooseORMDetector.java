@@ -20,7 +20,7 @@ import io.github.randomcodespace.iq.detector.ParserType;
     name = "mongoose_orm",
     category = "database",
     description = "Detects Mongoose schemas, models, and database connections",
-    parser = ParserType.ANTLR,
+    parser = ParserType.REGEX,
     languages = {"typescript", "javascript"},
     nodeKinds = {NodeKind.DATABASE_CONNECTION, NodeKind.ENTITY, NodeKind.EVENT},
     edgeKinds = {EdgeKind.QUERIES},
