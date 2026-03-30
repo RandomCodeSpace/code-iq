@@ -41,6 +41,15 @@ public enum NodeKind {
 
     private final String value;
 
+    private static final java.util.Map<String, NodeKind> BY_VALUE;
+    static {
+        java.util.Map<String, NodeKind> map = new java.util.HashMap<>();
+        for (NodeKind kind : values()) {
+            map.put(kind.value, kind);
+        }
+        BY_VALUE = java.util.Collections.unmodifiableMap(map);
+    }
+
     NodeKind(String value) {
         this.value = value;
     }
@@ -50,18 +59,17 @@ public enum NodeKind {
     }
 
     /**
-     * Look up a NodeKind by its string value.
+     * Look up a NodeKind by its string value (O(1) via static map).
      *
      * @param value the lowercase string value (e.g. "module", "rmi_interface")
      * @return the matching NodeKind
      * @throws IllegalArgumentException if no match found
      */
     public static NodeKind fromValue(String value) {
-        for (NodeKind kind : values()) {
-            if (kind.value.equals(value)) {
-                return kind;
-            }
+        NodeKind kind = BY_VALUE.get(value);
+        if (kind == null) {
+            throw new IllegalArgumentException("Unknown NodeKind value: " + value);
         }
-        throw new IllegalArgumentException("Unknown NodeKind value: " + value);
+        return kind;
     }
 }

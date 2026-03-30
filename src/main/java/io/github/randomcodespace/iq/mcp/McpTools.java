@@ -191,10 +191,11 @@ public class McpTools {
     }
 
     @Tool(name = "analyze_codebase", description = "Trigger codebase analysis. Scans files, runs detectors, builds the code graph.")
-    public String analyzeCosdebase(
+    public String analyzeCodebase(
             @ToolParam(description = "Use incremental analysis", required = false) Boolean incremental) {
         try {
-            AnalysisResult result = analyzer.run(Path.of(config.getRootPath()), null);
+            boolean useIncremental = incremental != null ? incremental : true;
+            AnalysisResult result = analyzer.run(Path.of(config.getRootPath()), null, useIncremental, null);
             Map<String, Object> response = new LinkedHashMap<>();
             response.put("status", "complete");
             response.put("total_files", result.totalFiles());
@@ -208,9 +209,17 @@ public class McpTools {
         }
     }
 
-    @Tool(name = "run_cypher", description = "Execute a raw Cypher query against the Neo4j graph database.")
+    @Tool(name = "run_cypher", description = "Execute a read-only Cypher query against the Neo4j graph database.")
     public String runCypher(
             @ToolParam(description = "Cypher query string") String query) {
+        // Block mutating queries
+        String upper = query.trim().toUpperCase();
+        if (upper.startsWith("DELETE") || upper.startsWith("REMOVE") || upper.startsWith("SET ")
+                || upper.startsWith("CREATE") || upper.startsWith("MERGE") || upper.startsWith("DROP")
+                || upper.contains("DETACH DELETE")
+                || (upper.contains("SET ") && !upper.startsWith("MATCH"))) {
+            return "{\"error\": \"Only read-only queries allowed. Mutating operations (CREATE, DELETE, SET, MERGE, DROP) are blocked.\"}";
+        }
         try {
             List<Map<String, Object>> rows = new ArrayList<>();
             try (var tx = graphDb.beginTx();
@@ -417,24 +426,14 @@ public class McpTools {
      */
     private CacheData loadCacheData() {
         Path root = Path.of(config.getRootPath()).toAbsolutePath().normalize();
-        Path cachePath = root.resolve("analysis-cache.db");
-
-        // Try standard cache dir location
-        Path standardCachePath = root.resolve(config.getRootPath() != null
-                ? Path.of(config.getRootPath()).toAbsolutePath().normalize()
-                        .resolve(config.getCacheDir()).resolve("analysis-cache.db")
-                : Path.of(config.getCacheDir()).resolve("analysis-cache.db"));
-
-        // Resolve from root path
-        Path actualPath = Path.of(config.getRootPath()).toAbsolutePath().normalize()
-                .resolve(config.getCacheDir()).resolve("analysis-cache.db");
-        Path h2File = actualPath.getParent().resolve("analysis-cache.mv.db");
+        Path cachePath = root.resolve(config.getCacheDir()).resolve("analysis-cache.db");
+        Path h2File = root.resolve(config.getCacheDir()).resolve("analysis-cache.mv.db");
 
         if (!java.nio.file.Files.exists(h2File)) {
             throw new RuntimeException("No analysis cache found. Run analyze first.");
         }
 
-        try (AnalysisCache cache = new AnalysisCache(actualPath)) {
+        try (AnalysisCache cache = new AnalysisCache(cachePath)) {
             return new CacheData(cache.loadAllNodes(), cache.loadAllEdges());
         }
     }

@@ -187,8 +187,9 @@ public class Analyzer {
         // Apply exclude patterns from project config
         if (projectConfig.hasExcludePatterns()) {
             List<String> excludes = projectConfig.getExclude();
+            List<java.util.regex.Pattern> compiledExcludes = compileExcludePatterns(excludes);
             files = files.stream()
-                    .filter(f -> !matchesAnyExclude(f.path().toString(), excludes))
+                    .filter(f -> !matchesAnyCompiledExclude(f.path().toString(), compiledExcludes))
                     .toList();
             report.accept("Exclude patterns: " + excludes);
         }
@@ -422,8 +423,9 @@ public class Analyzer {
         }
         if (projectConfig.hasExcludePatterns()) {
             List<String> excludes = projectConfig.getExclude();
+            List<java.util.regex.Pattern> compiledExcludes = compileExcludePatterns(excludes);
             files = files.stream()
-                    .filter(f -> !matchesAnyExclude(f.path().toString(), excludes))
+                    .filter(f -> !matchesAnyCompiledExclude(f.path().toString(), compiledExcludes))
                     .toList();
             report.accept("Exclude patterns: " + excludes);
         }
@@ -740,15 +742,32 @@ public class Analyzer {
     }
 
     /**
-     * Check whether a file path matches any of the given exclude patterns.
-     * Supports simple glob-like patterns: '*' matches any sequence of chars,
-     * '**' matches across directory separators.
+     * Pre-compile exclude glob patterns into regex Pattern objects.
+     */
+    private static List<java.util.regex.Pattern> compileExcludePatterns(List<String> excludePatterns) {
+        if (excludePatterns == null) return List.of();
+        return excludePatterns.stream()
+                .map(p -> compileGlob(p.replace('\\', '/')))
+                .toList();
+    }
+
+    /**
+     * Check whether a file path matches any of the given pre-compiled exclude patterns.
      */
     private static boolean matchesAnyExclude(String filePath, List<String> excludePatterns) {
         if (excludePatterns == null) return false;
+        List<java.util.regex.Pattern> compiled = compileExcludePatterns(excludePatterns);
+        return matchesAnyCompiledExclude(filePath, compiled);
+    }
+
+    /**
+     * Check whether a file path matches any of the given pre-compiled patterns.
+     */
+    private static boolean matchesAnyCompiledExclude(String filePath, List<java.util.regex.Pattern> compiledPatterns) {
+        if (compiledPatterns == null || compiledPatterns.isEmpty()) return false;
         String normalized = filePath.replace('\\', '/');
-        for (String pattern : excludePatterns) {
-            if (matchGlob(normalized, pattern.replace('\\', '/'))) {
+        for (java.util.regex.Pattern pattern : compiledPatterns) {
+            if (pattern.matcher(normalized).matches()) {
                 return true;
             }
         }
@@ -756,11 +775,11 @@ public class Analyzer {
     }
 
     /**
-     * Simple glob matching: '*' matches any non-separator sequence,
-     * '**' matches everything (including separators).
+     * Compile a glob pattern into a regex Pattern.
+     * '*' matches any non-separator sequence, '**' matches everything (including separators).
+     * All regex special characters are properly escaped.
      */
-    private static boolean matchGlob(String text, String pattern) {
-        // Convert glob to regex
+    private static java.util.regex.Pattern compileGlob(String pattern) {
         StringBuilder regex = new StringBuilder("^");
         int i = 0;
         while (i < pattern.length()) {
@@ -780,8 +799,9 @@ public class Analyzer {
             } else if (c == '?') {
                 regex.append("[^/]");
                 i++;
-            } else if (c == '.') {
-                regex.append("\\.");
+            } else if (".+^${}()|[]\\".indexOf(c) >= 0) {
+                // S5: Properly escape all regex special characters
+                regex.append('\\').append(c);
                 i++;
             } else {
                 regex.append(c);
@@ -789,6 +809,6 @@ public class Analyzer {
             }
         }
         regex.append("$");
-        return text.matches(regex.toString());
+        return java.util.regex.Pattern.compile(regex.toString());
     }
 }

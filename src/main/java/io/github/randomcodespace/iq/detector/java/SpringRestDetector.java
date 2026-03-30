@@ -139,6 +139,7 @@ public class SpringRestDetector extends AbstractJavaParserDetector {
                     node.getAnnotations().add("@" + annName);
                     node.getProperties().put("http_method", httpMethod);
                     node.getProperties().put("path", fullPath);
+                    node.getProperties().put("method", methodName);
                     if (produces != null) node.getProperties().put("produces", produces);
                     if (consumes != null) node.getProperties().put("consumes", consumes);
 

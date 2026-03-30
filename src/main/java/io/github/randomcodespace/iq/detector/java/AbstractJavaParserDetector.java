@@ -29,6 +29,8 @@ public abstract class AbstractJavaParserDetector extends AbstractRegexDetector {
             // JavaParser may throw AssertionError for unrecognized token kinds
             // (e.g. newer Java syntax). Fall back to regex in those cases.
             return Optional.empty();
+        } finally {
+            PARSER.remove();
         }
     }
 

@@ -7,6 +7,7 @@ import io.github.randomcodespace.iq.cache.AnalysisCache;
 import io.github.randomcodespace.iq.config.CodeIqConfig;
 import io.github.randomcodespace.iq.model.CodeEdge;
 import io.github.randomcodespace.iq.model.CodeNode;
+import io.github.randomcodespace.iq.model.EdgeKind;
 import org.neo4j.dbms.api.DatabaseManagementService;
 import org.neo4j.dbms.api.DatabaseManagementServiceBuilder;
 import org.neo4j.graphdb.GraphDatabaseService;
@@ -216,9 +217,17 @@ public class EnrichCommand implements Callable<Integer> {
                         String targetId = edge.getTarget() != null ? edge.getTarget().getId() : null;
                         if (sourceId == null || targetId == null) continue;
 
+                        // Validate edge kind comes from EdgeKind enum
+                        String edgeKindValue = edge.getKind().getValue();
+                        try {
+                            EdgeKind.fromValue(edgeKindValue);
+                        } catch (IllegalArgumentException ex) {
+                            log.warn("Skipping edge with unknown kind: {}", edgeKindValue);
+                            continue;
+                        }
                         var result = tx.execute(
                                 "MATCH (s:CodeNode {id: $sourceId}), (t:CodeNode {id: $targetId}) "
-                                        + "CREATE (s)-[r:" + sanitizeRelType(edge.getKind().getValue())
+                                        + "CREATE (s)-[r:" + sanitizeRelType(edgeKindValue)
                                         + " {id: $edgeId}]->(t)",
                                 java.util.Map.of(
                                         "sourceId", sourceId,

@@ -30,6 +30,8 @@ public class QueryService {
         this.config = config;
     }
 
+    // TODO: Replace findAll() with Cypher aggregation queries for node/edge counts
+    //       to avoid loading entire graph into memory. Requires Neo4j to be running.
     @Cacheable("graph-stats")
     public Map<String, Object> getStats() {
         long nodeCount = graphStore.count();
@@ -208,7 +210,7 @@ public class QueryService {
 
     public Map<String, Object> egoGraph(String center, int radius) {
         int cappedRadius = Math.min(radius, config.getMaxRadius());
-        List<CodeNode> nodes = graphStore.findEgoGraph(center, cappedRadius);
+        List<CodeNode> nodes = new ArrayList<>(graphStore.findEgoGraph(center, cappedRadius));
 
         // Include center node
         graphStore.findById(center).ifPresent(c -> {

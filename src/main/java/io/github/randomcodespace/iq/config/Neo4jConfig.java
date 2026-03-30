@@ -28,16 +28,7 @@ public class Neo4jConfig {
     @Bean(destroyMethod = "shutdown")
     DatabaseManagementService databaseManagementService(
             @Value("${codeiq.graph.path:.osscodeiq/graph.db}") String dbPath) {
-        DatabaseManagementService dbms = new DatabaseManagementServiceBuilder(Path.of(dbPath)).build();
-        // Ensure clean shutdown even if Spring context is not closed gracefully
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            try {
-                dbms.shutdown();
-            } catch (Exception ignored) {
-                // Already shut down by Spring's destroyMethod, or JVM is exiting
-            }
-        }, "neo4j-shutdown-hook"));
-        return dbms;
+        return new DatabaseManagementServiceBuilder(Path.of(dbPath)).build();
     }
 
     @Bean

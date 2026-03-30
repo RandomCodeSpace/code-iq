@@ -48,13 +48,14 @@ public class CodeIqApplication implements CommandLineRunner, ExitCodeGenerator {
         var app = new SpringApplication(CodeIqApplication.class);
         app.setBannerMode(org.springframework.boot.Banner.Mode.OFF);
 
-        // Detect command from arguments
-        boolean isServe = Arrays.stream(args)
-                .anyMatch(arg -> "serve".equalsIgnoreCase(arg));
-        boolean isIndex = Arrays.stream(args)
-                .anyMatch(arg -> "index".equalsIgnoreCase(arg));
-        boolean isEnrich = Arrays.stream(args)
-                .anyMatch(arg -> "enrich".equalsIgnoreCase(arg));
+        // Detect command from first non-flag argument only
+        String command = Arrays.stream(args)
+                .filter(arg -> !arg.startsWith("-"))
+                .findFirst()
+                .orElse("");
+        boolean isServe = "serve".equalsIgnoreCase(command);
+        boolean isIndex = "index".equalsIgnoreCase(command);
+        boolean isEnrich = "enrich".equalsIgnoreCase(command);
 
         if (isServe) {
             app.setAdditionalProfiles("serving");

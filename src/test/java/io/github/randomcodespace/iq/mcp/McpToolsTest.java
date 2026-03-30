@@ -32,6 +32,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
@@ -343,9 +344,9 @@ class McpToolsTest {
         var analysisResult = new AnalysisResult(
                 100, 80, 500, 200, Map.of(), Map.of(), Map.of(), Map.of(), Duration.ofMillis(1500)
         );
-        when(analyzer.run(any(), any())).thenReturn(analysisResult);
+        when(analyzer.run(any(), any(), anyBoolean(), any())).thenReturn(analysisResult);
 
-        String result = mcpTools.analyzeCosdebase(false);
+        String result = mcpTools.analyzeCodebase(false);
         Map<String, Object> parsed = parseJson(result);
 
         assertEquals("complete", parsed.get("status"));
@@ -354,9 +355,9 @@ class McpToolsTest {
 
     @Test
     void analyzeCodebaseShouldHandleError() throws IOException {
-        when(analyzer.run(any(), any())).thenThrow(new RuntimeException("Analysis failed"));
+        when(analyzer.run(any(), any(), anyBoolean(), any())).thenThrow(new RuntimeException("Analysis failed"));
 
-        String result = mcpTools.analyzeCosdebase(false);
+        String result = mcpTools.analyzeCodebase(false);
         Map<String, Object> parsed = parseJson(result);
 
         assertNotNull(parsed.get("error"));

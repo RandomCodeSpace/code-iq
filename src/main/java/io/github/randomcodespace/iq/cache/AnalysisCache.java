@@ -121,7 +121,7 @@ public class AnalysisCache implements Closeable {
     /**
      * Return the commit SHA from the most recent analysis run, or null.
      */
-    public String getLastCommit() {
+    public synchronized String getLastCommit() {
         try (var stmt = conn.prepareStatement(
                 "SELECT commit_sha FROM analysis_runs ORDER BY timestamp DESC LIMIT 1")) {
             ResultSet rs = stmt.executeQuery();
@@ -139,7 +139,7 @@ public class AnalysisCache implements Closeable {
     /**
      * Check whether results for the given content hash are cached.
      */
-    public boolean isCached(String contentHash) {
+    public synchronized boolean isCached(String contentHash) {
         try (var stmt = conn.prepareStatement(
                 "SELECT 1 FROM files WHERE content_hash = ?")) {
             stmt.setString(1, contentHash);
@@ -155,7 +155,7 @@ public class AnalysisCache implements Closeable {
     /**
      * Persist analysis results for a single file.
      */
-    public void storeResults(String contentHash, String filePath, String language,
+    public synchronized void storeResults(String contentHash, String filePath, String language,
                              List<CodeNode> nodes, List<CodeEdge> edges) {
         try {
             conn.setAutoCommit(false);
@@ -230,7 +230,7 @@ public class AnalysisCache implements Closeable {
      *
      * @return a CachedResult with the nodes and edges, or null if not cached
      */
-    public CachedResult loadCachedResults(String contentHash) {
+    public synchronized CachedResult loadCachedResults(String contentHash) {
         try {
             List<CodeNode> nodes = new ArrayList<>();
             try (var stmt = conn.prepareStatement("SELECT data FROM nodes WHERE content_hash = ?")) {
@@ -265,7 +265,7 @@ public class AnalysisCache implements Closeable {
     /**
      * Delete all cached results associated with a content hash.
      */
-    public void removeFile(String contentHash) {
+    public synchronized void removeFile(String contentHash) {
         try {
             conn.setAutoCommit(false);
             try (var stmt = conn.prepareStatement("DELETE FROM nodes WHERE content_hash = ?")) {
@@ -300,7 +300,7 @@ public class AnalysisCache implements Closeable {
     /**
      * Record an analysis run with its commit SHA and file count.
      */
-    public void recordRun(String commitSha, int fileCount) {
+    public synchronized void recordRun(String commitSha, int fileCount) {
         try (var stmt = conn.prepareStatement(
                 "INSERT INTO analysis_runs (run_id, commit_sha, timestamp, file_count) VALUES (?, ?, ?, ?)")) {
             stmt.setString(1, UUID.randomUUID().toString());
@@ -318,13 +318,13 @@ public class AnalysisCache implements Closeable {
     /**
      * Return cache statistics.
      */
-    public Map<String, Object> getStats() {
+    public synchronized Map<String, Object> getStats() {
         Map<String, Object> stats = new LinkedHashMap<>();
         try {
-            stats.put("cached_files", countTable("files"));
+            stats.put("cached_files", countFiles());
             stats.put("cached_nodes", getNodeCount());
-            stats.put("cached_edges", countTable("edges"));
-            stats.put("total_runs", countTable("analysis_runs"));
+            stats.put("cached_edges", countEdges());
+            stats.put("total_runs", countAnalysisRuns());
             stats.put("db_path", dbPath.toString());
         } catch (SQLException e) {
             stats.put("error", e.getMessage());
@@ -335,7 +335,7 @@ public class AnalysisCache implements Closeable {
     /**
      * Clear all cached data.
      */
-    public void clear() {
+    public synchronized void clear() {
         try (var stmt = conn.createStatement()) {
             stmt.execute("DELETE FROM edges");
             stmt.execute("DELETE FROM nodes");
@@ -456,9 +456,25 @@ public class AnalysisCache implements Closeable {
         }
     }
 
-    private long countTable(String table) throws SQLException {
+    private long countFiles() throws SQLException {
         try (var stmt = conn.createStatement()) {
-            ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM " + table);
+            ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM files");
+            rs.next();
+            return rs.getLong(1);
+        }
+    }
+
+    private long countEdges() throws SQLException {
+        try (var stmt = conn.createStatement()) {
+            ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM edges");
+            rs.next();
+            return rs.getLong(1);
+        }
+    }
+
+    private long countAnalysisRuns() throws SQLException {
+        try (var stmt = conn.createStatement()) {
+            ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM analysis_runs");
             rs.next();
             return rs.getLong(1);
         }
@@ -467,7 +483,7 @@ public class AnalysisCache implements Closeable {
     /**
      * Return the total number of cached nodes.
      */
-    public long getNodeCount() {
+    public synchronized long getNodeCount() {
         try (var stmt = conn.createStatement()) {
             ResultSet rs = stmt.executeQuery("SELECT COUNT(DISTINCT id) FROM nodes");
             rs.next();
@@ -481,9 +497,9 @@ public class AnalysisCache implements Closeable {
     /**
      * Return the total number of cached edges.
      */
-    public long getEdgeCount() {
+    public synchronized long getEdgeCount() {
         try {
-            return countTable("edges");
+            return countEdges();
         } catch (SQLException e) {
             log.debug("Failed to count edges", e);
             return 0;
@@ -511,7 +527,7 @@ public class AnalysisCache implements Closeable {
      *
      * @return list of all cached nodes
      */
-    public List<CodeNode> loadAllNodes() {
+    public synchronized List<CodeNode> loadAllNodes() {
         List<CodeNode> nodes = new ArrayList<>();
         // Use MIN(data) with GROUP BY id to deduplicate nodes that appear in multiple files
         try (var stmt = conn.prepareStatement("SELECT MIN(data) FROM nodes GROUP BY id")) {
@@ -530,7 +546,7 @@ public class AnalysisCache implements Closeable {
      *
      * @return list of all cached edges
      */
-    public List<CodeEdge> loadAllEdges() {
+    public synchronized List<CodeEdge> loadAllEdges() {
         List<CodeEdge> edges = new ArrayList<>();
         try (var stmt = conn.prepareStatement("SELECT data FROM edges")) {
             ResultSet rs = stmt.executeQuery();

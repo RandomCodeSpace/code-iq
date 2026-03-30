@@ -36,6 +36,15 @@ public enum EdgeKind {
 
     private final String value;
 
+    private static final java.util.Map<String, EdgeKind> BY_VALUE;
+    static {
+        java.util.Map<String, EdgeKind> map = new java.util.HashMap<>();
+        for (EdgeKind kind : values()) {
+            map.put(kind.value, kind);
+        }
+        BY_VALUE = java.util.Collections.unmodifiableMap(map);
+    }
+
     EdgeKind(String value) {
         this.value = value;
     }
@@ -45,18 +54,17 @@ public enum EdgeKind {
     }
 
     /**
-     * Look up an EdgeKind by its string value.
+     * Look up an EdgeKind by its string value (O(1) via static map).
      *
      * @param value the lowercase string value (e.g. "depends_on", "invokes_rmi")
      * @return the matching EdgeKind
      * @throws IllegalArgumentException if no match found
      */
     public static EdgeKind fromValue(String value) {
-        for (EdgeKind kind : values()) {
-            if (kind.value.equals(value)) {
-                return kind;
-            }
+        EdgeKind kind = BY_VALUE.get(value);
+        if (kind == null) {
+            throw new IllegalArgumentException("Unknown EdgeKind value: " + value);
         }
-        throw new IllegalArgumentException("Unknown EdgeKind value: " + value);
+        return kind;
     }
 }
