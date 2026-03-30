@@ -57,8 +57,16 @@ public class FileDiscovery {
             ".DS_Store", "Thumbs.db"
     );
 
-    /** Default maximum file size in bytes (512 KB). */
+    /** Default maximum file size in bytes (512 KB for source, 64 KB for docs/config). */
     private static final long DEFAULT_MAX_FILE_SIZE = 524_288L;
+
+    /** Smaller limit for non-source files (markdown, yaml, json, xml, toml, properties). */
+    private static final long CONFIG_MAX_FILE_SIZE = 65_536L;
+
+    /** Languages that get the smaller file size cap. */
+    private static final Set<String> CONFIG_LANGUAGES = Set.of(
+            "markdown", "yaml", "json", "xml", "toml", "properties", "sql"
+    );
 
     private final CodeIqConfig config;
 
@@ -136,7 +144,9 @@ public class FileDiscovery {
                 } catch (IOException e) {
                     continue;
                 }
-                if (size > DEFAULT_MAX_FILE_SIZE) continue;
+                long maxSize = CONFIG_LANGUAGES.contains(language)
+                        ? CONFIG_MAX_FILE_SIZE : DEFAULT_MAX_FILE_SIZE;
+                if (size > maxSize) continue;
 
                 result.add(new DiscoveredFile(relPath, language, size));
             }
@@ -169,7 +179,6 @@ public class FileDiscovery {
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
                     if (!attrs.isRegularFile()) return FileVisitResult.CONTINUE;
-                    if (attrs.size() > DEFAULT_MAX_FILE_SIZE) return FileVisitResult.CONTINUE;
 
                     Path relPath = root.relativize(file);
                     if (isExcluded(relPath)) return FileVisitResult.CONTINUE;
@@ -177,6 +186,10 @@ public class FileDiscovery {
 
                     String language = DetectorUtils.deriveLanguage(relPath.toString());
                     if (language == null) return FileVisitResult.CONTINUE;
+
+                    long maxSize = CONFIG_LANGUAGES.contains(language)
+                            ? CONFIG_MAX_FILE_SIZE : DEFAULT_MAX_FILE_SIZE;
+                    if (attrs.size() > maxSize) return FileVisitResult.CONTINUE;
 
                     result.add(new DiscoveredFile(relPath, language, attrs.size()));
                     return FileVisitResult.CONTINUE;
