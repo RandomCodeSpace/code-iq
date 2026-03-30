@@ -201,12 +201,6 @@ public class GraphController {
         return queryService.traceImpact(nodeId, cappedDepth);
     }
 
-    @GetMapping("/topology")
-    public Map<String, Object> getTopology() {
-        requireQueryService();
-        return queryService.getTopology();
-    }
-
     @GetMapping("/search")
     public List<Map<String, Object>> searchGraph(
             @RequestParam String q,
