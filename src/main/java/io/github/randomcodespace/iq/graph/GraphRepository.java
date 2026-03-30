@@ -13,6 +13,7 @@ import java.util.List;
 @Repository
 public interface GraphRepository extends Neo4jRepository<CodeNode, String> {
 
+    @Query("MATCH (n:CodeNode) WHERE n.kind = $kind RETURN n")
     List<CodeNode> findByKind(String kind);
 
     List<CodeNode> findByLayer(String layer);
