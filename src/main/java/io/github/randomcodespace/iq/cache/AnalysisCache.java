@@ -124,9 +124,10 @@ public class AnalysisCache implements Closeable {
     public synchronized String getLastCommit() {
         try (var stmt = conn.prepareStatement(
                 "SELECT commit_sha FROM analysis_runs ORDER BY timestamp DESC LIMIT 1")) {
-            ResultSet rs = stmt.executeQuery();
-            if (rs.next()) {
-                return rs.getString(1);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getString(1);
+                }
             }
         } catch (SQLException e) {
             log.debug("Failed to get last commit", e);
@@ -143,7 +144,9 @@ public class AnalysisCache implements Closeable {
         try (var stmt = conn.prepareStatement(
                 "SELECT 1 FROM files WHERE content_hash = ?")) {
             stmt.setString(1, contentHash);
-            return stmt.executeQuery().next();
+            try (ResultSet rs = stmt.executeQuery()) {
+                return rs.next();
+            }
         } catch (SQLException e) {
             log.debug("Cache lookup failed", e);
             return false;
@@ -235,18 +238,20 @@ public class AnalysisCache implements Closeable {
             List<CodeNode> nodes = new ArrayList<>();
             try (var stmt = conn.prepareStatement("SELECT data FROM nodes WHERE content_hash = ?")) {
                 stmt.setString(1, contentHash);
-                ResultSet rs = stmt.executeQuery();
-                while (rs.next()) {
-                    nodes.add(deserializeNode(rs.getString(1)));
+                try (ResultSet rs = stmt.executeQuery()) {
+                    while (rs.next()) {
+                        nodes.add(deserializeNode(rs.getString(1)));
+                    }
                 }
             }
 
             List<CodeEdge> edges = new ArrayList<>();
             try (var stmt = conn.prepareStatement("SELECT data FROM edges WHERE content_hash = ?")) {
                 stmt.setString(1, contentHash);
-                ResultSet rs = stmt.executeQuery();
-                while (rs.next()) {
-                    edges.add(deserializeEdge(rs.getString(1)));
+                try (ResultSet rs = stmt.executeQuery()) {
+                    while (rs.next()) {
+                        edges.add(deserializeEdge(rs.getString(1)));
+                    }
                 }
             }
 
@@ -457,24 +462,24 @@ public class AnalysisCache implements Closeable {
     }
 
     private long countFiles() throws SQLException {
-        try (var stmt = conn.createStatement()) {
-            ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM files");
+        try (var stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM files")) {
             rs.next();
             return rs.getLong(1);
         }
     }
 
     private long countEdges() throws SQLException {
-        try (var stmt = conn.createStatement()) {
-            ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM edges");
+        try (var stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM edges")) {
             rs.next();
             return rs.getLong(1);
         }
     }
 
     private long countAnalysisRuns() throws SQLException {
-        try (var stmt = conn.createStatement()) {
-            ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM analysis_runs");
+        try (var stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM analysis_runs")) {
             rs.next();
             return rs.getLong(1);
         }
@@ -484,8 +489,8 @@ public class AnalysisCache implements Closeable {
      * Return the total number of cached nodes.
      */
     public synchronized long getNodeCount() {
-        try (var stmt = conn.createStatement()) {
-            ResultSet rs = stmt.executeQuery("SELECT COUNT(DISTINCT id) FROM nodes");
+        try (var stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT COUNT(DISTINCT id) FROM nodes")) {
             rs.next();
             return rs.getLong(1);
         } catch (SQLException e) {
@@ -529,11 +534,16 @@ public class AnalysisCache implements Closeable {
      */
     public synchronized List<CodeNode> loadAllNodes() {
         List<CodeNode> nodes = new ArrayList<>();
-        // Use MIN(data) with GROUP BY id to deduplicate nodes that appear in multiple files
-        try (var stmt = conn.prepareStatement("SELECT MIN(data) FROM nodes GROUP BY id")) {
-            ResultSet rs = stmt.executeQuery();
-            while (rs.next()) {
-                nodes.add(deserializeNode(rs.getString(1)));
+        // Deduplicate by id, keeping the LAST inserted version (most complete data)
+        try (var stmt = conn.prepareStatement("""
+                SELECT n.data FROM nodes n
+                INNER JOIN (SELECT id, MAX(row_id) AS max_id FROM nodes GROUP BY id) m
+                ON n.id = m.id AND n.row_id = m.max_id
+                """)) {
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    nodes.add(deserializeNode(rs.getString(1)));
+                }
             }
         } catch (SQLException e) {
             log.debug("Failed to load all nodes", e);
@@ -549,9 +559,10 @@ public class AnalysisCache implements Closeable {
     public synchronized List<CodeEdge> loadAllEdges() {
         List<CodeEdge> edges = new ArrayList<>();
         try (var stmt = conn.prepareStatement("SELECT data FROM edges")) {
-            ResultSet rs = stmt.executeQuery();
-            while (rs.next()) {
-                edges.add(deserializeEdge(rs.getString(1)));
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    edges.add(deserializeEdge(rs.getString(1)));
+                }
             }
         } catch (SQLException e) {
             log.debug("Failed to load all edges", e);

@@ -23,7 +23,8 @@ import java.util.stream.Collectors;
 /**
  * Service topology analysis — works on in-memory node/edge lists.
  * <p>
- * Runtime connections only: CALLS, PRODUCES, CONSUMES, QUERIES, CONNECTS_TO.
+ * Runtime connections: CALLS, PRODUCES, CONSUMES, QUERIES, CONNECTS_TO,
+ * PUBLISHES, LISTENS, SENDS_TO, RECEIVES_FROM, INVOKES_RMI, EXPORTS_RMI.
  * DEPENDS_ON is excluded (build dependency, not runtime).
  */
 @Service
@@ -35,7 +36,13 @@ public class TopologyService {
             EdgeKind.PRODUCES,
             EdgeKind.CONSUMES,
             EdgeKind.QUERIES,
-            EdgeKind.CONNECTS_TO
+            EdgeKind.CONNECTS_TO,
+            EdgeKind.PUBLISHES,
+            EdgeKind.LISTENS,
+            EdgeKind.SENDS_TO,
+            EdgeKind.RECEIVES_FROM,
+            EdgeKind.INVOKES_RMI,
+            EdgeKind.EXPORTS_RMI
     );
 
     /**

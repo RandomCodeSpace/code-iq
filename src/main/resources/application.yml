@@ -58,4 +58,4 @@ spring:
 
 codeiq:
   neo4j:
-    enabled: false
+    enabled: true

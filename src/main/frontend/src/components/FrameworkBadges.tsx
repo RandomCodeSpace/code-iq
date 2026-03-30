@@ -31,11 +31,16 @@ const frameworkColors: Record<string, string> = {
 const defaultColor = 'bg-surface-700/30 text-surface-300 border-surface-600/30';
 
 interface FrameworkBadgesProps {
-  frameworks: string[];
+  /** Map of framework name -> count of nodes using that framework */
+  frameworks: Record<string, number>;
 }
 
 export default function FrameworkBadges({ frameworks }: FrameworkBadgesProps) {
-  if (!frameworks || frameworks.length === 0) return null;
+  const entries = Object.entries(frameworks || {});
+  if (entries.length === 0) return null;
+
+  // Sort by count descending
+  const sorted = entries.sort(([, a], [, b]) => b - a);
 
   return (
     <div className="glass-card p-5">
@@ -43,15 +48,16 @@ export default function FrameworkBadges({ frameworks }: FrameworkBadgesProps) {
         Frameworks & Technologies
       </h3>
       <div className="flex flex-wrap gap-2">
-        {frameworks.map(fw => {
+        {sorted.map(([fw, count]) => {
           const lower = fw.toLowerCase();
           const color = Object.entries(frameworkColors).find(([k]) => lower.includes(k))?.[1] || defaultColor;
           return (
             <span
               key={fw}
-              className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium border ${color} transition-all hover:scale-105`}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border ${color} transition-all hover:scale-105`}
             >
               {fw}
+              <span className="opacity-60 font-mono">{count.toLocaleString()}</span>
             </span>
           );
         })}
