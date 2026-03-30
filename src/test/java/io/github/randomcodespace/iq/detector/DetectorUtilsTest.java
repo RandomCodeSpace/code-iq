@@ -26,17 +26,12 @@ class DetectorUtilsTest {
             "App.kt, kotlin",
             "Program.cs, csharp",
             "main.tf, terraform",
-            "build.gradle, gradle",
             "query.sql, sql",
             "schema.graphql, graphql",
-            "style.css, css",
-            "style.scss, scss",
             "app.vue, vue",
             "App.svelte, svelte",
-            "index.html, html",
             "script.sh, bash",
             "run.ps1, powershell",
-            "run.bat, batch",
             "lib.rb, ruby",
             "Main.scala, scala",
             "App.swift, swift",
@@ -47,28 +42,46 @@ class DetectorUtilsTest {
             "app.dart, dart",
             "app.dockerfile, dockerfile",
             "config.toml, toml",
-            "settings.ini, ini",
-            "app.env, dotenv",
-            "data.csv, csv",
             "readme.md, markdown",
             "app.mjs, javascript",
             "app.cjs, javascript",
             "app.mts, typescript",
             "app.cts, typescript",
             "types.pyi, python",
-            "page.razor, razor",
-            "page.cshtml, cshtml",
-            "doc.adoc, asciidoc",
             "schema.gql, graphql",
             "vars.tfvars, terraform",
             "config.hcl, terraform",
-            "app.cfg, ini",
-            "app.conf, ini",
-            "settings.jsonc, json",
             "build.groovy, groovy"
     })
     void deriveLanguageForExtensions(String filename, String expected) {
         assertEquals(expected, DetectorUtils.deriveLanguage(filename));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "style.css",
+            "style.scss",
+            "style.less",
+            "index.html",
+            "index.htm",
+            "run.bat",
+            "run.cmd",
+            "script.zsh",
+            "settings.ini",
+            "app.cfg",
+            "app.conf",
+            "app.env",
+            "data.csv",
+            "page.razor",
+            "page.cshtml",
+            "doc.adoc",
+            "settings.jsonc",
+            "build.gradle",
+            "module.psm1",
+            "manifest.psd1"
+    })
+    void removedExtensionsReturnNull(String filename) {
+        assertNull(DetectorUtils.deriveLanguage(filename));
     }
 
     @ParameterizedTest
@@ -80,11 +93,15 @@ class DetectorUtilsTest {
             "Vagrantfile, ruby",
             "Gemfile, ruby",
             "Rakefile, ruby",
-            "go.mod, gomod",
-            "go.sum, gosum"
+            "go.mod, gomod"
     })
     void deriveLanguageForFilenames(String filename, String expected) {
         assertEquals(expected, DetectorUtils.deriveLanguage(filename));
+    }
+
+    @Test
+    void goSumIsExcludedReturnsNull() {
+        assertNull(DetectorUtils.deriveLanguage("go.sum"));
     }
 
     @Test

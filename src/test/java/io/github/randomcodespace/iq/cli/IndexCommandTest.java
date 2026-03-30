@@ -116,7 +116,7 @@ class IndexCommandTest {
         int exitCode = cmdLine.execute(tempDir.toString(), "--no-cache");
 
         assertEquals(0, exitCode);
-        verify(analyzer).runBatchedIndex(any(Path.class), eq(null), eq(500), eq(false), any(Consumer.class));
+        verify(analyzer).runBatchedIndex(any(Path.class), eq(null), eq(1000), eq(false), any(Consumer.class));
     }
 
     @Test
@@ -140,6 +140,6 @@ class IndexCommandTest {
         int exitCode = cmdLine.execute(tempDir.toString(), "--parallelism", "4");
 
         assertEquals(0, exitCode);
-        verify(analyzer).runBatchedIndex(any(Path.class), eq(4), eq(500), eq(true), any(Consumer.class));
+        verify(analyzer).runBatchedIndex(any(Path.class), eq(4), eq(1000), eq(true), any(Consumer.class));
     }
 }

@@ -42,10 +42,8 @@ class LanguageMappingTest {
         "README.md,               markdown",
         "service.proto,           proto",
         "schema.sql,              sql",
-        "build.gradle,            gradle",
         "app.properties,          properties",
         "config.toml,             toml",
-        "settings.ini,            ini",
         "App.vue,                 vue",
         "Page.svelte,             svelte"
     })
@@ -88,19 +86,19 @@ class LanguageMappingTest {
     }
 
     @Test
-    void allThirtyFiveExtensionsAreMapped() {
-        // Verify we have exactly 35 extension mappings
-        // The 35 extensions: .java, .py, .ts, .tsx, .js, .jsx, .yaml, .yml, .json, .xml,
+    void allThirtyThreeExtensionsAreMapped() {
+        // Verify we have exactly 33 extension mappings
+        // The 33 extensions: .java, .py, .ts, .tsx, .js, .jsx, .yaml, .yml, .json, .xml,
         // .go, .rs, .kt, .kts, .scala, .cs, .cpp, .cc, .c, .h, .sh, .bash,
-        // .ps1, .tf, .hcl, .dockerfile, .md, .proto, .sql, .gradle, .properties,
-        // .toml, .ini, .vue, .svelte
+        // .ps1, .tf, .hcl, .dockerfile, .md, .proto, .sql, .properties,
+        // .toml, .vue, .svelte
         String[] extensions = {
             ".java", ".py", ".ts", ".tsx", ".js", ".jsx", ".yaml", ".yml", ".json", ".xml",
             ".go", ".rs", ".kt", ".kts", ".scala", ".cs", ".cpp", ".cc", ".c", ".h",
             ".sh", ".bash", ".ps1", ".tf", ".hcl", ".dockerfile", ".md", ".proto", ".sql",
-            ".gradle", ".properties", ".toml", ".ini", ".vue", ".svelte"
+            ".properties", ".toml", ".vue", ".svelte"
         };
-        assertEquals(35, extensions.length);
+        assertEquals(33, extensions.length);
         for (String ext : extensions) {
             String result = DetectorUtils.deriveLanguage("file" + ext);
             assertNotNull(result,
