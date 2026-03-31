@@ -70,13 +70,17 @@ public class GraphStore implements FlowDataSource {
         if (nodes.isEmpty()) return;
         long start = System.currentTimeMillis();
 
-        // 1. Clear existing data
+        // 1. Clear existing data in batches to avoid memory pool limit
         log.info("Neo4j: clearing existing graph...");
-        try (Transaction tx = graphDb.beginTx()) {
-            // Batch delete to avoid OOM on huge graphs
-            tx.execute("MATCH (n) DETACH DELETE n");
-            tx.commit();
-        }
+        int deleted;
+        do {
+            try (Transaction tx = graphDb.beginTx()) {
+                var result = tx.execute(
+                        "MATCH (n) WITH n LIMIT 5000 DETACH DELETE n RETURN count(*) AS cnt");
+                deleted = result.hasNext() ? ((Number) result.next().get("cnt")).intValue() : 0;
+                tx.commit();
+            }
+        } while (deleted > 0);
 
         // 2. Create index on id property for fast MATCH during edge creation
         try (Transaction tx = graphDb.beginTx()) {

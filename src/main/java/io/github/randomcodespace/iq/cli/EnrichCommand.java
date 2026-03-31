@@ -168,11 +168,17 @@ public class EnrichCommand implements Callable<Integer> {
             dbms = new DatabaseManagementServiceBuilder(graphPath).build();
             GraphDatabaseService db = dbms.database("neo4j");
 
-            // Clear existing data
-            try (Transaction tx = db.beginTx()) {
-                tx.execute("MATCH (n) DETACH DELETE n");
-                tx.commit();
-            }
+            // Clear existing data in batches to avoid memory pool limit on large graphs
+            CliOutput.info("  Clearing existing graph...");
+            int deleted;
+            do {
+                try (Transaction tx = db.beginTx()) {
+                    var result = tx.execute(
+                            "MATCH (n) WITH n LIMIT 5000 DETACH DELETE n RETURN count(*) AS cnt");
+                    deleted = result.hasNext() ? ((Number) result.next().get("cnt")).intValue() : 0;
+                    tx.commit();
+                }
+            } while (deleted > 0);
 
             // Bulk-load nodes in batches using UNWIND
             // Smaller batches to avoid Neo4j memory pool limit (nodes carry prop_* properties)
