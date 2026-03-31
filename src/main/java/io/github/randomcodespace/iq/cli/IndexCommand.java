@@ -42,8 +42,8 @@ public class IndexCommand implements Callable<Integer> {
             description = "Max parallel threads (default: auto-detect from CPU)")
     private Integer parallelism;
 
-    @Option(names = {"--batch-size", "-b"}, defaultValue = "1000",
-            description = "Files per H2 flush batch (default: 1000)")
+    @Option(names = {"--batch-size", "-b"}, defaultValue = "500",
+            description = "Files per H2 flush batch (default: 500)")
     private int batchSize;
 
     @Option(names = {"--graph"}, description = "Path to shared graph directory (for multi-repo)")

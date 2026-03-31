@@ -23,7 +23,7 @@ public class CodeIqConfig {
     private int maxRadius = 10;
 
     /** Batch size for file processing during indexing (files per H2 flush). */
-    private int batchSize = 1000;
+    private int batchSize = 500;
 
     /** Service name tag for multi-repo graph mode. */
     private String serviceName;

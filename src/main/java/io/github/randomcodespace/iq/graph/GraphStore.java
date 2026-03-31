@@ -62,94 +62,128 @@ public class GraphStore implements FlowDataSource {
     }
 
     /**
-     * Bulk save nodes and edges using Cypher MERGE (bypasses SDN to avoid
-     * duplicate key issues with relationship hydration).
-     * Nodes are saved first, then edges, to ensure referential integrity.
+     * Bulk save nodes and edges using UNWIND for batch Cypher inserts.
+     * Creates an index on CodeNode.id for fast MATCH during edge creation.
+     * Logs progress every 10K items for visibility on large graphs.
      */
     public void bulkSave(List<CodeNode> nodes) {
         if (nodes.isEmpty()) return;
+        long start = System.currentTimeMillis();
 
-        // Clear existing data
+        // 1. Clear existing data
+        log.info("Neo4j: clearing existing graph...");
         try (Transaction tx = graphDb.beginTx()) {
+            // Batch delete to avoid OOM on huge graphs
             tx.execute("MATCH (n) DETACH DELETE n");
             tx.commit();
         }
 
-        // Save nodes in batches of 500
-        int batchSize = 500;
-        for (int i = 0; i < nodes.size(); i += batchSize) {
-            List<CodeNode> batch = nodes.subList(i, Math.min(i + batchSize, nodes.size()));
+        // 2. Create index on id property for fast MATCH during edge creation
+        try (Transaction tx = graphDb.beginTx()) {
+            tx.execute("CREATE INDEX IF NOT EXISTS FOR (n:CodeNode) ON (n.id)");
+            tx.commit();
+        }
+
+        // 3. Save nodes using UNWIND for batch inserts
+        int batchSize = 2000;
+        int totalNodes = nodes.size();
+        log.info("Neo4j: persisting {} nodes...", totalNodes);
+
+        for (int i = 0; i < totalNodes; i += batchSize) {
+            List<CodeNode> batch = nodes.subList(i, Math.min(i + batchSize, totalNodes));
+            List<Map<String, Object>> batchProps = new ArrayList<>(batch.size());
+            for (CodeNode node : batch) {
+                batchProps.add(nodeToProps(node));
+            }
             try (Transaction tx = graphDb.beginTx()) {
-                for (CodeNode node : batch) {
-                    Map<String, Object> props = new HashMap<>();
-                    props.put("id", node.getId());
-                    props.put("kind", node.getKind().getValue());
-                    props.put("label", node.getLabel());
-                    if (node.getFqn() != null) props.put("fqn", node.getFqn());
-                    if (node.getModule() != null) props.put("module", node.getModule());
-                    if (node.getFilePath() != null) props.put("filePath", node.getFilePath());
-                    if (node.getLineStart() != null) props.put("lineStart", node.getLineStart());
-                    if (node.getLineEnd() != null) props.put("lineEnd", node.getLineEnd());
-                    if (node.getLayer() != null) props.put("layer", node.getLayer());
-                    if (node.getAnnotations() != null && !node.getAnnotations().isEmpty()) {
-                        props.put("annotations", String.join(",", node.getAnnotations()));
-                    }
-                    // Serialize properties map as individual prefixed keys
-                    if (node.getProperties() != null) {
-                        for (var entry : node.getProperties().entrySet()) {
-                            if (entry.getValue() != null) {
-                                props.put("prop_" + entry.getKey(), entry.getValue().toString());
-                            }
-                        }
-                    }
-                    tx.execute("CREATE (n:CodeNode) SET n = $props", Map.of("props", props));
-                }
+                tx.execute("UNWIND $batch AS props CREATE (n:CodeNode) SET n = props",
+                        Map.of("batch", batchProps));
                 tx.commit();
+            }
+            int done = Math.min(i + batchSize, totalNodes);
+            if (done % 10000 < batchSize || done == totalNodes) {
+                log.info("  nodes: {}/{} ({}%)", done, totalNodes, 100 * done / totalNodes);
             }
         }
 
-        // Build set of all saved node IDs for edge validation
-        Set<String> savedNodeIds = new HashSet<>(nodes.size());
+        // 4. Build set of all saved node IDs for edge validation
+        Set<String> savedNodeIds = new HashSet<>(totalNodes);
         for (CodeNode node : nodes) {
             savedNodeIds.add(node.getId());
         }
 
-        // Save edges (only where both source and target exist in the graph)
+        // 5. Save edges using UNWIND for batch inserts
         List<CodeEdge> allEdges = nodes.stream()
                 .flatMap(n -> n.getEdges().stream())
                 .toList();
+        int totalEdges = allEdges.size();
+        log.info("Neo4j: persisting {} edges...", totalEdges);
+
         int created = 0;
         int skipped = 0;
-        for (int i = 0; i < allEdges.size(); i += batchSize) {
-            List<CodeEdge> batch = allEdges.subList(i, Math.min(i + batchSize, allEdges.size()));
-            try (Transaction tx = graphDb.beginTx()) {
-                for (CodeEdge edge : batch) {
-                    String sourceId = edge.getSourceId();
-                    String targetId = edge.getTarget() != null ? edge.getTarget().getId() : null;
-                    if (targetId == null || sourceId == null) {
-                        skipped++;
-                        continue;
-                    }
-                    if (!savedNodeIds.contains(sourceId) || !savedNodeIds.contains(targetId)) {
-                        skipped++;
-                        continue;
-                    }
-                    Map<String, Object> params = new HashMap<>();
-                    params.put("sourceId", sourceId);
-                    params.put("targetId", targetId);
-                    params.put("edgeId", edge.getId());
-                    params.put("kind", edge.getKind().getValue());
-                    tx.execute("""
-                            MATCH (s:CodeNode {id: $sourceId}), (t:CodeNode {id: $targetId})
-                            CREATE (s)-[:RELATES_TO {id: $edgeId, kind: $kind, sourceId: $sourceId}]->(t)
-                            """, params);
-                    created++;
+        for (int i = 0; i < totalEdges; i += batchSize) {
+            List<CodeEdge> batch = allEdges.subList(i, Math.min(i + batchSize, totalEdges));
+            List<Map<String, Object>> edgeBatch = new ArrayList<>(batch.size());
+            for (CodeEdge edge : batch) {
+                String sourceId = edge.getSourceId();
+                String targetId = edge.getTarget() != null ? edge.getTarget().getId() : null;
+                if (targetId == null || sourceId == null
+                        || !savedNodeIds.contains(sourceId) || !savedNodeIds.contains(targetId)) {
+                    skipped++;
+                    continue;
                 }
-                tx.commit();
+                edgeBatch.add(Map.of(
+                        "sourceId", sourceId,
+                        "targetId", targetId,
+                        "edgeId", edge.getId(),
+                        "kind", edge.getKind().getValue()
+                ));
+                created++;
+            }
+            if (!edgeBatch.isEmpty()) {
+                try (Transaction tx = graphDb.beginTx()) {
+                    tx.execute("""
+                            UNWIND $batch AS e
+                            MATCH (s:CodeNode {id: e.sourceId}), (t:CodeNode {id: e.targetId})
+                            CREATE (s)-[:RELATES_TO {id: e.edgeId, kind: e.kind, sourceId: e.sourceId}]->(t)
+                            """, Map.of("batch", edgeBatch));
+                    tx.commit();
+                }
+            }
+            int done = Math.min(i + batchSize, totalEdges);
+            if (done % 10000 < batchSize || done == totalEdges) {
+                log.info("  edges: {}/{} ({}%)", done, totalEdges, 100 * done / totalEdges);
             }
         }
-        log.info("Edges: {} created, {} skipped (missing source/target node), {} total",
-                created, skipped, allEdges.size());
+
+        long elapsed = System.currentTimeMillis() - start;
+        log.info("Neo4j: bulk save complete — {} nodes, {} edges ({} skipped) in {}s",
+                totalNodes, created, skipped, elapsed / 1000);
+    }
+
+    /** Convert a CodeNode to a flat property map for Cypher SET. */
+    private Map<String, Object> nodeToProps(CodeNode node) {
+        Map<String, Object> props = new HashMap<>();
+        props.put("id", node.getId());
+        props.put("kind", node.getKind().getValue());
+        props.put("label", node.getLabel());
+        if (node.getFqn() != null) props.put("fqn", node.getFqn());
+        if (node.getModule() != null) props.put("module", node.getModule());
+        if (node.getFilePath() != null) props.put("filePath", node.getFilePath());
+        if (node.getLineStart() != null) props.put("lineStart", node.getLineStart());
+        if (node.getLineEnd() != null) props.put("lineEnd", node.getLineEnd());
+        if (node.getLayer() != null) props.put("layer", node.getLayer());
+        if (node.getAnnotations() != null && !node.getAnnotations().isEmpty()) {
+            props.put("annotations", String.join(",", node.getAnnotations()));
+        }
+        if (node.getProperties() != null) {
+            for (var entry : node.getProperties().entrySet()) {
+                if (entry.getValue() != null) {
+                    props.put("prop_" + entry.getKey(), entry.getValue().toString());
+                }
+            }
+        }
+        return props;
     }
 
     // --- Read operations (embedded API, no relationship hydration) ---
