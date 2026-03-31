@@ -68,6 +68,12 @@ venv/
 
 # Superpowers plugin
 .superpowers/
+docs/superpowers/
+
+# Docker & Helm (bundled separately)
+Dockerfile
+docker-compose.yml
+helm/
 
 # Neo4j embedded data
 neo4j-data/

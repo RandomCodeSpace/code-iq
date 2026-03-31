@@ -330,35 +330,6 @@ Benchmarked on 13 real-world projects. All results deterministic across 3 runs.
 | `index` (batched H2) | kubernetes 20K files | 2.1 GB |
 | `index` (batched H2) | terraform 9K files | 1.0 GB |
 
-## Docker
-
-```bash
-# Build
-docker build -t code-iq .
-
-# Analyze a codebase
-docker run -v /path/to/repo:/data code-iq analyze /data
-
-# Start server
-docker run -p 8080:8080 -v /path/to/repo:/data code-iq serve /data
-```
-
-The Docker image uses Eclipse Temurin 25, ZGC garbage collector, Spring AOT cache for fast startup, and runs as a non-root user.
-
-## Kubernetes
-
-Helm chart included for K8s deployment with HPA auto-scaling:
-
-```bash
-helm install code-iq helm/code-iq \
-  --set image.tag=latest \
-  --set persistence.graphPath=/data/graph.db
-```
-
-- HPA scales pods based on query load
-- Readiness/liveness health probes
-- Near-cache per pod for hot query data
-
 ## Development
 
 ```bash
@@ -404,7 +375,6 @@ java -jar target/code-iq-*-cli.jar serve .
 | CLI | Picocli 4.7.7 |
 | Web UI | React 18 + TypeScript + Vite + Tailwind CSS |
 | Build | Maven + Spring Boot Plugin |
-| Docker | Eclipse Temurin 25, ZGC, Spring AOT |
 
 ## License
 
