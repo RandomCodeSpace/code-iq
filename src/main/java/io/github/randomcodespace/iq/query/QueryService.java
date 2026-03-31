@@ -25,23 +25,16 @@ public class QueryService {
 
     private final GraphStore graphStore;
     private final CodeIqConfig config;
-    private final StatsService statsService;
 
-    public QueryService(GraphStore graphStore, CodeIqConfig config, StatsService statsService) {
+    public QueryService(GraphStore graphStore, CodeIqConfig config) {
         this.graphStore = graphStore;
         this.config = config;
-        this.statsService = statsService;
     }
 
     @Cacheable("graph-stats")
     public Map<String, Object> getStats() {
-        // Load full graph data and compute rich categorized stats
-        List<CodeNode> nodes = graphStore.findAll();
-        List<CodeEdge> edges = nodes.stream()
-                .flatMap(n -> n.getEdges().stream())
-                .toList();
-
-        Map<String, Object> result = statsService.computeStats(nodes, edges);
+        // Use Cypher aggregation — never loads full nodes into heap
+        Map<String, Object> result = graphStore.computeAggregateStats();
 
         // Also include raw counts and breakdowns for backward compat
         Map<String, Long> nodesByKind = new LinkedHashMap<>();
@@ -53,8 +46,16 @@ public class QueryService {
             nodesByLayer.put((String) row.get("layer"), ((Number) row.get("cnt")).longValue());
         }
 
-        result.put("node_count", nodes.size());
-        result.put("edge_count", edges.size());
+        // Read from already-computed graph sub-map instead of re-querying
+        @SuppressWarnings("unchecked")
+        Map<String, Object> graphStats = (Map<String, Object>) result.get("graph");
+        if (graphStats != null) {
+            result.put("node_count", graphStats.get("nodes"));
+            result.put("edge_count", graphStats.get("edges"));
+        } else {
+            result.put("node_count", graphStore.count());
+            result.put("edge_count", graphStore.countEdges());
+        }
         result.put("nodes_by_kind", nodesByKind);
         result.put("nodes_by_layer", nodesByLayer);
         return result;
@@ -66,15 +67,11 @@ public class QueryService {
      */
     @Cacheable(value = "detailed-stats", key = "#category")
     public Map<String, Object> getDetailedStats(String category) {
-        List<CodeNode> nodes = graphStore.findAll();
-        List<CodeEdge> edges = nodes.stream()
-                .flatMap(n -> n.getEdges().stream())
-                .toList();
-
+        // Use Cypher aggregation — never loads full nodes into heap
         if (category == null || "all".equalsIgnoreCase(category)) {
-            return statsService.computeStats(nodes, edges);
+            return graphStore.computeAggregateStats();
         }
-        Map<String, Object> catResult = statsService.computeCategory(nodes, edges, category);
+        Map<String, Object> catResult = graphStore.computeAggregateCategoryStats(category);
         if (catResult == null) {
             Map<String, Object> error = new LinkedHashMap<>();
             error.put("error", "Unknown category: " + category

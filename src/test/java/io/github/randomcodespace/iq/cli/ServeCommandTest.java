@@ -16,11 +16,6 @@ class ServeCommandTest {
     }
 
     @Test
-    void commandNameConstantMatchesAnnotation() {
-        assertEquals("serve", ServeCommand.COMMAND_NAME);
-    }
-
-    @Test
     void defaultPortIs8080() {
         var cmd = new ServeCommand();
         // After picocli parsing with defaults

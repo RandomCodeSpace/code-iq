@@ -36,8 +36,7 @@ class QueryServiceTest {
         config = new CodeIqConfig();
         config.setMaxDepth(10);
         config.setMaxRadius(10);
-        statsService = new StatsService();
-        service = new QueryService(graphStore, config, statsService);
+        service = new QueryService(graphStore, config);
     }
 
     private CodeNode makeNode(String id, NodeKind kind, String label) {
@@ -61,14 +60,26 @@ class QueryServiceTest {
 
     @Test
     void getStatsShouldReturnNodeAndEdgeCounts() {
-        var endpoint = makeNodeWithEdge("ep:1", NodeKind.ENDPOINT, "GET /users",
-                "svc:1", EdgeKind.CALLS);
-        endpoint.getProperties().put("http_method", "GET");
-        endpoint.setFilePath("src/Main.java");
-        var cls = makeNode("cls:1", NodeKind.CLASS, "UserService");
-        cls.setFilePath("src/UserService.java");
-        cls.setEdges(new ArrayList<>());
-        when(graphStore.findAll()).thenReturn(List.of(endpoint, cls));
+        // Mock Cypher aggregation from GraphStore
+        Map<String, Object> aggregateStats = new java.util.LinkedHashMap<>();
+        aggregateStats.put("graph", Map.of("nodes", 2L, "edges", 1L, "files", 2L));
+        aggregateStats.put("languages", Map.of("java", 2L));
+        aggregateStats.put("frameworks", Map.of());
+        aggregateStats.put("infra", Map.of("databases", Map.of(), "messaging", Map.of(), "cloud", Map.of()));
+        Map<String, Object> rest = new java.util.LinkedHashMap<>();
+        rest.put("total", 1L);
+        rest.put("by_method", Map.of("GET", 1L));
+        Map<String, Object> connections = new java.util.LinkedHashMap<>();
+        connections.put("rest", rest);
+        connections.put("grpc", 0L);
+        connections.put("websocket", 0L);
+        connections.put("producers", 0L);
+        connections.put("consumers", 0L);
+        aggregateStats.put("connections", connections);
+        aggregateStats.put("auth", Map.of());
+        aggregateStats.put("architecture", Map.of("classes", 1L));
+
+        when(graphStore.computeAggregateStats()).thenReturn(aggregateStats);
         when(graphStore.countNodesByKind()).thenReturn(List.of(
                 Map.of("kind", "endpoint", "cnt", 1L),
                 Map.of("kind", "class", "cnt", 1L)));
@@ -77,11 +88,10 @@ class QueryServiceTest {
 
         Map<String, Object> stats = service.getStats();
 
-        // ComputedStatsResponse format — graph section from StatsService
         @SuppressWarnings("unchecked")
         Map<String, Object> graph = (Map<String, Object>) stats.get("graph");
-        assertEquals(2, graph.get("nodes"));
-        assertEquals(1, graph.get("edges"));
+        assertEquals(2L, graph.get("nodes"));
+        assertEquals(1L, graph.get("edges"));
         assertEquals(2L, graph.get("files"));
         assertNotNull(stats.get("languages"));
         assertNotNull(stats.get("frameworks"));
@@ -89,15 +99,13 @@ class QueryServiceTest {
         assertNotNull(stats.get("connections"));
         assertNotNull(stats.get("auth"));
         assertNotNull(stats.get("architecture"));
-        // REST endpoint detection
         @SuppressWarnings("unchecked")
-        Map<String, Object> connections = (Map<String, Object>) stats.get("connections");
+        Map<String, Object> resultConnections = (Map<String, Object>) stats.get("connections");
         @SuppressWarnings("unchecked")
-        Map<String, Object> rest = (Map<String, Object>) connections.get("rest");
-        assertEquals(1L, rest.get("total"));
-        // Backward compat
-        assertEquals(2, stats.get("node_count"));
-        assertEquals(1, stats.get("edge_count"));
+        Map<String, Object> resultRest = (Map<String, Object>) resultConnections.get("rest");
+        assertEquals(1L, resultRest.get("total"));
+        assertEquals(2L, stats.get("node_count"));
+        assertEquals(1L, stats.get("edge_count"));
         assertNotNull(stats.get("nodes_by_kind"));
         assertNotNull(stats.get("nodes_by_layer"));
     }

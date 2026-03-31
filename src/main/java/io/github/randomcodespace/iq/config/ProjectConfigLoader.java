@@ -162,21 +162,8 @@ public final class ProjectConfigLoader {
         if (data.containsKey("max_radius")) {
             config.setMaxRadius(toInt(data.get("max_radius"), config.getMaxRadius()));
         }
-        // Nested analysis section (matches Python config structure)
-        if (data.get("analysis") instanceof Map<?, ?> analysis) {
-            if (analysis.containsKey("parallelism")) {
-                // Stored for CLI to pick up; not directly in CodeIqConfig
-            }
-            if (analysis.containsKey("incremental")) {
-                // Available for future use
-            }
-        }
-        // Nested output section
-        if (data.get("output") instanceof Map<?, ?> output) {
-            if (output.containsKey("max_nodes")) {
-                // Available for future use
-            }
-        }
+        // Nested analysis/output sections are recognized but not yet mapped to CodeIqConfig.
+        // They are loaded and accessible via data map for CLI commands that need them.
     }
 
     private static int toInt(Object value, int defaultValue) {

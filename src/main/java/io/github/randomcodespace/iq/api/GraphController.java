@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -194,13 +195,6 @@ public class GraphController {
             @RequestParam(defaultValue = "50") int limit) {
         requireQueryService();
         return queryService.searchGraph(q, Math.min(limit, 1000));
-    }
-
-    /**
-     * Check whether Neo4j (via QueryService) is available for queries.
-     */
-    private boolean useNeo4j() {
-        return queryService != null;
     }
 
     private void requireQueryService() {

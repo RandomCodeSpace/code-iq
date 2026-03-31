@@ -21,6 +21,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.stream.Collectors;
 
 /**
  * Facade service over the Neo4j graph backend.
@@ -400,7 +402,7 @@ public class GraphStore implements FlowDataSource {
     public long countDistinctFiles() {
         try (Transaction tx = graphDb.beginTx()) {
             var result = tx.execute(
-                    "MATCH (n:CodeNode) WHERE n.filePath IS NOT NULL "
+                    "MATCH (n:CodeNode) WHERE n.filePath IS NOT NULL AND n.filePath <> '' "
                             + "RETURN count(DISTINCT n.filePath) AS cnt");
             if (result.hasNext()) {
                 return ((Number) result.next().get("cnt")).longValue();
@@ -644,6 +646,260 @@ public class GraphStore implements FlowDataSource {
         topology.put("infrastructure", infrastructure);
         topology.put("connections", connections);
         return topology;
+    }
+
+    // --- Stats aggregation queries (Cypher-only, no node hydration) ---
+
+    /**
+     * Compute all categorized stats via Cypher aggregation.
+     * Never loads full nodes into heap — safe for 100K+ node graphs.
+     */
+    public Map<String, Object> computeAggregateStats() {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("graph", computeGraphStats());
+        result.put("languages", computeLanguageStats());
+        result.put("frameworks", computeFrameworkStats());
+        result.put("infra", computeInfraStats());
+        result.put("connections", computeConnectionStats());
+        result.put("auth", computeAuthStats());
+        result.put("architecture", computeArchitectureStats());
+        return result;
+    }
+
+    /**
+     * Compute stats for a single category via Cypher aggregation.
+     */
+    public Map<String, Object> computeAggregateCategoryStats(String category) {
+        return switch (category.toLowerCase()) {
+            case "graph" -> computeGraphStats();
+            case "languages" -> computeLanguageStats();
+            case "frameworks" -> computeFrameworkStats();
+            case "infra" -> computeInfraStats();
+            case "connections" -> computeConnectionStats();
+            case "auth" -> computeAuthStats();
+            case "architecture" -> computeArchitectureStats();
+            default -> null;
+        };
+    }
+
+    private Map<String, Object> computeGraphStats() {
+        Map<String, Object> graph = new LinkedHashMap<>();
+        graph.put("nodes", count());
+        graph.put("edges", countEdges());
+        graph.put("files", countDistinctFiles());
+        return graph;
+    }
+
+    private Map<String, Object> computeLanguageStats() {
+        Map<String, Long> langCounts = new TreeMap<>();
+        try (Transaction tx = graphDb.beginTx()) {
+            var result = tx.execute(
+                    "MATCH (n:CodeNode) WHERE n.prop_language IS NOT NULL "
+                            + "RETURN toLower(n.prop_language) AS lang, count(n) AS cnt");
+            while (result.hasNext()) {
+                var row = result.next();
+                String lang = String.valueOf(row.get("lang")).trim();
+                if (!lang.isBlank()) {
+                    langCounts.merge(lang, ((Number) row.get("cnt")).longValue(), Long::sum);
+                }
+            }
+        }
+        if (langCounts.isEmpty()) {
+            for (Map<String, Object> row : countByFileExtension()) {
+                String ext = String.valueOf(row.get("ext")).trim().toLowerCase();
+                String lang = extensionToLanguage(ext);
+                if (lang != null) {
+                    langCounts.merge(lang, ((Number) row.get("cnt")).longValue(), Long::sum);
+                }
+            }
+        }
+        return new LinkedHashMap<>(sortByValueDesc(langCounts));
+    }
+
+    private Map<String, Object> computeFrameworkStats() {
+        Map<String, Long> fwCounts = new TreeMap<>();
+        try (Transaction tx = graphDb.beginTx()) {
+            var result = tx.execute(
+                    "MATCH (n:CodeNode) WHERE n.prop_framework IS NOT NULL "
+                            + "RETURN n.prop_framework AS fw, count(n) AS cnt");
+            while (result.hasNext()) {
+                var row = result.next();
+                String fw = String.valueOf(row.get("fw")).trim();
+                if (!fw.isBlank()) {
+                    fwCounts.merge(fw, ((Number) row.get("cnt")).longValue(), Long::sum);
+                }
+            }
+        }
+        return new LinkedHashMap<>(sortByValueDesc(fwCounts));
+    }
+
+    private Map<String, Object> computeInfraStats() {
+        Map<String, Object> infra = new LinkedHashMap<>();
+
+        Map<String, Long> databases = new TreeMap<>();
+        try (Transaction tx = graphDb.beginTx()) {
+            var result = tx.execute(
+                    "MATCH (n:CodeNode) WHERE n.kind = 'database_connection' AND n.prop_db_type IS NOT NULL "
+                            + "RETURN n.prop_db_type AS dbType, count(n) AS cnt");
+            while (result.hasNext()) {
+                var row = result.next();
+                String dbType = normalizeDbType(String.valueOf(row.get("dbType")));
+                if (dbType != null) {
+                    databases.merge(dbType, ((Number) row.get("cnt")).longValue(), Long::sum);
+                }
+            }
+        }
+        infra.put("databases", sortByValueDesc(databases));
+
+        Map<String, Long> messaging = new TreeMap<>();
+        try (Transaction tx = graphDb.beginTx()) {
+            var result = tx.execute(
+                    "MATCH (n:CodeNode) WHERE n.kind IN ['topic', 'queue', 'message_queue'] "
+                            + "RETURN coalesce(n.prop_protocol, n.label, 'unknown') AS protocol, count(n) AS cnt");
+            while (result.hasNext()) {
+                var row = result.next();
+                messaging.merge(String.valueOf(row.get("protocol")), ((Number) row.get("cnt")).longValue(), Long::sum);
+            }
+        }
+        infra.put("messaging", sortByValueDesc(messaging));
+
+        Map<String, Long> cloud = new TreeMap<>();
+        try (Transaction tx = graphDb.beginTx()) {
+            var result = tx.execute(
+                    "MATCH (n:CodeNode) WHERE n.kind IN ['azure_resource', 'infra_resource'] "
+                            + "RETURN coalesce(n.prop_resource_type, n.label, 'unknown') AS resType, count(n) AS cnt");
+            while (result.hasNext()) {
+                var row = result.next();
+                cloud.merge(String.valueOf(row.get("resType")), ((Number) row.get("cnt")).longValue(), Long::sum);
+            }
+        }
+        infra.put("cloud", sortByValueDesc(cloud));
+
+        return infra;
+    }
+
+    private Map<String, Object> computeConnectionStats() {
+        Map<String, Object> connections = new LinkedHashMap<>();
+        try (Transaction tx = graphDb.beginTx()) {
+            var restResult = tx.execute(
+                    "MATCH (n:CodeNode) WHERE n.kind = 'endpoint' "
+                            + "AND (n.prop_protocol IS NULL OR n.prop_protocol <> 'grpc') "
+                            + "RETURN coalesce(toUpper(n.prop_http_method), 'UNKNOWN') AS method, count(n) AS cnt");
+            Map<String, Long> restByMethod = new TreeMap<>();
+            while (restResult.hasNext()) {
+                var row = restResult.next();
+                restByMethod.put(String.valueOf(row.get("method")), ((Number) row.get("cnt")).longValue());
+            }
+            long restTotal = restByMethod.values().stream().mapToLong(Long::longValue).sum();
+            Map<String, Object> rest = new LinkedHashMap<>();
+            rest.put("total", restTotal);
+            rest.put("by_method", sortByValueDesc(restByMethod));
+            connections.put("rest", rest);
+
+            var grpcResult = tx.execute(
+                    "MATCH (n:CodeNode) WHERE n.kind = 'endpoint' AND n.prop_protocol = 'grpc' RETURN count(n) AS cnt");
+            connections.put("grpc", grpcResult.hasNext() ? ((Number) grpcResult.next().get("cnt")).longValue() : 0L);
+
+            var wsResult = tx.execute(
+                    "MATCH (n:CodeNode) WHERE n.kind = 'websocket_endpoint' RETURN count(n) AS cnt");
+            connections.put("websocket", wsResult.hasNext() ? ((Number) wsResult.next().get("cnt")).longValue() : 0L);
+
+            var prodResult = tx.execute(
+                    "MATCH ()-[r:RELATES_TO]->() WHERE r.kind IN ['produces', 'publishes'] RETURN count(r) AS cnt");
+            connections.put("producers", prodResult.hasNext() ? ((Number) prodResult.next().get("cnt")).longValue() : 0L);
+
+            var consResult = tx.execute(
+                    "MATCH ()-[r:RELATES_TO]->() WHERE r.kind IN ['consumes', 'listens'] RETURN count(r) AS cnt");
+            connections.put("consumers", consResult.hasNext() ? ((Number) consResult.next().get("cnt")).longValue() : 0L);
+        }
+        return connections;
+    }
+
+    private Map<String, Object> computeAuthStats() {
+        Map<String, Long> authCounts = new TreeMap<>();
+        try (Transaction tx = graphDb.beginTx()) {
+            var guardResult = tx.execute(
+                    "MATCH (n:CodeNode) WHERE n.kind = 'guard' AND n.prop_auth_type IS NOT NULL "
+                            + "RETURN n.prop_auth_type AS authType, count(n) AS cnt");
+            while (guardResult.hasNext()) {
+                var row = guardResult.next();
+                String authType = String.valueOf(row.get("authType")).trim();
+                if (!authType.isBlank()) {
+                    authCounts.merge(authType, ((Number) row.get("cnt")).longValue(), Long::sum);
+                }
+            }
+            var fwResult = tx.execute(
+                    "MATCH (n:CodeNode) WHERE n.prop_framework STARTS WITH 'auth:' "
+                            + "RETURN n.prop_framework AS fw, count(n) AS cnt");
+            while (fwResult.hasNext()) {
+                var row = fwResult.next();
+                String fw = String.valueOf(row.get("fw")).trim();
+                String authType = fw.substring("auth:".length()).trim();
+                if (!authType.isEmpty()) {
+                    authCounts.merge(authType, ((Number) row.get("cnt")).longValue(), Long::sum);
+                }
+            }
+        }
+        return new LinkedHashMap<>(sortByValueDesc(authCounts));
+    }
+
+    private Map<String, Object> computeArchitectureStats() {
+        Map<String, Object> arch = new LinkedHashMap<>();
+        Map<String, String> kindToLabel = Map.of(
+                "class", "classes", "interface", "interfaces",
+                "abstract_class", "abstract_classes", "enum", "enums",
+                "annotation_type", "annotation_types", "module", "modules",
+                "method", "methods");
+        List<String> archKinds = List.of("class", "interface", "abstract_class", "enum",
+                "annotation_type", "module", "method");
+        try (Transaction tx = graphDb.beginTx()) {
+            var result = tx.execute(
+                    "MATCH (n:CodeNode) WHERE n.kind IN $kinds RETURN n.kind AS kind, count(n) AS cnt",
+                    Map.of("kinds", archKinds));
+            while (result.hasNext()) {
+                var row = result.next();
+                String kind = (String) row.get("kind");
+                long cnt = ((Number) row.get("cnt")).longValue();
+                if (cnt > 0) {
+                    arch.put(kindToLabel.getOrDefault(kind, kind), cnt);
+                }
+            }
+        }
+        return arch;
+    }
+
+    private static final Map<String, String> STATS_DB_TYPE_NORMALIZE = Map.ofEntries(
+            Map.entry("mysql", "MySQL"), Map.entry("postgresql", "PostgreSQL"),
+            Map.entry("postgres", "PostgreSQL"), Map.entry("sqlserver", "SQL Server"),
+            Map.entry("mssql", "SQL Server"), Map.entry("oracle", "Oracle"),
+            Map.entry("h2", "H2"), Map.entry("sqlite", "SQLite"),
+            Map.entry("mariadb", "MariaDB"), Map.entry("mongo", "MongoDB"),
+            Map.entry("mongodb", "MongoDB"), Map.entry("redis", "Redis"),
+            Map.entry("neo4j", "Neo4j"));
+
+    private static String normalizeDbType(String raw) {
+        String lower = raw.trim().toLowerCase();
+        if (lower.contains("@")) lower = lower.substring(0, lower.indexOf('@'));
+        return STATS_DB_TYPE_NORMALIZE.getOrDefault(lower, raw.trim());
+    }
+
+    private static String extensionToLanguage(String ext) {
+        return switch (ext) {
+            case "java" -> "java"; case "kt", "kts" -> "kotlin";
+            case "py" -> "python"; case "js", "mjs", "cjs" -> "javascript";
+            case "ts", "tsx" -> "typescript"; case "go" -> "go";
+            case "rs" -> "rust"; case "cs" -> "csharp";
+            case "scala" -> "scala"; case "cpp", "cc", "cxx" -> "cpp";
+            case "proto" -> "protobuf"; default -> null;
+        };
+    }
+
+    private static <K> Map<K, Long> sortByValueDesc(Map<K, Long> map) {
+        return map.entrySet().stream()
+                .sorted(Map.Entry.<K, Long>comparingByValue().reversed())
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey, Map.Entry::getValue,
+                        (a, b) -> a, LinkedHashMap::new));
     }
 
     // --- Internal helpers ---

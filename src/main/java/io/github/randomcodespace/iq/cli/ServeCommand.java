@@ -30,8 +30,6 @@ public class ServeCommand implements Callable<Integer> {
 
     private static final Logger log = LoggerFactory.getLogger(ServeCommand.class);
 
-    public static final String COMMAND_NAME = "serve";
-
     @Parameters(index = "0", defaultValue = ".", description = "Path to analyzed codebase")
     private Path path;
 

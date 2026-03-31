@@ -520,6 +520,7 @@ public class Analyzer {
         var batchExecutorService = parallelism != null && parallelism > 0
                 ? Executors.newFixedThreadPool(parallelism)
                 : Executors.newVirtualThreadPerTaskExecutor();
+        try (batchExecutorService) {
         List<DiscoveredFile> batch = new ArrayList<>(batchSize);
         for (int fileIdx = 0; fileIdx < files.size(); fileIdx++) {
             batch.add(files.get(fileIdx));
@@ -634,7 +635,7 @@ public class Analyzer {
                 batch.clear();
             }
         }
-        batchExecutorService.close();
+        } // close batchExecutorService
 
         if (cacheHits > 0) {
             report.accept("Cache hits: " + cacheHits + " / " + totalFiles + " files");
@@ -1286,15 +1287,6 @@ public class Analyzer {
         return excludePatterns.stream()
                 .map(p -> compileGlob(p.replace('\\', '/')))
                 .toList();
-    }
-
-    /**
-     * Check whether a file path matches any of the given pre-compiled exclude patterns.
-     */
-    private static boolean matchesAnyExclude(String filePath, List<String> excludePatterns) {
-        if (excludePatterns == null) return false;
-        List<java.util.regex.Pattern> compiled = compileExcludePatterns(excludePatterns);
-        return matchesAnyCompiledExclude(filePath, compiled);
     }
 
     /**
