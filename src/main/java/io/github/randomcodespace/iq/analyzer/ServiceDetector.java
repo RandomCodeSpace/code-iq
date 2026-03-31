@@ -319,46 +319,59 @@ public class ServiceDetector {
      * Scan the filesystem recursively for build files that indicate service/module boundaries.
      * More reliable than scanning node file paths since not all build files produce CodeNodes.
      */
+    /** Directories to skip entirely during filesystem walk. */
+    private static final java.util.Set<String> SKIP_DIRS = java.util.Set.of(
+            "node_modules", ".git", "target", "build", "dist", ".gradle",
+            ".idea", ".vscode", "__pycache__", ".tox", ".eggs", "venv",
+            ".venv", "vendor", ".bundle", "_build", "deps"
+    );
+
     private void scanFilesystemForBuildFiles(Path root, Path projectRoot, Map<String, ModuleInfo> modules) {
-        try (var stream = Files.walk(root, 10)) {
-            stream.filter(Files::isRegularFile)
-                    .filter(p -> {
-                        String name = p.getFileName().toString();
-                        return BUILD_FILES.containsKey(name)
-                                || name.endsWith(CSPROJ_EXTENSION) || name.endsWith(FSPROJ_EXTENSION)
-                                || name.endsWith(VBPROJ_EXTENSION) || name.endsWith(GEMSPEC_EXTENSION)
-                                || name.endsWith(CABAL_EXTENSION) || name.endsWith(NIMBLE_EXTENSION);
-                    })
-                    .sorted() // deterministic
-                    .forEach(p -> {
-                        String name = p.getFileName().toString();
-                        String relDir = projectRoot.relativize(p.getParent()).toString()
-                                .replace('\\', '/');
-                        if (relDir.equals(".")) relDir = "";
+        try {
+            Files.walkFileTree(root, java.util.EnumSet.noneOf(java.nio.file.FileVisitOption.class),
+                    10, new java.nio.file.SimpleFileVisitor<Path>() {
 
-                        // Skip node_modules, .git, target, build directories
-                        if (relDir.contains("node_modules") || relDir.contains(".git/")
-                                || relDir.contains("/target/") || relDir.startsWith("target/")
-                                || relDir.contains("/build/") || relDir.startsWith("build/")) {
-                            return;
-                        }
+                @Override
+                public java.nio.file.FileVisitResult preVisitDirectory(Path dir, java.nio.file.attribute.BasicFileAttributes attrs) {
+                    String dirName = dir.getFileName() != null ? dir.getFileName().toString() : "";
+                    if (SKIP_DIRS.contains(dirName)) {
+                        return java.nio.file.FileVisitResult.SKIP_SUBTREE;
+                    }
+                    return java.nio.file.FileVisitResult.CONTINUE;
+                }
 
-                        if (name.endsWith(CSPROJ_EXTENSION) || name.endsWith(FSPROJ_EXTENSION)
-                                || name.endsWith(VBPROJ_EXTENSION)) {
-                            modules.putIfAbsent(relDir, new ModuleInfo(relDir, "dotnet", name));
-                        } else if (name.endsWith(GEMSPEC_EXTENSION)) {
-                            modules.putIfAbsent(relDir, new ModuleInfo(relDir, "ruby", name));
-                        } else if (name.endsWith(CABAL_EXTENSION)) {
-                            modules.putIfAbsent(relDir, new ModuleInfo(relDir, "haskell", name));
-                        } else if (name.endsWith(NIMBLE_EXTENSION)) {
-                            modules.putIfAbsent(relDir, new ModuleInfo(relDir, "nim", name));
-                        } else {
-                            String buildTool = BUILD_FILES.get(name);
-                            if (buildTool != null) {
-                                registerModule(modules, relDir, buildTool, name);
-                            }
+                @Override
+                public java.nio.file.FileVisitResult visitFile(Path file, java.nio.file.attribute.BasicFileAttributes attrs) {
+                    String name = file.getFileName().toString();
+                    boolean isBuildFile = BUILD_FILES.containsKey(name)
+                            || name.endsWith(CSPROJ_EXTENSION) || name.endsWith(FSPROJ_EXTENSION)
+                            || name.endsWith(VBPROJ_EXTENSION) || name.endsWith(GEMSPEC_EXTENSION)
+                            || name.endsWith(CABAL_EXTENSION) || name.endsWith(NIMBLE_EXTENSION);
+
+                    if (!isBuildFile) return java.nio.file.FileVisitResult.CONTINUE;
+
+                    String relDir = projectRoot.relativize(file.getParent()).toString()
+                            .replace('\\', '/');
+                    if (relDir.equals(".")) relDir = "";
+
+                    if (name.endsWith(CSPROJ_EXTENSION) || name.endsWith(FSPROJ_EXTENSION)
+                            || name.endsWith(VBPROJ_EXTENSION)) {
+                        modules.putIfAbsent(relDir, new ModuleInfo(relDir, "dotnet", name));
+                    } else if (name.endsWith(GEMSPEC_EXTENSION)) {
+                        modules.putIfAbsent(relDir, new ModuleInfo(relDir, "ruby", name));
+                    } else if (name.endsWith(CABAL_EXTENSION)) {
+                        modules.putIfAbsent(relDir, new ModuleInfo(relDir, "haskell", name));
+                    } else if (name.endsWith(NIMBLE_EXTENSION)) {
+                        modules.putIfAbsent(relDir, new ModuleInfo(relDir, "nim", name));
+                    } else {
+                        String buildTool = BUILD_FILES.get(name);
+                        if (buildTool != null) {
+                            registerModule(modules, relDir, buildTool, name);
                         }
-                    });
+                    }
+                    return java.nio.file.FileVisitResult.CONTINUE;
+                }
+            });
         } catch (IOException e) {
             log.warn("Could not scan filesystem for build files: {}", e.getMessage());
         }
