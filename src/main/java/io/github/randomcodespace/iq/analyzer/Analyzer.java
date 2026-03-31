@@ -236,7 +236,7 @@ public class Analyzer {
         // 2. Analyze files in parallel with virtual threads
         report.accept("Analyzing " + totalFiles + " files...");
         DetectorResult[] resultSlots = new DetectorResult[files.size()];
-        int[] cacheHits = {0};
+        var cacheHitsCounter = new java.util.concurrent.atomic.AtomicInteger(0);
 
         final DetectorRegistry detectorRegistry = effectiveRegistry;
         var executorService = parallelism != null && parallelism > 0
@@ -258,9 +258,7 @@ public class Analyzer {
                                 var cached = cacheRef.loadCachedResults(hash);
                                 if (cached != null) {
                                     resultSlots[idx] = DetectorResult.of(cached.nodes(), cached.edges());
-                                    synchronized (cacheHits) {
-                                        cacheHits[0]++;
-                                    }
+                                    cacheHitsCounter.incrementAndGet();
                                     return null;
                                 }
                             }
@@ -296,8 +294,8 @@ public class Analyzer {
             }
         }
 
-        if (cache != null && cacheHits[0] > 0) {
-            report.accept("Cache hits: " + cacheHits[0] + " / " + totalFiles + " files");
+        if (cache != null && cacheHitsCounter.get() > 0) {
+            report.accept("Cache hits: " + cacheHitsCounter.get() + " / " + totalFiles + " files");
         }
 
         // 3. Build graph (batched)

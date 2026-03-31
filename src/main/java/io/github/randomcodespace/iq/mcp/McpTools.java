@@ -257,11 +257,15 @@ public class McpTools {
     public String runCypher(
             @McpToolParam(description = "Cypher query string") String query) {
         // Block any mutation keywords anywhere in the query (defense-in-depth)
-        Set<String> BLOCKED = Set.of("CREATE", "DELETE", "DETACH", "SET ", "REMOVE", "MERGE", "DROP", "FOREACH", "LOAD CSV");
         String upper = query.trim().toUpperCase();
-        for (String blocked : BLOCKED) {
-            if (upper.contains(blocked)) {
-                return toJson(Map.of("error", "Read-only queries only. Mutation keyword found: " + blocked.trim()));
+        List<String> BLOCKED_PATTERNS = List.of(
+                "\\bCREATE\\b", "\\bDELETE\\b", "\\bDETACH\\b", "\\bSET\\b",
+                "\\bREMOVE\\b", "\\bMERGE\\b", "\\bDROP\\b", "\\bFOREACH\\b",
+                "\\bLOAD\\s+CSV\\b", "\\bCALL\\b");
+        for (String pattern : BLOCKED_PATTERNS) {
+            if (java.util.regex.Pattern.compile(pattern).matcher(upper).find()) {
+                String keyword = pattern.replace("\\b", "").replace("\\s+", " ");
+                return toJson(Map.of("error", "Read-only queries only. Mutation keyword found: " + keyword));
             }
         }
         try {

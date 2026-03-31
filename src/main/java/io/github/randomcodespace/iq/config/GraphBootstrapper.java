@@ -99,8 +99,9 @@ public class GraphBootstrapper {
                 sourceNode.getEdges().add(edge);
             }
 
-            // Save all nodes (with their attached edges) to Neo4j
-            graphStore.saveAll(nodes);
+            // Save all nodes (with their attached edges) to Neo4j using bulk Cypher
+            // (not SDN saveAll which recursively hydrates @Relationship edges → OOM)
+            graphStore.bulkSave(nodes);
 
             log.info("Bootstrapped Neo4j with {} nodes and {} edges from H2 cache",
                     nodes.size(), edges.size());

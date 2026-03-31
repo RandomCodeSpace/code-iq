@@ -91,7 +91,7 @@ public class TopologyController {
     /**
      * Invalidate the in-memory cache (e.g. after re-analysis).
      */
-    public void invalidateCache() {
+    public synchronized void invalidateCache() {
         cachedNodes = null;
         cachedEdges = null;
         neo4jHasData = null;

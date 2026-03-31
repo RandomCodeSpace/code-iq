@@ -418,7 +418,6 @@ public class GraphStore implements FlowDataSource {
         try (Transaction tx = graphDb.beginTx()) {
             var result = tx.execute(
                     "MATCH (n:CodeNode) WHERE n.filePath IS NOT NULL AND n.filePath CONTAINS '.' "
-                            + "WITH reverse(split(n.filePath, '.')[-1]) AS ext, n "
                             + "WITH split(n.filePath, '.')[-1] AS ext "
                             + "RETURN ext, count(*) AS cnt ORDER BY cnt DESC");
             while (result.hasNext()) {

@@ -240,7 +240,8 @@ public class AnalysisCache implements Closeable {
                 stmt.setString(1, contentHash);
                 try (ResultSet rs = stmt.executeQuery()) {
                     while (rs.next()) {
-                        nodes.add(deserializeNode(rs.getString(1)));
+                        CodeNode node = deserializeNode(rs.getString(1));
+                        if (node != null) nodes.add(node);
                     }
                 }
             }
@@ -250,7 +251,8 @@ public class AnalysisCache implements Closeable {
                 stmt.setString(1, contentHash);
                 try (ResultSet rs = stmt.executeQuery()) {
                     while (rs.next()) {
-                        edges.add(deserializeEdge(rs.getString(1)));
+                        CodeEdge edge = deserializeEdge(rs.getString(1));
+                        if (edge != null) edges.add(edge);
                     }
                 }
             }
@@ -471,9 +473,14 @@ public class AnalysisCache implements Closeable {
     private CodeNode deserializeNode(String json) {
         try {
             Map<String, Object> data = MAPPER.readValue(json, new TypeReference<>() {});
+            String kindStr = (String) data.get("kind");
+            if (kindStr == null) {
+                log.debug("Skipping node with null kind: {}", json);
+                return null;
+            }
             CodeNode node = new CodeNode();
             node.setId((String) data.get("id"));
-            node.setKind(NodeKind.fromValue((String) data.get("kind")));
+            node.setKind(NodeKind.fromValue(kindStr));
             node.setLabel((String) data.get("label"));
             node.setFqn((String) data.get("fqn"));
             node.setModule((String) data.get("module"));
@@ -492,7 +499,7 @@ public class AnalysisCache implements Closeable {
             return node;
         } catch (Exception e) {
             log.debug("Failed to deserialize node: {}", json, e);
-            return new CodeNode("unknown", NodeKind.CLASS, "unknown");
+            return null;
         }
     }
 
@@ -519,6 +526,10 @@ public class AnalysisCache implements Closeable {
             Map<String, Object> data = MAPPER.readValue(json, new TypeReference<>() {});
             String id = (String) data.get("id");
             String kindStr = (String) data.get("kind");
+            if (kindStr == null) {
+                log.debug("Skipping edge with null kind: {}", json);
+                return null;
+            }
             String sourceId = (String) data.get("source_id");
             String targetId = (String) data.get("target_id");
 
@@ -537,7 +548,7 @@ public class AnalysisCache implements Closeable {
             return edge;
         } catch (Exception e) {
             log.debug("Failed to deserialize edge: {}", json, e);
-            return new CodeEdge("unknown", EdgeKind.CALLS, "unknown", null);
+            return null;
         }
     }
 
@@ -622,7 +633,8 @@ public class AnalysisCache implements Closeable {
                 """)) {
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    nodes.add(deserializeNode(rs.getString(1)));
+                    CodeNode node = deserializeNode(rs.getString(1));
+                    if (node != null) nodes.add(node);
                 }
             }
         } catch (SQLException e) {
@@ -641,7 +653,8 @@ public class AnalysisCache implements Closeable {
         try (var stmt = conn.prepareStatement("SELECT data FROM edges")) {
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    edges.add(deserializeEdge(rs.getString(1)));
+                    CodeEdge edge = deserializeEdge(rs.getString(1));
+                    if (edge != null) edges.add(edge);
                 }
             }
         } catch (SQLException e) {
