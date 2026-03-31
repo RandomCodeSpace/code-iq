@@ -14,6 +14,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import io.github.randomcodespace.iq.detector.DetectorInfo;
 import io.github.randomcodespace.iq.detector.ParserType;
 
@@ -33,7 +35,21 @@ import io.github.randomcodespace.iq.detector.ParserType;
 @Component
 public class PropertiesDetector extends AbstractStructuredDetector {
 
-    private static final Set<String> DB_KEYWORDS = Set.of("url", "jdbc", "datasource");
+    private static final Set<String> DB_URL_KEYWORDS = Set.of("url", "jdbc-url", "uri");
+    private static final Pattern JDBC_DB_TYPE_RE = Pattern.compile(
+            "jdbc:(mysql|postgresql|sqlserver|oracle|db2|h2|sqlite|mariadb|derby|hsqldb)");
+    private static final Map<String, String> DB_TYPE_LABELS = Map.ofEntries(
+            Map.entry("mysql", "MySQL"),
+            Map.entry("postgresql", "PostgreSQL"),
+            Map.entry("sqlserver", "SQL Server"),
+            Map.entry("oracle", "Oracle"),
+            Map.entry("db2", "DB2"),
+            Map.entry("h2", "H2"),
+            Map.entry("sqlite", "SQLite"),
+            Map.entry("mariadb", "MariaDB"),
+            Map.entry("derby", "Derby"),
+            Map.entry("hsqldb", "HSQLDB")
+    );
     private static final int MAX_KEYS = 200;
 
     @Override
@@ -83,7 +99,14 @@ public class PropertiesDetector extends AbstractStructuredDetector {
             String keyLower = key.toLowerCase();
             String keyId = "props:" + filepath + ":" + key;
 
-            boolean isDb = DB_KEYWORDS.stream().anyMatch(keyLower::contains);
+            // Only treat as DATABASE_CONNECTION if the key is a URL-type key
+            // AND the value contains a recognizable connection string
+            boolean isDbUrlKey = DB_URL_KEYWORDS.stream().anyMatch(kw -> {
+                // Match key segments like "spring.datasource.url" or "jdbc-url"
+                String lastSegment = keyLower.contains(".") ? keyLower.substring(keyLower.lastIndexOf('.') + 1) : keyLower;
+                return lastSegment.equals(kw) || lastSegment.contains(kw);
+            });
+            boolean hasDbValue = value instanceof String s && s.contains("jdbc:");
 
             Map<String, Object> props = new HashMap<>();
             props.put("key", key);
@@ -91,8 +114,11 @@ public class PropertiesDetector extends AbstractStructuredDetector {
                 props.put("value", s);
             }
 
-            if (isDb) {
-                CodeNode keyNode = new CodeNode(keyId, NodeKind.DATABASE_CONNECTION, key);
+            if (isDbUrlKey && hasDbValue) {
+                String dbType = extractDbType(value.toString());
+                String dbLabel = dbType != null ? dbType : "database";
+                props.put("db_type", dbLabel);
+                CodeNode keyNode = new CodeNode(keyId, NodeKind.DATABASE_CONNECTION, dbLabel);
                 keyNode.setFqn(filepath + ":" + key);
                 keyNode.setModule(ctx.moduleName());
                 keyNode.setFilePath(filepath);
@@ -121,5 +147,18 @@ public class PropertiesDetector extends AbstractStructuredDetector {
         }
 
         return DetectorResult.of(nodes, edges);
+    }
+
+    /**
+     * Extract a normalized database type label from a JDBC URL string.
+     * Returns null if the type cannot be determined.
+     */
+    static String extractDbType(String jdbcUrl) {
+        if (jdbcUrl == null) return null;
+        Matcher m = JDBC_DB_TYPE_RE.matcher(jdbcUrl.toLowerCase());
+        if (m.find()) {
+            return DB_TYPE_LABELS.getOrDefault(m.group(1), m.group(1));
+        }
+        return null;
     }
 }

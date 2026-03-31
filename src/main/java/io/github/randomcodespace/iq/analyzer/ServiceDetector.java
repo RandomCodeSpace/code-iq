@@ -7,13 +7,17 @@ import io.github.randomcodespace.iq.model.NodeKind;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Detects service boundaries by scanning the graph for build file nodes
@@ -22,6 +26,18 @@ import java.util.UUID;
  * <p>
  * Creates SERVICE nodes and sets the {@code service} property on all
  * child nodes (nodes whose filePath starts with the module directory).
+ * <p>
+ * Supported build systems:
+ * <ul>
+ *   <li>Maven (pom.xml) -- extracts artifactId</li>
+ *   <li>Gradle (build.gradle, build.gradle.kts)</li>
+ *   <li>npm (package.json) -- extracts name field</li>
+ *   <li>Go (go.mod) -- extracts module name</li>
+ *   <li>Cargo (Cargo.toml) -- extracts package name</li>
+ *   <li>.NET (.csproj)</li>
+ *   <li>Python (requirements.txt, setup.py, pyproject.toml, manage.py)</li>
+ *   <li>Docker (Dockerfile) -- supplemental indicator</li>
+ * </ul>
  */
 public class ServiceDetector {
 
@@ -31,17 +47,41 @@ public class ServiceDetector {
      * Build file patterns that indicate module boundaries.
      * Maps filename to build tool name.
      */
-    private static final Map<String, String> BUILD_FILES = Map.of(
-            "pom.xml", "maven",
-            "package.json", "npm",
-            "go.mod", "go",
-            "build.gradle", "gradle",
-            "build.gradle.kts", "gradle",
-            "Cargo.toml", "cargo"
+    private static final Map<String, String> BUILD_FILES = Map.ofEntries(
+            Map.entry("pom.xml", "maven"),
+            Map.entry("package.json", "npm"),
+            Map.entry("go.mod", "go"),
+            Map.entry("build.gradle", "gradle"),
+            Map.entry("build.gradle.kts", "gradle"),
+            Map.entry("Cargo.toml", "cargo"),
+            Map.entry("requirements.txt", "python"),
+            Map.entry("setup.py", "python"),
+            Map.entry("pyproject.toml", "python"),
+            Map.entry("manage.py", "django"),
+            Map.entry("Dockerfile", "docker")
     );
 
     /** File extension for .csproj files (matched by suffix). */
     private static final String CSPROJ_EXTENSION = ".csproj";
+
+    /** Python build files ranked by priority (first match wins for a directory). */
+    private static final List<String> PYTHON_BUILD_FILES = List.of(
+            "pyproject.toml", "setup.py", "requirements.txt", "manage.py"
+    );
+
+    /** Regex patterns for extracting names from build file contents. */
+    private static final Pattern POM_ARTIFACT_ID = Pattern.compile(
+            "<artifactId>\\s*([^<]+?)\\s*</artifactId>");
+    private static final Pattern PACKAGE_JSON_NAME = Pattern.compile(
+            "\"name\"\\s*:\\s*\"([^\"]+)\"");
+    private static final Pattern GO_MOD_MODULE = Pattern.compile(
+            "^module\\s+(\\S+)", Pattern.MULTILINE);
+    private static final Pattern CARGO_PACKAGE_NAME = Pattern.compile(
+            "^name\\s*=\\s*\"([^\"]+)\"", Pattern.MULTILINE);
+    private static final Pattern PYPROJECT_NAME = Pattern.compile(
+            "^name\\s*=\\s*\"([^\"]+)\"", Pattern.MULTILINE);
+    private static final Pattern SETUP_PY_NAME = Pattern.compile(
+            "name\\s*=\\s*['\"]([^'\"]+)['\"]");
 
     /**
      * Detect service boundaries from the graph's nodes and create SERVICE nodes.
@@ -53,6 +93,20 @@ public class ServiceDetector {
      *         the service property assignments for existing nodes
      */
     public ServiceDetectionResult detect(List<CodeNode> nodes, List<CodeEdge> edges, String projectDir) {
+        return detect(nodes, edges, projectDir, null);
+    }
+
+    /**
+     * Detect service boundaries with optional project root for reading build file contents.
+     *
+     * @param nodes      all current nodes in the graph
+     * @param edges      all current edges in the graph
+     * @param projectDir the project root directory name (used as fallback service name)
+     * @param projectRoot optional absolute path to the project root (for reading build files)
+     * @return result containing new SERVICE nodes, CONTAINS edges
+     */
+    public ServiceDetectionResult detect(List<CodeNode> nodes, List<CodeEdge> edges,
+                                         String projectDir, Path projectRoot) {
         // 1. Find module boundaries by scanning node file paths for build files
         // Use TreeMap for deterministic ordering (sorted by directory path)
         Map<String, ModuleInfo> modules = new TreeMap<>();
@@ -67,11 +121,39 @@ public class ServiceDetector {
             // Check known build files
             String buildTool = BUILD_FILES.get(fileName);
             if (buildTool != null) {
-                modules.putIfAbsent(dirPath, new ModuleInfo(dirPath, buildTool, fileName));
+                // For Python: only register if no better build tool already present
+                ModuleInfo existing = modules.get(dirPath);
+                if (existing != null && isPythonTool(buildTool) && !isPythonTool(existing.buildTool())) {
+                    continue; // Don't override a non-Python build tool with Python
+                }
+                // For Docker: only register if no other build tool present
+                if ("docker".equals(buildTool) && existing != null) {
+                    // Add docker as supplemental info but don't override
+                    continue;
+                }
+                // For Python files: prefer higher-priority ones
+                if (isPythonTool(buildTool) && existing != null && isPythonTool(existing.buildTool())) {
+                    if (pythonPriority(fileName) >= pythonPriority(existing.buildFile())) {
+                        continue; // Current is same or lower priority
+                    }
+                }
+                modules.put(dirPath, new ModuleInfo(dirPath, buildTool, fileName));
             }
             // Check .csproj files
             if (fileName.endsWith(CSPROJ_EXTENSION)) {
                 modules.putIfAbsent(dirPath, new ModuleInfo(dirPath, "dotnet", fileName));
+            }
+        }
+
+        // 1b. Check for Dockerfile as supplemental indicator -- create service
+        // only if no other build file was found for that directory
+        for (CodeNode node : nodes) {
+            String filePath = node.getFilePath();
+            if (filePath == null) continue;
+            String fileName = Path.of(filePath).getFileName().toString();
+            if ("Dockerfile".equals(fileName)) {
+                String dirPath = parentDir(filePath);
+                modules.putIfAbsent(dirPath, new ModuleInfo(dirPath, "docker", fileName));
             }
         }
 
@@ -95,7 +177,7 @@ public class ServiceDetector {
             String dir = entry.getKey();
             ModuleInfo info = entry.getValue();
 
-            String serviceName = deriveServiceName(dir, projectDir);
+            String serviceName = extractServiceName(dir, info, projectDir, projectRoot);
 
             CodeNode service = new CodeNode();
             service.setId("service:" + serviceName);
@@ -141,6 +223,10 @@ public class ServiceDetector {
                 CodeNode serviceNode = serviceByDir.get(matchedDir);
                 if (serviceNode != null) {
                     String serviceName = serviceNode.getLabel();
+                    // Ensure properties map is mutable before modifying
+                    if (!(node.getProperties() instanceof java.util.HashMap)) {
+                        node.setProperties(new java.util.HashMap<>(node.getProperties()));
+                    }
                     node.getProperties().put("service", serviceName);
 
                     // Create CONTAINS edge
@@ -178,6 +264,104 @@ public class ServiceDetector {
     }
 
     /**
+     * Extract service name from build file contents if possible, otherwise use directory name.
+     */
+    private String extractServiceName(String dir, ModuleInfo info, String projectDir, Path projectRoot) {
+        // Try to read the build file and extract the real name
+        if (projectRoot != null && !info.buildFile().isEmpty()) {
+            String nameFromFile = readNameFromBuildFile(projectRoot, dir, info);
+            if (nameFromFile != null && !nameFromFile.isBlank()) {
+                return nameFromFile;
+            }
+        }
+        // Fallback to directory-based naming
+        return deriveServiceName(dir, projectDir);
+    }
+
+    /**
+     * Read the build file and extract the project/module/package name.
+     */
+    private String readNameFromBuildFile(Path projectRoot, String dir, ModuleInfo info) {
+        Path buildFile = dir.isEmpty()
+                ? projectRoot.resolve(info.buildFile())
+                : projectRoot.resolve(dir).resolve(info.buildFile());
+
+        if (!Files.isRegularFile(buildFile)) {
+            return null;
+        }
+
+        try {
+            String content = Files.readString(buildFile, StandardCharsets.UTF_8);
+            return switch (info.buildTool()) {
+                case "maven" -> extractFromPom(content);
+                case "npm" -> extractFromPackageJson(content);
+                case "go" -> extractFromGoMod(content);
+                case "cargo" -> extractFromCargoToml(content);
+                case "python" -> extractFromPythonBuild(content, info.buildFile());
+                case "django" -> null; // manage.py doesn't contain the name
+                default -> null;
+            };
+        } catch (IOException e) {
+            log.debug("Could not read build file {}: {}", buildFile, e.getMessage());
+            return null;
+        }
+    }
+
+    private String extractFromPom(String content) {
+        // Find the first <artifactId> that is a direct child of <project>
+        // (not inside <parent> or <dependency>). Simple heuristic: skip
+        // artifactIds that appear inside a <parent> block.
+        int parentEnd = content.indexOf("</parent>");
+        String searchContent = parentEnd > 0 ? content.substring(parentEnd) : content;
+        Matcher m = POM_ARTIFACT_ID.matcher(searchContent);
+        return m.find() ? m.group(1).trim() : null;
+    }
+
+    private String extractFromPackageJson(String content) {
+        Matcher m = PACKAGE_JSON_NAME.matcher(content);
+        if (m.find()) {
+            String name = m.group(1).trim();
+            // Strip npm scope prefix (@org/name -> name)
+            if (name.contains("/")) {
+                name = name.substring(name.lastIndexOf('/') + 1);
+            }
+            return name;
+        }
+        return null;
+    }
+
+    private String extractFromGoMod(String content) {
+        Matcher m = GO_MOD_MODULE.matcher(content);
+        if (m.find()) {
+            String module = m.group(1).trim();
+            // Use last path segment (github.com/org/repo -> repo)
+            if (module.contains("/")) {
+                module = module.substring(module.lastIndexOf('/') + 1);
+            }
+            return module;
+        }
+        return null;
+    }
+
+    private String extractFromCargoToml(String content) {
+        Matcher m = CARGO_PACKAGE_NAME.matcher(content);
+        return m.find() ? m.group(1).trim() : null;
+    }
+
+    private String extractFromPythonBuild(String content, String fileName) {
+        if ("pyproject.toml".equals(fileName)) {
+            Matcher m = PYPROJECT_NAME.matcher(content);
+            return m.find() ? m.group(1).trim() : null;
+        }
+        if ("setup.py".equals(fileName)) {
+            Matcher m = SETUP_PY_NAME.matcher(content);
+            return m.find() ? m.group(1).trim() : null;
+        }
+        // requirements.txt has no name
+        return null;
+    }
+
+    /**
      * Derive a human-readable service name from a directory path.
      */
     private String deriveServiceName(String dir, String projectDir) {
@@ -198,6 +382,18 @@ public class ServiceDetector {
         int lastSlash = normalized.lastIndexOf('/');
         if (lastSlash <= 0) return "";
         return normalized.substring(0, lastSlash);
+    }
+
+    private static boolean isPythonTool(String buildTool) {
+        return "python".equals(buildTool) || "django".equals(buildTool);
+    }
+
+    /**
+     * Priority index for Python build files (lower = higher priority).
+     */
+    private static int pythonPriority(String fileName) {
+        int idx = PYTHON_BUILD_FILES.indexOf(fileName);
+        return idx < 0 ? PYTHON_BUILD_FILES.size() : idx;
     }
 
     /**

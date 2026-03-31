@@ -102,15 +102,40 @@ public class StatsService {
         return new LinkedHashMap<>(sortByValueDesc(fwCounts));
     }
 
+    private static final Map<String, String> DB_TYPE_NORMALIZE = Map.ofEntries(
+            Map.entry("mysql", "MySQL"),
+            Map.entry("postgresql", "PostgreSQL"),
+            Map.entry("postgres", "PostgreSQL"),
+            Map.entry("sqlserver", "SQL Server"),
+            Map.entry("mssql", "SQL Server"),
+            Map.entry("oracle", "Oracle"),
+            Map.entry("db2", "DB2"),
+            Map.entry("h2", "H2"),
+            Map.entry("sqlite", "SQLite"),
+            Map.entry("mariadb", "MariaDB"),
+            Map.entry("derby", "Derby"),
+            Map.entry("hsqldb", "HSQLDB"),
+            Map.entry("mongo", "MongoDB"),
+            Map.entry("mongodb", "MongoDB"),
+            Map.entry("redis", "Redis"),
+            Map.entry("cassandra", "Cassandra"),
+            Map.entry("dynamodb", "DynamoDB"),
+            Map.entry("couchbase", "Couchbase"),
+            Map.entry("neo4j", "Neo4j"),
+            Map.entry("cockroachdb", "CockroachDB")
+    );
+
     Map<String, Object> computeInfra(List<CodeNode> nodes) {
         Map<String, Object> infra = new LinkedHashMap<>();
 
-        // Databases
+        // Databases -- use db_type property with normalization, skip config-key labels
         Map<String, Long> databases = new TreeMap<>();
         for (CodeNode node : nodes) {
             if (node.getKind() == NodeKind.DATABASE_CONNECTION) {
-                String dbType = propOrLabel(node, "db_type");
-                databases.merge(dbType, 1L, Long::sum);
+                String dbType = resolveDbType(node);
+                if (dbType != null) {
+                    databases.merge(dbType, 1L, Long::sum);
+                }
             }
         }
         infra.put("databases", sortByValueDesc(databases));
@@ -191,6 +216,18 @@ public class StatsService {
                 Object authType = node.getProperties().get("auth_type");
                 String at = authType != null ? authType.toString() : "unknown";
                 authCounts.merge(at, 1L, Long::sum);
+            } else {
+                // Also count nodes where framework property starts with "auth:"
+                Object fw = node.getProperties().get("framework");
+                if (fw != null) {
+                    String fwStr = fw.toString().trim();
+                    if (fwStr.startsWith("auth:")) {
+                        String authType = fwStr.substring("auth:".length()).trim();
+                        if (!authType.isEmpty()) {
+                            authCounts.merge(authType, 1L, Long::sum);
+                        }
+                    }
+                }
             }
         }
         return new LinkedHashMap<>(sortByValueDesc(authCounts));
@@ -271,6 +308,62 @@ public class StatsService {
             case "sh", "bash" -> "shell";
             default -> ext;
         };
+    }
+
+    /**
+     * Resolve the display-friendly database type for a DATABASE_CONNECTION node.
+     * Uses db_type property first, then tries to extract from connection_url or value,
+     * then falls back to label only if it looks like a DB name (not a config key).
+     * Returns null if the node is a false positive (e.g. a config key like "spring.datasource.password").
+     */
+    private String resolveDbType(CodeNode node) {
+        Map<String, Object> props = node.getProperties();
+
+        // 1. Check db_type property
+        Object dbType = props.get("db_type");
+        if (dbType != null && !dbType.toString().isBlank()) {
+            return normalizeDbType(dbType.toString());
+        }
+
+        // 2. Try to extract from connection_url or value properties
+        for (String urlProp : List.of("connection_url", "value", "url")) {
+            Object urlVal = props.get(urlProp);
+            if (urlVal instanceof String s && s.contains("jdbc:")) {
+                String extracted = extractDbTypeFromUrl(s);
+                if (extracted != null) return extracted;
+            }
+        }
+
+        // 3. Fall back to label, but only if it doesn't look like a config key
+        String label = node.getLabel();
+        if (label != null && !label.isBlank() && !label.contains(".") && !label.contains("=")) {
+            return normalizeDbType(label);
+        }
+
+        // Skip -- this is likely a false-positive config key node
+        return null;
+    }
+
+    private String normalizeDbType(String raw) {
+        String lower = raw.trim().toLowerCase();
+        // Handle "type@host" format from JdbcDetector (e.g. "mysql@localhost")
+        if (lower.contains("@")) {
+            lower = lower.substring(0, lower.indexOf('@'));
+        }
+        return DB_TYPE_NORMALIZE.getOrDefault(lower, raw.trim());
+    }
+
+    private String extractDbTypeFromUrl(String url) {
+        // Match jdbc:TYPE pattern
+        int idx = url.indexOf("jdbc:");
+        if (idx < 0) return null;
+        String afterJdbc = url.substring(idx + 5);
+        int colonIdx = afterJdbc.indexOf(':');
+        if (colonIdx > 0) {
+            String type = afterJdbc.substring(0, colonIdx).toLowerCase();
+            return DB_TYPE_NORMALIZE.getOrDefault(type, type);
+        }
+        return null;
     }
 
     private String propOrLabel(CodeNode node, String propKey) {

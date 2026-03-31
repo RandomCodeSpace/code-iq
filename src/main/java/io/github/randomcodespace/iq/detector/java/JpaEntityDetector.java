@@ -33,7 +33,7 @@ import io.github.randomcodespace.iq.detector.ParserType;
     languages = {"java"},
     nodeKinds = {NodeKind.ENTITY, NodeKind.DATABASE_CONNECTION},
     edgeKinds = {EdgeKind.MAPS_TO, EdgeKind.CONNECTS_TO},
-    properties = {"columns", "table_name"}
+    properties = {"columns", "framework", "table_name"}
 )
 @Component
 public class JpaEntityDetector extends AbstractJavaParserDetector {
@@ -131,6 +131,7 @@ public class JpaEntityDetector extends AbstractJavaParserDetector {
 
             String entityId = ctx.filePath() + ":" + className;
             Map<String, Object> properties = new LinkedHashMap<>();
+            properties.put("framework", "spring_boot");
             properties.put("table_name", tableName);
             if (!columns.isEmpty()) properties.put("columns", columns);
 
@@ -263,6 +264,7 @@ public class JpaEntityDetector extends AbstractJavaParserDetector {
 
         String entityId = ctx.filePath() + ":" + className;
         Map<String, Object> properties = new LinkedHashMap<>();
+        properties.put("framework", "spring_boot");
         properties.put("table_name", tableName);
         if (!columns.isEmpty()) properties.put("columns", columns);
 

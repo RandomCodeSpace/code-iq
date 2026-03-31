@@ -35,6 +35,10 @@ class JavaDetectorsTest {
             assertFalse(r.nodes().isEmpty());
             assertTrue(r.nodes().stream().anyMatch(n -> n.getLabel().contains("GET")));
             assertTrue(r.nodes().stream().anyMatch(n -> n.getLabel().contains("POST")));
+            assertTrue(r.nodes().stream()
+                    .filter(n -> n.getKind() == io.github.randomcodespace.iq.model.NodeKind.ENDPOINT)
+                    .allMatch(n -> "spring_boot".equals(n.getProperties().get("framework"))),
+                    "All endpoint nodes should have framework=spring_boot");
         }
 
         @Test
@@ -46,6 +50,109 @@ class JavaDetectorsTest {
         @Test
         void isDeterministic() {
             DetectorTestUtils.assertDeterministic(new SpringRestDetector(), ctx("java", SAMPLE));
+        }
+
+        @Test
+        void requestMappingWithoutMethodDefaultsToAll() {
+            String source = """
+                    @RestController
+                    @RequestMapping("/api")
+                    public class MyController {
+                        @RequestMapping("/items")
+                        public String listItems() { return "items"; }
+                        @RequestMapping(value = "/search", method = RequestMethod.POST)
+                        public String search() { return "results"; }
+                    }
+                    """;
+            var r = new SpringRestDetector().detect(ctx("java", source));
+            var endpoints = r.nodes().stream()
+                    .filter(n -> n.getKind() == io.github.randomcodespace.iq.model.NodeKind.ENDPOINT)
+                    .toList();
+            assertEquals(2, endpoints.size(), "Should detect 2 endpoints");
+            // @RequestMapping without method= should default to ALL
+            assertTrue(endpoints.stream().anyMatch(n -> "ALL".equals(n.getProperties().get("http_method"))),
+                    "RequestMapping without method should default to ALL");
+            // @RequestMapping with explicit method should use that method
+            assertTrue(endpoints.stream().anyMatch(n -> "POST".equals(n.getProperties().get("http_method"))),
+                    "RequestMapping with method=POST should be POST");
+            // No endpoint should have UNKNOWN or null http_method
+            assertTrue(endpoints.stream().allMatch(n -> n.getProperties().get("http_method") != null),
+                    "All endpoints must have http_method set");
+        }
+
+        @Test
+        void skipsModelAttributeMethods() {
+            String source = """
+                    @Controller
+                    @RequestMapping("/owners")
+                    public class OwnerController {
+                        @ModelAttribute("owner")
+                        public Owner findOwner(@PathVariable int ownerId) { return null; }
+                        @GetMapping("/new")
+                        public String initCreationForm() { return "createForm"; }
+                        @PostMapping("/new")
+                        public String processCreationForm(@Valid Owner owner) { return "redirect:/"; }
+                    }
+                    """;
+            var r = new SpringRestDetector().detect(ctx("java", source));
+            var endpoints = r.nodes().stream()
+                    .filter(n -> n.getKind() == io.github.randomcodespace.iq.model.NodeKind.ENDPOINT)
+                    .toList();
+            assertEquals(2, endpoints.size(), "Should detect 2 endpoints (GET and POST), not @ModelAttribute");
+            assertTrue(endpoints.stream().noneMatch(n -> n.getLabel().contains("findOwner")),
+                    "@ModelAttribute method should not be detected as endpoint");
+        }
+
+        @Test
+        void skipsInitBinderMethods() {
+            String source = """
+                    @Controller
+                    @RequestMapping("/pets")
+                    public class PetController {
+                        @InitBinder
+                        public void setAllowedFields(WebDataBinder binder) {}
+                        @GetMapping("/new")
+                        public String initCreationForm() { return "createForm"; }
+                    }
+                    """;
+            var r = new SpringRestDetector().detect(ctx("java", source));
+            var endpoints = r.nodes().stream()
+                    .filter(n -> n.getKind() == io.github.randomcodespace.iq.model.NodeKind.ENDPOINT)
+                    .toList();
+            assertEquals(1, endpoints.size(), "Should detect only 1 endpoint, not @InitBinder");
+            assertEquals("GET", endpoints.get(0).getProperties().get("http_method"));
+        }
+
+        @Test
+        void skipsExceptionHandlerMethods() {
+            String source = """
+                    @RestController
+                    @RequestMapping("/api")
+                    public class ApiController {
+                        @ExceptionHandler(Exception.class)
+                        public ResponseEntity<String> handleError(Exception ex) { return null; }
+                        @GetMapping("/data")
+                        public String getData() { return "data"; }
+                    }
+                    """;
+            var r = new SpringRestDetector().detect(ctx("java", source));
+            var endpoints = r.nodes().stream()
+                    .filter(n -> n.getKind() == io.github.randomcodespace.iq.model.NodeKind.ENDPOINT)
+                    .toList();
+            assertEquals(1, endpoints.size(), "Should detect only 1 endpoint, not @ExceptionHandler");
+        }
+
+        @Test
+        void requestMappingWithoutMethodIsDeterministic() {
+            String source = """
+                    @RestController
+                    @RequestMapping("/api")
+                    public class MyController {
+                        @RequestMapping("/items")
+                        public String listItems() { return "items"; }
+                    }
+                    """;
+            DetectorTestUtils.assertDeterministic(new SpringRestDetector(), ctx("java", source));
         }
     }
 
@@ -69,6 +176,9 @@ class JavaDetectorsTest {
             assertFalse(r.nodes().isEmpty());
             assertTrue(r.nodes().stream().anyMatch(n -> n.getLabel().equals("@Secured")));
             assertTrue(r.nodes().stream().anyMatch(n -> n.getLabel().equals("@EnableWebSecurity")));
+            assertTrue(r.nodes().stream()
+                    .allMatch(n -> "spring_boot".equals(n.getProperties().get("framework"))),
+                    "All guard nodes should have framework=spring_boot");
         }
 
         @Test
@@ -100,6 +210,9 @@ class JavaDetectorsTest {
             var r = new SpringEventsDetector().detect(ctx("java", SAMPLE));
             assertFalse(r.nodes().isEmpty());
             assertFalse(r.edges().isEmpty());
+            assertTrue(r.nodes().stream()
+                    .allMatch(n -> "spring_boot".equals(n.getProperties().get("framework"))),
+                    "All event nodes should have framework=spring_boot");
         }
 
         @Test
@@ -133,6 +246,10 @@ class JavaDetectorsTest {
             assertEquals(2, r.nodes().size()); // entity + database:unknown
             assertTrue(r.nodes().stream().anyMatch(n -> n.getLabel().contains("users")));
             assertTrue(r.edges().stream().anyMatch(e -> e.getKind() == io.github.randomcodespace.iq.model.EdgeKind.CONNECTS_TO));
+            assertTrue(r.nodes().stream()
+                    .filter(n -> n.getKind() == io.github.randomcodespace.iq.model.NodeKind.ENTITY)
+                    .allMatch(n -> "spring_boot".equals(n.getProperties().get("framework"))),
+                    "Entity nodes should have framework=spring_boot");
         }
 
         @Test
@@ -163,6 +280,10 @@ class JavaDetectorsTest {
             assertEquals(2, r.nodes().size()); // repository + database:unknown
             assertTrue(r.nodes().stream().anyMatch(n -> "UserRepository".equals(n.getLabel())));
             assertTrue(r.edges().stream().anyMatch(e -> e.getKind() == io.github.randomcodespace.iq.model.EdgeKind.CONNECTS_TO));
+            assertTrue(r.nodes().stream()
+                    .filter(n -> n.getKind() == io.github.randomcodespace.iq.model.NodeKind.REPOSITORY)
+                    .allMatch(n -> "spring_boot".equals(n.getProperties().get("framework"))),
+                    "Repository nodes should have framework=spring_boot");
         }
 
         @Test

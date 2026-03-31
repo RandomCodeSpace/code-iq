@@ -26,7 +26,7 @@ import io.github.randomcodespace.iq.detector.ParserType;
     parser = ParserType.JAVAPARSER,
     languages = {"java"},
     nodeKinds = {NodeKind.GUARD},
-    properties = {"auth_type", "roles"}
+    properties = {"auth_type", "framework", "roles"}
 )
 @Component
 public class SpringSecurityDetector extends AbstractJavaParserDetector {
@@ -266,7 +266,9 @@ public class SpringSecurityDetector extends AbstractJavaParserDetector {
         node.setFilePath(ctx.filePath());
         node.setLineStart(line);
         node.setAnnotations(new ArrayList<>(annotations));
-        node.setProperties(new LinkedHashMap<>(properties));
+        LinkedHashMap<String, Object> props = new LinkedHashMap<>(properties);
+        props.put("framework", "spring_boot");
+        node.setProperties(props);
         return node;
     }
 

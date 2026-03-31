@@ -30,7 +30,7 @@ import io.github.randomcodespace.iq.detector.ParserType;
     languages = {"java"},
     nodeKinds = {NodeKind.ENDPOINT},
     edgeKinds = {EdgeKind.EXPOSES, EdgeKind.CALLS},
-    properties = {"consumes", "http_method", "method", "path", "produces"}
+    properties = {"consumes", "framework", "http_method", "method", "path", "produces"}
 )
 @Component
 public class SpringRestDetector extends AbstractJavaParserDetector {
@@ -54,6 +54,18 @@ public class SpringRestDetector extends AbstractJavaParserDetector {
             "DeleteMapping", "DELETE",
             "PatchMapping", "PATCH"
     );
+
+    /**
+     * Annotations that mark methods as non-endpoint helpers (data binders, model populators,
+     * exception handlers). Methods with these annotations should NOT be detected as REST endpoints,
+     * even if they also carry a mapping annotation.
+     */
+    private static final Set<String> NON_ENDPOINT_ANNOTATIONS = Set.of(
+            "ModelAttribute", "InitBinder", "ExceptionHandler"
+    );
+
+    private static final Pattern NON_ENDPOINT_RE = Pattern.compile(
+            "@(ModelAttribute|InitBinder|ExceptionHandler)\\b");
 
     // ---- HTTP client patterns (for CALLS edge emission) ----
     private static final Pattern REST_TEMPLATE_RE = Pattern.compile("RestTemplate");
@@ -105,13 +117,19 @@ public class SpringRestDetector extends AbstractJavaParserDetector {
             }
 
             for (MethodDeclaration method : classDecl.getMethods()) {
+                // Skip methods annotated with @ModelAttribute, @InitBinder, @ExceptionHandler
+                // -- these are Spring MVC helpers, not REST endpoints
+                boolean isNonEndpoint = method.getAnnotations().stream()
+                        .anyMatch(a -> NON_ENDPOINT_ANNOTATIONS.contains(a.getNameAsString()));
+                if (isNonEndpoint) continue;
+
                 for (AnnotationExpr ann : method.getAnnotations()) {
                     String annName = ann.getNameAsString();
 
                     String httpMethod = MAPPING_ANNOTATIONS.get(annName);
                     if (httpMethod == null && "RequestMapping".equals(annName)) {
                         httpMethod = extractMethodAttr(ann);
-                        if (httpMethod == null) httpMethod = "GET";
+                        if (httpMethod == null) httpMethod = "ALL";
                     }
                     if (httpMethod == null) continue;
 
@@ -143,6 +161,7 @@ public class SpringRestDetector extends AbstractJavaParserDetector {
                     node.setFilePath(ctx.filePath());
                     node.setLineStart(line);
                     node.getAnnotations().add("@" + annName);
+                    node.getProperties().put("framework", "spring_boot");
                     node.getProperties().put("http_method", httpMethod);
                     node.getProperties().put("path", fullPath);
                     node.getProperties().put("method", methodName);
@@ -300,10 +319,21 @@ public class SpringRestDetector extends AbstractJavaParserDetector {
             }
             if (isClassLevel) continue;
 
+            // Skip methods annotated with @ModelAttribute, @InitBinder, @ExceptionHandler
+            boolean isNonEndpoint = false;
+            for (int k = Math.max(0, i - 3); k < Math.min(i + 5, lines.length); k++) {
+                if (k == i) continue;
+                if (NON_ENDPOINT_RE.matcher(lines[k]).find()) {
+                    isNonEndpoint = true;
+                    break;
+                }
+            }
+            if (isNonEndpoint) continue;
+
             String httpMethod = MAPPING_ANNOTATIONS.get(annotationName);
             if (httpMethod == null) {
                 String extracted = extractAttr(attrStr, METHOD_ATTR_RE);
-                httpMethod = extracted != null ? extracted : "GET";
+                httpMethod = extracted != null ? extracted : "ALL";
             }
 
             String path = extractAttr(attrStr, VALUE_RE);
@@ -341,6 +371,7 @@ public class SpringRestDetector extends AbstractJavaParserDetector {
             node.setFilePath(ctx.filePath());
             node.setLineStart(i + 1);
             node.getAnnotations().add("@" + annotationName);
+            node.getProperties().put("framework", "spring_boot");
             node.getProperties().put("http_method", httpMethod);
             node.getProperties().put("path", fullPath);
             if (produces != null) node.getProperties().put("produces", produces);

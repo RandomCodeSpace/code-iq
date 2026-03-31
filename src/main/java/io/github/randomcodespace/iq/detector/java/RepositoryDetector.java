@@ -24,7 +24,7 @@ import io.github.randomcodespace.iq.detector.DetectorInfo;
     languages = {"java"},
     nodeKinds = {NodeKind.ENTITY, NodeKind.REPOSITORY, NodeKind.DATABASE_CONNECTION},
     edgeKinds = {EdgeKind.QUERIES, EdgeKind.CONNECTS_TO},
-    properties = {"custom_queries", "method"}
+    properties = {"custom_queries", "framework", "method"}
 )
 @Component
 public class RepositoryDetector extends AbstractRegexDetector {
@@ -107,6 +107,7 @@ public class RepositoryDetector extends AbstractRegexDetector {
 
         String repoId = ctx.filePath() + ":" + interfaceName;
         Map<String, Object> properties = new LinkedHashMap<>();
+        properties.put("framework", "spring_boot");
         if (parentRepo != null) {
             properties.put("extends", parentRepo);
         }

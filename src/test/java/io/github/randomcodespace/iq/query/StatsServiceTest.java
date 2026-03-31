@@ -152,6 +152,61 @@ class StatsServiceTest {
     }
 
     @Test
+    void computeInfraNormalizesDbTypeCase() {
+        var n1 = makeNode("n1", NodeKind.DATABASE_CONNECTION, "db1", "src/A.java");
+        n1.getProperties().put("db_type", "mysql");
+        var n2 = makeNode("n2", NodeKind.DATABASE_CONNECTION, "db2", "src/B.java");
+        n2.getProperties().put("db_type", "postgresql");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> infra = service.computeInfra(List.of(n1, n2));
+        @SuppressWarnings("unchecked")
+        Map<String, Long> dbs = (Map<String, Long>) infra.get("databases");
+
+        assertEquals(1L, dbs.get("MySQL"));
+        assertEquals(1L, dbs.get("PostgreSQL"));
+        assertNull(dbs.get("mysql"), "Lowercase db_type should be normalized");
+    }
+
+    @Test
+    void computeInfraExtractsDbTypeFromConnectionUrl() {
+        var n1 = makeNode("n1", NodeKind.DATABASE_CONNECTION, "MySQL@localhost", "src/A.java");
+        n1.getProperties().put("connection_url", "jdbc:mysql://localhost:3306/mydb");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> infra = service.computeInfra(List.of(n1));
+        @SuppressWarnings("unchecked")
+        Map<String, Long> dbs = (Map<String, Long>) infra.get("databases");
+
+        assertEquals(1L, dbs.get("MySQL"));
+    }
+
+    @Test
+    void computeInfraSkipsConfigKeyLabels() {
+        var n1 = makeNode("n1", NodeKind.DATABASE_CONNECTION, "spring.datasource.password", "src/app.properties");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> infra = service.computeInfra(List.of(n1));
+        @SuppressWarnings("unchecked")
+        Map<String, Long> dbs = (Map<String, Long>) infra.get("databases");
+
+        assertTrue(dbs.isEmpty(), "Config key labels should be filtered out of database stats");
+    }
+
+    @Test
+    void computeInfraHandlesTypeAtHostFormat() {
+        var n1 = makeNode("n1", NodeKind.DATABASE_CONNECTION, "mysql@localhost", "src/A.java");
+        n1.getProperties().put("db_type", "mysql");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> infra = service.computeInfra(List.of(n1));
+        @SuppressWarnings("unchecked")
+        Map<String, Long> dbs = (Map<String, Long>) infra.get("databases");
+
+        assertEquals(1L, dbs.get("MySQL"));
+    }
+
+    @Test
     void computeInfraGroupsMessaging() {
         var n1 = makeNode("n1", NodeKind.TOPIC, "t1", "src/A.java");
         n1.getProperties().put("protocol", "kafka");
@@ -259,6 +314,47 @@ class StatsServiceTest {
 
         assertEquals(2L, auth.get("spring_security"));
         assertEquals(1L, auth.get("ldap"));
+    }
+
+    @Test
+    void computeAuthIncludesFrameworkBasedAuth() {
+        // GUARD node with auth_type property
+        var n1 = makeNode("n1", NodeKind.GUARD, "g1", "src/A.java");
+        n1.getProperties().put("auth_type", "spring_security");
+
+        // Non-GUARD node with framework = "auth:jwt"
+        var n2 = makeNode("n2", NodeKind.ENDPOINT, "e1", "src/B.java");
+        n2.getProperties().put("framework", "auth:jwt");
+
+        // Another non-GUARD node with framework = "auth:jwt"
+        var n3 = makeNode("n3", NodeKind.CLASS, "c1", "src/C.java");
+        n3.getProperties().put("framework", "auth:jwt");
+
+        // Non-GUARD node with framework = "auth:oauth2"
+        var n4 = makeNode("n4", NodeKind.ENDPOINT, "e2", "src/D.java");
+        n4.getProperties().put("framework", "auth:oauth2");
+
+        // Non-GUARD node with non-auth framework (should NOT appear in auth stats)
+        var n5 = makeNode("n5", NodeKind.ENDPOINT, "e3", "src/E.java");
+        n5.getProperties().put("framework", "Spring MVC");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> auth = service.computeAuth(List.of(n1, n2, n3, n4, n5));
+
+        assertEquals(2L, auth.get("jwt"));
+        assertEquals(1L, auth.get("spring_security"));
+        assertEquals(1L, auth.get("oauth2"));
+        assertNull(auth.get("Spring MVC"));
+    }
+
+    @Test
+    void computeAuthFrameworkPrefixIgnoresBlankSuffix() {
+        // "auth:" with nothing after should be skipped
+        var n1 = makeNode("n1", NodeKind.ENDPOINT, "e1", "src/A.java");
+        n1.getProperties().put("framework", "auth:");
+
+        Map<String, Object> auth = service.computeAuth(List.of(n1));
+        assertTrue(auth.isEmpty());
     }
 
     // --- computeArchitecture ---

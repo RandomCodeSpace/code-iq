@@ -220,12 +220,177 @@ class LayerClassifierTest {
         assertEquals("backend", classifier.classifyOne(node));
     }
 
-    // ---- Fallback ----
+    // ---- Fallback: path heuristics ----
 
     @Test
-    void unknownNodeIsUnknown() {
+    void unknownNodeWithNoPathIsUnknown() {
         var node = new CodeNode("u1", NodeKind.CLASS, "Unknown");
         assertEquals("unknown", classifier.classifyOne(node));
+    }
+
+    // -- Java package/path heuristics --
+
+    @Test
+    void javaControllerPathIsBackend() {
+        var node = new CodeNode("jc1", NodeKind.CLASS, "OwnerController");
+        node.setFilePath("src/main/java/org/springframework/samples/petclinic/owner/OwnerController.java");
+        assertEquals("backend", classifier.classifyOne(node));
+    }
+
+    @Test
+    void javaModelPathIsBackend() {
+        var node = new CodeNode("jm1", NodeKind.CLASS, "Owner");
+        node.setFilePath("src/main/java/org/springframework/samples/petclinic/model/Owner.java");
+        assertEquals("backend", classifier.classifyOne(node));
+    }
+
+    @Test
+    void javaRepositoryPathIsBackend() {
+        var node = new CodeNode("jr1", NodeKind.CLASS, "OwnerRepository");
+        node.setFilePath("src/main/java/org/springframework/samples/petclinic/repository/OwnerRepository.java");
+        assertEquals("backend", classifier.classifyOne(node));
+    }
+
+    @Test
+    void javaServicePathIsBackend() {
+        var node = new CodeNode("js1", NodeKind.CLASS, "ClinicService");
+        node.setFilePath("src/main/java/org/springframework/samples/petclinic/service/ClinicService.java");
+        assertEquals("backend", classifier.classifyOne(node));
+    }
+
+    @Test
+    void javaConfigPathIsShared() {
+        var node = new CodeNode("jcf1", NodeKind.CLASS, "DataSourceConfig");
+        node.setFilePath("src/main/java/org/springframework/samples/petclinic/config/DataSourceConfig.java");
+        assertEquals("shared", classifier.classifyOne(node));
+    }
+
+    @Test
+    void javaUtilPathIsShared() {
+        var node = new CodeNode("ju1", NodeKind.CLASS, "DateUtils");
+        node.setFilePath("src/main/java/org/springframework/samples/petclinic/util/DateUtils.java");
+        assertEquals("shared", classifier.classifyOne(node));
+    }
+
+    @Test
+    void javaDomainPathIsBackend() {
+        var node = new CodeNode("jd1", NodeKind.CLASS, "Pet");
+        node.setFilePath("src/main/java/org/springframework/samples/petclinic/domain/Pet.java");
+        assertEquals("backend", classifier.classifyOne(node));
+    }
+
+    @Test
+    void javaDtoPathIsBackend() {
+        var node = new CodeNode("jdt1", NodeKind.CLASS, "OwnerDto");
+        node.setFilePath("src/main/java/com/example/dto/OwnerDto.java");
+        assertEquals("backend", classifier.classifyOne(node));
+    }
+
+    @Test
+    void javaExceptionPathIsShared() {
+        var node = new CodeNode("je1", NodeKind.CLASS, "NotFoundException");
+        node.setFilePath("src/main/java/com/example/exception/NotFoundException.java");
+        assertEquals("shared", classifier.classifyOne(node));
+    }
+
+    @Test
+    void javaSrcMainFallbackIsBackend() {
+        // A Java file under src/main/java but not matching any specific package pattern
+        var node = new CodeNode("jf1", NodeKind.CLASS, "PetclinicApplication");
+        node.setFilePath("src/main/java/org/springframework/samples/petclinic/PetclinicApplication.java");
+        assertEquals("backend", classifier.classifyOne(node));
+    }
+
+    // -- Node ID with package info --
+
+    @Test
+    void nodeIdWithControllerPackageIsBackend() {
+        var node = new CodeNode("java:src/main/java/com/example/controller/UserController.java:class:UserController",
+                NodeKind.CLASS, "UserController");
+        node.setFilePath("src/main/java/com/example/controller/UserController.java");
+        assertEquals("backend", classifier.classifyOne(node));
+    }
+
+    // -- TypeScript/JS path heuristics --
+
+    @Test
+    void tsComponentsPathIsFrontend() {
+        var node = new CodeNode("tc1", NodeKind.CLASS, "Button");
+        node.setFilePath("src/components/Button.ts");
+        // Already covered by existing FRONTEND_PATH_RE
+        assertEquals("frontend", classifier.classifyOne(node));
+    }
+
+    @Test
+    void tsMiddlewarePathIsBackend() {
+        var node = new CodeNode("tm1", NodeKind.CLASS, "AuthMiddleware");
+        node.setFilePath("src/middleware/auth.ts");
+        assertEquals("backend", classifier.classifyOne(node));
+    }
+
+    @Test
+    void tsModelsPathIsBackend() {
+        var node = new CodeNode("tmd1", NodeKind.CLASS, "User");
+        node.setFilePath("src/models/User.ts");
+        assertEquals("backend", classifier.classifyOne(node));
+    }
+
+    @Test
+    void tsHelpersPathIsShared() {
+        var node = new CodeNode("th1", NodeKind.CLASS, "StringHelper");
+        node.setFilePath("src/helpers/string.ts");
+        assertEquals("shared", classifier.classifyOne(node));
+    }
+
+    // -- Framework property heuristics --
+
+    @Test
+    void springBootFrameworkIsBackend() {
+        var node = new CodeNode("sb1", NodeKind.CLASS, "App");
+        node.setProperties(Map.of("framework", "spring_boot"));
+        assertEquals("backend", classifier.classifyOne(node));
+    }
+
+    @Test
+    void fastifyFrameworkIsBackend() {
+        var node = new CodeNode("ff1", NodeKind.CLASS, "Server");
+        node.setProperties(Map.of("framework", "fastify"));
+        assertEquals("backend", classifier.classifyOne(node));
+    }
+
+    // -- METHOD nodes inherit from path --
+
+    @Test
+    void methodInControllerPathIsBackend() {
+        var node = new CodeNode("m1", NodeKind.METHOD, "findOwner");
+        node.setFilePath("src/main/java/org/springframework/samples/petclinic/owner/OwnerController.java");
+        assertEquals("backend", classifier.classifyOne(node));
+    }
+
+    @Test
+    void methodInConfigPathIsShared() {
+        var node = new CodeNode("m2", NodeKind.METHOD, "dataSource");
+        node.setFilePath("src/main/java/com/example/config/DataSourceConfig.java");
+        assertEquals("shared", classifier.classifyOne(node));
+    }
+
+    // -- Fallback does not override existing classification --
+
+    @Test
+    void existingKindClassificationNotOverriddenByFallback() {
+        // ENDPOINT is backend by node kind, even though path has "config"
+        var node = new CodeNode("e1", NodeKind.ENDPOINT, "GET /config");
+        node.setFilePath("src/main/java/com/example/config/ConfigController.java");
+        assertEquals("backend", classifier.classifyOne(node));
+    }
+
+    // -- Case insensitivity --
+
+    @Test
+    void pathHeuristicIsCaseInsensitive() {
+        var node = new CodeNode("ci1", NodeKind.CLASS, "Foo");
+        node.setFilePath("src/main/java/com/example/Controller/Foo.java");
+        assertEquals("backend", classifier.classifyOne(node));
     }
 
     // ---- Batch classify ----
@@ -240,6 +405,7 @@ class LayerClassifierTest {
 
         assertEquals("frontend", frontend.getLayer());
         assertEquals("backend", backend.getLayer());
+        // "Util" with no path info remains unknown
         assertEquals("unknown", unknown.getLayer());
     }
 
@@ -251,5 +417,37 @@ class LayerClassifierTest {
         var node = new CodeNode("e1", NodeKind.ENDPOINT, "GET /");
         node.setFilePath("src/components/api.tsx");
         assertEquals("backend", classifier.classifyOne(node));
+    }
+
+    // ---- Determinism ----
+
+    @Test
+    void classificationIsDeterministic() {
+        var nodes = List.of(
+                createNode("n1", NodeKind.CLASS, "Owner", "src/main/java/com/example/model/Owner.java"),
+                createNode("n2", NodeKind.METHOD, "findAll", "src/main/java/com/example/repository/OwnerRepo.java"),
+                createNode("n3", NodeKind.CLASS, "AppConfig", "src/main/java/com/example/config/AppConfig.java"),
+                createNode("n4", NodeKind.CLASS, "DateUtil", "src/main/java/com/example/util/DateUtil.java"),
+                createNode("n5", NodeKind.CLASS, "Unknown", null)
+        );
+
+        // Run classification twice and verify identical results
+        var run1 = nodes.stream().map(classifier::classifyOne).toList();
+        var run2 = nodes.stream().map(classifier::classifyOne).toList();
+        assertEquals(run1, run2, "Classification must be deterministic across runs");
+
+        assertEquals("backend", run1.get(0));
+        assertEquals("backend", run1.get(1));
+        assertEquals("shared", run1.get(2));
+        assertEquals("shared", run1.get(3));
+        assertEquals("unknown", run1.get(4));
+    }
+
+    private CodeNode createNode(String id, NodeKind kind, String name, String filePath) {
+        var node = new CodeNode(id, kind, name);
+        if (filePath != null) {
+            node.setFilePath(filePath);
+        }
+        return node;
     }
 }

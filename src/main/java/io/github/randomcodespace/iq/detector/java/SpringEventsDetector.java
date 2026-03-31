@@ -23,7 +23,8 @@ import io.github.randomcodespace.iq.detector.DetectorInfo;
     description = "Detects Spring application events (publishers and listeners)",
     languages = {"java"},
     nodeKinds = {NodeKind.EVENT},
-    edgeKinds = {EdgeKind.LISTENS, EdgeKind.PUBLISHES}
+    edgeKinds = {EdgeKind.LISTENS, EdgeKind.PUBLISHES},
+    properties = {"event_class", "framework"}
 )
 @Component
 public class SpringEventsDetector extends AbstractRegexDetector {
@@ -148,6 +149,7 @@ public class SpringEventsDetector extends AbstractRegexDetector {
             node.setId(eventId);
             node.setKind(NodeKind.EVENT);
             node.setLabel(eventType);
+            node.getProperties().put("framework", "spring_boot");
             node.getProperties().put("event_class", eventType);
             nodes.add(node);
         }

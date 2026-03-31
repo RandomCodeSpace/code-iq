@@ -29,18 +29,73 @@ class PropertiesDetectorTest {
 
         // 1 file + 3 keys
         assertEquals(4, result.nodes().size());
-        // datasource.url contains "jdbc" -> DATABASE_CONNECTION
-        assertTrue(result.nodes().stream().anyMatch(n -> n.getKind() == NodeKind.DATABASE_CONNECTION));
-        // spring.datasource.username is spring config
-        var springNode = result.nodes().stream()
+        // datasource.url with jdbc: value -> DATABASE_CONNECTION
+        var dbNode = result.nodes().stream()
+                .filter(n -> n.getKind() == NodeKind.DATABASE_CONNECTION)
+                .findFirst().orElseThrow();
+        assertEquals("MySQL", dbNode.getLabel(), "Label should be the DB type, not the config key");
+        assertEquals("MySQL", dbNode.getProperties().get("db_type"));
+
+        // spring.datasource.username is NOT a DATABASE_CONNECTION (no jdbc: in value)
+        var usernameNode = result.nodes().stream()
                 .filter(n -> "spring.datasource.username".equals(n.getLabel()))
-                .findFirst().orElse(null);
-        // datasource.username contains "datasource" -> DATABASE_CONNECTION (not CONFIG_KEY with spring_config)
+                .findFirst().orElseThrow();
+        assertEquals(NodeKind.CONFIG_KEY, usernameNode.getKind(),
+                "Non-URL datasource keys should be CONFIG_KEY, not DATABASE_CONNECTION");
+
         // Check server.port has no spring_config marker (it doesn't start with "spring.")
         var portNode = result.nodes().stream()
                 .filter(n -> "server.port".equals(n.getLabel()))
                 .findFirst().orElseThrow();
         assertNull(portNode.getProperties().get("spring_config"));
+    }
+
+    @Test
+    void dbConnectionSetsDbTypeFromJdbcUrl() {
+        Map<String, Object> parsedData = Map.of(
+                "type", "properties",
+                "data", Map.of(
+                        "spring.datasource.url", "jdbc:postgresql://db-host:5432/mydb",
+                        "spring.datasource.password", "secret",
+                        "spring.datasource.driver-class-name", "org.postgresql.Driver"
+                )
+        );
+        DetectorContext ctx = new DetectorContext("application.properties", "properties", "", parsedData, null);
+        DetectorResult result = detector.detect(ctx);
+
+        // Only the url key should be DATABASE_CONNECTION
+        var dbNodes = result.nodes().stream()
+                .filter(n -> n.getKind() == NodeKind.DATABASE_CONNECTION)
+                .toList();
+        assertEquals(1, dbNodes.size(), "Only the URL key should produce a DATABASE_CONNECTION");
+        assertEquals("PostgreSQL", dbNodes.getFirst().getLabel());
+        assertEquals("PostgreSQL", dbNodes.getFirst().getProperties().get("db_type"));
+
+        // password and driver-class-name should be CONFIG_KEY
+        var configKeys = result.nodes().stream()
+                .filter(n -> n.getKind() == NodeKind.CONFIG_KEY)
+                .toList();
+        assertTrue(configKeys.stream().anyMatch(n -> n.getLabel().contains("password")),
+                "spring.datasource.password should be CONFIG_KEY");
+        assertTrue(configKeys.stream().anyMatch(n -> n.getLabel().contains("driver-class-name")),
+                "spring.datasource.driver-class-name should be CONFIG_KEY");
+    }
+
+    @Test
+    void nonJdbcUrlKeyIsConfigKey() {
+        // Keys that contain "datasource" but are not URLs should NOT be DATABASE_CONNECTION
+        Map<String, Object> parsedData = Map.of(
+                "type", "properties",
+                "data", Map.of(
+                        "spring.datasource.hikari.maximum-pool-size", "10",
+                        "spring.datasource.username", "admin"
+                )
+        );
+        DetectorContext ctx = new DetectorContext("application.properties", "properties", "", parsedData, null);
+        DetectorResult result = detector.detect(ctx);
+
+        assertTrue(result.nodes().stream().noneMatch(n -> n.getKind() == NodeKind.DATABASE_CONNECTION),
+                "Non-URL datasource keys should not produce DATABASE_CONNECTION nodes");
     }
 
     @Test

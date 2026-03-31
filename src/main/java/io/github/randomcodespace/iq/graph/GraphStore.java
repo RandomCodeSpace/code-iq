@@ -479,6 +479,42 @@ public class GraphStore implements FlowDataSource {
         }
     }
 
+    /**
+     * Find nodes that have no incoming semantic edges.
+     * <p>
+     * Structural edges (contains, defines, configures, documents) are excluded because
+     * every node typically has at least one incoming structural edge from its parent
+     * module/config_file. Dead code detection should only consider semantic edges like
+     * calls, imports, depends_on, uses, extends, implements.
+     *
+     * @param kinds      node kinds to consider (e.g. class, method, interface)
+     * @param semanticEdgeKinds edge kinds that count as "usage" — nodes without any
+     *                          incoming edge of these kinds are considered dead
+     * @param excludeNodeKinds  node kinds to exclude (e.g. endpoints, entry points)
+     * @param offset     pagination offset
+     * @param limit      pagination limit
+     */
+    public List<CodeNode> findNodesWithoutIncomingSemantic(List<String> kinds,
+                                                           List<String> semanticEdgeKinds,
+                                                           List<String> excludeNodeKinds,
+                                                           int offset, int limit) {
+        return queryNodes(
+                "MATCH (n:CodeNode) WHERE n.kind IN $kinds "
+                        + "AND NOT n.kind IN $excludeKinds "
+                        + "AND NOT EXISTS { MATCH (m)-[r:RELATES_TO]->(n) WHERE r.kind IN $semanticKinds } "
+                        + "RETURN n SKIP $offset LIMIT $limit",
+                Map.of("kinds", kinds,
+                        "semanticKinds", semanticEdgeKinds,
+                        "excludeKinds", excludeNodeKinds,
+                        "offset", offset,
+                        "limit", limit));
+    }
+
+    /**
+     * @deprecated Use {@link #findNodesWithoutIncomingSemantic} instead. This method
+     * counts ALL incoming edges including structural ones, producing false negatives.
+     */
+    @Deprecated
     public List<CodeNode> findNodesWithoutIncoming(List<String> kinds, int offset, int limit) {
         return queryNodes(
                 "MATCH (n:CodeNode) WHERE n.kind IN $kinds "

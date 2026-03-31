@@ -61,7 +61,32 @@ public class LayerClassifier {
     );
 
     private static final Set<String> BACKEND_FRAMEWORKS = Set.of(
-            "express", "nestjs", "flask", "django", "fastapi", "spring"
+            "express", "nestjs", "flask", "django", "fastapi", "spring",
+            "spring_boot", "spring_mvc", "spring_data", "spring_security",
+            "gin", "echo", "fiber", "actix", "rocket", "axum",
+            "asp.net", "koa", "hapi", "fastify"
+    );
+
+    // -- Fallback path heuristics (applied only to "unknown" nodes) --
+
+    private static final Pattern BACKEND_PACKAGE_PATH_RE = Pattern.compile(
+            "(?:^|/|\\.)(?:controller|controllers|api|web|rest|resource|resources|"
+            + "model|models|entity|entities|domain|dto|dtos|"
+            + "repository|repositories|dao|persistence|"
+            + "service|services|business|logic|"
+            + "routes|handlers|handler|middleware|middlewares|schemas)(?:/|\\.|$)",
+            Pattern.CASE_INSENSITIVE
+    );
+
+    private static final Pattern SHARED_PACKAGE_PATH_RE = Pattern.compile(
+            "(?:^|/|\\.)(?:config|configuration|util|utils|helper|helpers|common|shared|"
+            + "exception|exceptions|constants|enums)(?:/|\\.|$)",
+            Pattern.CASE_INSENSITIVE
+    );
+
+    private static final Pattern FRONTEND_PACKAGE_PATH_RE = Pattern.compile(
+            "(?:^|/|\\.)(?:components|views|pages|ui|widgets|screens|templates|layouts)(?:/|\\.|$)",
+            Pattern.CASE_INSENSITIVE
     );
 
     /**
@@ -104,6 +129,47 @@ public class LayerClassifier {
         // 5. Shared node kinds
         if (SHARED_NODE_KINDS.contains(node.getKind())) return "shared";
 
+        // 6. Fallback: package/path heuristics for remaining "unknown" nodes
+        return classifyByPathFallback(node);
+    }
+
+    /**
+     * Fallback classification using package names and file paths.
+     * Only called for nodes not matched by any earlier rule.
+     */
+    private String classifyByPathFallback(CodeNode node) {
+        String filePath = node.getFilePath() != null ? node.getFilePath() : "";
+        String nodeId = node.getId() != null ? node.getId() : "";
+
+        // Combine file path and node ID for matching (ID often contains package info)
+        String combined = filePath + "|" + nodeId;
+
+        // Check frontend path patterns first (components, views, pages, etc.)
+        if (FRONTEND_PACKAGE_PATH_RE.matcher(combined).find()) return "frontend";
+
+        // Check backend path patterns (controller, model, repository, service, etc.)
+        if (BACKEND_PACKAGE_PATH_RE.matcher(combined).find()) return "backend";
+
+        // Check shared path patterns (config, util, common, etc.)
+        if (SHARED_PACKAGE_PATH_RE.matcher(combined).find()) return "shared";
+
+        // Java-specific: check for standard Java/Spring package conventions in file path
+        if (filePath.endsWith(".java") || filePath.endsWith(".kt") || filePath.endsWith(".scala")) {
+            return classifyJavaByPath(filePath);
+        }
+
+        return "unknown";
+    }
+
+    /**
+     * Java-specific path classification: files under src/main/java in typical
+     * Spring/Java project structures are almost always backend code.
+     */
+    private String classifyJavaByPath(String filePath) {
+        // Files in src/main/java or src/main/kotlin are virtually always backend
+        if (filePath.contains("src/main/java/") || filePath.contains("src/main/kotlin/")) {
+            return "backend";
+        }
         return "unknown";
     }
 }

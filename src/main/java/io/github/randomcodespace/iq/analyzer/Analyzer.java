@@ -325,7 +325,18 @@ public class Analyzer {
         List<CodeNode> allNodes = builder.getNodes();
         layerClassifier.classify(allNodes);
 
-        // 5b. Tag nodes with service name if configured (multi-repo mode)
+        // 5b. Detect service boundaries and create SERVICE nodes
+        report.accept("Detecting service boundaries...");
+        var serviceDetector = new ServiceDetector();
+        String projectDirName = root.getFileName() != null ? root.getFileName().toString() : "root";
+        var serviceResult = serviceDetector.detect(allNodes, builder.getEdges(), projectDirName, root);
+        if (!serviceResult.serviceNodes().isEmpty()) {
+            builder.addNodes(serviceResult.serviceNodes());
+            builder.addEdges(serviceResult.serviceEdges());
+            allNodes = builder.getNodes(); // refresh reference after adding service nodes
+        }
+
+        // 5c. Tag nodes with service name if configured (multi-repo mode) -- overrides auto-detected
         String serviceName = config.getServiceName();
         if (serviceName != null && !serviceName.isBlank()) {
             for (CodeNode node : allNodes) {

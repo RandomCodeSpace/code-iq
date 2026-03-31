@@ -77,8 +77,10 @@ class AnalyzerTest {
 
         assertEquals(2, result.totalFiles());
         assertEquals(2, result.filesAnalyzed());
-        assertEquals(2, result.nodeCount());
-        assertEquals(0, result.edgeCount());
+        // 2 CLASS nodes + 1 SERVICE node (auto-detected root service)
+        assertEquals(3, result.nodeCount());
+        // 2 CONTAINS edges (service -> each class node)
+        assertEquals(2, result.edgeCount());
         assertTrue(result.languageBreakdown().containsKey("java"));
         assertEquals(2, result.languageBreakdown().get("java"));
         assertTrue(result.elapsed().toMillis() >= 0);
@@ -101,7 +103,8 @@ class AnalyzerTest {
 
         assertEquals(0, result.totalFiles());
         assertEquals(0, result.filesAnalyzed());
-        assertEquals(0, result.nodeCount());
+        // Even with no files, ServiceDetector creates a root service node
+        assertEquals(1, result.nodeCount());
         assertEquals(0, result.edgeCount());
     }
 
@@ -158,7 +161,8 @@ class AnalyzerTest {
 
         AnalysisResult result = analyzer.run(tempDir, null);
 
-        assertEquals(1, result.nodeCount());
+        // 1 CLASS node + 1 SERVICE node (auto-detected root service)
+        assertEquals(2, result.nodeCount());
         // The layer classifier should have run (we can't easily inspect nodes from here,
         // but the pipeline completing without error confirms it ran)
     }

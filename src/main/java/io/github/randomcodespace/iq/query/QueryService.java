@@ -375,6 +375,29 @@ public class QueryService {
 
     // --- Dead code detection ---
 
+    /**
+     * Semantic edge kinds that count as "usage" — if a node has no incoming edge
+     * of any of these kinds, it is considered potentially dead code.
+     * Structural edges like contains, defines, configures are excluded because
+     * they are always present from parent modules/config files.
+     */
+    private static final List<String> SEMANTIC_EDGE_KINDS = List.of(
+            "calls", "imports", "depends_on", "uses", "extends", "implements",
+            "injects", "queries", "maps_to", "consumes", "listens",
+            "invokes_rmi", "overrides", "connects_to", "triggers", "renders");
+
+    /**
+     * Node kinds that are entry points — they are intended to have no callers
+     * and should not be flagged as dead code.
+     */
+    private static final List<String> ENTRY_POINT_KINDS = List.of(
+            NodeKind.ENDPOINT.getValue(),
+            NodeKind.WEBSOCKET_ENDPOINT.getValue(),
+            NodeKind.MIGRATION.getValue(),
+            NodeKind.CONFIG_FILE.getValue(),
+            NodeKind.CONFIG_KEY.getValue(),
+            NodeKind.CONFIG_DEFINITION.getValue());
+
     @Cacheable(value = "dead-code", key = "#kind + ':' + #limit")
     public Map<String, Object> findDeadCode(String kind, int limit) {
         List<String> kinds;
@@ -384,10 +407,14 @@ public class QueryService {
             kinds = List.of(
                     NodeKind.CLASS.getValue(),
                     NodeKind.METHOD.getValue(),
-                    NodeKind.INTERFACE.getValue());
+                    NodeKind.INTERFACE.getValue(),
+                    NodeKind.ABSTRACT_CLASS.getValue(),
+                    NodeKind.COMPONENT.getValue(),
+                    NodeKind.SERVICE.getValue());
         }
 
-        List<CodeNode> deadNodes = graphStore.findNodesWithoutIncoming(kinds, 0, limit);
+        List<CodeNode> deadNodes = graphStore.findNodesWithoutIncomingSemantic(
+                kinds, SEMANTIC_EDGE_KINDS, ENTRY_POINT_KINDS, 0, limit);
 
         List<Map<String, Object>> deadCode = deadNodes.stream()
                 .map(n -> {

@@ -411,6 +411,89 @@ class QueryServiceTest {
         verify(graphStore).search("test", 200);
     }
 
+    // --- findDeadCode ---
+
+    @Test
+    void findDeadCodeShouldReturnNodesWithoutSemanticIncoming() {
+        var deadClass = makeNode("cls:dead", NodeKind.CLASS, "UnusedHelper");
+        when(graphStore.findNodesWithoutIncomingSemantic(anyList(), anyList(), anyList(), eq(0), eq(100)))
+                .thenReturn(List.of(deadClass));
+
+        Map<String, Object> result = service.findDeadCode(null, 100);
+
+        assertEquals(1, result.get("count"));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> deadCode = (List<Map<String, Object>>) result.get("dead_code");
+        assertEquals("cls:dead", deadCode.getFirst().get("id"));
+        assertEquals("class", deadCode.getFirst().get("kind"));
+        assertEquals("UnusedHelper", deadCode.getFirst().get("label"));
+    }
+
+    @Test
+    void findDeadCodeShouldPassSemanticEdgeKinds() {
+        when(graphStore.findNodesWithoutIncomingSemantic(anyList(), anyList(), anyList(), eq(0), eq(50)))
+                .thenReturn(List.of());
+
+        service.findDeadCode(null, 50);
+
+        // Verify semantic edge kinds are passed (not structural ones like contains, defines)
+        @SuppressWarnings("unchecked")
+        var captor = org.mockito.ArgumentCaptor.forClass(List.class);
+        verify(graphStore).findNodesWithoutIncomingSemantic(anyList(), captor.capture(), anyList(), eq(0), eq(50));
+        @SuppressWarnings("unchecked")
+        List<String> semanticKinds = captor.getValue();
+        assertTrue(semanticKinds.contains("calls"), "Should include 'calls'");
+        assertTrue(semanticKinds.contains("imports"), "Should include 'imports'");
+        assertTrue(semanticKinds.contains("depends_on"), "Should include 'depends_on'");
+        assertTrue(semanticKinds.contains("extends"), "Should include 'extends'");
+        assertTrue(semanticKinds.contains("implements"), "Should include 'implements'");
+        assertFalse(semanticKinds.contains("contains"), "Should NOT include 'contains'");
+        assertFalse(semanticKinds.contains("defines"), "Should NOT include 'defines'");
+    }
+
+    @Test
+    void findDeadCodeShouldExcludeEntryPointKinds() {
+        when(graphStore.findNodesWithoutIncomingSemantic(anyList(), anyList(), anyList(), eq(0), eq(50)))
+                .thenReturn(List.of());
+
+        service.findDeadCode(null, 50);
+
+        // Verify entry point kinds are excluded
+        @SuppressWarnings("unchecked")
+        var kindCaptor = org.mockito.ArgumentCaptor.forClass(List.class);
+        // args: kinds, semanticEdgeKinds, excludeNodeKinds, offset, limit
+        verify(graphStore).findNodesWithoutIncomingSemantic(anyList(), anyList(), kindCaptor.capture(), eq(0), eq(50));
+        @SuppressWarnings("unchecked")
+        List<String> excludeKinds = kindCaptor.getValue();
+        assertTrue(excludeKinds.contains("endpoint"), "Should exclude endpoints");
+        assertTrue(excludeKinds.contains("websocket_endpoint"), "Should exclude websocket endpoints");
+        assertTrue(excludeKinds.contains("migration"), "Should exclude migrations");
+        assertTrue(excludeKinds.contains("config_file"), "Should exclude config files");
+    }
+
+    @Test
+    void findDeadCodeShouldFilterBySpecificKind() {
+        when(graphStore.findNodesWithoutIncomingSemantic(eq(List.of("method")), anyList(), anyList(), eq(0), eq(50)))
+                .thenReturn(List.of());
+
+        service.findDeadCode("method", 50);
+
+        verify(graphStore).findNodesWithoutIncomingSemantic(eq(List.of("method")), anyList(), anyList(), eq(0), eq(50));
+    }
+
+    @Test
+    void findDeadCodeShouldReturnEmptyWhenAllNodesHaveSemanticEdges() {
+        when(graphStore.findNodesWithoutIncomingSemantic(anyList(), anyList(), anyList(), eq(0), eq(100)))
+                .thenReturn(List.of());
+
+        Map<String, Object> result = service.findDeadCode(null, 100);
+
+        assertEquals(0, result.get("count"));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> deadCode = (List<Map<String, Object>>) result.get("dead_code");
+        assertTrue(deadCode.isEmpty());
+    }
+
     // --- nodeToMap ---
 
     @Test
