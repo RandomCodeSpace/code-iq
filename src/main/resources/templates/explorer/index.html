@@ -6,50 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>OSSCodeIQ Explorer</title>
 
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        brand: { 50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 800: '#1e40af', 900: '#1e3a5f' },
-                        surface: { DEFAULT: '#f8fafc', dark: '#0f172a' },
-                        card: { DEFAULT: '#ffffff', dark: '#1e293b' },
-                        muted: { DEFAULT: '#64748b', dark: '#94a3b8' }
-                    },
-                    animation: {
-                        'fade-in': 'fadeIn 0.3s ease-out',
-                        'slide-up': 'slideUp 0.3s ease-out',
-                    },
-                    keyframes: {
-                        fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
-                        slideUp: { '0%': { opacity: '0', transform: 'translateY(8px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
-                    }
-                }
-            }
-        }
-    </script>
+    <link rel="stylesheet" th:href="@{/css/explorer.css}">
     <script th:src="@{/js/htmx.min.js}"></script>
     <script defer th:src="@{/js/alpine.min.js}"></script>
-
-    <style>
-        [x-cloak] { display: none !important; }
-        .htmx-indicator { display: none; }
-        .htmx-request .htmx-indicator { display: inline-block; }
-        .htmx-request.htmx-indicator { display: inline-block; }
-        .card-stagger:nth-child(1) { animation-delay: 0ms; }
-        .card-stagger:nth-child(2) { animation-delay: 30ms; }
-        .card-stagger:nth-child(3) { animation-delay: 60ms; }
-        .card-stagger:nth-child(4) { animation-delay: 90ms; }
-        .card-stagger:nth-child(5) { animation-delay: 120ms; }
-        .card-stagger:nth-child(6) { animation-delay: 150ms; }
-        .card-stagger:nth-child(7) { animation-delay: 180ms; }
-        .card-stagger:nth-child(8) { animation-delay: 210ms; }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
-    </style>
 
     <script>
         function themeManager() {
@@ -349,7 +308,7 @@
                                 Explore
                             </a>
                             <button hx-get="/ui/fragments/nodes/{kind}"
-                                    th:attr="hx-get='/ui/fragments/nodes/' + ${kindEntry['kind']}"
+                                    th:attr="hx-get='/ui/fragments/nodes/' + ${#uris.escapePathSegment(kindEntry['kind'])}"
                                     hx-target="#content"
                                     hx-swap="innerHTML"
                                     class="text-xs font-medium px-3 py-1.5 rounded-md text-muted dark:text-muted-dark hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
@@ -366,11 +325,12 @@
                 <svg class="mx-auto w-12 h-12 text-muted dark:text-muted-dark mb-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
                     <path d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
                 </svg>
-                <p class="text-muted dark:text-muted-dark">No nodes found. Run an analysis first.</p>
-                <button hx-post="/api/analyze" hx-swap="none"
-                        class="mt-4 text-sm font-medium px-4 py-2 rounded-lg bg-brand-600 text-white hover:bg-brand-700 transition-colors">
-                    Run Analysis
-                </button>
+                <p class="text-muted dark:text-muted-dark mb-2">No nodes found. Run the analysis pipeline from the CLI first:</p>
+                <div class="inline-block text-left bg-slate-100 dark:bg-slate-800 rounded-lg p-4 mt-2">
+                    <code class="block text-sm font-mono text-slate-700 dark:text-slate-300 mb-1">code-iq index /path/to/repo</code>
+                    <code class="block text-sm font-mono text-slate-700 dark:text-slate-300 mb-1">code-iq enrich /path/to/repo</code>
+                    <code class="block text-sm font-mono text-slate-700 dark:text-slate-300">code-iq serve /path/to/repo</code>
+                </div>
             </div>
         </div>
     </main>

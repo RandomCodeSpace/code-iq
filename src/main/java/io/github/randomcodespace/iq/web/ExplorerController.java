@@ -50,8 +50,8 @@ public class ExplorerController {
         return "explorer/nodes";
     }
 
-    @GetMapping("/node/{nodeId}")
-    public String nodeDetail(@PathVariable String nodeId, Model model) {
+    @GetMapping("/node")
+    public String nodeDetail(@RequestParam String nodeId, Model model) {
         Map<String, Object> detail = queryService.nodeDetailWithEdges(nodeId);
         model.addAttribute("detail", detail);
         return "explorer/detail";
@@ -76,8 +76,8 @@ public class ExplorerController {
         return "explorer/fragments/nodes-grid";
     }
 
-    @GetMapping("/fragments/detail/{nodeId}")
-    public String detailFragment(@PathVariable String nodeId, Model model) {
+    @GetMapping("/fragments/detail")
+    public String detailFragment(@RequestParam String nodeId, Model model) {
         Map<String, Object> detail = queryService.nodeDetailWithEdges(nodeId);
         model.addAttribute("detail", detail);
         return "explorer/fragments/detail-panel";
