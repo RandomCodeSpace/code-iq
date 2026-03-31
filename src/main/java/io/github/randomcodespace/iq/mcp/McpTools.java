@@ -2,10 +2,9 @@ package io.github.randomcodespace.iq.mcp;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.randomcodespace.iq.analyzer.AnalysisResult;
-import io.github.randomcodespace.iq.analyzer.Analyzer;
 import io.github.randomcodespace.iq.config.CodeIqConfig;
 import io.github.randomcodespace.iq.flow.FlowEngine;
+// Note: No Analyzer import — MCP server is read-only. Analysis is done via CLI only.
 import io.github.randomcodespace.iq.flow.FlowModels.FlowDiagram;
 import io.github.randomcodespace.iq.graph.GraphStore;
 import io.github.randomcodespace.iq.model.CodeEdge;
@@ -38,7 +37,6 @@ import java.util.Set;
 public class McpTools {
 
     private final QueryService queryService;
-    private final Analyzer analyzer;
     private final CodeIqConfig config;
     private final ObjectMapper objectMapper;
     private final FlowEngine flowEngine;
@@ -47,13 +45,12 @@ public class McpTools {
     private final TopologyService topologyService;
     private final GraphStore graphStore;
 
-    public McpTools(QueryService queryService, Analyzer analyzer,
+    public McpTools(QueryService queryService,
                     CodeIqConfig config, ObjectMapper objectMapper,
                     Optional<FlowEngine> flowEngine, GraphDatabaseService graphDb,
                     StatsService statsService, TopologyService topologyService,
                     GraphStore graphStore) {
         this.queryService = queryService;
-        this.analyzer = analyzer;
         this.config = config;
         this.objectMapper = objectMapper;
         this.flowEngine = flowEngine.orElse(null);
@@ -252,30 +249,9 @@ public class McpTools {
         }
     }
 
-    @McpTool(name = "analyze_codebase", description = "Trigger codebase analysis. Scans files, runs detectors, builds the code graph.")
-    public String analyzeCodebase(
-            @McpToolParam(description = "Use incremental analysis", required = false) Boolean incremental) {
-        try {
-            boolean useIncremental = incremental != null ? incremental : true;
-            AnalysisResult result = analyzer.run(Path.of(config.getRootPath()), null, useIncremental, null);
-
-            // Persist to Neo4j
-            if (graphStore != null && result.nodes() != null && !result.nodes().isEmpty()) {
-                graphStore.bulkSave(result.nodes());
-            }
-
-            Map<String, Object> response = new LinkedHashMap<>();
-            response.put("status", "complete");
-            response.put("total_files", result.totalFiles());
-            response.put("files_analyzed", result.filesAnalyzed());
-            response.put("node_count", result.nodeCount());
-            response.put("edge_count", result.edgeCount());
-            response.put("elapsed_ms", result.elapsed().toMillis());
-            return toJson(response);
-        } catch (Exception e) {
-            return toJson(Map.of("error", e.getMessage()));
-        }
-    }
+    // analyze_codebase removed — MCP server runs on remote hosts where
+    // source code is not available (only the bundled graph). Analysis is
+    // done locally via CLI: code-iq analyze / code-iq index
 
     @McpTool(name = "run_cypher", description = "Execute a read-only Cypher query against the Neo4j graph database.")
     public String runCypher(

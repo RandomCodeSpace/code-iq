@@ -1,7 +1,5 @@
 package io.github.randomcodespace.iq.api;
 
-import io.github.randomcodespace.iq.analyzer.AnalysisResult;
-import io.github.randomcodespace.iq.analyzer.Analyzer;
 import io.github.randomcodespace.iq.config.CodeIqConfig;
 import io.github.randomcodespace.iq.query.QueryService;
 import org.springframework.http.HttpStatus;
@@ -10,7 +8,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -20,13 +17,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
-
-import io.github.randomcodespace.iq.graph.GraphStore;
-import org.springframework.cache.CacheManager;
 
 /**
  * REST API controller matching the Python OSSCodeIQ API paths.
@@ -37,22 +29,12 @@ import org.springframework.cache.CacheManager;
 public class GraphController {
 
     private final QueryService queryService;
-    private final Analyzer analyzer;
     private final CodeIqConfig config;
-    private final CacheManager cacheManager;
-    private final GraphStore graphStore;
-    private final AtomicBoolean analysisRunning = new AtomicBoolean(false);
 
     public GraphController(@org.springframework.beans.factory.annotation.Autowired(required = false) QueryService queryService,
-                           Analyzer analyzer,
-                           CodeIqConfig config,
-                           @org.springframework.beans.factory.annotation.Autowired(required = false) CacheManager cacheManager,
-                           @org.springframework.beans.factory.annotation.Autowired(required = false) GraphStore graphStore) {
+                           CodeIqConfig config) {
         this.queryService = queryService;
-        this.analyzer = analyzer;
         this.config = config;
-        this.cacheManager = cacheManager;
-        this.graphStore = graphStore;
     }
 
     @GetMapping("/stats")
@@ -268,39 +250,7 @@ public class GraphController {
         }
     }
 
-    @PostMapping("/analyze")
-    public ResponseEntity<?> triggerAnalysis(
-            @RequestParam(defaultValue = "false") boolean incremental) {
-        if (!analysisRunning.compareAndSet(false, true)) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(Map.of("error", "Analysis already in progress"));
-        }
-        try {
-            AnalysisResult result = analyzer.run(Path.of(config.getRootPath()), null);
-
-            // Persist to Neo4j if GraphStore is available
-            if (graphStore != null && result.nodes() != null && !result.nodes().isEmpty()) {
-                graphStore.bulkSave(result.nodes());
-            }
-
-            // Evict all Spring caches so queries pick up new data
-            if (cacheManager != null) {
-                cacheManager.getCacheNames().forEach(name -> {
-                    var cache = cacheManager.getCache(name);
-                    if (cache != null) cache.clear();
-                });
-            }
-
-            Map<String, Object> response = new LinkedHashMap<>();
-            response.put("status", "complete");
-            response.put("total_files", result.totalFiles());
-            response.put("files_analyzed", result.filesAnalyzed());
-            response.put("node_count", result.nodeCount());
-            response.put("edge_count", result.edgeCount());
-            response.put("elapsed_ms", result.elapsed().toMillis());
-            return ResponseEntity.ok(response);
-        } finally {
-            analysisRunning.set(false);
-        }
-    }
+    // POST /api/analyze removed — API/MCP server is read-only.
+    // Analysis is done locally via CLI: code-iq analyze / code-iq index
+    // Data is loaded into Neo4j on serve startup (auto-enrich).
 }

@@ -74,7 +74,7 @@ class TopologyEndpointTest {
         var topologyController = new TopologyController(topologyService, graphStore, config);
         mockMvc = MockMvcBuilders.standaloneSetup(topologyController).build();
 
-        mcpTools = new McpTools(queryService, analyzer, config, objectMapper,
+        mcpTools = new McpTools(queryService, config, objectMapper,
                 Optional.empty(), graphDb, new StatsService(),
                 new TopologyService(), graphStore);
     }

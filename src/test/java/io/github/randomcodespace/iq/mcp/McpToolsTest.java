@@ -2,8 +2,6 @@ package io.github.randomcodespace.iq.mcp;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.randomcodespace.iq.analyzer.AnalysisResult;
-import io.github.randomcodespace.iq.analyzer.Analyzer;
 import io.github.randomcodespace.iq.config.CodeIqConfig;
 import io.github.randomcodespace.iq.flow.FlowEngine;
 import io.github.randomcodespace.iq.flow.FlowModels.FlowDiagram;
@@ -43,9 +41,6 @@ class McpToolsTest {
     private QueryService queryService;
 
     @Mock
-    private Analyzer analyzer;
-
-    @Mock
     private FlowEngine flowEngine;
 
     @Mock
@@ -66,7 +61,7 @@ class McpToolsTest {
         config = new CodeIqConfig();
         config.setRootPath(".");
         objectMapper = new ObjectMapper();
-        mcpTools = new McpTools(queryService, analyzer, config, objectMapper, java.util.Optional.ofNullable(flowEngine), graphDb, statsService, new io.github.randomcodespace.iq.query.TopologyService(), graphStore);
+        mcpTools = new McpTools(queryService, config, objectMapper, java.util.Optional.ofNullable(flowEngine), graphDb, statsService, new io.github.randomcodespace.iq.query.TopologyService(), graphStore);
     }
 
     private Map<String, Object> parseJson(String json) throws IOException {
@@ -340,31 +335,7 @@ class McpToolsTest {
         assertTrue(parsed.get("error").toString().contains("Unknown view"));
     }
 
-    // --- analyze_codebase ---
-
-    @Test
-    void analyzeCodebaseShouldReturnResult() throws IOException {
-        var analysisResult = new AnalysisResult(
-                100, 80, 500, 200, Map.of(), Map.of(), Map.of(), Map.of(), Duration.ofMillis(1500)
-        );
-        when(analyzer.run(any(), any(), anyBoolean(), any())).thenReturn(analysisResult);
-
-        String result = mcpTools.analyzeCodebase(false);
-        Map<String, Object> parsed = parseJson(result);
-
-        assertEquals("complete", parsed.get("status"));
-        assertEquals(500, parsed.get("node_count"));
-    }
-
-    @Test
-    void analyzeCodebaseShouldHandleError() throws IOException {
-        when(analyzer.run(any(), any(), anyBoolean(), any())).thenThrow(new RuntimeException("Analysis failed"));
-
-        String result = mcpTools.analyzeCodebase(false);
-        Map<String, Object> parsed = parseJson(result);
-
-        assertNotNull(parsed.get("error"));
-    }
+    // analyze_codebase removed — MCP is read-only
 
     // --- run_cypher ---
 
