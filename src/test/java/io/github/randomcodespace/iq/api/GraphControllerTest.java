@@ -114,6 +114,34 @@ class GraphControllerTest {
                 .andExpect(jsonPath("$.limit").value(25));
     }
 
+    @Test
+    void nodesByKindShouldReturn400ForInvalidKind() throws Exception {
+        mockMvc.perform(get("/api/kinds/not_a_real_kind"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void nodesByKindShouldClampNegativeOffset() throws Exception {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("kind", "endpoint");
+        result.put("nodes", List.of());
+        when(queryService.nodesByKind("endpoint", 50, 0)).thenReturn(result);
+
+        mockMvc.perform(get("/api/kinds/endpoint?offset=-5"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void nodesByKindShouldCapLimitTo1000() throws Exception {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("kind", "endpoint");
+        result.put("nodes", List.of());
+        when(queryService.nodesByKind("endpoint", 1000, 0)).thenReturn(result);
+
+        mockMvc.perform(get("/api/kinds/endpoint?limit=5000"))
+                .andExpect(status().isOk());
+    }
+
     // --- /api/nodes ---
 
     @Test
@@ -138,6 +166,34 @@ class GraphControllerTest {
         mockMvc.perform(get("/api/nodes?kind=endpoint"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.count").value(0));
+    }
+
+    @Test
+    void listNodesShouldReturn400ForInvalidKind() throws Exception {
+        mockMvc.perform(get("/api/nodes?kind=bogus_kind"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void listNodesShouldClampNegativeOffset() throws Exception {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("nodes", List.of());
+        result.put("count", 0);
+        when(queryService.listNodes(null, 100, 0)).thenReturn(result);
+
+        mockMvc.perform(get("/api/nodes?offset=-10"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void listNodesShouldCapLimitTo1000() throws Exception {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("nodes", List.of());
+        result.put("count", 0);
+        when(queryService.listNodes(null, 1000, 0)).thenReturn(result);
+
+        mockMvc.perform(get("/api/nodes?limit=9999"))
+                .andExpect(status().isOk());
     }
 
     // --- /api/nodes/{nodeId}/detail ---
@@ -206,6 +262,30 @@ class GraphControllerTest {
         mockMvc.perform(get("/api/edges"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.total").value(0));
+    }
+
+    @Test
+    void listEdgesShouldClampNegativeOffset() throws Exception {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("edges", List.of());
+        result.put("count", 0);
+        result.put("total", 0);
+        when(queryService.listEdges(null, 100, 0)).thenReturn(result);
+
+        mockMvc.perform(get("/api/edges?offset=-3"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void listEdgesShouldCapLimitTo1000() throws Exception {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("edges", List.of());
+        result.put("count", 0);
+        result.put("total", 0);
+        when(queryService.listEdges(null, 1000, 0)).thenReturn(result);
+
+        mockMvc.perform(get("/api/edges?limit=5000"))
+                .andExpect(status().isOk());
     }
 
     // --- /api/ego/{center} ---

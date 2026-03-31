@@ -34,9 +34,8 @@ public class Neo4jConfig {
     private int boltPort;
 
     @Bean(destroyMethod = "shutdown")
-    DatabaseManagementService databaseManagementService(
-            @Value("${codeiq.graph.path:.osscodeiq/graph.db}") String dbPath) {
-        return new DatabaseManagementServiceBuilder(Path.of(dbPath))
+    DatabaseManagementService databaseManagementService(CodeIqConfig config) {
+        return new DatabaseManagementServiceBuilder(Path.of(config.getGraph().getPath()))
                 .setConfig(BoltConnector.enabled, true)
                 .setConfig(BoltConnector.listen_address, new SocketAddress("localhost", boltPort))
                 .build();

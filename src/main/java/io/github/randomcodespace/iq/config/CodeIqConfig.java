@@ -25,6 +25,16 @@ public class CodeIqConfig {
     /** Batch size for file processing during indexing (files per H2 flush). */
     private int batchSize = 500;
 
+    /** Graph configuration sub-properties. */
+    private Graph graph = new Graph();
+
+    public static class Graph {
+        private String path = ".osscodeiq/graph.db";
+
+        public String getPath() { return path; }
+        public void setPath(String path) { this.path = path; }
+    }
+
     /** Service name tag for multi-repo graph mode. */
     private String serviceName;
 
@@ -76,5 +86,13 @@ public class CodeIqConfig {
 
     public void setServiceName(String serviceName) {
         this.serviceName = serviceName;
+    }
+
+    public Graph getGraph() {
+        return graph;
+    }
+
+    public void setGraph(Graph graph) {
+        this.graph = graph;
     }
 }

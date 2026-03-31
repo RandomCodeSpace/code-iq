@@ -3,7 +3,7 @@ spring:
     name: code-iq
   main:
     banner-mode: off
-    allow-bean-definition-overriding: true
+    allow-bean-definition-overriding: false
   threads:
     virtual:
       enabled: true

@@ -14,12 +14,16 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import io.github.randomcodespace.iq.model.NodeKind;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * REST API controller matching the Python OSSCodeIQ API paths.
@@ -63,7 +67,8 @@ public class GraphController {
             @RequestParam(defaultValue = "50") int limit,
             @RequestParam(defaultValue = "0") int offset) {
         requireQueryService();
-        return queryService.nodesByKind(kind, Math.min(limit, 1000), offset);
+        validateNodeKind(kind);
+        return queryService.nodesByKind(kind, Math.min(limit, 1000), Math.max(0, offset));
     }
 
     @GetMapping("/nodes")
@@ -72,13 +77,10 @@ public class GraphController {
             @RequestParam(defaultValue = "100") int limit,
             @RequestParam(defaultValue = "0") int offset) {
         requireQueryService();
-        return queryService.listNodes(kind, Math.min(limit, 1000), offset);
-    }
-
-    @GetMapping("/nodes/find")
-    public List<Map<String, Object>> findNode(@RequestParam String q) {
-        requireQueryService();
-        return queryService.searchGraph(q, 50);
+        if (kind != null) {
+            validateNodeKind(kind);
+        }
+        return queryService.listNodes(kind, Math.min(limit, 1000), Math.max(0, offset));
     }
 
     @GetMapping("/nodes/{nodeId}/detail")
@@ -105,7 +107,7 @@ public class GraphController {
             @RequestParam(defaultValue = "100") int limit,
             @RequestParam(defaultValue = "0") int offset) {
         requireQueryService();
-        return queryService.listEdges(kind, Math.min(limit, 1000), offset);
+        return queryService.listEdges(kind, Math.min(limit, 1000), Math.max(0, offset));
     }
 
     @GetMapping("/ego/{center}")
@@ -195,6 +197,18 @@ public class GraphController {
             @RequestParam(defaultValue = "50") int limit) {
         requireQueryService();
         return queryService.searchGraph(q, Math.min(limit, 1000));
+    }
+
+    private void validateNodeKind(String kind) {
+        try {
+            NodeKind.fromValue(kind);
+        } catch (IllegalArgumentException e) {
+            String valid = Arrays.stream(NodeKind.values())
+                    .map(NodeKind::getValue)
+                    .collect(Collectors.joining(", "));
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Invalid node kind: '" + kind + "'. Valid values: " + valid);
+        }
     }
 
     private void requireQueryService() {
