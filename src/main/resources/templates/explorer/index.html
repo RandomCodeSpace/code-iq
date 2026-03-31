@@ -308,7 +308,7 @@
                                 Explore
                             </a>
                             <button hx-get="/ui/fragments/nodes/{kind}"
-                                    th:attr="hx-get='/ui/fragments/nodes/' + ${kindEntry['kind']}"
+                                    th:attr="hx-get='/ui/fragments/nodes/' + ${#uris.escapePathSegment(kindEntry['kind'])}"
                                     hx-target="#content"
                                     hx-swap="innerHTML"
                                     class="text-xs font-medium px-3 py-1.5 rounded-md text-muted dark:text-muted-dark hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
