@@ -7,8 +7,9 @@
 - **Maven coordinates:** `io.github.randomcodespace.iq:code-iq`
 - **CLI command:** `code-iq` (via `java -jar`)
 - **Java package:** `io.github.randomcodespace.iq` (under `src/main/java/`)
-- **GitHub repo:** `RandomCodeSpace/code-iq` (branch: `java`)
+- **GitHub repo:** `RandomCodeSpace/code-iq` (branch: `main`)
 - **Cache directory on disk:** `.code-intelligence` (H2 analysis cache)
+- **Neo4j directory on disk:** `.osscodeiq/graph.db` (enriched graph)
 - **Config file:** `.osscodeiq.yml` (project-level overrides)
 
 ## Tech Stack
@@ -16,7 +17,7 @@
 - Java 25 (virtual threads, pattern matching, records, sealed classes)
 - Spring Boot 4.0.5
 - Neo4j Embedded 2026.02.3 (Community Edition, no external server)
-- Spring AI 1.1.4 (MCP server, streamable HTTP)
+- Spring AI 2.0.0-M3 (MCP server, `@McpTool` annotations, streamable HTTP)
 - JavaParser 3.28.0 (Java AST analysis)
 - ANTLR 4.13.2 (TypeScript/JavaScript, Python, Go, C#, Rust, C++ grammars)
 - Picocli 4.7.7 (CLI framework, integrated with Spring Boot)
@@ -25,13 +26,26 @@
 
 ## Architecture
 
+### Deployment Model
+
 ```
-FileDiscovery --> Parsers --> Detectors (virtual threads) --> GraphBuilder (buffered) --> Linkers --> LayerClassifier --> Neo4j Embedded
-                                                                                                                          |
-                                                                                                                    GraphStore (facade)
-                                                                                                                    /         |         \
-                                                                                                              REST API    MCP Server    Web UI
-                                                                                                             (/api)       (/mcp)        (/)
+Developer machine:
+  code-iq index  /repo  →  H2 cache (.code-intelligence/)
+  code-iq enrich /repo  →  Neo4j (.osscodeiq/graph.db)
+  code-iq bundle /repo  →  bundle.zip (graph + source snapshot)
+
+Remote server (or local):
+  code-iq serve /repo   →  read-only API + MCP + UI (from Neo4j)
+```
+
+**Key principle:** MCP and API are strictly **read-only**. No data manipulation from the serving layer. Analysis happens only via CLI (`index`/`enrich`). The remote server may not have source code access (bundle deployment model).
+
+### Pipeline
+
+```
+index:   FileDiscovery → Parsers → Detectors (virtual threads) → GraphBuilder → H2 cache
+enrich:  H2 → Linkers → LayerClassifier → ServiceDetector → Neo4j (UNWIND bulk-load)
+serve:   Neo4j → GraphStore → QueryService → REST API / MCP / Web UI
 ```
 
 ### Pipeline Components
@@ -40,24 +54,25 @@ FileDiscovery --> Parsers --> Detectors (virtual threads) --> GraphBuilder (buff
 - **Detectors** -- 97 concrete detector beans (Spring `@Component`), auto-discovered via classpath scan
 - **GraphBuilder** -- buffers all nodes and edges, flushes nodes first then edges (determinism guarantee)
 - **Linkers** -- run after all detectors: `TopicLinker`, `EntityLinker`, `ModuleContainmentLinker`
-- **LayerClassifier** -- sets `layer` property on every node: `frontend | backend | infra | shared | unknown`
-- **GraphStore** -- facade over Neo4j, delegates Cypher operations
+- **LayerClassifier** -- sets `layer` property on every node using node kind, framework, and path heuristics
+- **ServiceDetector** -- scans filesystem for build files (30+ build systems), creates SERVICE nodes with CONTAINS edges
+- **GraphStore** -- facade over Neo4j, UNWIND-based bulk save, Cypher reads (no SDN for reads)
 - **AnalysisCache** -- H2-backed file hash cache for incremental analysis
 
 ### Spring Profiles
-- **`indexing`** -- active during CLI analyze/stats/graph/query/find/flow/bundle/cache/plugins commands. Starts Neo4j Embedded, runs analysis pipeline.
-- **`serving`** -- active during `serve` command. Starts REST API, MCP server, web UI, health endpoint.
+- **`indexing`** -- active during CLI index/analyze/stats/graph/query/find/flow/bundle/cache/plugins commands. No Neo4j.
+- **`serving`** -- active during `serve` command. Starts Neo4j Embedded, REST API, MCP server, web UI.
 
 ## Package Structure
 
 ```
 io.github.randomcodespace.iq
   |-- CodeIqApplication.java       # Spring Boot main class
-  |-- analyzer/                    # Pipeline: Analyzer, FileDiscovery, GraphBuilder, LayerClassifier
+  |-- analyzer/                    # Pipeline: Analyzer, FileDiscovery, GraphBuilder, LayerClassifier, ServiceDetector
   |   |-- linker/                  # Cross-file linkers: TopicLinker, EntityLinker, ModuleContainmentLinker
-  |-- api/                         # REST controllers: GraphController, FlowController
+  |-- api/                         # REST controllers: GraphController (read-only), FlowController, TopologyController
   |-- cache/                       # AnalysisCache (H2), FileHasher
-  |-- cli/                         # Picocli commands (14 commands + CodeIqCli parent + CliOutput helper)
+  |-- cli/                         # Picocli commands: index, enrich, serve, analyze, stats, etc.
   |-- config/                      # Spring config: Neo4jConfig, CodeIqConfig, JacksonConfig
   |-- detector/                    # Detector interface + 97 concrete detectors
   |   |-- auth/                    # LDAP, certificate, session/header auth
@@ -79,27 +94,33 @@ io.github.randomcodespace.iq
   |   |-- typescript/              # Express, NestJS, Fastify, Prisma, TypeORM, etc.
   |-- flow/                        # FlowEngine, FlowRenderer, FlowViews, FlowModels
   |-- grammar/                     # ANTLR parser factory + generated parsers
-  |   |-- cpp/, csharp/, golang/, javascript/, python/, rust/
-  |-- graph/                       # GraphStore (facade), GraphRepository (Spring Data Neo4j)
+  |-- graph/                       # GraphStore (Neo4j facade), GraphRepository (SDN, writes only)
   |-- health/                      # GraphHealthIndicator (Spring Actuator)
-  |-- mcp/                         # McpTools (21 Spring AI @Tool methods)
+  |-- mcp/                         # McpTools (30 @McpTool methods, read-only)
   |-- model/                       # CodeNode, CodeEdge, NodeKind (32), EdgeKind (27)
-  |-- query/                       # QueryService (graph queries), StatsService (categorized stats)
+  |-- query/                       # QueryService, StatsService (categorized), TopologyService
   |-- web/                         # ExplorerController (Thymeleaf web UI)
 ```
 
 ## Critical Rules
+
+### Read-Only Serving Layer
+- MCP and API are **strictly read-only** -- no data manipulation
+- Analysis/enrichment happens only via CLI (`index`, `enrich`)
+- Remote servers may not have source code access (bundle deployment)
+- No `POST /api/analyze` or `analyze_codebase` MCP tool
 
 ### Determinism is Non-Negotiable
 - Same input MUST produce same output, every time
 - No `Set` iteration without sorting first (`TreeSet` or `stream().sorted()`)
 - No dependency on thread completion order (GraphBuilder uses indexed result slots)
 - All detectors must be stateless -- no mutable instance fields, use method-local state only
-- Collections in results must be deterministically ordered
 
-### Cross-Backend Consistency
-- The Python version has 3 backends (NetworkX, SQLite, KuzuDB). The Java version uses Neo4j Embedded only.
-- Node and edge counts should be consistent across runs (verified by benchmarks: 3 runs, identical counts)
+### Generic Detection -- Not Example-Specific
+- Every feature must work for ALL languages and architectures, not just the example given
+- Framework detectors must have discriminator guards (e.g., Quarkus detector requires `io.quarkus` import)
+- ServiceDetector supports 30+ build systems across all ecosystems, not just Maven
+- Never fix for one language and forget others
 
 ### Virtual Thread Safety
 - All file I/O and Neo4j operations run on virtual threads
@@ -110,24 +131,39 @@ io.github.randomcodespace.iq
 
 | Command | Description |
 |---------|-------------|
-| `analyze [path]` | Scan codebase and build knowledge graph |
+| `index [path]` | Memory-efficient batched scanning to H2 (preferred for large codebases) |
+| `enrich [path]` | Load H2 into Neo4j, run linkers, classify layers, detect services |
+| `serve [path]` | Start read-only web UI + REST API + MCP server (requires enrich first) |
+| `analyze [path]` | Legacy in-memory scan (use index+enrich for large codebases) |
 | `stats [path]` | Show rich categorized statistics from analyzed graph |
 | `graph [path]` | Export graph (JSON, YAML, Mermaid, DOT) |
 | `query [path]` | Query graph relationships (consumers, producers, callers) |
 | `find [what] [path]` | Preset queries (endpoints, guards, entities, topics, etc.) |
 | `cypher [query]` | Execute raw Cypher queries against Neo4j |
 | `flow [path]` | Generate architecture flow diagrams |
-| `serve [path]` | Start web UI + REST API + MCP server |
 | `bundle [path]` | Package graph + source into distributable ZIP |
 | `cache [action]` | Manage analysis cache |
 | `plugins [action]` | List and inspect detectors |
 | `version` | Show version info |
 
-## Server Endpoints
+### Standard Pipeline
+
+```bash
+# For large codebases (44K+ files):
+code-iq index /path/to/repo          # ~220s for 44K files, writes to H2
+code-iq enrich /path/to/repo         # loads H2 → Neo4j with linkers/layers/services
+code-iq serve /path/to/repo          # read-only server
+
+# For small codebases:
+code-iq analyze /path/to/repo        # in-memory, all-in-one
+code-iq serve /path/to/repo          # needs enrich if using index
+```
+
+## Server Endpoints (all read-only)
 
 ### REST API (`/api`)
-- `GET /api/stats` -- Graph statistics
-- `GET /api/stats/detailed?category=` -- Rich categorized stats
+- `GET /api/stats` -- Rich categorized statistics (graph, languages, frameworks, infra, connections, auth, architecture)
+- `GET /api/stats/detailed?category=` -- Single category stats
 - `GET /api/kinds` -- Node kinds with counts
 - `GET /api/kinds/{kind}` -- Paginated nodes by kind
 - `GET /api/nodes`, `GET /api/edges` -- Paginated queries
@@ -135,14 +171,15 @@ io.github.randomcodespace.iq
 - `GET /api/nodes/{id}/neighbors` -- Neighbor traversal
 - `GET /api/ego/{center}` -- Ego subgraph
 - `GET /api/query/cycles`, `/shortest-path`, `/consumers/{id}`, `/producers/{id}`, `/callers/{id}`, `/dependencies/{id}`, `/dependents/{id}`
+- `GET /api/query/dead-code` -- Dead code detection (semantic edge filtering, excludes entry points)
 - `GET /api/triage/component?file=`, `/impact/{id}` -- Agentic triage
 - `GET /api/search?q=` -- Free-text search
 - `GET /api/file?path=` -- Source files (path traversal protected)
 - `GET /api/flow/{view}` -- Flow diagrams
-- `POST /api/analyze` -- Trigger analysis
+- `GET /api/topology` -- Service topology map
 
-### MCP Tools (21)
-`get_stats`, `get_detailed_stats`, `query_nodes`, `query_edges`, `get_node_neighbors`, `get_ego_graph`, `find_cycles`, `find_shortest_path`, `find_consumers`, `find_producers`, `find_callers`, `find_dependencies`, `find_dependents`, `generate_flow`, `analyze_codebase`, `run_cypher`, `find_component_by_file`, `trace_impact`, `find_related_endpoints`, `search_graph`, `read_file`
+### MCP Tools (30, via `@McpTool` annotation)
+`get_stats`, `get_detailed_stats`, `query_nodes`, `query_edges`, `get_node_neighbors`, `get_ego_graph`, `find_cycles`, `find_shortest_path`, `find_consumers`, `find_producers`, `find_callers`, `find_dependencies`, `find_dependents`, `find_dead_code`, `generate_flow`, `run_cypher`, `find_component_by_file`, `trace_impact`, `find_related_endpoints`, `search_graph`, `read_file`, `get_topology`, `service_detail`, `service_dependencies`, `service_dependents`, `blast_radius`, `find_path`, `find_bottlenecks`, `find_circular_deps`, `find_dead_services`
 
 ## Adding a New Detector
 
@@ -161,12 +198,13 @@ io.github.randomcodespace.iq
    }
    ```
 3. **No registry changes needed** -- auto-discovered via Spring classpath scan
-4. For Java files needing AST access, extend `AbstractJavaParserDetector`
-5. For multi-language support via ANTLR, extend `AbstractAntlrDetector`
-6. For regex-only detection, extend `AbstractRegexDetector`
-7. Create test in `src/test/java/.../detector/<category>/MyDetectorTest.java`
-8. Include a determinism test (run twice, assert identical output)
-9. Run `mvn test` -- all tests must pass
+4. **Framework-specific detectors MUST have discriminator guards** -- require framework-specific imports before detecting (e.g., Quarkus requires `io.quarkus`, Fastify requires `fastify` import)
+5. For Java files needing AST access, extend `AbstractJavaParserDetector`
+6. For multi-language support via ANTLR, extend `AbstractAntlrDetector`
+7. For regex-only detection, extend `AbstractRegexDetector`
+8. Create test in `src/test/java/.../detector/<category>/MyDetectorTest.java`
+9. Include a determinism test (run twice, assert identical output)
+10. Run `mvn test` -- all tests must pass
 
 ### Detector Base Classes
 | Class | Use Case |
@@ -180,20 +218,31 @@ io.github.randomcodespace.iq
 ## Testing
 
 ```bash
-# Run all tests
+# Run all tests (~1385 tests)
 mvn test
 
 # Run a specific test class
 mvn test -Dtest=SpringRestDetectorTest
+
+# Run E2E quality tests (requires cloned test repo)
+E2E_PETCLINIC_DIR=/path/to/spring-petclinic mvn test -Dtest=E2EQualityTest
 
 # Run with verbose output
 mvn test -Dsurefire.useFile=false
 ```
 
 - Every detector needs: positive match test, negative match test, determinism test
-- Server tests use Spring Boot `@SpringBootTest` with `@AutoConfigureMockMvc`
+- Server tests use standalone MockMvc (no Spring context needed)
 - MCP tools tested by calling `McpTools` methods directly
-- 134 test files in `src/test/java/`
+- E2E quality tests validate against Context7-sourced ground truth (21 tests for petclinic)
+- Use `@ActiveProfiles("test")` for any `@SpringBootTest` to avoid Neo4j startup
+
+### E2E Quality Testing Strategy (mandatory for detection changes)
+1. Build ground truth using Context7 for well-known repos
+2. Clone official repo, run full pipeline (index → enrich → serve)
+3. Query ALL API endpoints, validate against ground truth
+4. Fix findings in loop with parallel agents until 95%+ pass rate
+5. Ground truth files: `src/test/resources/e2e/ground-truth-*.json`
 
 ## Build Commands
 
@@ -204,21 +253,16 @@ mvn clean package -DskipTests
 # Build + test
 mvn clean package
 
-# Run
-java -jar target/code-iq-*.jar analyze /path/to/repo
-
-# Docker
-docker build -t code-iq .
-docker run -v /path/to/repo:/data code-iq analyze /data
+# Run pipeline
+java -jar target/code-iq-*-cli.jar index /path/to/repo
+java -jar target/code-iq-*-cli.jar enrich /path/to/repo
+java -jar target/code-iq-*-cli.jar serve /path/to/repo
 
 # SpotBugs static analysis
 mvn spotbugs:check
 
 # OWASP dependency vulnerability check
 mvn dependency-check:check
-
-# Checkstyle
-mvn checkstyle:check
 ```
 
 ## Key Files
@@ -229,68 +273,75 @@ mvn checkstyle:check
 | `analyzer/Analyzer.java` | Pipeline orchestrator (discovery -> detect -> build -> link -> classify) |
 | `analyzer/FileDiscovery.java` | File discovery via git ls-files or directory walk |
 | `analyzer/GraphBuilder.java` | Buffered graph construction (nodes first, then edges) |
-| `analyzer/LayerClassifier.java` | Deterministic layer classification |
-| `analyzer/linker/TopicLinker.java` | Links producers/consumers to topics |
-| `analyzer/linker/EntityLinker.java` | Links entities to repositories |
-| `analyzer/linker/ModuleContainmentLinker.java` | Links modules to contained nodes |
+| `analyzer/LayerClassifier.java` | Deterministic layer classification (kind + framework + path heuristics) |
+| `analyzer/ServiceDetector.java` | Service boundary detection from build files (30+ build systems) |
+| `analyzer/linker/*.java` | Cross-file linkers: TopicLinker, EntityLinker, ModuleContainmentLinker |
 | `detector/Detector.java` | Detector interface |
-| `detector/AbstractRegexDetector.java` | Base class for regex detectors |
-| `detector/AbstractJavaParserDetector.java` | Base class for JavaParser-based detectors |
-| `detector/AbstractAntlrDetector.java` | Base class for ANTLR-based detectors |
 | `model/NodeKind.java` | 32 node types enum |
 | `model/EdgeKind.java` | 27 edge types enum |
-| `model/CodeNode.java` | Graph node entity (Spring Data Neo4j) |
-| `model/CodeEdge.java` | Graph edge entity (Spring Data Neo4j) |
-| `graph/GraphStore.java` | Neo4j facade |
-| `graph/GraphRepository.java` | Spring Data Neo4j repository |
+| `model/CodeNode.java` | Graph node entity |
+| `model/CodeEdge.java` | Graph edge entity |
+| `graph/GraphStore.java` | Neo4j facade (UNWIND bulk save, Cypher reads, indexes) |
 | `config/Neo4jConfig.java` | Embedded Neo4j configuration |
 | `config/CodeIqConfig.java` | Application configuration properties |
-| `config/ProjectConfigLoader.java` | Loads .osscodeiq.yml overrides |
+| `config/JacksonConfig.java` | Jackson config (FAIL_ON_UNKNOWN_PROPERTIES disabled for MCP compat) |
 | `cache/AnalysisCache.java` | H2 incremental cache |
-| `api/GraphController.java` | REST API endpoints |
-| `api/FlowController.java` | Flow diagram endpoints |
-| `mcp/McpTools.java` | 21 MCP tool definitions (Spring AI @Tool) |
-| `query/QueryService.java` | Graph query operations |
-| `query/StatsService.java` | Rich categorized statistics |
-| `web/ExplorerController.java` | Thymeleaf web UI |
-| `health/GraphHealthIndicator.java` | Spring Actuator health check |
-| `flow/FlowEngine.java` | Flow diagram generation and rendering |
-| `cli/CodeIqCli.java` | Picocli parent command |
+| `api/GraphController.java` | REST API endpoints (read-only) |
+| `mcp/McpTools.java` | 30 MCP tool definitions (`@McpTool`, read-only) |
+| `query/QueryService.java` | Graph query operations with Spring caching |
+| `query/StatsService.java` | Rich categorized statistics (7 categories) |
+| `query/TopologyService.java` | Service topology queries |
+| `cli/IndexCommand.java` | Memory-efficient batched indexing to H2 |
+| `cli/EnrichCommand.java` | H2 → Neo4j with linkers, layers, services |
+| `cli/ServeCommand.java` | Read-only server startup |
 
 ## Code Conventions
 
 - Java 25+ features: records, sealed classes, pattern matching, virtual threads
 - Spring Boot 4 conventions: constructor injection, `@Component` beans, profile activation
+- Spring AI 2.0: `@McpTool`/`@McpToolParam` annotations (not `@Tool`/`@ToolParam`)
 - Picocli for CLI with Spring integration (`picocli-spring-boot-starter`)
 - Detectors are `@Component` beans -- stateless, thread-safe, auto-discovered
+- Framework detectors require discriminator guards (framework-specific imports)
 - ID format: `"{prefix}:{filepath}:{type}:{identifier}"` for cross-file uniqueness
 - Properties map for detector-specific metadata (`auth_type`, `framework`, `roles`, etc.)
+- Spring detectors set `framework: "spring_boot"` on their nodes
 - `layer` property on every node: `frontend | backend | infra | shared | unknown`
-- Neo4j node labels: `CodeNode`, `CodeEdge` (Spring Data Neo4j entities)
-- Jackson for JSON serialization, SnakeYAML for YAML
+- Neo4j reads use embedded API (no SDN hydration). Writes use SDN or UNWIND Cypher.
+- Neo4j properties round-trip via `prop_*` prefix (written by `bulkSave`, read by `nodeFromNeo4j`)
+- Jackson `FAIL_ON_UNKNOWN_PROPERTIES` disabled globally for MCP protocol compatibility
 - UTF-8 encoding everywhere (explicit `StandardCharsets.UTF_8`)
 
 ## Configuration
 
-### Application properties (`application.properties` / `application.yml`)
+### Application properties (`application.yml`)
 - `codeiq.root-path` -- codebase root (default: `.`)
 - `codeiq.cache-dir` -- cache directory name (default: `.code-intelligence`)
+- `codeiq.graph.path` -- Neo4j graph path (default: `.osscodeiq/graph.db`)
 - `codeiq.max-radius` -- max ego graph radius (default: 10)
 - `codeiq.max-depth` -- max impact trace depth (default: 10)
+- `codeiq.batch-size` -- files per H2 flush batch (default: 500)
+- `spring.ai.mcp.server.protocol` -- MCP protocol (STREAMABLE)
 
 ### Project-level overrides (`.osscodeiq.yml`)
 Placed in the codebase root, loaded by `ProjectConfigLoader` before analysis.
 
 ## Gotchas & Lessons Learned
 
-- **Package name = repo name here**: Unlike the Python version where package is `osscodeiq` but repo is `code-iq`, the Java artifact ID is also `code-iq`.
-- **Spring Boot startup overhead**: 8-16s for embedded Neo4j + Spring context init. Use `spring.main.banner-mode=off` for CLI commands.
-- **Neo4j deprecation warnings**: `CodeEdge` uses Long IDs (deprecated). Plan to migrate to external IDs.
-- **MCP warnings in CLI mode**: "No tool/resource/prompt/complete methods found" -- expected when not in `serving` profile.
-- **XML DOCTYPE warnings**: Non-fatal stderr from XML parser encountering DOCTYPE declarations.
-- **Virtual thread pinning**: H2 JDBC operations can pin carrier threads. Use `synchronized` blocks (not `ReentrantLock`) for virtual thread compatibility.
-- **ANTLR generated sources**: Generated during `mvn generate-sources` from `.g4` files. Do not edit generated code in `grammar/` subdirectories.
-- **Graph builder determinism**: Uses indexed result slots (not append order) to ensure virtual thread completion order does not affect output.
+- **Pipeline is index → enrich → serve**: Don't put analysis/enrichment in serve. Serve is read-only.
+- **MCP/API is read-only**: No data manipulation from serving layer. Remote servers may lack source code.
+- **Framework false positives**: Quarkus/Micronaut/Fastify detectors matched generic patterns (router.get, @Transactional). Always add discriminator guards requiring framework-specific imports.
+- **Neo4j property round-trip**: Properties stored as `prop_*` keys in Neo4j. `nodeFromNeo4j()` must restore them. Verify properties survive write→read.
+- **Edge persistence**: Edges must be attached to source nodes before `bulkSave()`. MATCH silently returns 0 rows for missing nodes -- pre-validate IDs.
+- **ServiceDetector must scan filesystem**: Don't rely on node file paths for build file detection. Many build files (pom.xml) don't produce CodeNodes. Walk the filesystem directly.
+- **Generic, not example-specific**: Every feature must work for ALL architectures. Don't fix for the specific example given and forget other ecosystems.
+- **Neo4j indexes**: Created by `enrich` on `id`, `kind`, `layer`, `module`, `filePath`. Critical for query performance on large graphs.
+- **Default batch size is 500**: Performs better than 1000 for indexing.
+- **Spring Boot startup overhead**: 8-16s for embedded Neo4j + Spring context init.
+- **Virtual thread pinning**: H2 JDBC operations can pin carrier threads. Use `synchronized` blocks (not `ReentrantLock`).
+- **ANTLR generated sources**: Generated during `mvn generate-sources` from `.g4` files. Do not edit.
+- **`@ActiveProfiles("test")`**: Required on any `@SpringBootTest` to avoid Neo4j startup conflicts.
+- **Dead code detection**: Must filter by semantic edges only (calls, imports, depends_on). Exclude structural edges (contains, defines) and entry points (endpoints, config files).
 
 ## Updating This File
 
