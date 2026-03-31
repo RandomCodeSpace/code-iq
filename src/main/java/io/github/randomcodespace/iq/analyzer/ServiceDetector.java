@@ -107,10 +107,17 @@ public class ServiceDetector {
      */
     public ServiceDetectionResult detect(List<CodeNode> nodes, List<CodeEdge> edges,
                                          String projectDir, Path projectRoot) {
-        // 1. Find module boundaries by scanning node file paths for build files
-        // Use TreeMap for deterministic ordering (sorted by directory path)
+        // 1. Find module boundaries by scanning the filesystem for build files.
+        //    This is more reliable than scanning node file paths, which may miss
+        //    modules where no detector created a node from the build file.
         Map<String, ModuleInfo> modules = new TreeMap<>();
 
+        if (projectRoot != null) {
+            // Scan filesystem directly for build files (most reliable)
+            scanFilesystemForBuildFiles(projectRoot, projectRoot, modules);
+        }
+
+        // Fallback: also scan node file paths in case filesystem scan missed anything
         for (CodeNode node : nodes) {
             String filePath = node.getFilePath();
             if (filePath == null) continue;
@@ -118,42 +125,12 @@ public class ServiceDetector {
             String fileName = Path.of(filePath).getFileName().toString();
             String dirPath = parentDir(filePath);
 
-            // Check known build files
             String buildTool = BUILD_FILES.get(fileName);
             if (buildTool != null) {
-                // For Python: only register if no better build tool already present
-                ModuleInfo existing = modules.get(dirPath);
-                if (existing != null && isPythonTool(buildTool) && !isPythonTool(existing.buildTool())) {
-                    continue; // Don't override a non-Python build tool with Python
-                }
-                // For Docker: only register if no other build tool present
-                if ("docker".equals(buildTool) && existing != null) {
-                    // Add docker as supplemental info but don't override
-                    continue;
-                }
-                // For Python files: prefer higher-priority ones
-                if (isPythonTool(buildTool) && existing != null && isPythonTool(existing.buildTool())) {
-                    if (pythonPriority(fileName) >= pythonPriority(existing.buildFile())) {
-                        continue; // Current is same or lower priority
-                    }
-                }
-                modules.put(dirPath, new ModuleInfo(dirPath, buildTool, fileName));
+                registerModule(modules, dirPath, buildTool, fileName);
             }
-            // Check .csproj files
             if (fileName.endsWith(CSPROJ_EXTENSION)) {
                 modules.putIfAbsent(dirPath, new ModuleInfo(dirPath, "dotnet", fileName));
-            }
-        }
-
-        // 1b. Check for Dockerfile as supplemental indicator -- create service
-        // only if no other build file was found for that directory
-        for (CodeNode node : nodes) {
-            String filePath = node.getFilePath();
-            if (filePath == null) continue;
-            String fileName = Path.of(filePath).getFileName().toString();
-            if ("Dockerfile".equals(fileName)) {
-                String dirPath = parentDir(filePath);
-                modules.putIfAbsent(dirPath, new ModuleInfo(dirPath, "docker", fileName));
             }
         }
 
@@ -261,6 +238,68 @@ public class ServiceDetector {
                 serviceNodes.stream().map(CodeNode::getLabel).toList());
 
         return new ServiceDetectionResult(serviceNodes, serviceEdges);
+    }
+
+    /**
+     * Scan the filesystem recursively for build files that indicate service/module boundaries.
+     * More reliable than scanning node file paths since not all build files produce CodeNodes.
+     */
+    private void scanFilesystemForBuildFiles(Path root, Path projectRoot, Map<String, ModuleInfo> modules) {
+        try (var stream = Files.walk(root, 10)) {
+            stream.filter(Files::isRegularFile)
+                    .filter(p -> {
+                        String name = p.getFileName().toString();
+                        return BUILD_FILES.containsKey(name) || name.endsWith(CSPROJ_EXTENSION);
+                    })
+                    .sorted() // deterministic
+                    .forEach(p -> {
+                        String name = p.getFileName().toString();
+                        String relDir = projectRoot.relativize(p.getParent()).toString()
+                                .replace('\\', '/');
+                        if (relDir.equals(".")) relDir = "";
+
+                        // Skip node_modules, .git, target, build directories
+                        if (relDir.contains("node_modules") || relDir.contains(".git/")
+                                || relDir.contains("/target/") || relDir.startsWith("target/")
+                                || relDir.contains("/build/") || relDir.startsWith("build/")) {
+                            return;
+                        }
+
+                        if (name.endsWith(CSPROJ_EXTENSION)) {
+                            modules.putIfAbsent(relDir, new ModuleInfo(relDir, "dotnet", name));
+                        } else {
+                            String buildTool = BUILD_FILES.get(name);
+                            if (buildTool != null) {
+                                registerModule(modules, relDir, buildTool, name);
+                            }
+                        }
+                    });
+        } catch (IOException e) {
+            log.warn("Could not scan filesystem for build files: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Register a module, respecting priority rules for Python/Docker.
+     */
+    private void registerModule(Map<String, ModuleInfo> modules, String dirPath,
+                                 String buildTool, String fileName) {
+        ModuleInfo existing = modules.get(dirPath);
+        // Python doesn't override non-Python
+        if (existing != null && isPythonTool(buildTool) && !isPythonTool(existing.buildTool())) {
+            return;
+        }
+        // Docker doesn't override anything
+        if ("docker".equals(buildTool) && existing != null) {
+            return;
+        }
+        // Python priority: pyproject.toml > setup.py > requirements.txt > manage.py
+        if (isPythonTool(buildTool) && existing != null && isPythonTool(existing.buildTool())) {
+            if (pythonPriority(fileName) >= pythonPriority(existing.buildFile())) {
+                return;
+            }
+        }
+        modules.put(dirPath, new ModuleInfo(dirPath, buildTool, fileName));
     }
 
     /**
