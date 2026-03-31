@@ -174,11 +174,12 @@ public class EnrichCommand implements Callable<Integer> {
                 tx.commit();
             }
 
-            // Bulk-load nodes in batches of 5000 using UNWIND
-            int nodeBatchSize = 5000;
+            // Bulk-load nodes in batches using UNWIND
+            int nodeBatchSize = 2000;
             int nodesLoaded = 0;
-            for (int i = 0; i < enrichedNodes.size(); i += nodeBatchSize) {
-                int end = Math.min(i + nodeBatchSize, enrichedNodes.size());
+            int totalNodes = enrichedNodes.size();
+            for (int i = 0; i < totalNodes; i += nodeBatchSize) {
+                int end = Math.min(i + nodeBatchSize, totalNodes);
                 var batch = new ArrayList<Map<String, Object>>(end - i);
                 for (int j = i; j < end; j++) {
                     CodeNode node = enrichedNodes.get(j);
@@ -192,6 +193,17 @@ public class EnrichCommand implements Callable<Integer> {
                     if (node.getLineStart() != null) props.put("lineStart", node.getLineStart());
                     if (node.getLineEnd() != null) props.put("lineEnd", node.getLineEnd());
                     if (node.getLayer() != null) props.put("layer", node.getLayer());
+                    if (node.getAnnotations() != null && !node.getAnnotations().isEmpty()) {
+                        props.put("annotations", String.join(",", node.getAnnotations()));
+                    }
+                    // Include detector properties (framework, http_method, auth_type, etc.)
+                    if (node.getProperties() != null) {
+                        for (var entry : node.getProperties().entrySet()) {
+                            if (entry.getValue() != null) {
+                                props.put("prop_" + entry.getKey(), entry.getValue().toString());
+                            }
+                        }
+                    }
                     batch.add(props);
                 }
                 try (Transaction tx = db.beginTx()) {
@@ -200,8 +212,11 @@ public class EnrichCommand implements Callable<Integer> {
                     tx.commit();
                 }
                 nodesLoaded += batch.size();
+                if (nodesLoaded % 10000 < nodeBatchSize || nodesLoaded >= totalNodes) {
+                    CliOutput.info("  nodes: " + nf.format(nodesLoaded) + "/" + nf.format(totalNodes)
+                            + " (" + (100 * nodesLoaded / totalNodes) + "%)");
+                }
             }
-            CliOutput.info("  Loaded " + nf.format(nodesLoaded) + " nodes into Neo4j");
 
             // Create index on id for edge resolution
             try (Transaction tx = db.beginTx()) {
@@ -248,10 +263,12 @@ public class EnrichCommand implements Callable<Integer> {
                 validEdgeMaps.add(props);
             }
 
-            int edgeBatchSize = 5000;
+            int edgeBatchSize = 2000;
             int edgesLoaded = 0;
-            for (int i = 0; i < validEdgeMaps.size(); i += edgeBatchSize) {
-                int end = Math.min(i + edgeBatchSize, validEdgeMaps.size());
+            int totalEdges = validEdgeMaps.size();
+            CliOutput.info("  Loading " + nf.format(totalEdges) + " edges...");
+            for (int i = 0; i < totalEdges; i += edgeBatchSize) {
+                int end = Math.min(i + edgeBatchSize, totalEdges);
                 var batch = validEdgeMaps.subList(i, end);
                 try (Transaction tx = db.beginTx()) {
                     tx.execute(
@@ -262,8 +279,11 @@ public class EnrichCommand implements Callable<Integer> {
                     tx.commit();
                 }
                 edgesLoaded += batch.size();
+                if (edgesLoaded % 10000 < edgeBatchSize || edgesLoaded >= totalEdges) {
+                    CliOutput.info("  edges: " + nf.format(edgesLoaded) + "/" + nf.format(totalEdges)
+                            + " (" + (100 * edgesLoaded / totalEdges) + "%)");
+                }
             }
-            CliOutput.info("  Loaded " + nf.format(edgesLoaded) + " edges into Neo4j");
 
             // Create additional indexes for fast queries
             try (Transaction tx = db.beginTx()) {
