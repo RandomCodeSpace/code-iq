@@ -125,7 +125,7 @@ class ExplorerControllerTest {
 
         when(queryService.nodeDetailWithEdges("cls:test:class:UserService")).thenReturn(detail);
 
-        mockMvc.perform(get("/ui/node/cls:test:class:UserService"))
+        mockMvc.perform(get("/ui/node").param("nodeId", "cls:test:class:UserService"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("explorer/detail"))
                 .andExpect(model().attributeExists("detail"));
@@ -135,7 +135,7 @@ class ExplorerControllerTest {
     void nodeDetailWithNullShouldStillReturnView() throws Exception {
         when(queryService.nodeDetailWithEdges("missing")).thenReturn(null);
 
-        mockMvc.perform(get("/ui/node/missing"))
+        mockMvc.perform(get("/ui/node").param("nodeId", "missing"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("explorer/detail"));
     }
@@ -201,7 +201,7 @@ class ExplorerControllerTest {
 
         when(queryService.nodeDetailWithEdges("n1")).thenReturn(detail);
 
-        mockMvc.perform(get("/ui/fragments/detail/n1"))
+        mockMvc.perform(get("/ui/fragments/detail").param("nodeId", "n1"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("explorer/fragments/detail-panel"))
                 .andExpect(model().attributeExists("detail"));

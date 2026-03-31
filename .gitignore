@@ -43,6 +43,8 @@ src/main/frontend/node_modules/
 src/main/frontend/node/
 src/main/frontend/dist/
 src/main/frontend/tsconfig.tsbuildinfo
+# Generated explorer CSS (rebuild via: cd src/main/frontend && npm run build:explorer-css)
+src/main/resources/static/css/explorer.css
 
 # Distribution
 *.tar.gz

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build && npm run build:explorer-css",
-    "build:explorer-css": "npx tailwindcss -i ./src/explorer.css -o ../resources/static/css/explorer.css --minify",
+    "build:explorer-css": "npx tailwindcss -c ./explorer-tailwind.config.ts -i ./src/explorer.css -o ../resources/static/css/explorer.css --minify",
     "preview": "vite preview"
   },
   "dependencies": {
