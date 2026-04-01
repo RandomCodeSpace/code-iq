@@ -71,6 +71,9 @@ public class CodeIqApplication implements CommandLineRunner, ExitCodeGenerator {
             boolean noUi = Arrays.asList(args).contains("--no-ui");
             if (noUi) {
                 System.setProperty("codeiq.ui.enabled", "false");
+                // Also disable Spring Boot's static resource handler so no
+                // static files (index.html, JS, CSS bundles) are served.
+                System.setProperty("spring.web.resources.add-mappings", "false");
             }
 
             // Resolve codebase root so Neo4j points to the correct graph.db

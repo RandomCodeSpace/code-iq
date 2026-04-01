@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.GetMapping;
  * Catch-all controller that forwards unmatched routes to index.html
  * for React Router client-side routing (HTML5 pushState).
  * <p>
- * Only matches paths without a file extension (e.g. /topology, /explorer/class)
+ * Only matches paths without a file extension (e.g. /graph, /explorer/class)
  * so static assets (.js, .css, .html, .svg) are served normally.
  * <p>
  * Disabled when {@code codeiq.ui.enabled=false} (i.e. {@code --no-ui} flag passed to serve).
@@ -20,12 +20,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 public class SpaController {
 
     @GetMapping(value = {
-            "/topology",
-            "/topology/**",
+            "/graph",
+            "/graph/**",
             "/explorer",
             "/explorer/**",
-            "/flow",
-            "/flow/**",
             "/console",
             "/console/**",
             "/api-docs",
