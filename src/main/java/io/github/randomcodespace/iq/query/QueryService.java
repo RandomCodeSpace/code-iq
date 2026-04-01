@@ -10,10 +10,12 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 /**
  * High-level query service wrapping GraphStore with caching.
@@ -323,6 +325,98 @@ public class QueryService {
         int cappedLimit = Math.min(limit, 200);
         List<CodeNode> results = graphStore.search(query, cappedLimit);
         return results.stream().map(this::nodeToMap).toList();
+    }
+
+    /**
+     * Build a hierarchical file-tree from all distinct filePaths in the graph.
+     * Each directory node carries an aggregate nodeCount (sum of all descendants).
+     * Each file node carries the count of CodeNodes at that exact path.
+     * Children are sorted: directories first (alphabetical), then files (alphabetical).
+     *
+     * @param maxDepth limit tree depth; null means unlimited
+     */
+    public Map<String, Object> getFileTree(Integer maxDepth) {
+        List<Map<String, Object>> rows = graphStore.getFilePathsWithCounts();
+
+        TreeNode root = new TreeNode("", "directory");
+        for (Map<String, Object> row : rows) {
+            String filePath = (String) row.get("filePath");
+            long count = ((Number) row.get("nodeCount")).longValue();
+            String[] parts = filePath.split("/", -1);
+            TreeNode current = root;
+            for (int i = 0; i < parts.length; i++) {
+                String part = parts[i];
+                if (part.isEmpty()) continue;
+                boolean isFile = (i == parts.length - 1);
+                String type = isFile ? "file" : "directory";
+                TreeNode child = current.children.computeIfAbsent(part, k -> new TreeNode(k, type));
+                if (isFile) {
+                    child.nodeCount += count;
+                }
+                current = child;
+            }
+        }
+
+        List<Map<String, Object>> tree = buildTreeOutput(root, maxDepth, 1);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("tree", tree);
+        result.put("total_files", (long) rows.size());
+        return result;
+    }
+
+    private List<Map<String, Object>> buildTreeOutput(TreeNode node, Integer maxDepth, int currentDepth) {
+        List<Map<String, Object>> output = new ArrayList<>();
+
+        List<TreeNode> dirs = node.children.values().stream()
+                .filter(n -> "directory".equals(n.type))
+                .sorted(Comparator.comparing(n -> n.name))
+                .toList();
+        List<TreeNode> files = node.children.values().stream()
+                .filter(n -> "file".equals(n.type))
+                .sorted(Comparator.comparing(n -> n.name))
+                .toList();
+
+        for (TreeNode child : dirs) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("name", child.name);
+            m.put("type", "directory");
+            m.put("nodeCount", aggregateCount(child));
+            if (maxDepth == null || currentDepth < maxDepth) {
+                m.put("children", buildTreeOutput(child, maxDepth, currentDepth + 1));
+            } else {
+                m.put("children", List.of());
+            }
+            output.add(m);
+        }
+        for (TreeNode child : files) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("name", child.name);
+            m.put("type", "file");
+            m.put("nodeCount", child.nodeCount);
+            m.put("children", List.of());
+            output.add(m);
+        }
+        return output;
+    }
+
+    private long aggregateCount(TreeNode node) {
+        long total = node.nodeCount;
+        for (TreeNode child : node.children.values()) {
+            total += aggregateCount(child);
+        }
+        return total;
+    }
+
+    private static class TreeNode {
+        final String name;
+        final String type;
+        long nodeCount = 0;
+        final Map<String, TreeNode> children = new TreeMap<>();
+
+        TreeNode(String name, String type) {
+            this.name = name;
+            this.type = type;
+        }
     }
 
     /**

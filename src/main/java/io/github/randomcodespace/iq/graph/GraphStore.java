@@ -506,6 +506,28 @@ public class GraphStore implements FlowDataSource {
         return rows;
     }
 
+    /**
+     * Return each distinct filePath that has at least one CodeNode, along with the count
+     * of nodes stored at that path. Used to build the file-tree endpoint response.
+     */
+    public List<Map<String, Object>> getFilePathsWithCounts() {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        try (Transaction tx = graphDb.beginTx()) {
+            var result = tx.execute(
+                    "MATCH (n:CodeNode) WHERE n.filePath IS NOT NULL "
+                            + "RETURN n.filePath AS filePath, count(n) AS nodeCount "
+                            + "ORDER BY n.filePath");
+            while (result.hasNext()) {
+                var row = result.next();
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("filePath", row.get("filePath"));
+                m.put("nodeCount", ((Number) row.get("nodeCount")).longValue());
+                rows.add(m);
+            }
+        }
+        return rows;
+    }
+
     public long countEdgesByKind(String kind) {
         try (Transaction tx = graphDb.beginTx()) {
             var result = tx.execute(

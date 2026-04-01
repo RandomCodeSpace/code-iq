@@ -541,4 +541,93 @@ class QueryServiceTest {
         assertNull(map.get("line_start"));
         assertNull(map.get("layer"));
     }
+
+    // --- getFileTree ---
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void getFileTreeShouldBuildHierarchicalTree() {
+        when(graphStore.getFilePathsWithCounts()).thenReturn(List.of(
+                Map.of("filePath", "src/main/Foo.java", "nodeCount", 3L),
+                Map.of("filePath", "src/main/Bar.java", "nodeCount", 1L),
+                Map.of("filePath", "src/test/FooTest.java", "nodeCount", 2L),
+                Map.of("filePath", "pom.xml", "nodeCount", 1L)));
+
+        Map<String, Object> result = service.getFileTree(null);
+
+        assertEquals(4L, result.get("total_files"));
+        List<Map<String, Object>> tree = (List<Map<String, Object>>) result.get("tree");
+
+        // Directories first (src), then files (pom.xml)
+        assertEquals(2, tree.size());
+        Map<String, Object> srcNode = tree.get(0);
+        assertEquals("src", srcNode.get("name"));
+        assertEquals("directory", srcNode.get("type"));
+        assertEquals(6L, srcNode.get("nodeCount")); // aggregate: 3+1+2
+
+        Map<String, Object> pomNode = tree.get(1);
+        assertEquals("pom.xml", pomNode.get("name"));
+        assertEquals("file", pomNode.get("type"));
+        assertEquals(1L, pomNode.get("nodeCount"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void getFileTreeShouldSortDirectoriesBeforeFiles() {
+        when(graphStore.getFilePathsWithCounts()).thenReturn(List.of(
+                Map.of("filePath", "README.md", "nodeCount", 1L),
+                Map.of("filePath", "src/Foo.java", "nodeCount", 2L)));
+
+        Map<String, Object> result = service.getFileTree(null);
+
+        List<Map<String, Object>> tree = (List<Map<String, Object>>) result.get("tree");
+        assertEquals("src", tree.get(0).get("name"));      // directory first
+        assertEquals("README.md", tree.get(1).get("name")); // file second
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void getFileTreeShouldRespectDepthLimit() {
+        when(graphStore.getFilePathsWithCounts()).thenReturn(List.of(
+                Map.of("filePath", "src/main/java/Foo.java", "nodeCount", 5L)));
+
+        Map<String, Object> result = service.getFileTree(2);
+
+        List<Map<String, Object>> tree = (List<Map<String, Object>>) result.get("tree");
+        // depth=2: root children (depth=1) + their direct children (depth=2), no deeper
+        Map<String, Object> src = tree.get(0); // src (depth 1)
+        List<Map<String, Object>> srcChildren = (List<Map<String, Object>>) src.get("children");
+        Map<String, Object> main = srcChildren.get(0); // main (depth 2)
+        List<Map<String, Object>> mainChildren = (List<Map<String, Object>>) main.get("children");
+        assertTrue(mainChildren.isEmpty()); // depth limit reached
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void getFileTreeShouldReturnEmptyTreeForNoNodes() {
+        when(graphStore.getFilePathsWithCounts()).thenReturn(List.of());
+
+        Map<String, Object> result = service.getFileTree(null);
+
+        assertEquals(0L, result.get("total_files"));
+        List<Map<String, Object>> tree = (List<Map<String, Object>>) result.get("tree");
+        assertTrue(tree.isEmpty());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void getFileTreeShouldBeDeterministic() {
+        List<Map<String, Object>> paths = List.of(
+                Map.of("filePath", "src/B.java", "nodeCount", 2L),
+                Map.of("filePath", "src/A.java", "nodeCount", 1L),
+                Map.of("filePath", "lib/C.java", "nodeCount", 3L));
+
+        when(graphStore.getFilePathsWithCounts()).thenReturn(paths);
+        Map<String, Object> first = service.getFileTree(null);
+
+        when(graphStore.getFilePathsWithCounts()).thenReturn(paths);
+        Map<String, Object> second = service.getFileTree(null);
+
+        assertEquals(first.toString(), second.toString());
+    }
 }

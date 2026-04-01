@@ -202,6 +202,13 @@ public class GraphController {
         return queryService.searchGraph(q, Math.min(limit, 1000));
     }
 
+    @GetMapping("/file-tree")
+    public Map<String, Object> getFileTree(
+            @RequestParam(required = false) Integer depth) {
+        requireQueryService();
+        return queryService.getFileTree(depth);
+    }
+
     private void validateNodeKind(String kind) {
         try {
             NodeKind.fromValue(kind);
