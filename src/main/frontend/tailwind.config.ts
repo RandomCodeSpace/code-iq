@@ -88,6 +88,8 @@ export default {
         mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
       },
       animation: {
+        'accordion-down': 'accordionDown 0.2s ease-out',
+        'accordion-up': 'accordionUp 0.2s ease-out',
         'fade-in': 'fadeIn 0.5s ease-out',
         'slide-up': 'slideUp 0.4s ease-out',
         'counter': 'counter 1.5s ease-out',
@@ -98,6 +100,14 @@ export default {
         'panel-slide-out': 'panelSlideOut 0.25s ease-in',
       },
       keyframes: {
+        accordionDown: {
+          from: { height: '0' },
+          to: { height: 'var(--radix-accordion-content-height)' },
+        },
+        accordionUp: {
+          from: { height: 'var(--radix-accordion-content-height)' },
+          to: { height: '0' },
+        },
         fadeIn: {
           '0%': { opacity: '0' },
           '100%': { opacity: '1' },
