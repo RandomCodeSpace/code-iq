@@ -130,9 +130,8 @@ public class ReactComponentDetector extends AbstractRegexDetector {
 
         // RENDERS edges: scope JSX tag search to each component's body section.
         // A component's body is from its match position to the next component's position.
-        Set<String> allDetected = new HashSet<>(componentNames);
-        allDetected.addAll(hookNames);
-
+        // Filter: only exclude self-renders. Sibling components defined in the same file
+        // are allowed — they represent real inter-component RENDERS relationships.
         componentEntries.sort(Comparator.comparingInt(ComponentEntry::matchStart));
 
         for (int i = 0; i < componentEntries.size(); i++) {
@@ -147,7 +146,7 @@ public class ReactComponentDetector extends AbstractRegexDetector {
             Matcher jsxM = JSX_TAG.matcher(bodyText);
             while (jsxM.find()) {
                 String tag = jsxM.group(1);
-                if (!allDetected.contains(tag)) {
+                if (!tag.equals(comp.name())) {
                     childNames.add(tag);
                 }
             }

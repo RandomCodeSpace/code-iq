@@ -29,7 +29,12 @@ import io.github.randomcodespace.iq.detector.DetectorInfo;
 @Component
 public class KafkaDetector extends AbstractRegexDetector {
 
-    private static final Pattern CLASS_RE = Pattern.compile("(?:public\\s+)?class\\s+(\\w+)");
+    // Matches Java: `public class Foo`, `class Foo`
+    // Matches Kotlin: `class Foo`, `data class Foo`, `abstract class Foo`, `internal class Foo`,
+    //                 `open class Foo`, `sealed class Foo`, `object Foo` (Kotlin singleton)
+    private static final Pattern CLASS_RE = Pattern.compile(
+            "(?:(?:public|internal|private|protected|data|abstract|open|sealed|enum|inline|value)\\s+)*" +
+            "(?:class|object)\\s+(\\w+)");
     private static final Pattern KAFKA_LISTENER_RE = Pattern.compile(
             "@KafkaListener\\s*\\(\\s*(?:.*?topics?\\s*=\\s*)?[\\{\"]?\\s*\"([^\"]+)\"");
     private static final Pattern KAFKA_SEND_RE = Pattern.compile(

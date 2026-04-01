@@ -67,6 +67,27 @@ class ReactComponentDetectorTest {
     }
 
     @Test
+    void siblingComponentRendersEdgeIsNotDropped() {
+        // Header renders Footer (both in same file). Previously dropped by allDetected filter.
+        String source = """
+                export const Header = () => {
+                  return <div><Footer /></div>;
+                };
+
+                export const Footer = () => {
+                  return <div>footer</div>;
+                };
+                """;
+        DetectorResult r = d.detect(DetectorTestUtils.contextFor("typescript", source));
+        assertEquals(2, r.nodes().size());
+        List<String> headerRenders = r.edges().stream()
+                .filter(e -> e.getKind() == EdgeKind.RENDERS && e.getSourceId().contains("Header"))
+                .map(e -> e.getTarget().getId())
+                .toList();
+        assertTrue(headerRenders.contains("Footer"), "Header should RENDERS Footer (sibling component)");
+    }
+
+    @Test
     void singleComponentGetsAllJsxTags() {
         String source = """
                 export default function Dashboard() {

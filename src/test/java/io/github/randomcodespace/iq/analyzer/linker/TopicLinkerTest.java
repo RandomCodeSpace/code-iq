@@ -161,4 +161,38 @@ class TopicLinkerTest {
 
         assertEquals(1, result.edges().size());
     }
+
+    @Test
+    void isDeterministicWithSendToReceivesFrom() {
+        var topic = new CodeNode("topic:invoices", NodeKind.TOPIC, "invoices");
+        var sender1 = new CodeNode("svc:InvoiceService", NodeKind.CLASS, "InvoiceService");
+        var sender2 = new CodeNode("svc:BillingService", NodeKind.CLASS, "BillingService");
+        var receiver1 = new CodeNode("svc:AuditService", NodeKind.CLASS, "AuditService");
+        var receiver2 = new CodeNode("svc:ArchiveService", NodeKind.CLASS, "ArchiveService");
+
+        var e1 = new CodeEdge(); e1.setId("e1"); e1.setKind(EdgeKind.SENDS_TO);
+        e1.setSourceId("svc:InvoiceService"); e1.setTarget(topic);
+
+        var e2 = new CodeEdge(); e2.setId("e2"); e2.setKind(EdgeKind.SENDS_TO);
+        e2.setSourceId("svc:BillingService"); e2.setTarget(topic);
+
+        var e3 = new CodeEdge(); e3.setId("e3"); e3.setKind(EdgeKind.RECEIVES_FROM);
+        e3.setSourceId("svc:AuditService"); e3.setTarget(topic);
+
+        var e4 = new CodeEdge(); e4.setId("e4"); e4.setKind(EdgeKind.RECEIVES_FROM);
+        e4.setSourceId("svc:ArchiveService"); e4.setTarget(topic);
+
+        List<CodeNode> nodes = List.of(topic, sender1, sender2, receiver1, receiver2);
+        List<CodeEdge> edges = List.of(e1, e2, e3, e4);
+
+        LinkResult r1 = linker.link(nodes, edges);
+        LinkResult r2 = linker.link(nodes, edges);
+
+        assertEquals(r1.edges().size(), r2.edges().size(), "Edge count must be deterministic");
+        List<String> ids1 = r1.edges().stream().map(CodeEdge::getId).sorted().toList();
+        List<String> ids2 = r2.edges().stream().map(CodeEdge::getId).sorted().toList();
+        assertEquals(ids1, ids2, "Edge IDs must be deterministic");
+        // 2 senders × 2 receivers = 4 CALLS edges
+        assertEquals(4, r1.edges().size());
+    }
 }

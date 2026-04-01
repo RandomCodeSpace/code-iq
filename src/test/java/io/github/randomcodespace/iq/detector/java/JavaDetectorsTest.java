@@ -396,6 +396,34 @@ class JavaDetectorsTest {
         }
 
         @Test
+        void detectsKotlinDataClassKafkaListener() {
+            // data class and internal class modifiers must be handled by CLASS_RE
+            String kotlinSample = """
+                    internal data class OrderConsumer(val kafkaTemplate: Any) {
+                        @KafkaListener(topics = "payments")
+                        fun onPayment(msg: String) {}
+                    }
+                    """;
+            var r = new KafkaDetector().detect(ctx("kotlin", kotlinSample));
+            assertFalse(r.nodes().isEmpty());
+            assertTrue(r.edges().stream().anyMatch(e -> e.getKind().getValue().equals("consumes")));
+        }
+
+        @Test
+        void detectsKotlinObjectKafkaTemplate() {
+            // Kotlin object (singleton) is a common pattern for producer utilities
+            String kotlinSample = """
+                    object EventPublisher {
+                        lateinit var kafkaTemplate: KafkaTemplate<String, String>
+                        fun publish() { kafkaTemplate.send("events", "data") }
+                    }
+                    """;
+            var r = new KafkaDetector().detect(ctx("kotlin", kotlinSample));
+            assertFalse(r.nodes().isEmpty());
+            assertTrue(r.edges().stream().anyMatch(e -> e.getKind().getValue().equals("produces")));
+        }
+
+        @Test
         void detectsKotlinKafkaTemplate() {
             String kotlinSample = """
                     class NotificationService(val kafkaTemplate: KafkaTemplate<String, String>) {
@@ -741,6 +769,37 @@ class JavaDetectorsTest {
                     }
                     """;
             DetectorTestUtils.assertDeterministic(new ConfigDefDetector(), ctx("java", sample));
+        }
+
+        @Test
+        void genericDefineCallDoesNotFalsePositive() {
+            // A file containing "ConfigDef" text but calling .define() on an unrelated receiver
+            // must NOT produce config nodes (discriminator guard).
+            String sample = """
+                    import org.apache.kafka.common.config.ConfigDef;
+                    public class Schema {
+                        // this define() is on a Schema builder, not ConfigDef
+                        void setup() { schema.define("field", Type.STRING); }
+                    }
+                    """;
+            var r = new ConfigDefDetector().detect(ctx("java", sample));
+            assertTrue(r.nodes().isEmpty(), "schema.define() should not match — receiver is not ConfigDef");
+        }
+
+        @Test
+        void kafkaConfigDefWithReceiverMatches() {
+            String sample = """
+                    import org.apache.kafka.common.config.ConfigDef;
+                    public class MyConfig {
+                        static final ConfigDef CONFIG = new ConfigDef()
+                            .define("batch.size", ConfigDef.Type.INT, 1000)
+                            .define("timeout.ms", ConfigDef.Type.LONG, 5000L);
+                    }
+                    """;
+            var r = new ConfigDefDetector().detect(ctx("java", sample));
+            assertEquals(2, r.nodes().size());
+            assertTrue(r.nodes().stream().anyMatch(n -> n.getLabel().equals("batch.size")));
+            assertTrue(r.nodes().stream().anyMatch(n -> n.getLabel().equals("timeout.ms")));
         }
     }
 

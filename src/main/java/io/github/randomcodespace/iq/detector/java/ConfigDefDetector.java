@@ -80,16 +80,28 @@ public class ConfigDefDetector extends AbstractJavaParserDetector {
     private DetectorResult detectWithAst(CompilationUnit cu, DetectorContext ctx) {
         List<CodeNode> nodes = new ArrayList<>();
         List<CodeEdge> edges = new ArrayList<>();
+        // File-scoped seenKeys prevents duplicate config nodes when multiple classes
+        // in the same file reference the same key (e.g., @Value("${server.port}")).
+        Set<String> seenKeys = new LinkedHashSet<>();
 
         cu.findAll(ClassOrInterfaceDeclaration.class).forEach(classDecl -> {
             String className = classDecl.getNameAsString();
             String classNodeId = ctx.filePath() + ":" + className;
-            Set<String> seenKeys = new LinkedHashSet<>();
 
             // 1. Kafka ConfigDef.define() calls
+            // Discriminator: receiver must mention "ConfigDef" or "CONFIG" to avoid matching
+            // unrelated .define() calls (per CLAUDE.md: framework detectors must have guards).
             classDecl.findAll(MethodCallExpr.class).forEach(call -> {
                 if (!"define".equals(call.getNameAsString())) return;
                 if (call.getArguments().isEmpty()) return;
+                // Receiver check: scope must reference a ConfigDef instance or chain
+                boolean receiverIsConfigDef = call.getScope()
+                        .map(scope -> {
+                            String s = scope.toString();
+                            return s.contains("ConfigDef") || s.toUpperCase().contains("CONFIG");
+                        })
+                        .orElse(false);
+                if (!receiverIsConfigDef) return;
                 var firstArg = call.getArguments().get(0);
                 if (!firstArg.isStringLiteralExpr()) return;
                 String configKey = firstArg.asStringLiteralExpr().getValue();
