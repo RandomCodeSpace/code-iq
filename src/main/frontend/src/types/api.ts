@@ -94,15 +94,6 @@ export interface EdgesListResponse {
   total: number;
 }
 
-export interface AnalyzeResponse {
-  status: string;
-  total_files: number;
-  files_analyzed: number;
-  node_count: number;
-  edge_count: number;
-  elapsed_ms: number;
-}
-
 export interface SearchResult {
   id: string;
   kind: string;

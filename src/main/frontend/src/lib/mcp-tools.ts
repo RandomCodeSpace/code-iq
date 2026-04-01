@@ -320,17 +320,6 @@ export const TOOLS: McpTool[] = [
     description: "Find endpoints without auth guards",
     category: "security", icon: Shield, params: [], url: "/api/flow/auth?format=json",
   },
-  {
-    name: "analyze_codebase",
-    description: "Trigger a full codebase re-analysis (incremental or full)",
-    category: "security", icon: Shield,
-    params: [
-      { name: "incremental", type: "boolean", description: "Incremental mode (skip unchanged files)", default: "true" },
-    ],
-    url: (p) => `/api/analyze?incremental=${p.incremental ?? "true"}`,
-    method: "POST",
-  },
-
   // ── Code ──────────────────────────────────────────────────────────────────────
   {
     name: "read_file",
