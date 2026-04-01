@@ -2,23 +2,21 @@ import { useState } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
-  Network,
   FolderSearch,
-  Workflow,
   Terminal,
   BookOpen,
   Hexagon,
   Menu,
   X,
+  GitGraph,
 } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 import SearchBar from './SearchBar';
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/topology', label: 'Topology', icon: Network },
+  { path: '/graph', label: 'Code Graph', icon: GitGraph },
   { path: '/explorer', label: 'Explorer', icon: FolderSearch },
-  { path: '/flow', label: 'Flow', icon: Workflow },
   { path: '/console', label: 'Console', icon: Terminal },
   { path: '/api-docs', label: 'API Docs', icon: BookOpen },
 ];
