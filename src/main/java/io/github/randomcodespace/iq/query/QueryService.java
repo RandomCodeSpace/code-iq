@@ -384,9 +384,10 @@ public class QueryService {
      * they are always present from parent modules/config files.
      */
     private static final List<String> SEMANTIC_EDGE_KINDS = List.of(
-            "calls", "imports", "depends_on", "uses", "extends", "implements",
+            "calls", "imports", "depends_on", "extends", "implements",
             "injects", "queries", "maps_to", "consumes", "listens",
-            "invokes_rmi", "overrides", "connects_to", "triggers", "renders");
+            "invokes_rmi", "overrides", "connects_to", "triggers", "renders",
+            "protects");
 
     /**
      * Node kinds that are entry points — they are intended to have no callers
@@ -398,7 +399,13 @@ public class QueryService {
             NodeKind.MIGRATION.getValue(),
             NodeKind.CONFIG_FILE.getValue(),
             NodeKind.CONFIG_KEY.getValue(),
-            NodeKind.CONFIG_DEFINITION.getValue());
+            NodeKind.CONFIG_DEFINITION.getValue(),
+            NodeKind.GUARD.getValue(),
+            NodeKind.MIDDLEWARE.getValue(),
+            NodeKind.TOPIC.getValue(),
+            NodeKind.QUEUE.getValue(),
+            NodeKind.EVENT.getValue(),
+            NodeKind.MESSAGE_QUEUE.getValue());
 
     @Cacheable(value = "dead-code", key = "#kind + ':' + #limit")
     public Map<String, Object> findDeadCode(String kind, int limit) {
