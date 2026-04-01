@@ -7,6 +7,9 @@ import type {
   AnalyzeResponse,
   SearchResult,
   FileTreeNode,
+  TopologyResponse,
+  EgoGraphResponse,
+  NeighborsResponse,
 } from '@/types/api';
 
 const BASE = '/api';
@@ -44,9 +47,10 @@ export const api = {
   getNodesByKind: (kind: string, limit = 50, offset = 0) =>
     fetchJson<NodesListResponse>(`${BASE}/kinds/${kind}?limit=${limit}&offset=${offset}`),
 
-  getNodes: (kind?: string, limit = 100, offset = 0) => {
+  getNodes: (kind?: string, module?: string, limit = 100, offset = 0) => {
     const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
     if (kind) params.set('kind', kind);
+    if (module) params.set('module', module);
     return fetchJson<NodesListResponse>(`${BASE}/nodes?${params}`);
   },
 
@@ -109,4 +113,13 @@ export const api = {
     const params = depth !== undefined ? `?depth=${depth}` : '';
     return fetchJson<FileTreeNode>(`${BASE}/file-tree${params}`);
   },
+
+  getTopology: () =>
+    fetchJson<TopologyResponse>(`${BASE}/topology`),
+
+  getEgoGraph: (center: string, radius = 2) =>
+    fetchJson<EgoGraphResponse>(`${BASE}/ego/${encodeURIComponent(center)}?radius=${radius}`),
+
+  getNodeNeighborsTyped: (id: string) =>
+    fetchJson<NeighborsResponse>(`${BASE}/nodes/${encodeURIComponent(id)}/neighbors`),
 };

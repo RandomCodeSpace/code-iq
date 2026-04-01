@@ -118,3 +118,40 @@ export interface FileTreeNode {
   nodeCount: number;
   children?: FileTreeNode[];
 }
+
+// Topology API types
+export interface TopologyService {
+  name: string;
+  nodeCount?: number;
+  layer?: string;
+  modules?: string[];
+  language?: string;
+  framework?: string;
+}
+
+export interface TopologyDependency {
+  source: string;
+  target: string;
+  kind?: string;
+  count?: number;
+}
+
+export interface TopologyResponse {
+  services: TopologyService[];
+  dependencies: TopologyDependency[];
+}
+
+// Ego graph API types
+export interface EgoGraphResponse {
+  center: string;
+  nodes: NodeResponse[];
+  edges: EdgeResponse[];
+  radius?: number;
+}
+
+// Neighbors API types
+export interface NeighborsResponse {
+  node: NodeResponse;
+  incoming: Array<{ edge: EdgeResponse; node: NodeResponse }>;
+  outgoing: Array<{ edge: EdgeResponse; node: NodeResponse }>;
+}
