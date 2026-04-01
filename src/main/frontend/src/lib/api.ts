@@ -4,7 +4,6 @@ import type {
   NodesListResponse,
   NodeResponse,
   EdgesListResponse,
-  AnalyzeResponse,
   SearchResult,
   FileTreeNode,
   TopologyResponse,
@@ -23,18 +22,6 @@ async function fetchJson<T>(url: string): Promise<T> {
   return res.json();
 }
 
-async function postJson<T>(url: string, body?: unknown): Promise<T> {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: body ? { 'Content-Type': 'application/json' } : {},
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`API error ${res.status}: ${text}`);
-  }
-  return res.json();
-}
 
 export const api = {
   getStats: () => fetchJson<StatsResponse>(`${BASE}/stats`),
@@ -72,14 +59,13 @@ export const api = {
   search: (q: string, limit = 50) =>
     fetchJson<SearchResult[]>(`${BASE}/search?q=${encodeURIComponent(q)}&limit=${limit}`),
 
-  analyze: (incremental = false) =>
-    postJson<AnalyzeResponse>(`${BASE}/analyze?incremental=${incremental}`),
-
-  readFile: (path: string, startLine?: number, endLine?: number) => {
+  readFile: async (path: string, startLine?: number, endLine?: number) => {
     const params = new URLSearchParams({ path });
     if (startLine !== undefined) params.set('startLine', String(startLine));
     if (endLine !== undefined) params.set('endLine', String(endLine));
-    return fetch(`${BASE}/file?${params}`).then(r => r.text());
+    const r = await fetch(`${BASE}/file?${params}`);
+    if (!r.ok) throw new Error(`API error ${r.status}`);
+    return r.text();
   },
 
   getCycles: (limit = 100) =>

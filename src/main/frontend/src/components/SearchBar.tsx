@@ -36,6 +36,9 @@ export default function SearchBar() {
     timerRef.current = setTimeout(() => doSearch(val), 300);
   };
 
+  // Cancel pending debounce timer on unmount to prevent state updates after unmount
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {

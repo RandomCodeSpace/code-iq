@@ -103,6 +103,7 @@ export default function SwaggerView() {
               src="/swagger-ui/index.html"
               className="w-full h-full border-0"
               title="Swagger UI"
+              sandbox="allow-scripts allow-same-origin allow-forms"
               onLoad={() => setIframeLoaded(true)}
             />
           </div>

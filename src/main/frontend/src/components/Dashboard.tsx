@@ -328,18 +328,18 @@ export default function Dashboard() {
         {Object.keys(layers).length > 0 && (
           <SectionCard icon={Layers} iconClass="text-amber-400" title="Architecture Layers">
             <div className="space-y-2.5" role="list">
-              {Object.entries(layers)
-                .sort(([, a], [, b]) => b - a)
-                .map(([layer, count]) => {
-                  const layerColors: Record<string, string> = {
-                    frontend: 'bg-gradient-to-r from-cyan-500 to-blue-500',
-                    backend: 'bg-gradient-to-r from-indigo-500 to-purple-500',
-                    infra: 'bg-gradient-to-r from-amber-500 to-orange-500',
-                    shared: 'bg-gradient-to-r from-emerald-500 to-green-500',
-                    unknown: 'bg-gradient-to-r from-muted to-muted-foreground/30',
-                  };
-                  const total = Object.values(layers).reduce((s, v) => s + v, 0);
-                  return (
+              {(() => {
+                const layerColors: Record<string, string> = {
+                  frontend: 'bg-gradient-to-r from-cyan-500 to-blue-500',
+                  backend: 'bg-gradient-to-r from-indigo-500 to-purple-500',
+                  infra: 'bg-gradient-to-r from-amber-500 to-orange-500',
+                  shared: 'bg-gradient-to-r from-emerald-500 to-green-500',
+                  unknown: 'bg-gradient-to-r from-muted to-muted-foreground/30',
+                };
+                const total = Object.values(layers).reduce((s, v) => s + v, 0);
+                return Object.entries(layers)
+                  .sort(([, a], [, b]) => b - a)
+                  .map(([layer, count]) => (
                     <StatRow
                       key={layer}
                       label={layer}
@@ -347,8 +347,8 @@ export default function Dashboard() {
                       total={total}
                       colorClass={layerColors[layer] || layerColors.unknown}
                     />
-                  );
-                })}
+                  ));
+              })()}
             </div>
           </SectionCard>
         )}
@@ -421,29 +421,29 @@ export default function Dashboard() {
           {Object.keys(auth).length > 0 && (
             <SectionCard icon={Shield} iconClass="text-amber-400" title="Authentication">
               <div className="space-y-1" role="list">
-                {Object.entries(auth)
+                {(() => {
+                  const authTotal = Object.values(auth).reduce((s, n) => s + n, 0);
+                  return Object.entries(auth)
                   .sort(([, a], [, b]) => b - a)
-                  .map(([k, v]) => {
-                    const authTotal = Object.values(auth).reduce((s, n) => s + n, 0);
-                    return (
-                      <div key={k} className="flex items-center justify-between py-1" role="listitem">
-                        <div className="flex items-center gap-2">
-                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400/70 shrink-0" />
-                          <span className="text-xs text-muted-foreground capitalize">
-                            {k.replace(/_/g, ' ')}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] text-muted-foreground/50 tabular-nums font-mono">
-                            {((v / authTotal) * 100).toFixed(0)}%
-                          </span>
-                          <Badge variant="muted" className="text-[10px] font-mono py-0 px-1.5">
-                            {v.toLocaleString()}
-                          </Badge>
-                        </div>
+                  .map(([k, v]) => (
+                    <div key={k} className="flex items-center justify-between py-1" role="listitem">
+                      <div className="flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400/70 shrink-0" />
+                        <span className="text-xs text-muted-foreground capitalize">
+                          {k.replace(/_/g, ' ')}
+                        </span>
                       </div>
-                    );
-                  })}
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-muted-foreground/50 tabular-nums font-mono">
+                          {((v / authTotal) * 100).toFixed(0)}%
+                        </span>
+                        <Badge variant="muted" className="text-[10px] font-mono py-0 px-1.5">
+                          {v.toLocaleString()}
+                        </Badge>
+                      </div>
+                    </div>
+                  ));
+                })()}
               </div>
             </SectionCard>
           )}
