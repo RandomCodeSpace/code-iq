@@ -21,7 +21,7 @@
 - JavaParser 3.28.0 (Java AST analysis)
 - ANTLR 4.13.2 (TypeScript/JavaScript, Python, Go, C#, Rust, C++ grammars)
 - Picocli 4.7.7 (CLI framework, integrated with Spring Boot)
-- Thymeleaf + HTMX (web UI)
+- React 18 + TypeScript + Vite 6 + Tailwind CSS (web UI)
 - H2 (incremental analysis cache)
 
 ## Architecture
@@ -96,10 +96,10 @@ io.github.randomcodespace.iq
   |-- grammar/                     # ANTLR parser factory + generated parsers
   |-- graph/                       # GraphStore (Neo4j facade), GraphRepository (SDN, writes only)
   |-- health/                      # GraphHealthIndicator (Spring Actuator)
-  |-- mcp/                         # McpTools (30 @McpTool methods, read-only)
+  |-- mcp/                         # McpTools (31 @McpTool methods, read-only)
   |-- model/                       # CodeNode, CodeEdge, NodeKind (32), EdgeKind (27)
   |-- query/                       # QueryService, StatsService (categorized), TopologyService
-  |-- web/                         # ExplorerController (Thymeleaf web UI)
+  |-- web/                         # Static resource serving (React SPA)
 ```
 
 ## Critical Rules
@@ -144,6 +144,7 @@ io.github.randomcodespace.iq
 | `bundle [path]` | Package graph + source into distributable ZIP |
 | `cache [action]` | Manage analysis cache |
 | `plugins [action]` | List and inspect detectors |
+| `topology [path]` | Show service topology map |
 | `version` | Show version info |
 
 ### Standard Pipeline
@@ -161,25 +162,46 @@ code-iq serve /path/to/repo          # needs enrich if using index
 
 ## Server Endpoints (all read-only)
 
-### REST API (`/api`)
+### REST API (`/api`) -- 34 endpoints
+
+**GraphController** (`/api`):
 - `GET /api/stats` -- Rich categorized statistics (graph, languages, frameworks, infra, connections, auth, architecture)
 - `GET /api/stats/detailed?category=` -- Single category stats
 - `GET /api/kinds` -- Node kinds with counts
 - `GET /api/kinds/{kind}` -- Paginated nodes by kind
-- `GET /api/nodes`, `GET /api/edges` -- Paginated queries
+- `GET /api/nodes` -- Paginated node queries
 - `GET /api/nodes/{id}/detail` -- Full node detail with edges
 - `GET /api/nodes/{id}/neighbors` -- Neighbor traversal
+- `GET /api/edges` -- Paginated edge queries
 - `GET /api/ego/{center}` -- Ego subgraph
-- `GET /api/query/cycles`, `/shortest-path`, `/consumers/{id}`, `/producers/{id}`, `/callers/{id}`, `/dependencies/{id}`, `/dependents/{id}`
+- `GET /api/query/cycles` -- Cycle detection
+- `GET /api/query/shortest-path` -- Shortest path between nodes
+- `GET /api/query/consumers/{id}`, `/producers/{id}`, `/callers/{id}`, `/dependencies/{id}`, `/dependents/{id}`
 - `GET /api/query/dead-code` -- Dead code detection (semantic edge filtering, excludes entry points)
-- `GET /api/triage/component?file=`, `/impact/{id}` -- Agentic triage
+- `GET /api/triage/component?file=` -- Agentic triage by file
+- `GET /api/triage/impact/{id}` -- Impact trace
 - `GET /api/search?q=` -- Free-text search
 - `GET /api/file?path=` -- Source files (path traversal protected)
-- `GET /api/flow/{view}` -- Flow diagrams
-- `GET /api/topology` -- Service topology map
 
-### MCP Tools (30, via `@McpTool` annotation)
-`get_stats`, `get_detailed_stats`, `query_nodes`, `query_edges`, `get_node_neighbors`, `get_ego_graph`, `find_cycles`, `find_shortest_path`, `find_consumers`, `find_producers`, `find_callers`, `find_dependencies`, `find_dependents`, `find_dead_code`, `generate_flow`, `run_cypher`, `find_component_by_file`, `trace_impact`, `find_related_endpoints`, `search_graph`, `read_file`, `get_topology`, `service_detail`, `service_dependencies`, `service_dependents`, `blast_radius`, `find_path`, `find_bottlenecks`, `find_circular_deps`, `find_dead_services`
+**TopologyController** (`/api/topology`):
+- `GET /api/topology` -- Service topology map
+- `GET /api/topology/services/{name}` -- Service detail
+- `GET /api/topology/services/{name}/deps` -- Service dependencies
+- `GET /api/topology/services/{name}/dependents` -- Service dependents
+- `GET /api/topology/blast-radius/{nodeId}` -- Blast radius analysis
+- `GET /api/topology/path` -- Find path between services
+- `GET /api/topology/bottlenecks` -- Find bottleneck services
+- `GET /api/topology/circular` -- Circular dependency detection
+- `GET /api/topology/dead` -- Dead service detection
+
+**FlowController** (`/api/flow`):
+- `GET /api/flow` -- List available flow views
+- `GET /api/flow/{view}` -- Flow diagram for specific view
+- `GET /api/flow/{view}/{nodeId}/children` -- Node children in flow
+- `GET /api/flow/{view}/{nodeId}/parent` -- Node parent in flow
+
+### MCP Tools (31, via `@McpTool` annotation)
+`get_stats`, `get_detailed_stats`, `query_nodes`, `query_edges`, `get_node_neighbors`, `get_ego_graph`, `find_cycles`, `find_shortest_path`, `find_consumers`, `find_producers`, `find_callers`, `find_dependencies`, `find_dependents`, `find_dead_code`, `generate_flow`, `run_cypher`, `find_component_by_file`, `trace_impact`, `find_related_endpoints`, `search_graph`, `read_file`, `get_topology`, `service_detail`, `service_dependencies`, `service_dependents`, `blast_radius`, `find_path`, `find_bottlenecks`, `find_circular_deps`, `find_dead_services`, `find_node`
 
 ## Adding a New Detector
 
@@ -218,7 +240,7 @@ code-iq serve /path/to/repo          # needs enrich if using index
 ## Testing
 
 ```bash
-# Run all tests (~1385 tests)
+# Run all tests (~1440 tests)
 mvn test
 
 # Run a specific test class
@@ -287,7 +309,7 @@ mvn dependency-check:check
 | `config/JacksonConfig.java` | Jackson config (FAIL_ON_UNKNOWN_PROPERTIES disabled for MCP compat) |
 | `cache/AnalysisCache.java` | H2 incremental cache |
 | `api/GraphController.java` | REST API endpoints (read-only) |
-| `mcp/McpTools.java` | 30 MCP tool definitions (`@McpTool`, read-only) |
+| `mcp/McpTools.java` | 31 MCP tool definitions (`@McpTool`, read-only) |
 | `query/QueryService.java` | Graph query operations with Spring caching |
 | `query/StatsService.java` | Rich categorized statistics (7 categories) |
 | `query/TopologyService.java` | Service topology queries |
@@ -321,6 +343,7 @@ mvn dependency-check:check
 - `codeiq.max-radius` -- max ego graph radius (default: 10)
 - `codeiq.max-depth` -- max impact trace depth (default: 10)
 - `codeiq.batch-size` -- files per H2 flush batch (default: 500)
+- `codeiq.neo4j.enabled` -- Neo4j conditional toggle (default: `true`, overridden to `false` in `indexing` profile)
 - `spring.ai.mcp.server.protocol` -- MCP protocol (STREAMABLE)
 
 ### Project-level overrides (`.osscodeiq.yml`)

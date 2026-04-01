@@ -18,7 +18,7 @@
 
 ---
 
-**OSSCodeIQ** scans codebases to build a deterministic knowledge graph of code relationships -- classes, methods, endpoints, entities, dependencies, infrastructure resources, auth patterns, service topology, and more. 97 detectors across 35+ languages, Neo4j Embedded graph database, Spring AI MCP server (31 tools), REST API (32+ endpoints), React web UI, and zero AI dependency.
+**OSSCodeIQ** scans codebases to build a deterministic knowledge graph of code relationships -- classes, methods, endpoints, entities, dependencies, infrastructure resources, auth patterns, service topology, and more. 97 detectors across 35+ languages, Neo4j Embedded graph database, Spring AI MCP server (31 tools), REST API (34 endpoints), React web UI, and zero AI dependency.
 
 ## Quick Start
 
@@ -50,10 +50,10 @@ java -jar target/code-iq-*-cli.jar serve /path/to/repo
 - **Neo4j Embedded** graph database -- full Cypher query support, no external server needed
 - **H2 analysis cache** -- batched streaming for memory-efficient indexing on CI runners
 - **Spring AI MCP server** -- 31 tools via streamable HTTP for AI-powered triage
-- **REST API** -- 32+ endpoints for programmatic access
-- **React UI** -- Dashboard, Topology (Cytoscape.js), Explorer, Flow, MCP Console (Monaco Editor), API Docs
+- **REST API** -- 34 endpoints for programmatic access
+- **React UI** -- Dashboard, Topology (Cytoscape.js), Explorer, Flow, MCP Console, API Docs (Swagger)
 - **Service Topology** -- AppDynamics-style service map with blast radius, circular deps, bottleneck detection
-- **CLI with 14 commands** -- analyze, index, enrich, serve, stats, graph, query, find, flow, bundle, cache, plugins, topology, version
+- **CLI with 15 commands** -- analyze, index, enrich, serve, stats, graph, query, find, cypher, flow, topology, bundle, cache, plugins, version
 - **Virtual threads** (Java 25) -- adaptive parallelism across all available cores
 - **Config-driven pipeline** -- `.osscodeiq.yml` to control languages, detectors, parsers, excludes
 - **Multi-repo support** -- `--graph` + `--service-name` for shared graph across repositories
@@ -61,7 +61,7 @@ java -jar target/code-iq-*-cli.jar serve /path/to/repo
 - **Bundle & distribute** -- package graph DB + source + interactive HTML into a ZIP
 - **100% deterministic** -- same input, same output, every time
 - **Incremental analysis** -- H2-backed file hash cache, only re-analyzes changed files
-- **1,227 tests** passing
+- **1,440 tests** passing
 
 ## Three-Command Architecture
 
@@ -129,6 +129,7 @@ Spring Security, Django Auth, FastAPI Auth, NestJS Guards, Passport/JWT, K8s RBA
 | `graph [path]` | Export graph in various formats (JSON, YAML, Mermaid, DOT) |
 | `query [path]` | Query graph relationships (consumers, producers, callers, etc.) |
 | `find [what] [path]` | Preset queries (endpoints, guards, entities, topics, etc.) |
+| `cypher [query]` | Execute raw Cypher queries against Neo4j |
 | `topology [path]` | Service topology queries (blast radius, circular deps, bottlenecks) |
 | `flow [path]` | Generate architecture flow diagrams |
 | `bundle [path]` | Package graph + source into distributable ZIP |
@@ -195,7 +196,7 @@ code-iq serve /path/to/repo
     |         |        |
     v         v        v
  REST API   MCP     React UI
- (32+ ep)  (31 tools) (6 pages)
+ (34 ep)   (31 tools) (6 pages)
 ```
 
 ## Server
@@ -212,12 +213,12 @@ Modern React 18 + TypeScript + Tailwind CSS interface:
 - **Topology** -- Cytoscape.js service dependency map with drill-down
 - **Explorer** -- browse by node kind, click to drill into details with edges
 - **Flow** -- interactive architecture diagrams (Overview, CI, Deploy, Runtime, Auth)
-- **Console** -- Monaco Editor for MCP tool invocation
+- **Console** -- MCP Inspector for tool invocation with category filters and JSON response viewer
 - **API Docs** -- embedded Swagger/OpenAPI documentation
 - Dark/light/system theme toggle
 
 ### REST API (`/api`)
-32+ endpoints for programmatic access:
+34 endpoints for programmatic access:
 - `/api/stats`, `/api/stats/detailed?category=` -- graph and categorized statistics
 - `/api/kinds`, `/api/kinds/{kind}` -- node kinds with counts, paginated nodes
 - `/api/nodes`, `/api/edges` -- paginated queries with `?kind=&limit=&offset=`
@@ -228,17 +229,18 @@ Modern React 18 + TypeScript + Tailwind CSS interface:
 - `/api/triage/component?file=`, `/api/triage/impact/{id}` -- agentic triage
 - `/api/search?q=` -- free-text graph search
 - `/api/file?path=` -- source files (path traversal protected)
-- `/api/flow/{view}` -- flow diagrams
-- `POST /api/analyze` -- trigger analysis
+- `/api/flow`, `/api/flow/{view}`, `/api/flow/{view}/{nodeId}/children`, `/api/flow/{view}/{nodeId}/parent` -- flow diagrams
+- `/api/topology/services/{name}/deps`, `/api/topology/services/{name}/dependents` -- service dependencies
+- `/api/topology/path` -- find path between services
 
 ### MCP Server (`/mcp`)
 31 tools via Spring AI streamable HTTP for AI-powered code triage:
 
 **Core (21 tools):**
-`get_stats`, `get_detailed_stats`, `query_nodes`, `query_edges`, `get_node_neighbors`, `get_ego_graph`, `find_cycles`, `find_shortest_path`, `find_consumers`, `find_producers`, `find_callers`, `find_dependencies`, `find_dependents`, `generate_flow`, `analyze_codebase`, `run_cypher`, `find_component_by_file`, `trace_impact`, `find_related_endpoints`, `search_graph`, `read_file`
+`get_stats`, `get_detailed_stats`, `query_nodes`, `query_edges`, `get_node_neighbors`, `get_ego_graph`, `find_cycles`, `find_shortest_path`, `find_consumers`, `find_producers`, `find_callers`, `find_dependencies`, `find_dependents`, `find_dead_code`, `generate_flow`, `run_cypher`, `find_component_by_file`, `trace_impact`, `find_related_endpoints`, `search_graph`, `read_file`
 
 **Topology (10 tools):**
-`get_topology`, `get_service_detail`, `get_service_dependencies`, `get_service_dependents`, `get_blast_radius`, `find_service_path`, `find_bottlenecks`, `find_circular_dependencies`, `find_dead_services`, `find_topology_node`
+`get_topology`, `service_detail`, `service_dependencies`, `service_dependents`, `blast_radius`, `find_path`, `find_bottlenecks`, `find_circular_deps`, `find_dead_services`, `find_node`
 
 ## Service Topology
 
@@ -340,7 +342,7 @@ cd code-iq
 # Build
 mvn clean package
 
-# Run tests (1,227 tests)
+# Run tests (1,440 tests)
 mvn test
 
 # Analyze this repo
@@ -369,7 +371,7 @@ java -jar target/code-iq-*-cli.jar serve .
 | Graph DB | Neo4j Embedded 2026.02.3 (Community Edition) |
 | Analysis Cache | H2 (pure Java, virtual thread safe) |
 | Cache | Spring Cache (simple in-memory, @Cacheable on query methods) |
-| MCP | Spring AI 1.1.4 (streamable HTTP) |
+| MCP | Spring AI 2.0.0-M3 (streamable HTTP) |
 | Java AST | JavaParser 3.28.0 |
 | Multi-lang AST | ANTLR 4.13.2 (10 grammars) |
 | CLI | Picocli 4.7.7 |
