@@ -4,8 +4,6 @@ import type {
   NodesListResponse,
   NodeResponse,
   EdgesListResponse,
-  TopologyResponse,
-  FlowDiagram,
   AnalyzeResponse,
   SearchResult,
 } from '@/types/api';
@@ -65,20 +63,6 @@ export const api = {
     if (kind) params.set('kind', kind);
     return fetchJson<EdgesListResponse>(`${BASE}/edges?${params}`);
   },
-
-  getTopology: () => fetchJson<TopologyResponse>(`${BASE}/topology`),
-
-  getTopologyServiceDetail: (name: string) =>
-    fetchJson<Record<string, unknown>>(`${BASE}/topology/services/${encodeURIComponent(name)}`),
-
-  getBlastRadius: (id: string) =>
-    fetchJson<Record<string, unknown>>(`${BASE}/topology/blast-radius/${encodeURIComponent(id)}`),
-
-  getFlow: (view: string) =>
-    fetchJson<FlowDiagram>(`${BASE}/flow/${view}?format=json`),
-
-  getAllFlows: () =>
-    fetchJson<Record<string, FlowDiagram>>(`${BASE}/flow`),
 
   search: (q: string, limit = 50) =>
     fetchJson<SearchResult[]>(`${BASE}/search?q=${encodeURIComponent(q)}&limit=${limit}`),

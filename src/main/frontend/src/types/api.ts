@@ -94,51 +94,6 @@ export interface EdgesListResponse {
   total: number;
 }
 
-export interface TopologyResponse {
-  services: TopologyNode[];
-  connections: TopologyEdge[];
-  summary: Record<string, unknown>;
-}
-
-export interface TopologyNode {
-  id: string;
-  name: string;
-  type: string;
-  kind?: string;
-  nodeCount?: number;
-  layer?: string;
-  properties?: Record<string, unknown>;
-}
-
-export interface TopologyEdge {
-  source: string;
-  target: string;
-  type: string;
-  label?: string;
-  weight?: number;
-}
-
-export interface FlowDiagram {
-  title: string;
-  nodes: FlowNode[];
-  edges: FlowEdge[];
-}
-
-export interface FlowNode {
-  id: string;
-  label: string;
-  type: string;
-  group?: string;
-  properties?: Record<string, unknown>;
-}
-
-export interface FlowEdge {
-  source: string;
-  target: string;
-  label?: string;
-  type?: string;
-}
-
 export interface AnalyzeResponse {
   status: string;
   total_files: number;
