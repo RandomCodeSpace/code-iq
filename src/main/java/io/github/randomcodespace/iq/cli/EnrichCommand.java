@@ -309,6 +309,14 @@ public class EnrichCommand implements Callable<Integer> {
                 tx.execute("CREATE INDEX IF NOT EXISTS FOR (n:CodeNode) ON (n.filePath)");
                 tx.execute("CREATE INDEX IF NOT EXISTS FOR (n:CodeNode) ON (n.label_lower)");
                 tx.execute("CREATE INDEX IF NOT EXISTS FOR (n:CodeNode) ON (n.fqn_lower)");
+                tx.execute("CREATE FULLTEXT INDEX search_index IF NOT EXISTS "
+                        + "FOR (n:CodeNode) ON EACH [n.label_lower, n.fqn_lower] "
+                        + "OPTIONS {indexConfig: {`fulltext.analyzer`: 'keyword'}}");
+                tx.commit();
+            }
+            // Wait for all indexes (including fulltext) to finish building
+            try (Transaction tx = db.beginTx()) {
+                tx.execute("CALL db.awaitIndexes(300)");
                 tx.commit();
             }
             CliOutput.info("  Created Neo4j indexes");
