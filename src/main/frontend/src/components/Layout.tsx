@@ -26,6 +26,8 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import SearchBar from './SearchBar';
 import { useTheme } from '@/hooks/useTheme';
+import { FileSelectionProvider } from '@/contexts/FileSelectionContext';
+import ProjectFileTree from './ProjectFileTree';
 
 /* ------------------------------------------------------------------ */
 /* Right-panel context — lets child views open the details panel       */
@@ -194,17 +196,12 @@ function Sidebar({ collapsed, mobileOpen, onCollapse, onMobileClose }: SidebarPr
           })}
         </nav>
 
-        {/* File tree placeholder */}
+        {/* Project file tree */}
         {!collapsed && (
           <>
             <Separator />
-            <div className="px-3 py-3">
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                Project Files
-              </p>
-              <div className="text-xs text-muted-foreground/60 italic px-1">
-                File tree coming in Phase 2
-              </div>
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <ProjectFileTree />
             </div>
           </>
         )}
@@ -342,6 +339,7 @@ export default function Layout() {
   };
 
   return (
+    <FileSelectionProvider>
     <RightPanelContext.Provider value={{ openPanel, closePanel, isOpen: rightPanelOpen }}>
       <div className="flex h-screen overflow-hidden bg-background text-foreground">
 
@@ -405,5 +403,6 @@ export default function Layout() {
         </div>
       </div>
     </RightPanelContext.Provider>
+    </FileSelectionProvider>
   );
 }

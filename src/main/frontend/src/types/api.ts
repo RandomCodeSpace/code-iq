@@ -110,3 +110,11 @@ export interface SearchResult {
   score?: number;
   file_path?: string;
 }
+
+export interface FileTreeNode {
+  name: string;
+  path: string;
+  type: 'file' | 'directory';
+  nodeCount: number;
+  children?: FileTreeNode[];
+}

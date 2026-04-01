@@ -3,7 +3,8 @@ import * as d3 from 'd3';
 import { useApi } from '@/hooks/useApi';
 import { api } from '@/lib/api';
 import type { KindEntry, NodeResponse, NodesListResponse } from '@/types/api';
-import { ChevronRight, Home } from 'lucide-react';
+import { ChevronRight, Home, X, FileCode } from 'lucide-react';
+import { useFileSelection } from '@/contexts/FileSelectionContext';
 
 // Reuse the kind-color mapping from ExplorerView for consistency
 const KIND_COLORS: Record<string, string> = {
@@ -231,6 +232,8 @@ export default function CodeGraphView() {
   const [drillTotal, setDrillTotal] = useState(0);
   const [drillLoading, setDrillLoading] = useState(false);
 
+  const { selectedPath, selectedType, clearSelection } = useFileSelection();
+
   const { data: kindsData, loading: kindsLoading } = useApi(() => api.getKinds(), []);
 
   // Observe container size
@@ -261,16 +264,34 @@ export default function CodeGraphView() {
     setDrillNodes([]);
     setDrillTotal(0);
     try {
-      const result: NodesListResponse = await api.getNodesByKind(kind, 200, 0);
-      setDrillNodes(result.nodes ?? []);
-      setDrillTotal(result.total ?? result.count ?? (result.nodes ?? []).length);
+      const result: NodesListResponse = await api.getNodesByKind(kind, 500, 0);
+      const nodes = result.nodes ?? [];
+      // If a file/directory is selected, filter nodes to that path
+      const filtered = selectedPath
+        ? nodes.filter(n => {
+            if (!n.file_path) return false;
+            return selectedType === 'directory'
+              ? n.file_path.startsWith(selectedPath)
+              : n.file_path === selectedPath;
+          })
+        : nodes;
+      setDrillNodes(filtered);
+      setDrillTotal(filtered.length);
     } catch {
       setDrillNodes([]);
       setDrillTotal(0);
     } finally {
       setDrillLoading(false);
     }
-  }, []);
+  }, [selectedPath, selectedType]);
+
+  // Re-run drill if file selection changes while already drilled into a kind
+  useEffect(() => {
+    if (selectedKind) {
+      handleDrillDown(selectedKind);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPath]);
 
   const handleDrillUp = useCallback(() => {
     setSelectedKind(null);
@@ -280,52 +301,81 @@ export default function CodeGraphView() {
 
   const kinds: KindEntry[] = kindsData?.kinds ?? [];
 
+  // Friendly display name for the selected path
+  const selectedLabel = selectedPath
+    ? selectedPath.split('/').pop() ?? selectedPath
+    : null;
+
   return (
     <div className="flex flex-col h-full space-y-3">
       {/* Header + breadcrumb */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-2xl font-bold gradient-text">Code Graph</h1>
           <p className="text-sm text-surface-400 mt-0.5">
             {selectedKind
-              ? drillTotal > drillNodes.length
-                ? `Showing ${drillNodes.length} of ${drillTotal} "${selectedKind}" nodes`
-                : `${drillNodes.length} nodes of kind "${selectedKind}"`
+              ? drillTotal > 0
+                ? `${drillTotal} "${selectedKind}" nodes${selectedPath ? ` in ${selectedLabel}` : ''}`
+                : `No "${selectedKind}" nodes${selectedPath ? ` in ${selectedLabel}` : ''}`
               : `${kinds.length} node kinds — click a tile to explore`}
           </p>
         </div>
 
-        {/* Breadcrumb */}
-        <nav className="flex items-center gap-1 text-sm">
-          <button
-            onClick={handleDrillUp}
-            className={`flex items-center gap-1 px-2 py-1 rounded transition-colors ${
-              selectedKind
-                ? 'text-brand-400 hover:text-brand-300 hover:bg-surface-800/50 cursor-pointer'
-                : 'text-surface-500 cursor-default'
-            }`}
-            disabled={!selectedKind}
-          >
-            <Home className="w-3.5 h-3.5" />
-            <span>All Kinds</span>
-          </button>
-          {selectedKind && (
-            <>
-              <ChevronRight className="w-3.5 h-3.5 text-surface-600" />
-              <span
-                className="px-2 py-1 rounded text-brand-300 font-medium"
-                style={{ color: getKindColor(selectedKind) }}
-              >
-                {selectedKind.toUpperCase()}
+        <div className="flex items-center gap-2">
+          {/* Active file filter badge */}
+          {selectedPath && (
+            <div
+              className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs
+                         bg-surface-800/70 border border-surface-700/50 text-surface-300"
+              data-testid="file-filter-badge"
+            >
+              <FileCode className="w-3 h-3 text-brand-400 shrink-0" />
+              <span className="truncate max-w-[200px]" title={selectedPath}>
+                {selectedLabel}
               </span>
-            </>
+              <button
+                onClick={clearSelection}
+                aria-label="Clear file filter"
+                className="text-surface-500 hover:text-surface-300 ml-0.5"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
           )}
-        </nav>
+
+          {/* Breadcrumb */}
+          <nav className="flex items-center gap-1 text-sm" aria-label="Graph breadcrumb">
+            <button
+              onClick={handleDrillUp}
+              className={`flex items-center gap-1 px-2 py-1 rounded transition-colors ${
+                selectedKind
+                  ? 'text-brand-400 hover:text-brand-300 hover:bg-surface-800/50 cursor-pointer'
+                  : 'text-surface-500 cursor-default'
+              }`}
+              disabled={!selectedKind}
+            >
+              <Home className="w-3.5 h-3.5" />
+              <span>All Kinds</span>
+            </button>
+            {selectedKind && (
+              <>
+                <ChevronRight className="w-3.5 h-3.5 text-surface-600" />
+                <span
+                  className="px-2 py-1 rounded text-brand-300 font-medium"
+                  style={{ color: getKindColor(selectedKind) }}
+                >
+                  {selectedKind.toUpperCase()}
+                </span>
+              </>
+            )}
+          </nav>
+        </div>
       </div>
 
       {/* Treemap container */}
       <div
         ref={containerRef}
+        data-testid="graph-container"
         className="flex-1 rounded-xl border border-surface-800/50 bg-surface-900/40 overflow-hidden"
       >
         {(kindsLoading || drillLoading) && (

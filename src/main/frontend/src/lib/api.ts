@@ -6,6 +6,7 @@ import type {
   EdgesListResponse,
   AnalyzeResponse,
   SearchResult,
+  FileTreeNode,
 } from '@/types/api';
 
 const BASE = '/api';
@@ -103,4 +104,9 @@ export const api = {
 
   traceImpact: (id: string, depth = 3) =>
     fetchJson<Record<string, unknown>>(`${BASE}/triage/impact/${encodeURIComponent(id)}?depth=${depth}`),
+
+  getFileTree: (depth?: number) => {
+    const params = depth !== undefined ? `?depth=${depth}` : '';
+    return fetchJson<FileTreeNode>(`${BASE}/file-tree${params}`);
+  },
 };
