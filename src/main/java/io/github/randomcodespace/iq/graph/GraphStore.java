@@ -244,14 +244,13 @@ public class GraphStore implements FlowDataSource {
 
     public List<CodeNode> search(String text) {
         return queryNodes(
-                "MATCH (n:CodeNode) WHERE n.label CONTAINS $text OR n.fqn CONTAINS $text RETURN n",
+                "CALL db.index.fulltext.queryNodes('nodeSearchIndex', $text) YIELD node AS n RETURN n",
                 Map.of("text", text));
     }
 
     public List<CodeNode> search(String text, int limit) {
         return queryNodes(
-                "MATCH (n:CodeNode) WHERE toLower(n.label) CONTAINS toLower($text) "
-                        + "OR toLower(n.fqn) CONTAINS toLower($text) RETURN n LIMIT $limit",
+                "CALL db.index.fulltext.queryNodes('nodeSearchIndex', $text) YIELD node AS n RETURN n LIMIT $limit",
                 Map.of("text", text, "limit", limit));
     }
 
@@ -259,6 +258,33 @@ public class GraphStore implements FlowDataSource {
         return queryNodes(
                 "MATCH (n:CodeNode)-[r]-(m:CodeNode) WHERE n.id = $nodeId RETURN m",
                 Map.of("nodeId", nodeId));
+    }
+
+    /**
+     * Single-query batch lookup: for a list of node IDs, find all neighboring nodes
+     * whose kind is ENDPOINT or WEBSOCKET_ENDPOINT.
+     * Returns a map from source node ID to the list of endpoint neighbors found.
+     */
+    public Map<String, List<CodeNode>> findEndpointNeighborsBatch(List<String> nodeIds) {
+        Map<String, List<CodeNode>> result = new LinkedHashMap<>();
+        if (nodeIds.isEmpty()) return result;
+        List<String> epKinds = List.of(NodeKind.ENDPOINT.getValue(), NodeKind.WEBSOCKET_ENDPOINT.getValue());
+        try (Transaction tx = graphDb.beginTx()) {
+            var qr = tx.execute(
+                    "UNWIND $ids AS nid "
+                            + "MATCH (n:CodeNode {id: nid})-[]-(ep:CodeNode) "
+                            + "WHERE ep.kind IN $epKinds "
+                            + "RETURN nid AS matchId, ep",
+                    Map.of("ids", nodeIds, "epKinds", epKinds));
+            while (qr.hasNext()) {
+                var row = qr.next();
+                String matchId = (String) row.get("matchId");
+                if (row.get("ep") instanceof org.neo4j.graphdb.Node neo4jNode) {
+                    result.computeIfAbsent(matchId, k -> new ArrayList<>()).add(nodeFromNeo4j(neo4jNode));
+                }
+            }
+        }
+        return result;
     }
 
     public List<CodeNode> findOutgoingNeighbors(String nodeId) {
@@ -706,9 +732,16 @@ public class GraphStore implements FlowDataSource {
 
     private Map<String, Object> computeGraphStats() {
         Map<String, Object> graph = new LinkedHashMap<>();
-        graph.put("nodes", count());
-        graph.put("edges", countEdges());
-        graph.put("files", countDistinctFiles());
+        try (Transaction tx = graphDb.beginTx()) {
+            var r1 = tx.execute("MATCH (n:CodeNode) RETURN count(n) AS cnt");
+            graph.put("nodes", r1.hasNext() ? ((Number) r1.next().get("cnt")).longValue() : 0L);
+            var r2 = tx.execute("MATCH ()-[r:RELATES_TO]->() RETURN count(r) AS cnt");
+            graph.put("edges", r2.hasNext() ? ((Number) r2.next().get("cnt")).longValue() : 0L);
+            var r3 = tx.execute(
+                    "MATCH (n:CodeNode) WHERE n.filePath IS NOT NULL AND n.filePath <> '' "
+                            + "RETURN count(DISTINCT n.filePath) AS cnt");
+            graph.put("files", r3.hasNext() ? ((Number) r3.next().get("cnt")).longValue() : 0L);
+        }
         return graph;
     }
 

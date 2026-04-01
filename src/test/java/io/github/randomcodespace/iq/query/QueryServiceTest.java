@@ -630,4 +630,49 @@ class QueryServiceTest {
 
         assertEquals(first.toString(), second.toString());
     }
+
+    // --- findRelatedEndpoints ---
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void findRelatedEndpointsShouldReturnDirectEndpointMatches() {
+        var ep = makeNode("ep1", NodeKind.ENDPOINT, "GET /users");
+        when(graphStore.search("users", 50)).thenReturn(List.of(ep));
+        when(graphStore.findEndpointNeighborsBatch(List.of())).thenReturn(Map.of());
+
+        Map<String, Object> result = service.findRelatedEndpoints("users");
+
+        assertEquals(1, result.get("count"));
+        List<Map<String, Object>> endpoints = (List<Map<String, Object>>) result.get("endpoints");
+        assertEquals("ep1", endpoints.getFirst().get("id"));
+        verify(graphStore, never()).findNeighbors(anyString());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void findRelatedEndpointsShouldUseBatchQueryForNeighbors() {
+        var cls = makeNode("cls1", NodeKind.CLASS, "UserService");
+        var ep = makeNode("ep1", NodeKind.ENDPOINT, "GET /users");
+        when(graphStore.search("UserService", 50)).thenReturn(List.of(cls));
+        when(graphStore.findEndpointNeighborsBatch(List.of("cls1"))).thenReturn(Map.of("cls1", List.of(ep)));
+
+        Map<String, Object> result = service.findRelatedEndpoints("UserService");
+
+        assertEquals(1, result.get("count"));
+        List<Map<String, Object>> endpoints = (List<Map<String, Object>>) result.get("endpoints");
+        assertEquals("ep1", endpoints.getFirst().get("id"));
+        assertEquals("cls1", endpoints.getFirst().get("connected_via"));
+        verify(graphStore, never()).findNeighbors(anyString());
+    }
+
+    @Test
+    void findRelatedEndpointsShouldReturnEmptyWhenNoMatches() {
+        when(graphStore.search("unknown", 50)).thenReturn(List.of());
+        when(graphStore.findEndpointNeighborsBatch(List.of())).thenReturn(Map.of());
+
+        Map<String, Object> result = service.findRelatedEndpoints("unknown");
+
+        assertEquals(0, result.get("count"));
+        assertEquals(0, result.get("searched_nodes"));
+    }
 }

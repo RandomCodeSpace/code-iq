@@ -258,6 +258,7 @@ public class QueryService {
 
     // --- Relationship queries ---
 
+    @Cacheable(value = "consumers", key = "#targetId")
     public Map<String, Object> consumersOf(String targetId) {
         List<CodeNode> consumers = graphStore.findConsumers(targetId);
         Map<String, Object> result = new LinkedHashMap<>();
@@ -276,6 +277,7 @@ public class QueryService {
         return result;
     }
 
+    @Cacheable(value = "callers", key = "#targetId")
     public Map<String, Object> callersOf(String targetId) {
         List<CodeNode> callers = graphStore.findCallers(targetId);
         Map<String, Object> result = new LinkedHashMap<>();
@@ -305,6 +307,7 @@ public class QueryService {
 
     // --- Triage queries ---
 
+    @Cacheable(value = "component-by-file", key = "#filePath")
     public Map<String, Object> findComponentByFile(String filePath) {
         List<CodeNode> nodes = graphStore.findByFilePath(filePath);
         Map<String, Object> result = new LinkedHashMap<>();
@@ -422,28 +425,34 @@ public class QueryService {
     /**
      * Find API endpoints related to an identifier (file, class, entity).
      * Searches for matching nodes, then traverses the graph to find connected endpoints.
+     * Uses a batch query instead of N+1 individual neighbor lookups.
      */
+    @Cacheable(value = "related-endpoints", key = "#identifier")
     public Map<String, Object> findRelatedEndpoints(String identifier) {
-        // Find nodes matching the identifier
         List<CodeNode> matches = graphStore.search(identifier, 50);
 
-        // Collect endpoints: any match that IS an endpoint, plus neighbors of matches that are endpoints
         Set<String> seenIds = new java.util.LinkedHashSet<>();
         List<Map<String, Object>> endpoints = new ArrayList<>();
+        List<String> nonEndpointIds = new ArrayList<>();
 
+        // Partition: collect direct endpoint matches, queue rest for batch lookup
         for (CodeNode match : matches) {
             if (match.getKind() == NodeKind.ENDPOINT || match.getKind() == NodeKind.WEBSOCKET_ENDPOINT) {
                 if (seenIds.add(match.getId())) {
                     endpoints.add(nodeToMap(match));
                 }
+            } else {
+                nonEndpointIds.add(match.getId());
             }
-            // Check neighbors for connected endpoints
-            List<CodeNode> neighbors = graphStore.findNeighbors(match.getId());
-            for (CodeNode neighbor : neighbors) {
-                if ((neighbor.getKind() == NodeKind.ENDPOINT || neighbor.getKind() == NodeKind.WEBSOCKET_ENDPOINT)
-                        && seenIds.add(neighbor.getId())) {
+        }
+
+        // Single batch query for all endpoint neighbors — replaces up to 50 individual findNeighbors() calls
+        Map<String, List<CodeNode>> neighborEndpoints = graphStore.findEndpointNeighborsBatch(nonEndpointIds);
+        for (Map.Entry<String, List<CodeNode>> entry : neighborEndpoints.entrySet()) {
+            for (CodeNode neighbor : entry.getValue()) {
+                if (seenIds.add(neighbor.getId())) {
                     Map<String, Object> epMap = nodeToMap(neighbor);
-                    epMap.put("connected_via", match.getId());
+                    epMap.put("connected_via", entry.getKey());
                     endpoints.add(epMap);
                 }
             }
