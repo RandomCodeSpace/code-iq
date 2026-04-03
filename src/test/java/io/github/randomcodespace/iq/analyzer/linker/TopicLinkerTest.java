@@ -137,6 +137,130 @@ class TopicLinkerTest {
     }
 
     @Test
+    void linksPublisherToListenerViaEvent() {
+        var event = new CodeNode("event:UserCreated", NodeKind.EVENT, "UserCreated");
+        var publisher = new CodeNode("svc:UserService", NodeKind.CLASS, "UserService");
+        var listener = new CodeNode("svc:NotificationService", NodeKind.CLASS, "NotificationService");
+
+        var publishesEdge = new CodeEdge();
+        publishesEdge.setId("e1");
+        publishesEdge.setKind(EdgeKind.PUBLISHES);
+        publishesEdge.setSourceId("svc:UserService");
+        publishesEdge.setTarget(event);
+
+        var listensEdge = new CodeEdge();
+        listensEdge.setId("e2");
+        listensEdge.setKind(EdgeKind.LISTENS);
+        listensEdge.setSourceId("svc:NotificationService");
+        listensEdge.setTarget(event);
+
+        LinkResult result = linker.link(
+                List.of(event, publisher, listener),
+                List.of(publishesEdge, listensEdge)
+        );
+
+        assertEquals(1, result.edges().size());
+        CodeEdge callsEdge = result.edges().getFirst();
+        assertEquals(EdgeKind.CALLS, callsEdge.getKind());
+        assertEquals("svc:UserService", callsEdge.getSourceId());
+        assertEquals("svc:NotificationService", callsEdge.getTarget().getId());
+        assertEquals("UserCreated", callsEdge.getProperties().get("topic"));
+    }
+
+    @Test
+    void linksPublisherWithExistingConsumer() {
+        var event = new CodeNode("event:OrderPlaced", NodeKind.EVENT, "OrderPlaced");
+        var publisher = new CodeNode("svc:OrderService", NodeKind.CLASS, "OrderService");
+        var consumer = new CodeNode("svc:InventoryService", NodeKind.CLASS, "InventoryService");
+
+        var publishesEdge = new CodeEdge();
+        publishesEdge.setId("e1");
+        publishesEdge.setKind(EdgeKind.PUBLISHES);
+        publishesEdge.setSourceId("svc:OrderService");
+        publishesEdge.setTarget(event);
+
+        var consumesEdge = new CodeEdge();
+        consumesEdge.setId("e2");
+        consumesEdge.setKind(EdgeKind.CONSUMES);
+        consumesEdge.setSourceId("svc:InventoryService");
+        consumesEdge.setTarget(event);
+
+        LinkResult result = linker.link(
+                List.of(event, publisher, consumer),
+                List.of(publishesEdge, consumesEdge)
+        );
+
+        assertEquals(1, result.edges().size());
+        assertEquals(EdgeKind.CALLS, result.edges().getFirst().getKind());
+    }
+
+    @Test
+    void handlesMessageQueueNodes() {
+        var mq = new CodeNode("mq:ibm-orders", NodeKind.MESSAGE_QUEUE, "ibm-orders");
+        var producer = new CodeNode("svc:IBMProducer", NodeKind.CLASS, "IBMProducer");
+        var consumer = new CodeNode("svc:IBMConsumer", NodeKind.CLASS, "IBMConsumer");
+
+        var sendsEdge = new CodeEdge();
+        sendsEdge.setId("e1");
+        sendsEdge.setKind(EdgeKind.SENDS_TO);
+        sendsEdge.setSourceId("svc:IBMProducer");
+        sendsEdge.setTarget(mq);
+
+        var receivesEdge = new CodeEdge();
+        receivesEdge.setId("e2");
+        receivesEdge.setKind(EdgeKind.RECEIVES_FROM);
+        receivesEdge.setSourceId("svc:IBMConsumer");
+        receivesEdge.setTarget(mq);
+
+        LinkResult result = linker.link(
+                List.of(mq, producer, consumer),
+                List.of(sendsEdge, receivesEdge)
+        );
+
+        assertEquals(1, result.edges().size());
+        assertEquals(EdgeKind.CALLS, result.edges().getFirst().getKind());
+    }
+
+    @Test
+    void determinismTest() {
+        var topic = new CodeNode("topic:payments", NodeKind.TOPIC, "payments");
+        var event = new CodeNode("event:PaymentProcessed", NodeKind.EVENT, "PaymentProcessed");
+        var svcA = new CodeNode("svc:A", NodeKind.CLASS, "A");
+        var svcB = new CodeNode("svc:B", NodeKind.CLASS, "B");
+        var svcC = new CodeNode("svc:C", NodeKind.CLASS, "C");
+
+        List<CodeEdge> edges = new ArrayList<>();
+
+        var e1 = new CodeEdge();
+        e1.setId("e1"); e1.setKind(EdgeKind.PRODUCES); e1.setSourceId("svc:A"); e1.setTarget(topic);
+        edges.add(e1);
+
+        var e2 = new CodeEdge();
+        e2.setId("e2"); e2.setKind(EdgeKind.CONSUMES); e2.setSourceId("svc:B"); e2.setTarget(topic);
+        edges.add(e2);
+
+        var e3 = new CodeEdge();
+        e3.setId("e3"); e3.setKind(EdgeKind.PUBLISHES); e3.setSourceId("svc:A"); e3.setTarget(event);
+        edges.add(e3);
+
+        var e4 = new CodeEdge();
+        e4.setId("e4"); e4.setKind(EdgeKind.LISTENS); e4.setSourceId("svc:C"); e4.setTarget(event);
+        edges.add(e4);
+
+        List<CodeNode> nodes = List.of(topic, event, svcA, svcB, svcC);
+
+        LinkResult result1 = linker.link(nodes, edges);
+        LinkResult result2 = linker.link(nodes, edges);
+
+        assertEquals(result1.edges().size(), result2.edges().size());
+        for (int i = 0; i < result1.edges().size(); i++) {
+            assertEquals(result1.edges().get(i).getId(), result2.edges().get(i).getId());
+            assertEquals(result1.edges().get(i).getSourceId(), result2.edges().get(i).getSourceId());
+            assertEquals(result1.edges().get(i).getTarget().getId(), result2.edges().get(i).getTarget().getId());
+        }
+    }
+
+    @Test
     void handlesQueueNodes() {
         var queue = new CodeNode("queue:tasks", NodeKind.QUEUE, "tasks");
         var producer = new CodeNode("svc:TaskCreator", NodeKind.CLASS, "TaskCreator");

@@ -18,12 +18,13 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 
 /**
- * Links messaging producers to consumers via shared topic/queue names.
+ * Links messaging producers to consumers via shared topic/queue/event names.
  * <p>
- * Scans for TOPIC/QUEUE nodes and matches PRODUCES/SENDS_TO edges with
- * CONSUMES/RECEIVES_FROM edges on the same topic label to create direct
- * producer-to-consumer CALLS edges. Supports Kafka, RabbitMQ, TIBCO EMS,
- * IBM MQ, Azure Service Bus, and other enterprise messaging patterns.
+ * Scans for TOPIC, QUEUE, EVENT, and MESSAGE_QUEUE nodes and matches producer
+ * edges (PRODUCES, SENDS_TO, PUBLISHES) with consumer edges (CONSUMES,
+ * RECEIVES_FROM, LISTENS) on the same label to create direct producer-to-consumer
+ * CALLS edges. Supports Kafka, RabbitMQ, TIBCO EMS, IBM MQ, Azure Service Bus,
+ * Spring application events, and other enterprise messaging patterns.
  */
 @Component
 public class TopicLinker implements Linker {
@@ -35,7 +36,8 @@ public class TopicLinker implements Linker {
         // Collect topic/queue nodes by label
         Map<String, List<String>> topicIdsByLabel = new TreeMap<>();
         for (CodeNode node : nodes) {
-            if (node.getKind() == NodeKind.TOPIC || node.getKind() == NodeKind.QUEUE) {
+            if (node.getKind() == NodeKind.TOPIC || node.getKind() == NodeKind.QUEUE
+                    || node.getKind() == NodeKind.EVENT || node.getKind() == NodeKind.MESSAGE_QUEUE) {
                 topicIdsByLabel
                         .computeIfAbsent(node.getLabel(), k -> new ArrayList<>())
                         .add(node.getId());
@@ -52,8 +54,10 @@ public class TopicLinker implements Linker {
         Map<String, List<String>> consumersByTopic = new TreeMap<>();
 
         for (CodeEdge edge : edges) {
-            boolean isProducer = edge.getKind() == EdgeKind.PRODUCES || edge.getKind() == EdgeKind.SENDS_TO;
-            boolean isConsumer = edge.getKind() == EdgeKind.CONSUMES || edge.getKind() == EdgeKind.RECEIVES_FROM;
+            boolean isProducer = edge.getKind() == EdgeKind.PRODUCES || edge.getKind() == EdgeKind.SENDS_TO
+                    || edge.getKind() == EdgeKind.PUBLISHES;
+            boolean isConsumer = edge.getKind() == EdgeKind.CONSUMES || edge.getKind() == EdgeKind.RECEIVES_FROM
+                    || edge.getKind() == EdgeKind.LISTENS;
             if (isProducer && edge.getTarget() != null) {
                 producersByTopic
                         .computeIfAbsent(edge.getTarget().getId(), k -> new ArrayList<>())
