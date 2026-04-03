@@ -3,6 +3,9 @@ package io.github.randomcodespace.iq.mcp;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.randomcodespace.iq.config.CodeIqConfig;
+import io.github.randomcodespace.iq.intelligence.evidence.EvidencePackAssembler;
+import io.github.randomcodespace.iq.intelligence.evidence.EvidencePackRequest;
+import io.github.randomcodespace.iq.intelligence.provenance.ArtifactMetadata;
 import io.github.randomcodespace.iq.flow.FlowEngine;
 import io.github.randomcodespace.iq.intelligence.query.CapabilityMatrix;
 // Note: No Analyzer import — MCP server is read-only. Analysis is done via CLI only.
@@ -45,12 +48,16 @@ public class McpTools {
     private final StatsService statsService;
     private final TopologyService topologyService;
     private final GraphStore graphStore;
+    private final EvidencePackAssembler evidencePackAssembler;
+    private final ArtifactMetadata artifactMetadata;
 
     public McpTools(QueryService queryService,
                     CodeIqConfig config, ObjectMapper objectMapper,
                     Optional<FlowEngine> flowEngine, GraphDatabaseService graphDb,
                     StatsService statsService, TopologyService topologyService,
-                    GraphStore graphStore) {
+                    GraphStore graphStore,
+                    Optional<EvidencePackAssembler> evidencePackAssembler,
+                    Optional<ArtifactMetadata> artifactMetadata) {
         this.queryService = queryService;
         this.config = config;
         this.objectMapper = objectMapper;
@@ -59,6 +66,8 @@ public class McpTools {
         this.statsService = statsService;
         this.topologyService = topologyService;
         this.graphStore = graphStore;
+        this.evidencePackAssembler = evidencePackAssembler.orElse(null);
+        this.artifactMetadata = artifactMetadata.orElse(null);
     }
 
     /**
@@ -494,6 +503,37 @@ public class McpTools {
         try {
             var data = getCachedData();
             return toJson(topologyService.findNode(query, data.nodes()));
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @McpTool(name = "get_evidence_pack", description = "Assemble an evidence pack for a symbol or file. Returns matched nodes, snippets, provenance, and degradation notes. Provide symbol name and/or file path.")
+    public String getEvidencePack(
+            @McpToolParam(description = "Symbol name to look up (e.g. UserService, handleLogin)", required = false) String symbol,
+            @McpToolParam(description = "File path relative to repo root", required = false) String filePath,
+            @McpToolParam(description = "Max lines per snippet (default: config value)", required = false) Integer maxSnippetLines,
+            @McpToolParam(description = "Include cross-reference nodes (default: false)", required = false) Boolean includeReferences) {
+        if (evidencePackAssembler == null) {
+            return toJson(Map.of("error", "Evidence pack service unavailable. Run 'enrich' first."));
+        }
+        try {
+            EvidencePackRequest request = new EvidencePackRequest(
+                    symbol, filePath, maxSnippetLines,
+                    Boolean.TRUE.equals(includeReferences));
+            return toJson(evidencePackAssembler.assemble(request, artifactMetadata));
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @McpTool(name = "get_artifact_metadata", description = "Return artifact metadata: repo identity, commit SHA, build timestamp, extractor versions, capability matrix snapshot, and integrity hash.")
+    public String getArtifactMetadata() {
+        if (artifactMetadata == null) {
+            return toJson(Map.of("error", "Artifact metadata unavailable. Run 'enrich' first."));
+        }
+        try {
+            return toJson(artifactMetadata);
         } catch (Exception e) {
             return toJson(Map.of("error", e.getMessage()));
         }
