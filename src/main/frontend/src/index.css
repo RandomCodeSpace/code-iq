@@ -2,29 +2,112 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ------------------------------------------------------------------ */
+/* shadcn/ui CSS variables + AD-6 color system                         */
+/* ------------------------------------------------------------------ */
 @layer base {
+  :root {
+    /* Light mode — AD-6: white/gray backgrounds, indigo/blue accents */
+    --background: 0 0% 98%;          /* #FAFAFA */
+    --foreground: 240 10% 10%;       /* Zinc-900 ~#18181B */
+
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 10%;
+
+    --primary: 239 84% 59%;          /* Indigo-600 #4F46E5 */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 213 93% 58%;        /* Blue-500 #3B82F6 */
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 240 5% 96%;             /* #F4F4F5 */
+    --muted-foreground: 240 4% 46%;
+
+    --accent: 240 5% 94%;
+    --accent-foreground: 240 10% 10%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 239 84% 59%;
+
+    --radius: 0.5rem;
+
+    /* Sidebar */
+    --sidebar-background: 240 5% 96%;
+    --sidebar-foreground: 240 10% 10%;
+    --sidebar-border: 240 6% 88%;
+    --sidebar-accent: 240 5% 90%;
+    --sidebar-accent-foreground: 239 84% 59%;
+  }
+
+  .dark {
+    /* Dark mode — AD-6: deep charcoal/navy, teal/indigo accents */
+    --background: 20 14% 5%;         /* #0C0A09 deep charcoal */
+    --foreground: 240 5% 96%;        /* Zinc-100 #F4F4F5 */
+
+    --card: 20 14% 10%;              /* #1C1917 */
+    --card-foreground: 240 5% 96%;
+
+    --popover: 20 14% 10%;
+    --popover-foreground: 240 5% 96%;
+
+    --primary: 239 84% 72%;          /* Indigo-400 #818CF8 */
+    --primary-foreground: 20 14% 5%;
+
+    --secondary: 174 71% 52%;        /* Muted teal #2DD4BF */
+    --secondary-foreground: 20 14% 5%;
+
+    --muted: 20 14% 14%;
+    --muted-foreground: 240 5% 60%;
+
+    --accent: 20 14% 14%;
+    --accent-foreground: 240 5% 96%;
+
+    --destructive: 0 62% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 20 14% 18%;
+    --input: 20 14% 18%;
+    --ring: 239 84% 72%;
+
+    /* Sidebar */
+    --sidebar-background: 20 14% 8%;
+    --sidebar-foreground: 240 5% 88%;
+    --sidebar-border: 20 14% 16%;
+    --sidebar-accent: 20 14% 13%;
+    --sidebar-accent-foreground: 239 84% 72%;
+  }
+
   * {
-    @apply border-surface-800;
+    @apply border-border;
   }
+
+  html {
+    @apply scroll-smooth;
+  }
+
   body {
-    @apply bg-surface-950 text-surface-200 antialiased;
-  }
-  .dark body {
-    @apply bg-surface-950 text-surface-200;
-  }
-  .light body {
-    @apply bg-surface-50 text-surface-800;
+    @apply bg-background text-foreground antialiased;
   }
 }
 
+/* ------------------------------------------------------------------ */
+/* Component utilities                                                  */
+/* ------------------------------------------------------------------ */
 @layer components {
   .glass-card {
-    @apply bg-surface-900/60 backdrop-blur-md border border-surface-800/50
+    @apply bg-card/80 backdrop-blur-md border border-border
            rounded-xl shadow-lg;
   }
   .glass-card-hover {
     @apply glass-card transition-all duration-300
-           hover:border-brand-500/30 hover:shadow-brand-500/5 hover:shadow-xl
+           hover:border-primary/30 hover:shadow-primary/5 hover:shadow-xl
            hover:-translate-y-0.5;
   }
   .glow-brand {
@@ -32,11 +115,23 @@
                 0 0 40px rgba(99, 102, 241, 0.05);
   }
   .gradient-text {
-    @apply bg-gradient-to-r from-brand-400 to-purple-400 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent;
+  }
+
+  /* Panel resize handle */
+  .panel-resize-handle {
+    @apply relative flex items-center justify-center
+           bg-transparent hover:bg-primary/10 transition-colors duration-150
+           after:absolute after:inset-y-2 after:w-px after:bg-border;
+  }
+  .panel-resize-handle[data-resize-handle-active] {
+    @apply bg-primary/20;
   }
 }
 
-/* Custom scrollbar */
+/* ------------------------------------------------------------------ */
+/* Scrollbar                                                            */
+/* ------------------------------------------------------------------ */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -45,23 +140,23 @@
   @apply bg-transparent;
 }
 ::-webkit-scrollbar-thumb {
-  @apply bg-surface-700 rounded-full;
+  @apply bg-muted-foreground/30 rounded-full;
 }
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-surface-600;
+  @apply bg-muted-foreground/50;
 }
 
-/* Counter animation */
+/* ------------------------------------------------------------------ */
+/* Animations                                                           */
+/* ------------------------------------------------------------------ */
 @keyframes countUp {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
-
 .animate-count-up {
   animation: countUp 0.6s ease-out forwards;
 }
 
-/* Staggered animations */
 .stagger-1 { animation-delay: 0.05s; }
 .stagger-2 { animation-delay: 0.1s; }
 .stagger-3 { animation-delay: 0.15s; }
@@ -69,7 +164,9 @@
 .stagger-5 { animation-delay: 0.25s; }
 .stagger-6 { animation-delay: 0.3s; }
 
-/* Monaco overrides for dark theme */
+/* ------------------------------------------------------------------ */
+/* Monaco editor overrides                                              */
+/* ------------------------------------------------------------------ */
 .monaco-editor .margin,
 .monaco-editor .monaco-editor-background {
   background-color: transparent !important;
