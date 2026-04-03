@@ -5,7 +5,7 @@ import type {
   NodeResponse,
   EdgesListResponse,
   SearchResult,
-  FileTreeNode,
+  FileTreeResponse,
   TopologyResponse,
   EgoGraphResponse,
   NeighborsResponse,
@@ -97,7 +97,7 @@ export const api = {
 
   getFileTree: (depth?: number) => {
     const params = depth !== undefined ? `?depth=${depth}` : '';
-    return fetchJson<FileTreeNode>(`${BASE}/file-tree${params}`);
+    return fetchJson<FileTreeResponse>(`${BASE}/file-tree${params}`);
   },
 
   getTopology: () =>

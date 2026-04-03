@@ -279,7 +279,8 @@ function DensityBar({ value, max }: { value: number; max: number }) {
 /* ------------------------------------------------------------------ */
 
 export default function ProjectFileTree() {
-  const { data: root, loading, error } = useApi(() => api.getFileTree(), []);
+  const { data: treeResponse, loading, error } = useApi(() => api.getFileTree(), []);
+  const root = treeResponse?.tree?.[0] ?? null;
   const { selectedPath, setSelection } = useFileSelection();
   const navigate = useNavigate();
 

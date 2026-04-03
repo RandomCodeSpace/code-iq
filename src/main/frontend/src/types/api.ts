@@ -110,6 +110,12 @@ export interface FileTreeNode {
   children?: FileTreeNode[];
 }
 
+export interface FileTreeResponse {
+  tree: FileTreeNode[];
+  total_files: number;
+  truncated: boolean;
+}
+
 // Topology API types
 export interface TopologyService {
   name: string;
