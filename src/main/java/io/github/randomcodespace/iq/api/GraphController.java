@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import io.github.randomcodespace.iq.intelligence.query.CapabilityMatrix;
 import io.github.randomcodespace.iq.model.NodeKind;
 
 import java.io.IOException;
@@ -207,6 +208,24 @@ public class GraphController {
         requireQueryService();
         int cappedDepth = (depth != null) ? Math.min(depth, config.getMaxDepth()) : config.getMaxDepth();
         return queryService.getFileTree(cappedDepth);
+    }
+
+    @GetMapping("/capabilities")
+    public Map<String, Object> getCapabilities(
+            @RequestParam(required = false) String language) {
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        if (language != null && !language.isBlank()) {
+            result.put("language", language.strip().toLowerCase());
+            result.put("capabilities", CapabilityMatrix.forLanguage(language).entrySet().stream()
+                    .collect(java.util.stream.Collectors.toMap(
+                            e -> e.getKey().name().toLowerCase(),
+                            e -> e.getValue().name(),
+                            (a, b) -> a,
+                            java.util.TreeMap::new)));
+        } else {
+            result.put("matrix", CapabilityMatrix.asSerializableMap());
+        }
+        return result;
     }
 
     private void validateNodeKind(String kind) {

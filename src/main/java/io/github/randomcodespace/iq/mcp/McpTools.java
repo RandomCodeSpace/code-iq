@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.randomcodespace.iq.config.CodeIqConfig;
 import io.github.randomcodespace.iq.flow.FlowEngine;
+import io.github.randomcodespace.iq.intelligence.query.CapabilityMatrix;
 // Note: No Analyzer import — MCP server is read-only. Analysis is done via CLI only.
 import io.github.randomcodespace.iq.flow.FlowModels.FlowDiagram;
 import io.github.randomcodespace.iq.graph.GraphStore;
@@ -332,6 +333,26 @@ public class McpTools {
             @McpToolParam(description = "Max results", required = false) Integer limit) {
         try {
             return toJson(queryService.searchGraph(query, limit != null ? limit : 20));
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @McpTool(name = "get_capabilities", description = "Return the capability matrix declaring per-language analysis fidelity levels (EXACT/PARTIAL/LEXICAL_ONLY/UNSUPPORTED) for each intelligence dimension. Optionally filter by a single language.")
+    public String getCapabilities(
+            @McpToolParam(description = "Language to filter (e.g. java, python). Omit for the full matrix.", required = false) String language) {
+        try {
+            Map<String, Object> result = new LinkedHashMap<>();
+            if (language != null && !language.isBlank()) {
+                result.put("language", language.strip().toLowerCase());
+                Map<String, String> caps = new java.util.TreeMap<>();
+                CapabilityMatrix.forLanguage(language)
+                        .forEach((dim, lvl) -> caps.put(dim.name().toLowerCase(), lvl.name()));
+                result.put("capabilities", caps);
+            } else {
+                result.put("matrix", CapabilityMatrix.asSerializableMap());
+            }
+            return toJson(result);
         } catch (Exception e) {
             return toJson(Map.of("error", e.getMessage()));
         }
