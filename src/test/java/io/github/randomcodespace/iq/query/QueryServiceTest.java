@@ -571,7 +571,8 @@ class QueryServiceTest {
     void findRelatedEndpointsShouldIncludeDirectEndpointMatches() {
         var endpointNode = makeNode("ep:getUsers", NodeKind.ENDPOINT, "getUsers");
         when(graphStore.search("getUsers", 50)).thenReturn(List.of(endpointNode));
-        when(graphStore.findEndpointNeighborsBatch(List.of("ep:getUsers"))).thenReturn(Map.of());
+        // Endpoint nodes are partitioned directly into the result list — nonEndpointIds is empty
+        when(graphStore.findEndpointNeighborsBatch(List.of())).thenReturn(Map.of());
 
         Map<String, Object> result = service.findRelatedEndpoints("getUsers");
 
@@ -586,14 +587,13 @@ class QueryServiceTest {
     @Test
     void findRelatedEndpointsShouldDeduplicateEndpoints() {
         var endpointNode = makeNode("ep:getUsers", NodeKind.ENDPOINT, "getUsers");
-        // Same endpoint appears as both a direct match and a neighbor
+        // Endpoint node is a direct match — nonEndpointIds is empty, batch returns nothing
         when(graphStore.search("ep", 50)).thenReturn(List.of(endpointNode));
-        when(graphStore.findEndpointNeighborsBatch(List.of("ep:getUsers")))
-                .thenReturn(Map.of("ep:getUsers", List.of(endpointNode)));
+        when(graphStore.findEndpointNeighborsBatch(List.of())).thenReturn(Map.of());
 
         Map<String, Object> result = service.findRelatedEndpoints("ep");
 
-        // Should only appear once
+        // Should appear exactly once (direct match)
         assertEquals(1, result.get("count"));
     }
 
