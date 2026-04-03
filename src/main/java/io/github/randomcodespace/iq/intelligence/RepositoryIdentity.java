@@ -1,5 +1,6 @@
 package io.github.randomcodespace.iq.intelligence;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 
 /**
@@ -41,7 +42,7 @@ public record RepositoryIdentity(
                     .redirectErrorStream(true);
             var proc = pb.start();
             try (var is = proc.getInputStream()) {
-                String out = new String(is.readAllBytes()).trim();
+                String out = new String(is.readAllBytes(), StandardCharsets.UTF_8).trim();
                 int exit = proc.waitFor();
                 return (exit == 0 && !out.isBlank()) ? out : null;
             } finally {
