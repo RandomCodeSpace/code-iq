@@ -477,6 +477,48 @@ class QueryServiceTest {
         assertTrue(excludeKinds.contains("websocket_endpoint"), "Should exclude websocket endpoints");
         assertTrue(excludeKinds.contains("migration"), "Should exclude migrations");
         assertTrue(excludeKinds.contains("config_file"), "Should exclude config files");
+        assertTrue(excludeKinds.contains("guard"), "Should exclude guards");
+        assertTrue(excludeKinds.contains("middleware"), "Should exclude middleware");
+        assertTrue(excludeKinds.contains("topic"), "Should exclude topics");
+        assertTrue(excludeKinds.contains("queue"), "Should exclude queues");
+        assertTrue(excludeKinds.contains("event"), "Should exclude events");
+        assertTrue(excludeKinds.contains("message_queue"), "Should exclude message queues");
+    }
+
+    @Test
+    void findDeadCodeShouldNotFlagMessageDrivenComponents() {
+        var guard = makeNode("guard:AuthGuard", NodeKind.GUARD, "AuthGuard");
+        var middleware = makeNode("mid:LoggingMiddleware", NodeKind.MIDDLEWARE, "LoggingMiddleware");
+        var topic = makeNode("topic:UserEvents", NodeKind.TOPIC, "UserEvents");
+        var queue = makeNode("queue:EmailQueue", NodeKind.QUEUE, "EmailQueue");
+        var event = makeNode("event:OrderPlaced", NodeKind.EVENT, "OrderPlaced");
+        var messageQueue = makeNode("mq:NotificationQueue", NodeKind.MESSAGE_QUEUE, "NotificationQueue");
+
+        // These are excluded via ENTRY_POINT_KINDS so graphStore won't return them
+        when(graphStore.findNodesWithoutIncomingSemantic(anyList(), anyList(), anyList(), eq(0), eq(100)))
+                .thenReturn(List.of());
+
+        Map<String, Object> result = service.findDeadCode(null, 100);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> deadCode = (List<Map<String, Object>>) result.get("dead_code");
+        assertTrue(deadCode.isEmpty(), "Message-driven and security components should not be flagged as dead code");
+    }
+
+    @Test
+    void findDeadCodeShouldIncludeProtectsInSemanticEdgeKinds() {
+        when(graphStore.findNodesWithoutIncomingSemantic(anyList(), anyList(), anyList(), eq(0), eq(50)))
+                .thenReturn(List.of());
+
+        service.findDeadCode(null, 50);
+
+        @SuppressWarnings("unchecked")
+        var captor = org.mockito.ArgumentCaptor.forClass(List.class);
+        verify(graphStore).findNodesWithoutIncomingSemantic(anyList(), captor.capture(), anyList(), eq(0), eq(50));
+        @SuppressWarnings("unchecked")
+        List<String> semanticKinds = captor.getValue();
+        assertTrue(semanticKinds.contains("protects"), "Should include 'protects' as semantic edge");
+        assertFalse(semanticKinds.contains("uses"), "Should NOT include 'uses' — not a valid EdgeKind");
     }
 
     @Test
