@@ -1,6 +1,7 @@
 package io.github.randomcodespace.iq.intelligence.evidence;
 
 import io.github.randomcodespace.iq.config.CodeIqConfig;
+import io.github.randomcodespace.iq.graph.GraphStore;
 import io.github.randomcodespace.iq.intelligence.CapabilityLevel;
 import io.github.randomcodespace.iq.intelligence.lexical.CodeSnippet;
 import io.github.randomcodespace.iq.intelligence.lexical.LexicalQueryService;
@@ -38,15 +39,18 @@ public class EvidencePackAssembler {
     private final SnippetStore snippetStore;
     private final QueryPlanner queryPlanner;
     private final CodeIqConfig config;
+    private final GraphStore graphStore;
 
     public EvidencePackAssembler(LexicalQueryService lexicalQueryService,
                                  SnippetStore snippetStore,
                                  QueryPlanner queryPlanner,
-                                 CodeIqConfig config) {
+                                 CodeIqConfig config,
+                                 GraphStore graphStore) {
         this.lexicalQueryService = lexicalQueryService;
         this.snippetStore = snippetStore;
         this.queryPlanner = queryPlanner;
         this.config = config;
+        this.graphStore = graphStore;
     }
 
     /**
@@ -184,16 +188,27 @@ public class EvidencePackAssembler {
     }
 
     private List<CodeNode> fetchReferences(List<CodeNode> matchedSymbols, String subject) {
-        // Lexical search for related symbols — exclude exact matches already in matchedSymbols
+        // Traverse CALLS and DEPENDS_ON edges to find nodes that actually reference these symbols
         Set<String> matchedIds = new LinkedHashSet<>();
         for (CodeNode n : matchedSymbols) {
             if (n.getId() != null) matchedIds.add(n.getId());
         }
-        List<LexicalResult> refResults = lexicalQueryService.findByDocComment(subject);
-        return refResults.stream()
-                .map(LexicalResult::node)
-                .filter(n -> !matchedIds.contains(n.getId()))
-                .toList();
+        Set<String> seen = new LinkedHashSet<>(matchedIds);
+        List<CodeNode> references = new ArrayList<>();
+        for (CodeNode n : matchedSymbols) {
+            if (n.getId() == null) continue;
+            for (CodeNode caller : graphStore.findCallers(n.getId())) {
+                if (caller.getId() != null && seen.add(caller.getId())) {
+                    references.add(caller);
+                }
+            }
+            for (CodeNode dependent : graphStore.findDependents(n.getId())) {
+                if (dependent.getId() != null && seen.add(dependent.getId())) {
+                    references.add(dependent);
+                }
+            }
+        }
+        return references;
     }
 
     private String buildEmptyNote(String subject, QueryPlan plan) {

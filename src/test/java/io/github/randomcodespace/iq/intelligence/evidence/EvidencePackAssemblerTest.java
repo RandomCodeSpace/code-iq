@@ -1,6 +1,7 @@
 package io.github.randomcodespace.iq.intelligence.evidence;
 
 import io.github.randomcodespace.iq.config.CodeIqConfig;
+import io.github.randomcodespace.iq.graph.GraphStore;
 import io.github.randomcodespace.iq.intelligence.CapabilityLevel;
 import io.github.randomcodespace.iq.intelligence.lexical.LexicalQueryService;
 import io.github.randomcodespace.iq.intelligence.lexical.LexicalResult;
@@ -31,6 +32,8 @@ class EvidencePackAssemblerTest {
     private LexicalQueryService lexicalQueryService;
     @Mock
     private SnippetStore snippetStore;
+    @Mock
+    private GraphStore graphStore;
 
     private QueryPlanner queryPlanner;
     private CodeIqConfig config;
@@ -43,7 +46,7 @@ class EvidencePackAssemblerTest {
         config = new CodeIqConfig();
         config.setRootPath(System.getProperty("java.io.tmpdir"));
         config.setMaxSnippetLines(50);
-        assembler = new EvidencePackAssembler(lexicalQueryService, snippetStore, queryPlanner, config);
+        assembler = new EvidencePackAssembler(lexicalQueryService, snippetStore, queryPlanner, config, graphStore);
         metadata = new ArtifactMetadata(
                 "https://github.com/example/repo", "abc123", Instant.now(),
                 "1", "2", Map.of("code-iq", "1.0"),

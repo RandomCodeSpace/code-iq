@@ -263,6 +263,7 @@ public final class CapabilityMatrix {
             case "python"     -> PYTHON_CAPS;
             case "go"         -> GO_CAPS;
             case "csharp", "c#" -> CSHARP_CAPS;
+            case "cpp", "c++"   -> CPP_CAPS;
             case "rust"       -> RUST_CAPS;
             default -> {
                 if (LEXICAL_ONLY_LANGUAGES.contains(lang)) yield LEXICAL_ONLY_CAPS;
