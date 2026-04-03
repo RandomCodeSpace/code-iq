@@ -89,6 +89,9 @@ public class GraphStore implements FlowDataSource {
             tx.execute("CREATE INDEX IF NOT EXISTS FOR (n:CodeNode) ON (n.id)");
             tx.execute("CREATE INDEX IF NOT EXISTS FOR (n:CodeNode) ON (n.label_lower)");
             tx.execute("CREATE INDEX IF NOT EXISTS FOR (n:CodeNode) ON (n.fqn_lower)");
+            tx.execute("CREATE FULLTEXT INDEX search_index IF NOT EXISTS "
+                    + "FOR (n:CodeNode) ON EACH [n.label_lower, n.fqn_lower] "
+                    + "OPTIONS {indexConfig: {`fulltext.analyzer`: 'keyword'}}");
             tx.commit();
         }
 
@@ -249,16 +252,42 @@ public class GraphStore implements FlowDataSource {
 
     public List<CodeNode> search(String text) {
         return queryNodes(
-                "MATCH (n:CodeNode) WHERE n.label CONTAINS $text OR n.fqn CONTAINS $text RETURN n",
-                Map.of("text", text));
+                "CALL db.index.fulltext.queryNodes('search_index', $text) "
+                        + "YIELD node RETURN node AS n",
+                Map.of("text", toLuceneQuery(text)));
     }
 
     public List<CodeNode> search(String text, int limit) {
-        String lowerText = text.toLowerCase();
         return queryNodes(
-                "MATCH (n:CodeNode) WHERE n.label_lower CONTAINS $text "
-                        + "OR n.fqn_lower CONTAINS $text RETURN n LIMIT $limit",
-                Map.of("text", lowerText, "limit", limit));
+                "CALL db.index.fulltext.queryNodes('search_index', $text) "
+                        + "YIELD node RETURN node AS n LIMIT $limit",
+                Map.of("text", toLuceneQuery(text), "limit", limit));
+    }
+
+    /**
+     * Wraps a search term in Lucene wildcard syntax for substring matching against
+     * the fulltext index (which stores lowercased property values via keyword analyzer).
+     * Escapes Lucene special characters before wrapping.
+     */
+    private static String toLuceneQuery(String text) {
+        String lower = text.toLowerCase();
+        String escaped = lower
+                .replace("\\", "\\\\")
+                .replace("+", "\\+")
+                .replace("-", "\\-")
+                .replace("!", "\\!")
+                .replace("(", "\\(")
+                .replace(")", "\\)")
+                .replace("{", "\\{")
+                .replace("}", "\\}")
+                .replace("[", "\\[")
+                .replace("]", "\\]")
+                .replace("^", "\\^")
+                .replace("\"", "\\\"")
+                .replace("~", "\\~")
+                .replace(":", "\\:")
+                .replace("/", "\\/");
+        return "*" + escaped + "*";
     }
 
     public List<CodeNode> findNeighbors(String nodeId) {

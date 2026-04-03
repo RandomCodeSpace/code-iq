@@ -10,7 +10,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -18,10 +17,11 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 
 /**
- * Links Kafka/RabbitMQ producers to consumers via shared topic names.
+ * Links messaging producers to consumers via shared topic/queue/event names.
  * <p>
- * Scans for TOPIC/QUEUE nodes and matches PRODUCES edges with CONSUMES
- * edges on the same topic label to create direct producer-to-consumer
+ * Scans for TOPIC/QUEUE/EVENT/MESSAGE_QUEUE nodes and matches producer edges
+ * (PRODUCES, SENDS_TO, PUBLISHES) with consumer edges (CONSUMES, RECEIVES_FROM,
+ * LISTENS) on the same topic label to create direct producer-to-consumer
  * CALLS edges.
  */
 @Component
@@ -31,10 +31,11 @@ public class TopicLinker implements Linker {
 
     @Override
     public LinkResult link(List<CodeNode> nodes, List<CodeEdge> edges) {
-        // Collect topic/queue nodes by label
+        // Collect topic/queue/event/message_queue nodes by label
         Map<String, List<String>> topicIdsByLabel = new TreeMap<>();
         for (CodeNode node : nodes) {
-            if (node.getKind() == NodeKind.TOPIC || node.getKind() == NodeKind.QUEUE) {
+            if (node.getKind() == NodeKind.TOPIC || node.getKind() == NodeKind.QUEUE
+                    || node.getKind() == NodeKind.EVENT || node.getKind() == NodeKind.MESSAGE_QUEUE) {
                 topicIdsByLabel
                         .computeIfAbsent(node.getLabel(), k -> new ArrayList<>())
                         .add(node.getId());
@@ -51,11 +52,13 @@ public class TopicLinker implements Linker {
         Map<String, List<String>> consumersByTopic = new TreeMap<>();
 
         for (CodeEdge edge : edges) {
-            if (edge.getKind() == EdgeKind.PRODUCES && edge.getTarget() != null) {
+            if (edge.getTarget() == null) continue;
+            EdgeKind kind = edge.getKind();
+            if (kind == EdgeKind.PRODUCES || kind == EdgeKind.SENDS_TO || kind == EdgeKind.PUBLISHES) {
                 producersByTopic
                         .computeIfAbsent(edge.getTarget().getId(), k -> new ArrayList<>())
                         .add(edge.getSourceId());
-            } else if (edge.getKind() == EdgeKind.CONSUMES && edge.getTarget() != null) {
+            } else if (kind == EdgeKind.CONSUMES || kind == EdgeKind.RECEIVES_FROM || kind == EdgeKind.LISTENS) {
                 consumersByTopic
                         .computeIfAbsent(edge.getTarget().getId(), k -> new ArrayList<>())
                         .add(edge.getSourceId());
