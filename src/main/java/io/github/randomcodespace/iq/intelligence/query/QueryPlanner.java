@@ -1,6 +1,7 @@
 package io.github.randomcodespace.iq.intelligence.query;
 
 import io.github.randomcodespace.iq.intelligence.CapabilityLevel;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 import java.util.EnumSet;
@@ -25,6 +26,7 @@ import java.util.Set;
  * regardless of language, because text search operates on raw source content, not the graph.
  */
 @Service
+@Profile("serving")
 public class QueryPlanner {
 
     // ------------------------------------------------------------------

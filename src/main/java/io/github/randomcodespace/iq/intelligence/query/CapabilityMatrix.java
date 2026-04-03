@@ -67,6 +67,9 @@ public final class CapabilityMatrix {
     /** Rust: ANTLR grammar — partial structural coverage. */
     private static final Map<CapabilityDimension, CapabilityLevel> RUST_CAPS;
 
+    /** C++: ANTLR grammar — partial structural coverage, no ORM convention. */
+    private static final Map<CapabilityDimension, CapabilityLevel> CPP_CAPS;
+
     /** Fallback for regex-only languages. */
     private static final Map<CapabilityDimension, CapabilityLevel> LEXICAL_ONLY_CAPS;
 
@@ -152,6 +155,18 @@ public final class CapabilityMatrix {
                 CapabilityDimension.IMPORT_RESOLUTION,   CapabilityLevel.PARTIAL,
                 CapabilityDimension.TYPE_INFO,            CapabilityLevel.PARTIAL,
                 CapabilityDimension.CLASS_HIERARCHY,      CapabilityLevel.LEXICAL_ONLY,
+                CapabilityDimension.FRAMEWORK_SEMANTICS,  CapabilityLevel.PARTIAL,
+                CapabilityDimension.ORM_ENTITY_MAPPING,   CapabilityLevel.UNSUPPORTED,
+                CapabilityDimension.AUTH_SECURITY,        CapabilityLevel.LEXICAL_ONLY,
+                CapabilityDimension.ASYNC_PATTERNS,       CapabilityLevel.PARTIAL
+        );
+
+        CPP_CAPS = immutableDimMap(
+                CapabilityDimension.SYMBOL_DEFINITIONS,  CapabilityLevel.PARTIAL,
+                CapabilityDimension.SYMBOL_REFERENCES,   CapabilityLevel.PARTIAL,
+                CapabilityDimension.IMPORT_RESOLUTION,   CapabilityLevel.PARTIAL,
+                CapabilityDimension.TYPE_INFO,            CapabilityLevel.PARTIAL,
+                CapabilityDimension.CLASS_HIERARCHY,      CapabilityLevel.PARTIAL,
                 CapabilityDimension.FRAMEWORK_SEMANTICS,  CapabilityLevel.PARTIAL,
                 CapabilityDimension.ORM_ENTITY_MAPPING,   CapabilityLevel.UNSUPPORTED,
                 CapabilityDimension.AUTH_SECURITY,        CapabilityLevel.LEXICAL_ONLY,
