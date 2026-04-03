@@ -21,7 +21,7 @@ import io.github.randomcodespace.iq.detector.DetectorInfo;
     name = "kafka",
     category = "messaging",
     description = "Detects Kafka producers, consumers, and topic configurations",
-    languages = {"java"},
+    languages = {"java", "kotlin"},
     nodeKinds = {NodeKind.TOPIC},
     edgeKinds = {EdgeKind.CONSUMES, EdgeKind.PRODUCES},
     properties = {"broker", "group_id", "topic"}
@@ -29,7 +29,9 @@ import io.github.randomcodespace.iq.detector.DetectorInfo;
 @Component
 public class KafkaDetector extends AbstractRegexDetector {
 
-    private static final Pattern CLASS_RE = Pattern.compile("(?:public\\s+)?class\\s+(\\w+)");
+    private static final Pattern CLASS_RE = Pattern.compile(
+            "(?:(?:public|internal|private|protected|data|abstract|open|sealed|enum|inline|value)\\s+)*" +
+            "(?:class|object)\\s+(\\w+)");
     private static final Pattern KAFKA_LISTENER_RE = Pattern.compile(
             "@KafkaListener\\s*\\(\\s*(?:.*?topics?\\s*=\\s*)?[\\{\"]?\\s*\"([^\"]+)\"");
     private static final Pattern KAFKA_SEND_RE = Pattern.compile(
@@ -43,7 +45,7 @@ public class KafkaDetector extends AbstractRegexDetector {
 
     @Override
     public Set<String> getSupportedLanguages() {
-        return Set.of("java");
+        return Set.of("java", "kotlin");
     }
 
     @Override

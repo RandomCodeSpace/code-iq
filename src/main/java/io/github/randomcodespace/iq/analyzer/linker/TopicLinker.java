@@ -19,10 +19,11 @@ import java.util.TreeSet;
 /**
  * Links messaging producers to consumers via shared topic/queue/event names.
  * <p>
- * Scans for TOPIC/QUEUE/EVENT/MESSAGE_QUEUE nodes and matches producer edges
- * (PRODUCES, SENDS_TO, PUBLISHES) with consumer edges (CONSUMES, RECEIVES_FROM,
- * LISTENS) on the same topic label to create direct producer-to-consumer
- * CALLS edges.
+ * Scans for TOPIC, QUEUE, EVENT, and MESSAGE_QUEUE nodes and matches producer
+ * edges (PRODUCES, SENDS_TO, PUBLISHES) with consumer edges (CONSUMES,
+ * RECEIVES_FROM, LISTENS) on the same label to create direct producer-to-consumer
+ * CALLS edges. Supports Kafka, RabbitMQ, TIBCO EMS, IBM MQ, Azure Service Bus,
+ * Spring application events, and other enterprise messaging patterns.
  */
 @Component
 public class TopicLinker implements Linker {

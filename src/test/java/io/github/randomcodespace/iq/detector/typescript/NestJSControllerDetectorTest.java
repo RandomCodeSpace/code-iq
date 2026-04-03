@@ -84,6 +84,22 @@ class NestJSControllerDetectorTest {
     }
 
     @Test
+    void noFalsePositiveOnAngularController() {
+        // Angular @Controller-like patterns without @nestjs/ import must not match
+        String code = """
+                import { Component } from '@angular/core';
+                @Controller('items')
+                export class ItemsComponent {
+                    @Get()
+                    list() {}
+                }
+                """;
+        DetectorContext ctx = DetectorTestUtils.contextFor("src/items.component.ts", "typescript", code);
+        DetectorResult result = detector.detect(ctx);
+        assertTrue(result.nodes().isEmpty(), "Should not match Angular component without @nestjs/ import");
+    }
+
+    @Test
     void deterministic() {
         String code = "import { Controller, Get } from '@nestjs/common';\n@Controller('test')\nexport class TestController {\n    @Get()\n    find() {}\n}";
         DetectorContext ctx = DetectorTestUtils.contextFor("src/test.controller.ts", "typescript", code);

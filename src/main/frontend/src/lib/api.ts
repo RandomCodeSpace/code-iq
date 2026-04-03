@@ -4,8 +4,11 @@ import type {
   NodesListResponse,
   NodeResponse,
   EdgesListResponse,
-  AnalyzeResponse,
   SearchResult,
+  FileTreeResponse,
+  TopologyResponse,
+  EgoGraphResponse,
+  NeighborsResponse,
 } from '@/types/api';
 
 const BASE = '/api';
@@ -19,18 +22,6 @@ async function fetchJson<T>(url: string): Promise<T> {
   return res.json();
 }
 
-async function postJson<T>(url: string, body?: unknown): Promise<T> {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: body ? { 'Content-Type': 'application/json' } : {},
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`API error ${res.status}: ${text}`);
-  }
-  return res.json();
-}
 
 export const api = {
   getStats: () => fetchJson<StatsResponse>(`${BASE}/stats`),
@@ -43,9 +34,10 @@ export const api = {
   getNodesByKind: (kind: string, limit = 50, offset = 0) =>
     fetchJson<NodesListResponse>(`${BASE}/kinds/${kind}?limit=${limit}&offset=${offset}`),
 
-  getNodes: (kind?: string, limit = 100, offset = 0) => {
+  getNodes: (kind?: string, module?: string, limit = 100, offset = 0) => {
     const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
     if (kind) params.set('kind', kind);
+    if (module) params.set('module', module);
     return fetchJson<NodesListResponse>(`${BASE}/nodes?${params}`);
   },
 
@@ -67,14 +59,13 @@ export const api = {
   search: (q: string, limit = 50) =>
     fetchJson<SearchResult[]>(`${BASE}/search?q=${encodeURIComponent(q)}&limit=${limit}`),
 
-  analyze: (incremental = false) =>
-    postJson<AnalyzeResponse>(`${BASE}/analyze?incremental=${incremental}`),
-
-  readFile: (path: string, startLine?: number, endLine?: number) => {
+  readFile: async (path: string, startLine?: number, endLine?: number) => {
     const params = new URLSearchParams({ path });
     if (startLine !== undefined) params.set('startLine', String(startLine));
     if (endLine !== undefined) params.set('endLine', String(endLine));
-    return fetch(`${BASE}/file?${params}`).then(r => r.text());
+    const r = await fetch(`${BASE}/file?${params}`);
+    if (!r.ok) throw new Error(`API error ${r.status}`);
+    return r.text();
   },
 
   getCycles: (limit = 100) =>
@@ -103,4 +94,18 @@ export const api = {
 
   traceImpact: (id: string, depth = 3) =>
     fetchJson<Record<string, unknown>>(`${BASE}/triage/impact/${encodeURIComponent(id)}?depth=${depth}`),
+
+  getFileTree: (depth?: number) => {
+    const params = depth !== undefined ? `?depth=${depth}` : '';
+    return fetchJson<FileTreeResponse>(`${BASE}/file-tree${params}`);
+  },
+
+  getTopology: () =>
+    fetchJson<TopologyResponse>(`${BASE}/topology`),
+
+  getEgoGraph: (center: string, radius = 2) =>
+    fetchJson<EgoGraphResponse>(`${BASE}/ego/${encodeURIComponent(center)}?radius=${radius}`),
+
+  getNodeNeighborsTyped: (id: string) =>
+    fetchJson<NeighborsResponse>(`${BASE}/nodes/${encodeURIComponent(id)}/neighbors`),
 };

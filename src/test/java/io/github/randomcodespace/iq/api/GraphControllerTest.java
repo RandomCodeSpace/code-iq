@@ -22,6 +22,7 @@ import java.util.Map;
 
 import static org.hamcrest.Matchers.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -554,4 +555,52 @@ class GraphControllerTest {
     }
 
     // POST /api/analyze removed — API is read-only
+
+    // --- /api/file-tree ---
+
+    @Test
+    void getFileTreeShouldReturnHierarchicalTree() throws Exception {
+        Map<String, Object> treeResult = new LinkedHashMap<>();
+        treeResult.put("tree", List.of(
+                Map.of("name", "src", "type", "directory", "nodeCount", 10L, "children", List.of()),
+                Map.of("name", "pom.xml", "type", "file", "nodeCount", 1L, "children", List.of())));
+        treeResult.put("total_files", 3L);
+        when(queryService.getFileTree(10)).thenReturn(treeResult);
+
+        mockMvc.perform(get("/api/file-tree"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.total_files").value(3))
+                .andExpect(jsonPath("$.tree[0].name").value("src"))
+                .andExpect(jsonPath("$.tree[0].type").value("directory"))
+                .andExpect(jsonPath("$.tree[0].nodeCount").value(10))
+                .andExpect(jsonPath("$.tree[1].name").value("pom.xml"))
+                .andExpect(jsonPath("$.tree[1].type").value("file"));
+    }
+
+    @Test
+    void getFileTreeShouldPassDepthParam() throws Exception {
+        Map<String, Object> treeResult = new LinkedHashMap<>();
+        treeResult.put("tree", List.of());
+        treeResult.put("total_files", 0L);
+        when(queryService.getFileTree(2)).thenReturn(treeResult);
+
+        mockMvc.perform(get("/api/file-tree").param("depth", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total_files").value(0));
+    }
+
+    @Test
+    void getFileTreeShouldCapDepthAtMaxDepth() throws Exception {
+        Map<String, Object> treeResult = new LinkedHashMap<>();
+        treeResult.put("tree", List.of());
+        treeResult.put("total_files", 0L);
+        when(queryService.getFileTree(10)).thenReturn(treeResult);
+
+        mockMvc.perform(get("/api/file-tree").param("depth", "999"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total_files").value(0));
+
+        verify(queryService).getFileTree(10);
+    }
 }

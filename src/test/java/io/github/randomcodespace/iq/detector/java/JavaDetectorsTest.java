@@ -381,6 +381,57 @@ class JavaDetectorsTest {
         void isDeterministic() {
             DetectorTestUtils.assertDeterministic(new KafkaDetector(), ctx("java", SAMPLE));
         }
+
+        @Test
+        void detectsKotlinKafkaListener() {
+            String kotlinSample = """
+                    class OrderConsumer {
+                        @KafkaListener(topics = "orders")
+                        fun consume(msg: String) {}
+                    }
+                    """;
+            var r = new KafkaDetector().detect(ctx("kotlin", kotlinSample));
+            assertFalse(r.nodes().isEmpty());
+            assertTrue(r.edges().stream().anyMatch(e -> e.getKind().getValue().equals("consumes")));
+        }
+
+        @Test
+        void detectsKotlinKafkaTemplate() {
+            String kotlinSample = """
+                    class NotificationService(val kafkaTemplate: KafkaTemplate<String, String>) {
+                        fun notify() { kafkaTemplate.send("notifications", "hi") }
+                    }
+                    """;
+            var r = new KafkaDetector().detect(ctx("kotlin", kotlinSample));
+            assertFalse(r.nodes().isEmpty());
+            assertTrue(r.edges().stream().anyMatch(e -> e.getKind().getValue().equals("produces")));
+        }
+
+        @Test
+        void detectsKotlinObjectDeclaration() {
+            String kotlinSample = """
+                    object OrderConsumer {
+                        @KafkaListener(topics = "orders")
+                        fun consume(msg: String) {}
+                    }
+                    """;
+            var r = new KafkaDetector().detect(ctx("kotlin", kotlinSample));
+            assertFalse(r.nodes().isEmpty());
+            assertTrue(r.edges().stream().anyMatch(e -> e.getKind().getValue().equals("consumes")));
+        }
+
+        @Test
+        void detectsKotlinDataClassModifiers() {
+            String kotlinSample = """
+                    internal open class PaymentConsumer {
+                        @KafkaListener(topics = "payments")
+                        fun consume(msg: String) {}
+                    }
+                    """;
+            var r = new KafkaDetector().detect(ctx("kotlin", kotlinSample));
+            assertFalse(r.nodes().isEmpty());
+            assertTrue(r.edges().stream().anyMatch(e -> e.getKind().getValue().equals("consumes")));
+        }
     }
 
     // ==================== KafkaProtocolDetector ====================
@@ -674,6 +725,48 @@ class JavaDetectorsTest {
         @Test
         void isDeterministic() {
             DetectorTestUtils.assertDeterministic(new ConfigDefDetector(), ctx("java", SAMPLE));
+        }
+
+        @Test
+        void detectsSpringValueAnnotation() {
+            String sample = """
+                    import org.springframework.beans.factory.annotation.Value;
+                    public class AppConfig {
+                        @Value("${app.timeout}")
+                        private int timeout;
+                        @Value("${app.host}")
+                        private String host;
+                    }
+                    """;
+            var r = new ConfigDefDetector().detect(ctx("java", sample));
+            assertEquals(2, r.nodes().size());
+            assertTrue(r.nodes().stream().anyMatch(n -> n.getLabel().equals("app.timeout")));
+            assertTrue(r.nodes().stream().anyMatch(n -> n.getLabel().equals("app.host")));
+        }
+
+        @Test
+        void detectsConfigurationPropertiesAnnotation() {
+            String sample = """
+                    import org.springframework.boot.context.properties.ConfigurationProperties;
+                    @ConfigurationProperties(prefix = "spring.datasource")
+                    public class DataSourceConfig {
+                        private String url;
+                    }
+                    """;
+            var r = new ConfigDefDetector().detect(ctx("java", sample));
+            assertFalse(r.nodes().isEmpty());
+            assertTrue(r.nodes().stream().anyMatch(n -> n.getLabel().equals("spring.datasource")));
+        }
+
+        @Test
+        void isDeterministicWithValueAnnotations() {
+            String sample = """
+                    public class Cfg {
+                        @Value("${server.port}") private int port;
+                        @Value("${server.host}") private String host;
+                    }
+                    """;
+            DetectorTestUtils.assertDeterministic(new ConfigDefDetector(), ctx("java", sample));
         }
     }
 

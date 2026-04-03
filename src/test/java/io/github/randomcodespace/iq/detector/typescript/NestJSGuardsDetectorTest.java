@@ -15,7 +15,7 @@ class NestJSGuardsDetectorTest {
     @Test
     void detectsGuardsAndRoles() {
         String code = """
-                import { Injectable, CanActivate } from '@nestjs/common';
+                import { UseGuards } from '@nestjs/common';
                 import { AuthGuard } from '@nestjs/passport';
                 @UseGuards(JwtAuthGuard, RolesGuard)
                 @Roles('admin', 'user')
@@ -60,8 +60,22 @@ class NestJSGuardsDetectorTest {
     }
 
     @Test
+    void noFalsePositiveOnGenericCanActivate() {
+        // canActivate() in Angular or custom code without @nestjs/ import must not match
+        String code = """
+                import { CanActivate } from '@angular/router';
+                export class AuthGuard implements CanActivate {
+                    canActivate(route, state) { return true; }
+                }
+                """;
+        DetectorContext ctx = DetectorTestUtils.contextFor("src/auth.guard.ts", "typescript", code);
+        DetectorResult result = detector.detect(ctx);
+        assertTrue(result.nodes().isEmpty(), "Should not match Angular guard without @nestjs/ import");
+    }
+
+    @Test
     void deterministic() {
-        String code = "import { Injectable } from '@nestjs/common';\n@UseGuards(AuthGuard)\n@Roles('admin')";
+        String code = "import { UseGuards } from '@nestjs/common';\n@UseGuards(AuthGuard)\n@Roles('admin')";
         DetectorContext ctx = DetectorTestUtils.contextFor("src/auth.guard.ts", "typescript", code);
         DetectorTestUtils.assertDeterministic(detector, ctx);
     }

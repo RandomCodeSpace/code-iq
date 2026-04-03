@@ -636,4 +636,173 @@ class QueryServiceTest {
         assertNull(map.get("line_start"));
         assertNull(map.get("layer"));
     }
+
+    // --- getFileTree ---
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void getFileTreeShouldBuildHierarchicalTree() {
+        when(graphStore.getFilePathsWithCounts(anyInt())).thenReturn(new GraphStore.FilePathResult(List.of(
+                Map.of("filePath", "src/main/Foo.java", "nodeCount", 3L),
+                Map.of("filePath", "src/main/Bar.java", "nodeCount", 1L),
+                Map.of("filePath", "src/test/FooTest.java", "nodeCount", 2L),
+                Map.of("filePath", "pom.xml", "nodeCount", 1L)), false));
+
+        Map<String, Object> result = service.getFileTree(null);
+
+        assertEquals(4L, result.get("total_files"));
+        List<Map<String, Object>> tree = (List<Map<String, Object>>) result.get("tree");
+
+        // Directories first (src), then files (pom.xml)
+        assertEquals(2, tree.size());
+        Map<String, Object> srcNode = tree.get(0);
+        assertEquals("src", srcNode.get("name"));
+        assertEquals("directory", srcNode.get("type"));
+        assertEquals(6L, srcNode.get("nodeCount")); // aggregate: 3+1+2
+
+        Map<String, Object> pomNode = tree.get(1);
+        assertEquals("pom.xml", pomNode.get("name"));
+        assertEquals("file", pomNode.get("type"));
+        assertEquals(1L, pomNode.get("nodeCount"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void getFileTreeShouldIncludePathFieldAtEveryLevel() {
+        when(graphStore.getFilePathsWithCounts(anyInt())).thenReturn(new GraphStore.FilePathResult(List.of(
+                Map.of("filePath", "src/main/java/Foo.java", "nodeCount", 2L),
+                Map.of("filePath", "pom.xml", "nodeCount", 1L)), false));
+
+        Map<String, Object> result = service.getFileTree(null);
+
+        List<Map<String, Object>> tree = (List<Map<String, Object>>) result.get("tree");
+
+        // Root-level directory: path = "src"
+        Map<String, Object> src = tree.get(0);
+        assertEquals("src", src.get("path"));
+
+        // Nested directory: path = "src/main"
+        List<Map<String, Object>> srcChildren = (List<Map<String, Object>>) src.get("children");
+        Map<String, Object> main = srcChildren.get(0);
+        assertEquals("src/main", main.get("path"));
+
+        // Deeper directory: path = "src/main/java"
+        List<Map<String, Object>> mainChildren = (List<Map<String, Object>>) main.get("children");
+        Map<String, Object> java = mainChildren.get(0);
+        assertEquals("src/main/java", java.get("path"));
+
+        // File inside directory: path = "src/main/java/Foo.java"
+        List<Map<String, Object>> javaChildren = (List<Map<String, Object>>) java.get("children");
+        Map<String, Object> foo = javaChildren.get(0);
+        assertEquals("src/main/java/Foo.java", foo.get("path"));
+
+        // Root-level file: path = "pom.xml"
+        Map<String, Object> pom = tree.get(1);
+        assertEquals("pom.xml", pom.get("path"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void getFileTreeShouldSortDirectoriesBeforeFiles() {
+        when(graphStore.getFilePathsWithCounts(anyInt())).thenReturn(new GraphStore.FilePathResult(List.of(
+                Map.of("filePath", "README.md", "nodeCount", 1L),
+                Map.of("filePath", "src/Foo.java", "nodeCount", 2L)), false));
+
+        Map<String, Object> result = service.getFileTree(null);
+
+        List<Map<String, Object>> tree = (List<Map<String, Object>>) result.get("tree");
+        assertEquals("src", tree.get(0).get("name"));      // directory first
+        assertEquals("README.md", tree.get(1).get("name")); // file second
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void getFileTreeShouldRespectDepthLimit() {
+        when(graphStore.getFilePathsWithCounts(anyInt())).thenReturn(new GraphStore.FilePathResult(List.of(
+                Map.of("filePath", "src/main/java/Foo.java", "nodeCount", 5L)), false));
+
+        Map<String, Object> result = service.getFileTree(2);
+
+        List<Map<String, Object>> tree = (List<Map<String, Object>>) result.get("tree");
+        // depth=2: root children (depth=1) + their direct children (depth=2), no deeper
+        Map<String, Object> src = tree.get(0); // src (depth 1)
+        List<Map<String, Object>> srcChildren = (List<Map<String, Object>>) src.get("children");
+        Map<String, Object> main = srcChildren.get(0); // main (depth 2)
+        List<Map<String, Object>> mainChildren = (List<Map<String, Object>>) main.get("children");
+        assertTrue(mainChildren.isEmpty()); // depth limit reached
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void getFileTreeShouldReturnEmptyTreeForNoNodes() {
+        when(graphStore.getFilePathsWithCounts(anyInt())).thenReturn(new GraphStore.FilePathResult(List.of(), false));
+
+        Map<String, Object> result = service.getFileTree(null);
+
+        assertEquals(0L, result.get("total_files"));
+        List<Map<String, Object>> tree = (List<Map<String, Object>>) result.get("tree");
+        assertTrue(tree.isEmpty());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void getFileTreeShouldBeDeterministic() {
+        List<Map<String, Object>> paths = List.of(
+                Map.of("filePath", "src/B.java", "nodeCount", 2L),
+                Map.of("filePath", "src/A.java", "nodeCount", 1L),
+                Map.of("filePath", "lib/C.java", "nodeCount", 3L));
+
+        when(graphStore.getFilePathsWithCounts(anyInt())).thenReturn(new GraphStore.FilePathResult(paths, false));
+        Map<String, Object> first = service.getFileTree(null);
+
+        when(graphStore.getFilePathsWithCounts(anyInt())).thenReturn(new GraphStore.FilePathResult(paths, false));
+        Map<String, Object> second = service.getFileTree(null);
+
+        assertEquals(first.toString(), second.toString());
+    }
+
+    // --- findRelatedEndpoints ---
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void findRelatedEndpointsShouldReturnDirectEndpointMatches() {
+        var ep = makeNode("ep1", NodeKind.ENDPOINT, "GET /users");
+        when(graphStore.search("users", 50)).thenReturn(List.of(ep));
+        when(graphStore.findEndpointNeighborsBatch(List.of())).thenReturn(Map.of());
+
+        Map<String, Object> result = service.findRelatedEndpoints("users");
+
+        assertEquals(1, result.get("count"));
+        List<Map<String, Object>> endpoints = (List<Map<String, Object>>) result.get("endpoints");
+        assertEquals("ep1", endpoints.getFirst().get("id"));
+        verify(graphStore, never()).findNeighbors(anyString());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void findRelatedEndpointsShouldUseBatchQueryForNeighbors() {
+        var cls = makeNode("cls1", NodeKind.CLASS, "UserService");
+        var ep = makeNode("ep1", NodeKind.ENDPOINT, "GET /users");
+        when(graphStore.search("UserService", 50)).thenReturn(List.of(cls));
+        when(graphStore.findEndpointNeighborsBatch(List.of("cls1"))).thenReturn(Map.of("cls1", List.of(ep)));
+
+        Map<String, Object> result = service.findRelatedEndpoints("UserService");
+
+        assertEquals(1, result.get("count"));
+        List<Map<String, Object>> endpoints = (List<Map<String, Object>>) result.get("endpoints");
+        assertEquals("ep1", endpoints.getFirst().get("id"));
+        assertEquals("cls1", endpoints.getFirst().get("connected_via"));
+        verify(graphStore, never()).findNeighbors(anyString());
+    }
+
+    @Test
+    void findRelatedEndpointsShouldReturnEmptyWhenNoMatches() {
+        when(graphStore.search("unknown", 50)).thenReturn(List.of());
+        when(graphStore.findEndpointNeighborsBatch(List.of())).thenReturn(Map.of());
+
+        Map<String, Object> result = service.findRelatedEndpoints("unknown");
+
+        assertEquals(0, result.get("count"));
+        assertEquals(0, result.get("searched_nodes"));
+    }
 }

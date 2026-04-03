@@ -296,6 +296,33 @@ public class GraphStore implements FlowDataSource {
                 Map.of("nodeId", nodeId));
     }
 
+    /**
+     * Single-query batch lookup: for a list of node IDs, find all neighboring nodes
+     * whose kind is ENDPOINT or WEBSOCKET_ENDPOINT.
+     * Returns a map from source node ID to the list of endpoint neighbors found.
+     */
+    public Map<String, List<CodeNode>> findEndpointNeighborsBatch(List<String> nodeIds) {
+        Map<String, List<CodeNode>> result = new LinkedHashMap<>();
+        if (nodeIds.isEmpty()) return result;
+        List<String> epKinds = List.of(NodeKind.ENDPOINT.getValue(), NodeKind.WEBSOCKET_ENDPOINT.getValue());
+        try (Transaction tx = graphDb.beginTx()) {
+            var qr = tx.execute(
+                    "UNWIND $ids AS nid "
+                            + "MATCH (n:CodeNode {id: nid})-[]-(ep:CodeNode) "
+                            + "WHERE ep.kind IN $epKinds "
+                            + "RETURN nid AS matchId, ep",
+                    Map.of("ids", nodeIds, "epKinds", epKinds));
+            while (qr.hasNext()) {
+                var row = qr.next();
+                String matchId = (String) row.get("matchId");
+                if (row.get("ep") instanceof org.neo4j.graphdb.Node neo4jNode) {
+                    result.computeIfAbsent(matchId, k -> new ArrayList<>()).add(nodeFromNeo4j(neo4jNode));
+                }
+            }
+        }
+        return result;
+    }
+
     public List<CodeNode> findOutgoingNeighbors(String nodeId) {
         return queryNodes(
                 "MATCH (n:CodeNode)-[r]->(m:CodeNode) WHERE n.id = $nodeId RETURN m",
@@ -566,6 +593,38 @@ public class GraphStore implements FlowDataSource {
         return rows;
     }
 
+    /** Result wrapper for file-path queries, carrying a truncation flag. */
+    public record FilePathResult(List<Map<String, Object>> rows, boolean truncated) {}
+
+    /**
+     * Return each distinct filePath that has at least one CodeNode, along with the count
+     * of nodes stored at that path. Results are capped at {@code maxFiles}; if more paths
+     * exist the {@link FilePathResult#truncated()} flag is set to {@code true}.
+     */
+    public FilePathResult getFilePathsWithCounts(int maxFiles) {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        try (Transaction tx = graphDb.beginTx()) {
+            var result = tx.execute(
+                    "MATCH (n:CodeNode) WHERE n.filePath IS NOT NULL "
+                            + "RETURN n.filePath AS filePath, count(n) AS nodeCount "
+                            + "ORDER BY n.filePath "
+                            + "LIMIT $limit",
+                    Map.of("limit", (long) (maxFiles + 1)));
+            while (result.hasNext()) {
+                var row = result.next();
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("filePath", row.get("filePath"));
+                m.put("nodeCount", ((Number) row.get("nodeCount")).longValue());
+                rows.add(m);
+            }
+        }
+        boolean truncated = rows.size() > maxFiles;
+        if (truncated) {
+            rows = rows.subList(0, maxFiles);
+        }
+        return new FilePathResult(rows, truncated);
+    }
+
     public long countEdgesByKind(String kind) {
         try (Transaction tx = graphDb.beginTx()) {
             var result = tx.execute(
@@ -744,9 +803,16 @@ public class GraphStore implements FlowDataSource {
 
     private Map<String, Object> computeGraphStats() {
         Map<String, Object> graph = new LinkedHashMap<>();
-        graph.put("nodes", count());
-        graph.put("edges", countEdges());
-        graph.put("files", countDistinctFiles());
+        try (Transaction tx = graphDb.beginTx()) {
+            var r1 = tx.execute("MATCH (n:CodeNode) RETURN count(n) AS cnt");
+            graph.put("nodes", r1.hasNext() ? ((Number) r1.next().get("cnt")).longValue() : 0L);
+            var r2 = tx.execute("MATCH ()-[r:RELATES_TO]->() RETURN count(r) AS cnt");
+            graph.put("edges", r2.hasNext() ? ((Number) r2.next().get("cnt")).longValue() : 0L);
+            var r3 = tx.execute(
+                    "MATCH (n:CodeNode) WHERE n.filePath IS NOT NULL AND n.filePath <> '' "
+                            + "RETURN count(DISTINCT n.filePath) AS cnt");
+            graph.put("files", r3.hasNext() ? ((Number) r3.next().get("cnt")).longValue() : 0L);
+        }
         return graph;
     }
 

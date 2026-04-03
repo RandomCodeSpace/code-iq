@@ -10,10 +10,12 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 /**
  * High-level query service wrapping GraphStore with caching.
@@ -256,6 +258,7 @@ public class QueryService {
 
     // --- Relationship queries ---
 
+    @Cacheable(value = "consumers", key = "#targetId")
     public Map<String, Object> consumersOf(String targetId) {
         List<CodeNode> consumers = graphStore.findConsumers(targetId);
         Map<String, Object> result = new LinkedHashMap<>();
@@ -274,6 +277,7 @@ public class QueryService {
         return result;
     }
 
+    @Cacheable(value = "callers", key = "#targetId")
     public Map<String, Object> callersOf(String targetId) {
         List<CodeNode> callers = graphStore.findCallers(targetId);
         Map<String, Object> result = new LinkedHashMap<>();
@@ -303,6 +307,7 @@ public class QueryService {
 
     // --- Triage queries ---
 
+    @Cacheable(value = "component-by-file", key = "#filePath")
     public Map<String, Object> findComponentByFile(String filePath) {
         List<CodeNode> nodes = graphStore.findByFilePath(filePath);
         Map<String, Object> result = new LinkedHashMap<>();
@@ -326,35 +331,135 @@ public class QueryService {
     }
 
     /**
+     * Build a hierarchical file-tree from all distinct filePaths in the graph.
+     * Each directory node carries an aggregate nodeCount (sum of all descendants).
+     * Each file node carries the count of CodeNodes at that exact path.
+     * Children are sorted: directories first (alphabetical), then files (alphabetical).
+     *
+     * @param maxDepth limit tree depth; null means unlimited
+     */
+    @Cacheable(value = "file-tree", key = "#maxDepth")
+    public Map<String, Object> getFileTree(Integer maxDepth) {
+        GraphStore.FilePathResult filePathResult = graphStore.getFilePathsWithCounts(config.getMaxFiles());
+        List<Map<String, Object>> rows = filePathResult.rows();
+
+        TreeNode root = new TreeNode("", "directory");
+        for (Map<String, Object> row : rows) {
+            String filePath = (String) row.get("filePath");
+            long count = ((Number) row.get("nodeCount")).longValue();
+            String[] parts = filePath.split("/", -1);
+            TreeNode current = root;
+            for (int i = 0; i < parts.length; i++) {
+                String part = parts[i];
+                if (part.isEmpty()) continue;
+                boolean isFile = (i == parts.length - 1);
+                String type = isFile ? "file" : "directory";
+                TreeNode child = current.children.computeIfAbsent(part, k -> new TreeNode(k, type));
+                if (isFile) {
+                    child.nodeCount += count;
+                }
+                current = child;
+            }
+        }
+
+        List<Map<String, Object>> tree = buildTreeOutput(root, maxDepth, 1, "");
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("tree", tree);
+        result.put("total_files", (long) rows.size());
+        result.put("truncated", filePathResult.truncated());
+        return result;
+    }
+
+    private List<Map<String, Object>> buildTreeOutput(TreeNode node, Integer maxDepth, int currentDepth, String parentPath) {
+        List<Map<String, Object>> output = new ArrayList<>();
+
+        List<TreeNode> dirs = node.children.values().stream()
+                .filter(n -> "directory".equals(n.type))
+                .sorted(Comparator.comparing(n -> n.name))
+                .toList();
+        List<TreeNode> files = node.children.values().stream()
+                .filter(n -> "file".equals(n.type))
+                .sorted(Comparator.comparing(n -> n.name))
+                .toList();
+
+        for (TreeNode child : dirs) {
+            String childPath = parentPath.isEmpty() ? child.name : parentPath + "/" + child.name;
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("name", child.name);
+            m.put("path", childPath);
+            m.put("type", "directory");
+            m.put("nodeCount", aggregateCount(child));
+            if (maxDepth == null || currentDepth < maxDepth) {
+                m.put("children", buildTreeOutput(child, maxDepth, currentDepth + 1, childPath));
+            } else {
+                m.put("children", List.of());
+            }
+            output.add(m);
+        }
+        for (TreeNode child : files) {
+            String childPath = parentPath.isEmpty() ? child.name : parentPath + "/" + child.name;
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("name", child.name);
+            m.put("path", childPath);
+            m.put("type", "file");
+            m.put("nodeCount", child.nodeCount);
+            m.put("children", List.of());
+            output.add(m);
+        }
+        return output;
+    }
+
+    private long aggregateCount(TreeNode node) {
+        long total = node.nodeCount;
+        for (TreeNode child : node.children.values()) {
+            total += aggregateCount(child);
+        }
+        return total;
+    }
+
+    private static class TreeNode {
+        final String name;
+        final String type;
+        long nodeCount = 0;
+        final Map<String, TreeNode> children = new TreeMap<>();
+
+        TreeNode(String name, String type) {
+            this.name = name;
+            this.type = type;
+        }
+    }
+
+    /**
      * Find API endpoints related to an identifier (file, class, entity).
      * Searches for matching nodes, then traverses the graph to find connected endpoints.
+     * Uses a batch query instead of N+1 individual neighbor lookups.
      */
+    @Cacheable(value = "related-endpoints", key = "#identifier")
     public Map<String, Object> findRelatedEndpoints(String identifier) {
-        // Find nodes matching the identifier
         List<CodeNode> matches = graphStore.search(identifier, 50);
 
-        // Collect endpoints: any match that IS an endpoint, plus neighbors of matches that are endpoints
         Set<String> seenIds = new java.util.LinkedHashSet<>();
         List<Map<String, Object>> endpoints = new ArrayList<>();
+        List<String> nonEndpointIds = new ArrayList<>();
 
-        // First pass: collect matches that are themselves endpoints
+        // Partition: collect direct endpoint matches, queue rest for batch lookup
         for (CodeNode match : matches) {
             if (match.getKind() == NodeKind.ENDPOINT || match.getKind() == NodeKind.WEBSOCKET_ENDPOINT) {
                 if (seenIds.add(match.getId())) {
                     endpoints.add(nodeToMap(match));
                 }
+            } else {
+                nonEndpointIds.add(match.getId());
             }
         }
 
-        // Single batched query for all endpoint neighbors (replaces N+1 loop)
-        List<String> matchIds = matches.stream().map(CodeNode::getId).toList();
-        Map<String, List<CodeNode>> endpointNeighbors = graphStore.findEndpointNeighborsBatch(matchIds);
-        for (Map.Entry<String, List<CodeNode>> entry : endpointNeighbors.entrySet()) {
-            String sourceId = entry.getKey();
+        // Single batch query for all endpoint neighbors — replaces up to 50 individual findNeighbors() calls
+        Map<String, List<CodeNode>> neighborEndpoints = graphStore.findEndpointNeighborsBatch(nonEndpointIds);
+        for (Map.Entry<String, List<CodeNode>> entry : neighborEndpoints.entrySet()) {
             for (CodeNode neighbor : entry.getValue()) {
                 if (seenIds.add(neighbor.getId())) {
                     Map<String, Object> epMap = nodeToMap(neighbor);
-                    epMap.put("connected_via", sourceId);
+                    epMap.put("connected_via", entry.getKey());
                     endpoints.add(epMap);
                 }
             }

@@ -16,21 +16,26 @@ export default function NodeDetailModal({ nodeId, onClose }: NodeDetailModalProp
 
   useEffect(() => {
     if (!nodeId) return;
+    let cancelled = false;
     setLoading(true);
     setError(null);
     setSourceCode(null);
 
     api.getNodeDetail(nodeId)
-      .then(data => {
+      .then(async data => {
+        if (cancelled) return;
         setNode(data);
         if (data.file_path && data.line_start && data.line_end) {
           const start = Math.max(1, data.line_start - 3);
           const end = data.line_end + 3;
-          return api.readFile(data.file_path, start, end).then(setSourceCode);
+          const src = await api.readFile(data.file_path, start, end);
+          if (!cancelled) setSourceCode(src);
         }
       })
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false));
+      .catch(err => { if (!cancelled) setError(err.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+
+    return () => { cancelled = true; };
   }, [nodeId]);
 
   if (!nodeId) return null;

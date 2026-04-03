@@ -36,7 +36,7 @@ export function useApi<T>(fetcher: () => Promise<T>, deps: unknown[] = []): UseA
 
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trigger, ...deps]);
+  }, [trigger, JSON.stringify(deps)]);
 
   return { data, loading, error, refetch };
 }

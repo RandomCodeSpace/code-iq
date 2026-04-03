@@ -317,7 +317,8 @@ public class EnrichCommand implements Callable<Integer> {
             // Wait for all indexes (including fulltext) to finish building
             try (Transaction tx = db.beginTx()) {
                 tx.execute("CALL db.awaitIndexes(300)");
-                tx.commit();
+            } catch (Exception e) {
+                log.debug("Secondary index await returned: {}", e.getMessage());
             }
             CliOutput.info("  Created Neo4j indexes");
 

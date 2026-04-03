@@ -94,19 +94,63 @@ export interface EdgesListResponse {
   total: number;
 }
 
-export interface AnalyzeResponse {
-  status: string;
-  total_files: number;
-  files_analyzed: number;
-  node_count: number;
-  edge_count: number;
-  elapsed_ms: number;
-}
-
 export interface SearchResult {
   id: string;
   kind: string;
-  label: string;
+  label?: string;
+  name?: string;
   score?: number;
   file_path?: string;
+  filePath?: string;
+}
+
+export interface FileTreeNode {
+  name: string;
+  path: string;
+  type: 'file' | 'directory';
+  nodeCount: number;
+  children?: FileTreeNode[];
+}
+
+export interface FileTreeResponse {
+  tree: FileTreeNode[];
+  total_files: number;
+  truncated: boolean;
+}
+
+// Topology API types
+export interface TopologyService {
+  name: string;
+  nodeCount?: number;
+  layer?: string;
+  modules?: string[];
+  language?: string;
+  framework?: string;
+}
+
+export interface TopologyDependency {
+  source: string;
+  target: string;
+  kind?: string;
+  count?: number;
+}
+
+export interface TopologyResponse {
+  services: TopologyService[];
+  dependencies: TopologyDependency[];
+}
+
+// Ego graph API types
+export interface EgoGraphResponse {
+  center: string;
+  nodes: NodeResponse[];
+  edges: EdgeResponse[];
+  radius?: number;
+}
+
+// Neighbors API types
+export interface NeighborsResponse {
+  node: NodeResponse;
+  incoming: Array<{ edge: EdgeResponse; node: NodeResponse }>;
+  outgoing: Array<{ edge: EdgeResponse; node: NodeResponse }>;
 }

@@ -55,7 +55,11 @@ public class ReactComponentDetector extends AbstractRegexDetector {
         List<CodeNode> nodes = new ArrayList<>();
         List<CodeEdge> edges = new ArrayList<>();
         String filePath = ctx.filePath();
-        List<String> componentNames = new ArrayList<>();
+
+        // Track component name -> (sourceId, matchStart) for scoped JSX search
+        record ComponentEntry(String name, String sourceId, int matchStart) {}
+        List<ComponentEntry> componentEntries = new ArrayList<>();
+        Set<String> componentNames = new LinkedHashSet<>();
 
         // Function components
         for (Pattern pattern : List.of(EXPORT_DEFAULT_FUNC, EXPORT_CONST_ARROW, EXPORT_CONST_FC)) {
@@ -64,8 +68,9 @@ public class ReactComponentDetector extends AbstractRegexDetector {
                 String name = m.group(1);
                 if (componentNames.contains(name)) continue;
                 int line = text.substring(0, m.start()).split("\n", -1).length;
+                String sourceId = "react:" + filePath + ":component:" + name;
                 CodeNode node = new CodeNode();
-                node.setId("react:" + filePath + ":component:" + name);
+                node.setId(sourceId);
                 node.setKind(NodeKind.COMPONENT);
                 node.setLabel(name);
                 node.setFqn(filePath + "::" + name);
@@ -75,6 +80,7 @@ public class ReactComponentDetector extends AbstractRegexDetector {
                 node.getProperties().put("component_type", "function");
                 nodes.add(node);
                 componentNames.add(name);
+                componentEntries.add(new ComponentEntry(name, sourceId, m.start()));
             }
         }
 
@@ -85,8 +91,9 @@ public class ReactComponentDetector extends AbstractRegexDetector {
                 String name = m.group(1);
                 if (componentNames.contains(name)) continue;
                 int line = text.substring(0, m.start()).split("\n", -1).length;
+                String sourceId = "react:" + filePath + ":component:" + name;
                 CodeNode node = new CodeNode();
-                node.setId("react:" + filePath + ":component:" + name);
+                node.setId(sourceId);
                 node.setKind(NodeKind.COMPONENT);
                 node.setLabel(name);
                 node.setFqn(filePath + "::" + name);
@@ -96,6 +103,7 @@ public class ReactComponentDetector extends AbstractRegexDetector {
                 node.getProperties().put("component_type", "class");
                 nodes.add(node);
                 componentNames.add(name);
+                componentEntries.add(new ComponentEntry(name, sourceId, m.start()));
             }
         }
 
@@ -120,25 +128,35 @@ public class ReactComponentDetector extends AbstractRegexDetector {
             }
         }
 
-        // RENDERS edges (JSX child components)
+        // RENDERS edges: scope JSX tag search to each component's body section.
+        // A component's body is from its match position to the next component's position.
         Set<String> allDetected = new HashSet<>(componentNames);
         allDetected.addAll(hookNames);
-        Set<String> childNames = new TreeSet<>();
-        Matcher jsxM = JSX_TAG.matcher(text);
-        while (jsxM.find()) {
-            String tag = jsxM.group(1);
-            if (!allDetected.contains(tag)) {
-                childNames.add(tag);
-            }
-        }
 
-        for (String comp : componentNames) {
-            String sourceId = "react:" + filePath + ":component:" + comp;
+        componentEntries.sort(Comparator.comparingInt(ComponentEntry::matchStart));
+
+        for (int i = 0; i < componentEntries.size(); i++) {
+            ComponentEntry comp = componentEntries.get(i);
+            int bodyStart = comp.matchStart();
+            int bodyEnd = (i + 1 < componentEntries.size())
+                    ? componentEntries.get(i + 1).matchStart()
+                    : text.length();
+            String bodyText = text.substring(bodyStart, bodyEnd);
+
+            Set<String> childNames = new TreeSet<>();
+            Matcher jsxM = JSX_TAG.matcher(bodyText);
+            while (jsxM.find()) {
+                String tag = jsxM.group(1);
+                if (!tag.equals(comp.name())) {
+                    childNames.add(tag);
+                }
+            }
+
             for (String child : childNames) {
                 CodeEdge edge = new CodeEdge();
-                edge.setId(sourceId + ":renders:" + child);
+                edge.setId(comp.sourceId() + ":renders:" + child);
                 edge.setKind(EdgeKind.RENDERS);
-                edge.setSourceId(sourceId);
+                edge.setSourceId(comp.sourceId());
                 edge.setTarget(new CodeNode(child, NodeKind.COMPONENT, child));
                 edges.add(edge);
             }

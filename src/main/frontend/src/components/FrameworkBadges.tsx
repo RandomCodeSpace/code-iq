@@ -1,67 +1,81 @@
-const frameworkColors: Record<string, string> = {
-  spring: 'bg-green-500/10 text-green-400 border-green-500/20',
-  'spring boot': 'bg-green-500/10 text-green-400 border-green-500/20',
-  nestjs: 'bg-red-500/10 text-red-400 border-red-500/20',
-  express: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-  fastapi: 'bg-teal-500/10 text-teal-400 border-teal-500/20',
-  django: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  react: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
-  angular: 'bg-red-500/10 text-red-400 border-red-500/20',
-  vue: 'bg-green-500/10 text-green-400 border-green-500/20',
-  flask: 'bg-slate-400/10 text-slate-300 border-slate-400/20',
-  rails: 'bg-red-500/10 text-red-400 border-red-500/20',
-  laravel: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
-  kafka: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-  graphql: 'bg-pink-500/10 text-pink-400 border-pink-500/20',
-  grpc: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  websocket: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
-  neo4j: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  postgres: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  mysql: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
-  redis: 'bg-red-500/10 text-red-400 border-red-500/20',
-  mongodb: 'bg-green-500/10 text-green-400 border-green-500/20',
-  docker: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  kubernetes: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  terraform: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-  aws: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-  gcp: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  azure: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-};
+import { useNavigate } from 'react-router-dom';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Puzzle } from 'lucide-react';
 
-const defaultColor = 'bg-surface-700/30 text-surface-300 border-surface-600/30';
+/** Maps lowercase framework name fragments → Badge variant */
+type BadgeVariant = 'default' | 'secondary' | 'outline' | 'muted' | 'success' | 'warning' | 'info' | 'purple';
+
+const frameworkVariants: Array<[string, BadgeVariant]> = [
+  ['spring', 'success'],
+  ['django', 'success'],
+  ['rails', 'warning'],
+  ['laravel', 'warning'],
+  ['nestjs', 'warning'],
+  ['express', 'warning'],
+  ['fastapi', 'info'],
+  ['flask', 'muted'],
+  ['react', 'info'],
+  ['angular', 'warning'],
+  ['vue', 'success'],
+  ['kafka', 'purple'],
+  ['graphql', 'purple'],
+  ['grpc', 'info'],
+  ['websocket', 'info'],
+  ['neo4j', 'info'],
+  ['postgres', 'info'],
+  ['mysql', 'warning'],
+  ['redis', 'warning'],
+  ['mongodb', 'success'],
+  ['docker', 'info'],
+  ['kubernetes', 'info'],
+  ['terraform', 'purple'],
+  ['aws', 'warning'],
+  ['gcp', 'info'],
+  ['azure', 'info'],
+];
+
+function getVariant(name: string): BadgeVariant {
+  const lower = name.toLowerCase();
+  return frameworkVariants.find(([k]) => lower.includes(k))?.[1] ?? 'muted';
+}
 
 interface FrameworkBadgesProps {
-  /** Map of framework name -> count of nodes using that framework */
   frameworks: Record<string, number>;
 }
 
 export default function FrameworkBadges({ frameworks }: FrameworkBadgesProps) {
+  const navigate = useNavigate();
   const entries = Object.entries(frameworks || {});
   if (entries.length === 0) return null;
 
-  // Sort by count descending
   const sorted = entries.sort(([, a], [, b]) => b - a);
 
   return (
-    <div className="glass-card p-5">
-      <h3 className="text-xs font-medium text-surface-400 uppercase tracking-wider mb-3">
-        Frameworks & Technologies
-      </h3>
-      <div className="flex flex-wrap gap-2">
-        {sorted.map(([fw, count]) => {
-          const lower = fw.toLowerCase();
-          const color = Object.entries(frameworkColors).find(([k]) => lower.includes(k))?.[1] || defaultColor;
-          return (
-            <span
+    <Card className="border-border/60 bg-card/80 backdrop-blur-sm">
+      <CardHeader className="pb-3 px-5 pt-4">
+        <CardTitle className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-widest">
+          <Puzzle className="w-3.5 h-3.5" />
+          Frameworks &amp; Technologies
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="px-5 pb-4 pt-0">
+        <div className="flex flex-wrap gap-1.5" role="list" aria-label="Detected frameworks">
+          {sorted.map(([fw, count]) => (
+            <Badge
               key={fw}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border ${color} transition-all hover:scale-105`}
+              variant={getVariant(fw)}
+              className="cursor-pointer hover:opacity-80 transition-opacity select-none gap-1.5 px-2.5 py-1"
+              onClick={() => navigate(`/explorer?q=${encodeURIComponent(fw)}`)}
+              role="listitem"
+              title={`${count.toLocaleString()} nodes`}
             >
               {fw}
-              <span className="opacity-60 font-mono">{count.toLocaleString()}</span>
-            </span>
-          );
-        })}
-      </div>
-    </div>
+              <span className="opacity-50 font-mono text-[10px]">{count.toLocaleString()}</span>
+            </Badge>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
