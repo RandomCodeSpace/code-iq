@@ -40,9 +40,13 @@ public record RepositoryIdentity(
                     .directory(repoPath.toFile())
                     .redirectErrorStream(true);
             var proc = pb.start();
-            String out = new String(proc.getInputStream().readAllBytes()).trim();
-            int exit = proc.waitFor();
-            return (exit == 0 && !out.isBlank()) ? out : null;
+            try {
+                String out = new String(proc.getInputStream().readAllBytes()).trim();
+                int exit = proc.waitFor();
+                return (exit == 0 && !out.isBlank()) ? out : null;
+            } finally {
+                proc.destroy();
+            }
         } catch (Exception e) {
             return null;
         }
