@@ -234,7 +234,7 @@ public final class CapabilityMatrix {
     public static Map<String, Map<String, String>> asSerializableMap() {
         Map<String, Map<String, String>> result = new TreeMap<>();
         for (String lang : new String[]{
-                "java", "typescript", "javascript", "python", "go", "csharp", "rust",
+                "java", "typescript", "javascript", "python", "go", "csharp", "rust", "cpp",
                 "kotlin", "scala", "ruby", "php", "shell"}) {
             Map<CapabilityDimension, CapabilityLevel> caps = tableFor(lang);
             Map<String, String> row = new LinkedHashMap<>();

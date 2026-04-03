@@ -153,7 +153,7 @@ class CapabilityMatrixTest {
     @Test
     void serializableMap_containsExpectedLanguages() {
         Map<String, Map<String, String>> matrix = CapabilityMatrix.asSerializableMap();
-        assertThat(matrix).containsKeys("java", "typescript", "javascript", "python", "go", "csharp", "rust");
+        assertThat(matrix).containsKeys("java", "typescript", "javascript", "python", "go", "csharp", "rust", "cpp");
     }
 
     @Test
