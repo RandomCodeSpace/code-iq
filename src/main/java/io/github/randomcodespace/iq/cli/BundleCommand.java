@@ -6,6 +6,9 @@ import io.github.randomcodespace.iq.cache.AnalysisCache;
 import io.github.randomcodespace.iq.config.CodeIqConfig;
 import io.github.randomcodespace.iq.flow.FlowEngine;
 import io.github.randomcodespace.iq.graph.GraphStore;
+import io.github.randomcodespace.iq.intelligence.ArtifactManifest;
+import io.github.randomcodespace.iq.intelligence.FileInventory;
+import io.github.randomcodespace.iq.intelligence.RepositoryIdentity;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
@@ -120,7 +123,6 @@ public class BundleCommand implements Callable<Integer> {
 
         // Get node/edge counts from H2 cache
         long nodeCount = 0, edgeCount = 0;
-        int filesAnalyzed = 0;
         if (Files.isDirectory(h2Dir)) {
             try (var cache = new AnalysisCache(h2Dir.resolve("analysis-cache.db"))) {
                 nodeCount = cache.getNodeCount();
@@ -136,8 +138,9 @@ public class BundleCommand implements Callable<Integer> {
 
             // 1. manifest.json
             CliOutput.info("  Writing manifest.json");
-            String manifest = createManifest(projectName, bundleTag, version,
-                    nodeCount, edgeCount, filesAnalyzed, !noSource, includeJar);
+            RepositoryIdentity repoIdentity = RepositoryIdentity.resolve(root);
+            String manifest = createManifest(projectName, bundleTag, version, repoIdentity,
+                    nodeCount, edgeCount, !noSource, includeJar);
             writeEntry(zos, "manifest.json", manifest);
 
             // 2. serve.sh
@@ -217,27 +220,27 @@ public class BundleCommand implements Callable<Integer> {
     // --- Manifest ---
 
     private String createManifest(String projectName, String bundleTag, String version,
-                                   long nodeCount, long edgeCount, int filesAnalyzed,
+                                   RepositoryIdentity repoIdentity,
+                                   long nodeCount, long edgeCount,
                                    boolean includesSource, boolean includesJar) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("bundle_format", 2);
-        m.put("tag", bundleTag);
-        m.put("project", projectName);
-        m.put("osscodeiq_version", version);
-        m.put("created_at", Instant.now().toString());
-        m.put("backend", "neo4j");
-        m.put("node_count", nodeCount);
-        m.put("edge_count", edgeCount);
-        m.put("files_analyzed", filesAnalyzed);
-        m.put("includes_source", includesSource);
-        m.put("includes_jar", includesJar);
-
-        String gitSha = getGitSha();
-        if (gitSha != null) m.put("git_sha", gitSha);
-
+        var manifest = new ArtifactManifest(
+                ArtifactManifest.BUNDLE_FORMAT_VERSION,
+                bundleTag,
+                projectName,
+                version,
+                io.github.randomcodespace.iq.intelligence.Provenance.CURRENT_SCHEMA_VERSION,
+                Instant.now().toString(),
+                repoIdentity,
+                FileInventory.EMPTY.toSummary(),
+                nodeCount,
+                edgeCount,
+                includesSource,
+                includesJar,
+                null
+        );
         try {
             return new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT)
-                    .writeValueAsString(m);
+                    .writeValueAsString(manifest.toMap());
         } catch (Exception e) {
             return "{}";
         }
@@ -464,17 +467,4 @@ public class BundleCommand implements Callable<Integer> {
         writeEntry(zos, name, content);
     }
 
-    private String getGitSha() {
-        try {
-            ProcessBuilder pb = new ProcessBuilder("git", "rev-parse", "HEAD")
-                    .directory(path.toAbsolutePath().normalize().toFile())
-                    .redirectErrorStream(true);
-            Process proc = pb.start();
-            String sha = new String(proc.getInputStream().readAllBytes(), StandardCharsets.UTF_8).trim();
-            int exitCode = proc.waitFor();
-            return (exitCode == 0 && sha.length() >= 7) ? sha : null;
-        } catch (Exception ignored) {
-            return null;
-        }
-    }
 }

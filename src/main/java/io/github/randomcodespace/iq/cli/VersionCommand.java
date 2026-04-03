@@ -16,7 +16,7 @@ import java.util.concurrent.Callable;
         description = "Show version info")
 public class VersionCommand implements Callable<Integer> {
 
-    static final String VERSION = "0.1.0-SNAPSHOT";
+    public static final String VERSION = "0.1.0-SNAPSHOT";
 
     private final DetectorRegistry registry;
 

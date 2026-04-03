@@ -5,6 +5,9 @@ import io.github.randomcodespace.iq.analyzer.LayerClassifier;
 import io.github.randomcodespace.iq.analyzer.linker.Linker;
 import io.github.randomcodespace.iq.cache.AnalysisCache;
 import io.github.randomcodespace.iq.config.CodeIqConfig;
+import io.github.randomcodespace.iq.intelligence.CapabilityLevel;
+import io.github.randomcodespace.iq.intelligence.Provenance;
+import io.github.randomcodespace.iq.intelligence.RepositoryIdentity;
 import io.github.randomcodespace.iq.model.CodeEdge;
 import io.github.randomcodespace.iq.model.CodeNode;
 import io.github.randomcodespace.iq.model.EdgeKind;
@@ -116,7 +119,15 @@ public class EnrichCommand implements Callable<Integer> {
 
         // 2. Run linkers (these work on in-memory node/edge lists)
         CliOutput.step("\uD83D\uDD17", "Running cross-file linkers...");
-        var builder = new GraphBuilder();
+        RepositoryIdentity repoIdentity = RepositoryIdentity.resolve(root);
+        Provenance provenance = new Provenance(
+                repoIdentity.repoUrl(),
+                repoIdentity.commitSha(),
+                VersionCommand.VERSION,
+                Provenance.CURRENT_SCHEMA_VERSION,
+                CapabilityLevel.PARTIAL
+        );
+        var builder = new GraphBuilder(provenance);
         for (CodeNode node : allNodes) {
             builder.addNodes(List.of(node));
         }
@@ -147,6 +158,7 @@ public class EnrichCommand implements Callable<Integer> {
         String projectName = root.getFileName().toString();
         var serviceResult = serviceDetector.detect(enrichedNodes, enrichedEdges, projectName, root);
         if (!serviceResult.serviceNodes().isEmpty()) {
+            serviceResult.serviceNodes().forEach(n -> n.setProvenance(provenance));
             // Add service nodes and edges to the builder
             builder.addNodes(serviceResult.serviceNodes());
             builder.addEdges(serviceResult.serviceEdges());

@@ -7,6 +7,8 @@ import org.springframework.data.neo4j.core.schema.Node;
 import org.springframework.data.neo4j.core.schema.Relationship;
 import org.springframework.data.neo4j.core.schema.Relationship.Direction;
 
+import io.github.randomcodespace.iq.intelligence.Provenance;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -167,6 +169,26 @@ public class CodeNode {
     @Override
     public int hashCode() {
         return Objects.hash(id);
+    }
+
+    // --- Provenance helpers ---
+
+    /**
+     * Write provenance into this node's properties map using {@code prov_*} keys.
+     * Overwrites any existing provenance.
+     */
+    public void setProvenance(Provenance provenance) {
+        if (provenance != null) {
+            properties.putAll(provenance.toProperties());
+        }
+    }
+
+    /**
+     * Read provenance from this node's properties map.
+     * Returns null if no provenance keys are present.
+     */
+    public Provenance getProvenance() {
+        return Provenance.fromProperties(properties);
     }
 
     @Override
