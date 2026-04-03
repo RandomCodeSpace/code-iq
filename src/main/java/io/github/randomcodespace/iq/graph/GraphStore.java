@@ -532,17 +532,23 @@ public class GraphStore implements FlowDataSource {
         return rows;
     }
 
+    /** Result wrapper for file-path queries, carrying a truncation flag. */
+    public record FilePathResult(List<Map<String, Object>> rows, boolean truncated) {}
+
     /**
      * Return each distinct filePath that has at least one CodeNode, along with the count
-     * of nodes stored at that path. Used to build the file-tree endpoint response.
+     * of nodes stored at that path. Results are capped at {@code maxFiles}; if more paths
+     * exist the {@link FilePathResult#truncated()} flag is set to {@code true}.
      */
-    public List<Map<String, Object>> getFilePathsWithCounts() {
+    public FilePathResult getFilePathsWithCounts(int maxFiles) {
         List<Map<String, Object>> rows = new ArrayList<>();
         try (Transaction tx = graphDb.beginTx()) {
             var result = tx.execute(
                     "MATCH (n:CodeNode) WHERE n.filePath IS NOT NULL "
                             + "RETURN n.filePath AS filePath, count(n) AS nodeCount "
-                            + "ORDER BY n.filePath");
+                            + "ORDER BY n.filePath "
+                            + "LIMIT $limit",
+                    Map.of("limit", (long) (maxFiles + 1)));
             while (result.hasNext()) {
                 var row = result.next();
                 Map<String, Object> m = new LinkedHashMap<>();
@@ -551,7 +557,11 @@ public class GraphStore implements FlowDataSource {
                 rows.add(m);
             }
         }
-        return rows;
+        boolean truncated = rows.size() > maxFiles;
+        if (truncated) {
+            rows = rows.subList(0, maxFiles);
+        }
+        return new FilePathResult(rows, truncated);
     }
 
     public long countEdgesByKind(String kind) {

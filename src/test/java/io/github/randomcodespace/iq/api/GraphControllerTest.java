@@ -22,6 +22,7 @@ import java.util.Map;
 
 import static org.hamcrest.Matchers.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -564,7 +565,7 @@ class GraphControllerTest {
                 Map.of("name", "src", "type", "directory", "nodeCount", 10L, "children", List.of()),
                 Map.of("name", "pom.xml", "type", "file", "nodeCount", 1L, "children", List.of())));
         treeResult.put("total_files", 3L);
-        when(queryService.getFileTree(null)).thenReturn(treeResult);
+        when(queryService.getFileTree(10)).thenReturn(treeResult);
 
         mockMvc.perform(get("/api/file-tree"))
                 .andExpect(status().isOk())
@@ -587,5 +588,19 @@ class GraphControllerTest {
         mockMvc.perform(get("/api/file-tree").param("depth", "2"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.total_files").value(0));
+    }
+
+    @Test
+    void getFileTreeShouldCapDepthAtMaxDepth() throws Exception {
+        Map<String, Object> treeResult = new LinkedHashMap<>();
+        treeResult.put("tree", List.of());
+        treeResult.put("total_files", 0L);
+        when(queryService.getFileTree(10)).thenReturn(treeResult);
+
+        mockMvc.perform(get("/api/file-tree").param("depth", "999"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total_files").value(0));
+
+        verify(queryService).getFileTree(10);
     }
 }

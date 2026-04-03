@@ -8,7 +8,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -206,7 +205,8 @@ public class GraphController {
     public Map<String, Object> getFileTree(
             @RequestParam(required = false) Integer depth) {
         requireQueryService();
-        return queryService.getFileTree(depth);
+        int cappedDepth = (depth != null) ? Math.min(depth, config.getMaxDepth()) : config.getMaxDepth();
+        return queryService.getFileTree(cappedDepth);
     }
 
     private void validateNodeKind(String kind) {

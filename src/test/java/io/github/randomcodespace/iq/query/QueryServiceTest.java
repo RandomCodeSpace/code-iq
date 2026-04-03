@@ -547,11 +547,11 @@ class QueryServiceTest {
     @Test
     @SuppressWarnings("unchecked")
     void getFileTreeShouldBuildHierarchicalTree() {
-        when(graphStore.getFilePathsWithCounts()).thenReturn(List.of(
+        when(graphStore.getFilePathsWithCounts(anyInt())).thenReturn(new GraphStore.FilePathResult(List.of(
                 Map.of("filePath", "src/main/Foo.java", "nodeCount", 3L),
                 Map.of("filePath", "src/main/Bar.java", "nodeCount", 1L),
                 Map.of("filePath", "src/test/FooTest.java", "nodeCount", 2L),
-                Map.of("filePath", "pom.xml", "nodeCount", 1L)));
+                Map.of("filePath", "pom.xml", "nodeCount", 1L)), false));
 
         Map<String, Object> result = service.getFileTree(null);
 
@@ -574,9 +574,9 @@ class QueryServiceTest {
     @Test
     @SuppressWarnings("unchecked")
     void getFileTreeShouldSortDirectoriesBeforeFiles() {
-        when(graphStore.getFilePathsWithCounts()).thenReturn(List.of(
+        when(graphStore.getFilePathsWithCounts(anyInt())).thenReturn(new GraphStore.FilePathResult(List.of(
                 Map.of("filePath", "README.md", "nodeCount", 1L),
-                Map.of("filePath", "src/Foo.java", "nodeCount", 2L)));
+                Map.of("filePath", "src/Foo.java", "nodeCount", 2L)), false));
 
         Map<String, Object> result = service.getFileTree(null);
 
@@ -588,8 +588,8 @@ class QueryServiceTest {
     @Test
     @SuppressWarnings("unchecked")
     void getFileTreeShouldRespectDepthLimit() {
-        when(graphStore.getFilePathsWithCounts()).thenReturn(List.of(
-                Map.of("filePath", "src/main/java/Foo.java", "nodeCount", 5L)));
+        when(graphStore.getFilePathsWithCounts(anyInt())).thenReturn(new GraphStore.FilePathResult(List.of(
+                Map.of("filePath", "src/main/java/Foo.java", "nodeCount", 5L)), false));
 
         Map<String, Object> result = service.getFileTree(2);
 
@@ -605,7 +605,7 @@ class QueryServiceTest {
     @Test
     @SuppressWarnings("unchecked")
     void getFileTreeShouldReturnEmptyTreeForNoNodes() {
-        when(graphStore.getFilePathsWithCounts()).thenReturn(List.of());
+        when(graphStore.getFilePathsWithCounts(anyInt())).thenReturn(new GraphStore.FilePathResult(List.of(), false));
 
         Map<String, Object> result = service.getFileTree(null);
 
@@ -622,10 +622,10 @@ class QueryServiceTest {
                 Map.of("filePath", "src/A.java", "nodeCount", 1L),
                 Map.of("filePath", "lib/C.java", "nodeCount", 3L));
 
-        when(graphStore.getFilePathsWithCounts()).thenReturn(paths);
+        when(graphStore.getFilePathsWithCounts(anyInt())).thenReturn(new GraphStore.FilePathResult(paths, false));
         Map<String, Object> first = service.getFileTree(null);
 
-        when(graphStore.getFilePathsWithCounts()).thenReturn(paths);
+        when(graphStore.getFilePathsWithCounts(anyInt())).thenReturn(new GraphStore.FilePathResult(paths, false));
         Map<String, Object> second = service.getFileTree(null);
 
         assertEquals(first.toString(), second.toString());

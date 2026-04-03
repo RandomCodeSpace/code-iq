@@ -22,6 +22,9 @@ public class CodeIqConfig {
     /** Maximum radius for ego graph queries. */
     private int maxRadius = 10;
 
+    /** Maximum number of file paths returned by the file-tree query before truncation. */
+    private int maxFiles = 10000;
+
     /** Batch size for file processing during indexing (files per H2 flush). */
     private int batchSize = 500;
 
@@ -65,6 +68,14 @@ public class CodeIqConfig {
 
     public void setMaxDepth(int maxDepth) {
         this.maxDepth = maxDepth;
+    }
+
+    public int getMaxFiles() {
+        return maxFiles;
+    }
+
+    public void setMaxFiles(int maxFiles) {
+        this.maxFiles = Math.max(1, maxFiles);
     }
 
     public int getMaxRadius() {
