@@ -1,6 +1,6 @@
 /// <reference types="node" />
 import { type Page, expect } from '@playwright/test';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 // ── Route helpers ────────────────────────────────────────────────────────────
@@ -25,30 +25,54 @@ export type AppRoute = (typeof ROUTES)[keyof typeof ROUTES];
  */
 export async function patchIndexHtml(page: Page) {
   // process.cwd() is the frontend dir when running `npx playwright test`
-  const diskHtml = readFileSync(
-    resolve(process.cwd(), '../resources/static/index.html'),
-    'utf-8',
-  );
+  const staticDir = resolve(process.cwd(), '../resources/static');
+  const diskHtml = readFileSync(resolve(staticDir, 'index.html'), 'utf-8');
+
+  const CONTENT_TYPES: Record<string, string> = {
+    '.js':   'application/javascript',
+    '.mjs':  'application/javascript',
+    '.css':  'text/css',
+    '.svg':  'image/svg+xml',
+    '.png':  'image/png',
+    '.ico':  'image/x-icon',
+    '.woff2': 'font/woff2',
+    '.woff':  'font/woff',
+  };
+
   // Intercept the SPA shell route (all navigation routes return the same HTML)
   await page.route('**/*', async (route) => {
     const req = route.request();
     const url = req.url();
-    // Only intercept HTML document requests (the SPA shell), not API/asset calls
+
+    // Serve HTML shell from disk
     if (
       req.resourceType() === 'document' &&
       !url.includes('/api/') &&
-      !url.includes('/assets/') &&
       !url.includes('/swagger') &&
       !url.includes('/v3/')
     ) {
-      await route.fulfill({
-        status: 200,
-        contentType: 'text/html',
-        body: diskHtml,
-      });
-    } else {
-      await route.continue();
+      await route.fulfill({ status: 200, contentType: 'text/html', body: diskHtml });
+      return;
     }
+
+    // Serve static assets from disk if available (fixes stale-JAR bundle mismatch)
+    const assetMatch = url.match(/\/assets\/([^?#]+)/);
+    if (assetMatch) {
+      const assetName = assetMatch[1];
+      const diskPath = resolve(staticDir, 'assets', assetName);
+      const ext = assetName.includes('.') ? '.' + assetName.split('.').pop()! : '';
+      if (existsSync(diskPath)) {
+        const body = readFileSync(diskPath);
+        await route.fulfill({
+          status: 200,
+          contentType: CONTENT_TYPES[ext] ?? 'application/octet-stream',
+          body,
+        });
+        return;
+      }
+    }
+
+    await route.fallback();
   });
 }
 

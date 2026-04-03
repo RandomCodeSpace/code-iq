@@ -97,9 +97,11 @@ export interface EdgesListResponse {
 export interface SearchResult {
   id: string;
   kind: string;
-  label: string;
+  label?: string;
+  name?: string;
   score?: number;
   file_path?: string;
+  filePath?: string;
 }
 
 export interface FileTreeNode {
