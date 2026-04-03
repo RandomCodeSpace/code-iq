@@ -273,6 +273,31 @@ public class GraphStore implements FlowDataSource {
                 Map.of("nodeId", nodeId));
     }
 
+    /**
+     * Batch-find all ENDPOINT/WEBSOCKET_ENDPOINT neighbors for a list of node IDs in one query.
+     * Returns a map of sourceNodeId -> list of endpoint neighbor nodes.
+     */
+    public Map<String, List<CodeNode>> findEndpointNeighborsBatch(List<String> nodeIds) {
+        Map<String, List<CodeNode>> result = new java.util.LinkedHashMap<>();
+        if (nodeIds.isEmpty()) return result;
+        try (Transaction tx = graphDb.beginTx()) {
+            var queryResult = tx.execute(
+                    "MATCH (n:CodeNode)-[]-(m:CodeNode) "
+                            + "WHERE n.id IN $nodeIds AND m.kind IN ['ENDPOINT', 'WEBSOCKET_ENDPOINT'] "
+                            + "RETURN n.id AS sourceId, m",
+                    Map.of("nodeIds", nodeIds));
+            while (queryResult.hasNext()) {
+                var row = queryResult.next();
+                String sourceId = (String) row.get("sourceId");
+                Object val = row.get("m");
+                if (val instanceof org.neo4j.graphdb.Node neo4jNode) {
+                    result.computeIfAbsent(sourceId, k -> new ArrayList<>()).add(nodeFromNeo4j(neo4jNode));
+                }
+            }
+        }
+        return result;
+    }
+
     public long count() {
         try (Transaction tx = graphDb.beginTx()) {
             var result = tx.execute("MATCH (n:CodeNode) RETURN count(n) AS cnt");

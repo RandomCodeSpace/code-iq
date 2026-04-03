@@ -337,19 +337,24 @@ public class QueryService {
         Set<String> seenIds = new java.util.LinkedHashSet<>();
         List<Map<String, Object>> endpoints = new ArrayList<>();
 
+        // First pass: collect matches that are themselves endpoints
         for (CodeNode match : matches) {
             if (match.getKind() == NodeKind.ENDPOINT || match.getKind() == NodeKind.WEBSOCKET_ENDPOINT) {
                 if (seenIds.add(match.getId())) {
                     endpoints.add(nodeToMap(match));
                 }
             }
-            // Check neighbors for connected endpoints
-            List<CodeNode> neighbors = graphStore.findNeighbors(match.getId());
-            for (CodeNode neighbor : neighbors) {
-                if ((neighbor.getKind() == NodeKind.ENDPOINT || neighbor.getKind() == NodeKind.WEBSOCKET_ENDPOINT)
-                        && seenIds.add(neighbor.getId())) {
+        }
+
+        // Single batched query for all endpoint neighbors (replaces N+1 loop)
+        List<String> matchIds = matches.stream().map(CodeNode::getId).toList();
+        Map<String, List<CodeNode>> endpointNeighbors = graphStore.findEndpointNeighborsBatch(matchIds);
+        for (Map.Entry<String, List<CodeNode>> entry : endpointNeighbors.entrySet()) {
+            String sourceId = entry.getKey();
+            for (CodeNode neighbor : entry.getValue()) {
+                if (seenIds.add(neighbor.getId())) {
                     Map<String, Object> epMap = nodeToMap(neighbor);
-                    epMap.put("connected_via", match.getId());
+                    epMap.put("connected_via", sourceId);
                     endpoints.add(epMap);
                 }
             }

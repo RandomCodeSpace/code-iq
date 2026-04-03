@@ -502,6 +502,59 @@ class QueryServiceTest {
         assertTrue(deadCode.isEmpty());
     }
 
+    // --- findRelatedEndpoints ---
+
+    @Test
+    void findRelatedEndpointsShouldUsesBatchQueryInsteadOfNPlusOne() {
+        var classNode = makeNode("cls:UserService", NodeKind.CLASS, "UserService");
+        var endpointNode = makeNode("ep:getUsers", NodeKind.ENDPOINT, "getUsers");
+        when(graphStore.search("UserService", 50)).thenReturn(List.of(classNode));
+        when(graphStore.findEndpointNeighborsBatch(List.of("cls:UserService")))
+                .thenReturn(Map.of("cls:UserService", List.of(endpointNode)));
+
+        Map<String, Object> result = service.findRelatedEndpoints("UserService");
+
+        assertEquals("UserService", result.get("identifier"));
+        assertEquals(1, result.get("count"));
+        assertEquals(1, result.get("searched_nodes"));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> endpoints = (List<Map<String, Object>>) result.get("endpoints");
+        assertEquals("ep:getUsers", endpoints.getFirst().get("id"));
+        assertEquals("cls:UserService", endpoints.getFirst().get("connected_via"));
+        // Verify no per-node findNeighbors calls were made
+        verify(graphStore, never()).findNeighbors(anyString());
+    }
+
+    @Test
+    void findRelatedEndpointsShouldIncludeDirectEndpointMatches() {
+        var endpointNode = makeNode("ep:getUsers", NodeKind.ENDPOINT, "getUsers");
+        when(graphStore.search("getUsers", 50)).thenReturn(List.of(endpointNode));
+        when(graphStore.findEndpointNeighborsBatch(List.of("ep:getUsers"))).thenReturn(Map.of());
+
+        Map<String, Object> result = service.findRelatedEndpoints("getUsers");
+
+        assertEquals(1, result.get("count"));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> endpoints = (List<Map<String, Object>>) result.get("endpoints");
+        assertEquals("ep:getUsers", endpoints.getFirst().get("id"));
+        // Direct endpoint matches have no connected_via
+        assertNull(endpoints.getFirst().get("connected_via"));
+    }
+
+    @Test
+    void findRelatedEndpointsShouldDeduplicateEndpoints() {
+        var endpointNode = makeNode("ep:getUsers", NodeKind.ENDPOINT, "getUsers");
+        // Same endpoint appears as both a direct match and a neighbor
+        when(graphStore.search("ep", 50)).thenReturn(List.of(endpointNode));
+        when(graphStore.findEndpointNeighborsBatch(List.of("ep:getUsers")))
+                .thenReturn(Map.of("ep:getUsers", List.of(endpointNode)));
+
+        Map<String, Object> result = service.findRelatedEndpoints("ep");
+
+        // Should only appear once
+        assertEquals(1, result.get("count"));
+    }
+
     // --- nodeToMap ---
 
     @Test
