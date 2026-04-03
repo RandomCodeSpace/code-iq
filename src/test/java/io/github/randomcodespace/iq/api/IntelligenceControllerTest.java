@@ -1,0 +1,92 @@
+package io.github.randomcodespace.iq.api;
+
+import io.github.randomcodespace.iq.config.CodeIqConfig;
+import io.github.randomcodespace.iq.intelligence.CapabilityLevel;
+import io.github.randomcodespace.iq.intelligence.evidence.EvidencePack;
+import io.github.randomcodespace.iq.intelligence.evidence.EvidencePackAssembler;
+import io.github.randomcodespace.iq.intelligence.evidence.EvidencePackRequest;
+import io.github.randomcodespace.iq.intelligence.provenance.ArtifactMetadata;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+class IntelligenceControllerTest {
+
+    private MockMvc mockMvc;
+    private EvidencePackAssembler assembler;
+    private ArtifactMetadata metadata;
+
+    @BeforeEach
+    void setUp() {
+        assembler = Mockito.mock(EvidencePackAssembler.class);
+        metadata = new ArtifactMetadata(
+                "https://github.com/example/repo", "abc123", Instant.now(),
+                "1", "2", Map.of("code-iq", "1.0"),
+                Map.of(), "deadbeef");
+
+        CodeIqConfig config = new CodeIqConfig();
+        config.setRootPath(System.getProperty("java.io.tmpdir"));
+
+        IntelligenceController controller = new IntelligenceController(assembler, metadata, config);
+        mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
+    }
+
+    @Test
+    void evidenceEndpointReturns200ForValidSymbol() throws Exception {
+        EvidencePack pack = new EvidencePack(
+                List.of(), List.of(), List.of(), List.of(), List.of(),
+                List.of(), metadata, CapabilityLevel.EXACT);
+        when(assembler.assemble(any(EvidencePackRequest.class), any())).thenReturn(pack);
+
+        mockMvc.perform(get("/api/intelligence/evidence").param("symbol", "UserService"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.capabilityLevel").value("EXACT"));
+    }
+
+    @Test
+    void evidenceEndpointReturns400WhenNeitherSymbolNorFileProvided() throws Exception {
+        mockMvc.perform(get("/api/intelligence/evidence"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void evidenceEndpointReturns400ForPathTraversal() throws Exception {
+        mockMvc.perform(get("/api/intelligence/evidence")
+                .param("file", "../../etc/passwd"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void manifestEndpointReturns200() throws Exception {
+        mockMvc.perform(get("/api/intelligence/manifest"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.commitSha").value("abc123"));
+    }
+
+    @Test
+    void capabilitiesEndpointReturnsMatrix() throws Exception {
+        mockMvc.perform(get("/api/intelligence/capabilities"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.matrix").isMap());
+    }
+
+    @Test
+    void capabilitiesEndpointFiltersbyLanguage() throws Exception {
+        mockMvc.perform(get("/api/intelligence/capabilities").param("language", "java"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.language").value("java"))
+                .andExpect(jsonPath("$.capabilities").isMap());
+    }
+}

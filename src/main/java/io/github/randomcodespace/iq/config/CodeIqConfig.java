@@ -34,6 +34,9 @@ public class CodeIqConfig {
     /** Whether to serve the React web UI. Set to false via --no-ui flag. */
     private boolean uiEnabled = true;
 
+    /** Maximum lines per snippet returned in evidence packs (default 50). */
+    private int maxSnippetLines = 50;
+
     public static class Graph {
         private String path = ".osscodeiq/graph.db";
 
@@ -116,5 +119,13 @@ public class CodeIqConfig {
 
     public void setUiEnabled(boolean uiEnabled) {
         this.uiEnabled = uiEnabled;
+    }
+
+    public int getMaxSnippetLines() {
+        return maxSnippetLines;
+    }
+
+    public void setMaxSnippetLines(int maxSnippetLines) {
+        this.maxSnippetLines = Math.max(1, maxSnippetLines);
     }
 }

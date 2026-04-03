@@ -76,7 +76,8 @@ class TopologyEndpointTest {
 
         mcpTools = new McpTools(queryService, config, objectMapper,
                 Optional.empty(), graphDb, new StatsService(),
-                new TopologyService(), graphStore);
+                new TopologyService(), graphStore,
+                Optional.empty(), Optional.empty());
     }
 
     private Map<String, Object> buildTopologyResponse() {
