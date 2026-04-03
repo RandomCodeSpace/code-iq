@@ -84,9 +84,11 @@ public class GraphStore implements FlowDataSource {
             }
         } while (deleted > 0);
 
-        // 2. Create index on id property for fast MATCH during edge creation
+        // 2. Create indexes: id for MATCH, label_lower/fqn_lower for fast case-insensitive search
         try (Transaction tx = graphDb.beginTx()) {
             tx.execute("CREATE INDEX IF NOT EXISTS FOR (n:CodeNode) ON (n.id)");
+            tx.execute("CREATE INDEX IF NOT EXISTS FOR (n:CodeNode) ON (n.label_lower)");
+            tx.execute("CREATE INDEX IF NOT EXISTS FOR (n:CodeNode) ON (n.fqn_lower)");
             tx.commit();
         }
 
@@ -182,6 +184,9 @@ public class GraphStore implements FlowDataSource {
         if (node.getAnnotations() != null && !node.getAnnotations().isEmpty()) {
             props.put("annotations", String.join(",", node.getAnnotations()));
         }
+        // Pre-lowered properties for index-backed case-insensitive search
+        props.put("label_lower", node.getLabel() != null ? node.getLabel().toLowerCase() : "");
+        if (node.getFqn() != null) props.put("fqn_lower", node.getFqn().toLowerCase());
         if (node.getProperties() != null) {
             for (var entry : node.getProperties().entrySet()) {
                 if (entry.getValue() != null) {
@@ -249,10 +254,11 @@ public class GraphStore implements FlowDataSource {
     }
 
     public List<CodeNode> search(String text, int limit) {
+        String lowerText = text.toLowerCase();
         return queryNodes(
-                "MATCH (n:CodeNode) WHERE toLower(n.label) CONTAINS toLower($text) "
-                        + "OR toLower(n.fqn) CONTAINS toLower($text) RETURN n LIMIT $limit",
-                Map.of("text", text, "limit", limit));
+                "MATCH (n:CodeNode) WHERE n.label_lower CONTAINS $text "
+                        + "OR n.fqn_lower CONTAINS $text RETURN n LIMIT $limit",
+                Map.of("text", lowerText, "limit", limit));
     }
 
     public List<CodeNode> findNeighbors(String nodeId) {

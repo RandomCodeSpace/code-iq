@@ -23,7 +23,7 @@ public interface GraphRepository extends Neo4jRepository<CodeNode, String> {
     @Query("MATCH (n:CodeNode) WHERE n.filePath = $filePath RETURN n")
     List<CodeNode> findByFilePath(String filePath);
 
-    @Query("MATCH (n:CodeNode) WHERE toLower(n.label) CONTAINS toLower($text) OR toLower(n.fqn) CONTAINS toLower($text) RETURN n LIMIT $limit")
+    @Query("MATCH (n:CodeNode) WHERE n.label_lower CONTAINS $text OR n.fqn_lower CONTAINS $text RETURN n LIMIT $limit")
     List<CodeNode> search(String text, int limit);
 
     @Query("MATCH (n:CodeNode) WHERE n.label CONTAINS $text OR n.fqn CONTAINS $text RETURN n")

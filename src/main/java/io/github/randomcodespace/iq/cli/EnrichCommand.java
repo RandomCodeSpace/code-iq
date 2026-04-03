@@ -307,6 +307,8 @@ public class EnrichCommand implements Callable<Integer> {
                 tx.execute("CREATE INDEX IF NOT EXISTS FOR (n:CodeNode) ON (n.layer)");
                 tx.execute("CREATE INDEX IF NOT EXISTS FOR (n:CodeNode) ON (n.module)");
                 tx.execute("CREATE INDEX IF NOT EXISTS FOR (n:CodeNode) ON (n.filePath)");
+                tx.execute("CREATE INDEX IF NOT EXISTS FOR (n:CodeNode) ON (n.label_lower)");
+                tx.execute("CREATE INDEX IF NOT EXISTS FOR (n:CodeNode) ON (n.fqn_lower)");
                 tx.commit();
             }
             CliOutput.info("  Created Neo4j indexes");
