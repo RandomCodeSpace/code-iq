@@ -38,6 +38,8 @@ public class NestJSControllerDetector extends AbstractAntlrDetector {
     private static final Pattern FETCH_RE = Pattern.compile(
             "\\bfetch\\s*\\(\\s*['\"`]");
 
+    private static final Pattern NESTJS_IMPORT = Pattern.compile("from\\s+['\"]@nestjs/");
+
     private static final Pattern CONTROLLER_PATTERN = Pattern.compile(
             "@Controller\\(\\s*['\"`]?([^'\"`\\)\\s]*)['\"`]?\\s*\\)(?:\\s*@\\w+\\([^)]*\\))*\\s*\\n\\s*(?:export\\s+)?class\\s+(\\w+)"
     );
@@ -78,9 +80,11 @@ public class NestJSControllerDetector extends AbstractAntlrDetector {
 
     @Override
     protected DetectorResult detectWithRegex(DetectorContext ctx) {
+        String text = ctx.content();
+        if (!NESTJS_IMPORT.matcher(text).find()) return DetectorResult.empty();
+
         List<CodeNode> nodes = new ArrayList<>();
         List<CodeEdge> edges = new ArrayList<>();
-        String text = ctx.content();
         String filePath = ctx.filePath();
         String moduleName = ctx.moduleName();
 
@@ -161,6 +165,7 @@ public class NestJSControllerDetector extends AbstractAntlrDetector {
                 edge.setId(classId + "->exposes->" + nodeId);
                 edge.setKind(EdgeKind.EXPOSES);
                 edge.setSourceId(classId);
+                edge.setTarget(node);
                 edges.add(edge);
             }
         }

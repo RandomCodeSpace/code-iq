@@ -15,6 +15,7 @@ class NestJSControllerDetectorTest {
     @Test
     void detectsNestJSController() {
         String code = """
+                import { Controller, Get, Post } from '@nestjs/common';
                 @Controller('users')
                 export class UsersController {
                     @Get()
@@ -35,8 +36,10 @@ class NestJSControllerDetectorTest {
         // Endpoints
         assertTrue(result.nodes().stream().anyMatch(n ->
                 n.getKind() == NodeKind.ENDPOINT && "GET /users".equals(n.getLabel())));
-        // EXPOSES edges
+        // EXPOSES edges — each has both sourceId and target set
         assertEquals(3, result.edges().size());
+        assertTrue(result.edges().stream().allMatch(e -> e.getTarget() != null),
+                "All EXPOSES edges must have a target node set");
     }
 
     @Test
@@ -48,8 +51,24 @@ class NestJSControllerDetectorTest {
     }
 
     @Test
+    void noFalsePositiveOnAngularController() {
+        // Angular @Controller-like patterns without @nestjs/ import must not match
+        String code = """
+                import { Component } from '@angular/core';
+                @Controller('items')
+                export class ItemsComponent {
+                    @Get()
+                    list() {}
+                }
+                """;
+        DetectorContext ctx = DetectorTestUtils.contextFor("src/items.component.ts", "typescript", code);
+        DetectorResult result = detector.detect(ctx);
+        assertTrue(result.nodes().isEmpty(), "Should not match Angular component without @nestjs/ import");
+    }
+
+    @Test
     void deterministic() {
-        String code = "@Controller('test')\nexport class TestController {\n    @Get()\n    find() {}\n}";
+        String code = "import { Controller, Get } from '@nestjs/common';\n@Controller('test')\nexport class TestController {\n    @Get()\n    find() {}\n}";
         DetectorContext ctx = DetectorTestUtils.contextFor("typescript", code);
         DetectorTestUtils.assertDeterministic(detector, ctx);
     }

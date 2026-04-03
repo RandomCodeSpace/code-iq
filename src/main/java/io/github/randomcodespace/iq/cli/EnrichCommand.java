@@ -310,6 +310,11 @@ public class EnrichCommand implements Callable<Integer> {
                 tx.execute("CREATE FULLTEXT INDEX nodeSearchIndex IF NOT EXISTS FOR (n:CodeNode) ON EACH [n.label, n.fqn]");
                 tx.commit();
             }
+            try (Transaction tx = db.beginTx()) {
+                tx.execute("CALL db.awaitIndexes(300)");
+            } catch (Exception e) {
+                log.debug("Secondary index await returned: {}", e.getMessage());
+            }
             CliOutput.info("  Created Neo4j indexes");
 
             Duration elapsed = Duration.between(start, Instant.now());

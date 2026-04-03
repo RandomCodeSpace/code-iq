@@ -28,6 +28,8 @@ import io.github.randomcodespace.iq.detector.ParserType;
 @Component
 public class NestJSGuardsDetector extends AbstractAntlrDetector {
 
+    private static final Pattern NESTJS_IMPORT = Pattern.compile("from\\s+['\"]@nestjs/");
+
     private static final Pattern USE_GUARDS_PATTERN = Pattern.compile(
             "@UseGuards\\(\\s*([^)]+)\\)"
     );
@@ -67,8 +69,10 @@ public class NestJSGuardsDetector extends AbstractAntlrDetector {
 
     @Override
     protected DetectorResult detectWithRegex(DetectorContext ctx) {
-        List<CodeNode> nodes = new ArrayList<>();
         String text = ctx.content();
+        if (!NESTJS_IMPORT.matcher(text).find()) return DetectorResult.empty();
+
+        List<CodeNode> nodes = new ArrayList<>();
         String filePath = ctx.filePath();
         String moduleName = ctx.moduleName();
 
