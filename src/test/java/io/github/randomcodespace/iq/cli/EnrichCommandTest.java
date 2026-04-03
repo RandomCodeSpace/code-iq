@@ -4,6 +4,7 @@ import io.github.randomcodespace.iq.analyzer.LayerClassifier;
 import io.github.randomcodespace.iq.analyzer.linker.Linker;
 import io.github.randomcodespace.iq.cache.AnalysisCache;
 import io.github.randomcodespace.iq.config.CodeIqConfig;
+import io.github.randomcodespace.iq.intelligence.extractor.LanguageEnricher;
 import io.github.randomcodespace.iq.intelligence.lexical.LexicalEnricher;
 import io.github.randomcodespace.iq.model.CodeEdge;
 import io.github.randomcodespace.iq.model.CodeNode;
@@ -51,7 +52,7 @@ class EnrichCommandTest {
         var layerClassifier = new LayerClassifier();
         List<Linker> linkers = List.of();
 
-        var cmd = new EnrichCommand(config, layerClassifier, linkers, new LexicalEnricher());
+        var cmd = new EnrichCommand(config, layerClassifier, linkers, new LexicalEnricher(), new LanguageEnricher(List.of()));
         var cmdLine = new picocli.CommandLine(cmd);
         int exitCode = cmdLine.execute(tempDir.toString());
 
@@ -87,7 +88,7 @@ class EnrichCommandTest {
         var layerClassifier = new LayerClassifier();
         List<Linker> linkers = List.of();
 
-        var cmd = new EnrichCommand(config, layerClassifier, linkers, new LexicalEnricher());
+        var cmd = new EnrichCommand(config, layerClassifier, linkers, new LexicalEnricher(), new LanguageEnricher(List.of()));
         var cmdLine = new picocli.CommandLine(cmd);
         int exitCode = cmdLine.execute(tempDir.toString());
 
@@ -122,7 +123,7 @@ class EnrichCommandTest {
         var layerClassifier = new LayerClassifier();
         List<Linker> linkers = List.of();
 
-        var cmd = new EnrichCommand(config, layerClassifier, linkers, new LexicalEnricher());
+        var cmd = new EnrichCommand(config, layerClassifier, linkers, new LexicalEnricher(), new LanguageEnricher(List.of()));
         var cmdLine = new picocli.CommandLine(cmd);
         int exitCode = cmdLine.execute(tempDir.toString());
 

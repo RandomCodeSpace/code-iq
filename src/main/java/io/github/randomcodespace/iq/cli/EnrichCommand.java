@@ -6,6 +6,7 @@ import io.github.randomcodespace.iq.analyzer.linker.Linker;
 import io.github.randomcodespace.iq.cache.AnalysisCache;
 import io.github.randomcodespace.iq.config.CodeIqConfig;
 import io.github.randomcodespace.iq.intelligence.RepositoryIdentity;
+import io.github.randomcodespace.iq.intelligence.extractor.LanguageEnricher;
 import io.github.randomcodespace.iq.intelligence.lexical.LexicalEnricher;
 import io.github.randomcodespace.iq.model.CodeEdge;
 import io.github.randomcodespace.iq.model.CodeNode;
@@ -61,13 +62,16 @@ public class EnrichCommand implements Callable<Integer> {
     private final LayerClassifier layerClassifier;
     private final List<Linker> linkers;
     private final LexicalEnricher lexicalEnricher;
+    private final LanguageEnricher languageEnricher;
 
     public EnrichCommand(CodeIqConfig config, LayerClassifier layerClassifier,
-                         List<Linker> linkers, LexicalEnricher lexicalEnricher) {
+                         List<Linker> linkers, LexicalEnricher lexicalEnricher,
+                         LanguageEnricher languageEnricher) {
         this.config = config;
         this.layerClassifier = layerClassifier;
         this.linkers = linkers;
         this.lexicalEnricher = lexicalEnricher;
+        this.languageEnricher = languageEnricher;
     }
 
     @Override
@@ -150,6 +154,10 @@ public class EnrichCommand implements Callable<Integer> {
         // 3b. Enrich lexical metadata (doc comments, config keys) for fulltext search
         CliOutput.step("\uD83D\uDD0D", "Enriching lexical metadata...");
         lexicalEnricher.enrich(enrichedNodes, root);
+
+        // 3b2. Language-specific enrichment (call graph, type hints, import resolution)
+        CliOutput.step("\uD83D\uDD0D", "Running language-specific enrichment...");
+        languageEnricher.enrich(enrichedNodes, enrichedEdges, root);
 
         // 3c. Detect services
         CliOutput.step("\uD83C\uDFD7\uFE0F", "Detecting service boundaries...");
