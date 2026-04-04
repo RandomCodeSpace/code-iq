@@ -1,7 +1,6 @@
 package io.github.randomcodespace.iq.detector.rust;
 
 import io.github.randomcodespace.iq.detector.AbstractAntlrDetector;
-import io.github.randomcodespace.iq.grammar.AntlrParserFactory;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.model.CodeEdge;
@@ -29,6 +28,8 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class RustStructuresDetector extends AbstractAntlrDetector {
+    private static final String PROP_TYPE = "type";
+
 
     private static final Pattern USE_RE = Pattern.compile("^\\s*use\\s+([\\w:]+)", Pattern.MULTILINE);
     private static final Pattern STRUCT_RE = Pattern.compile("^\\s*(?:pub\\s+)?struct\\s+(\\w+)", Pattern.MULTILINE);
@@ -84,7 +85,7 @@ public class RustStructuresDetector extends AbstractAntlrDetector {
             CodeNode n = new CodeNode(); n.setId(fp + ":" + name);
             n.setKind(NodeKind.CLASS); n.setLabel(name); n.setFqn(name);
             n.setFilePath(fp); n.setLineStart(findLineNumber(text, m.start()));
-            n.getProperties().put("type", "struct"); nodes.add(n);
+            n.getProperties().put(PROP_TYPE, "struct"); nodes.add(n);
         }
 
         m = TRAIT_RE.matcher(text);
@@ -93,7 +94,7 @@ public class RustStructuresDetector extends AbstractAntlrDetector {
             CodeNode n = new CodeNode(); n.setId(fp + ":" + name);
             n.setKind(NodeKind.INTERFACE); n.setLabel(name); n.setFqn(name);
             n.setFilePath(fp); n.setLineStart(findLineNumber(text, m.start()));
-            n.getProperties().put("type", "trait"); nodes.add(n);
+            n.getProperties().put(PROP_TYPE, "trait"); nodes.add(n);
         }
 
         m = ENUM_RE.matcher(text);
@@ -128,7 +129,7 @@ public class RustStructuresDetector extends AbstractAntlrDetector {
             CodeNode n = new CodeNode(); n.setId(fp + ":" + name);
             n.setKind(NodeKind.METHOD); n.setLabel(name); n.setFqn(name);
             n.setFilePath(fp); n.setLineStart(findLineNumber(text, m.start()));
-            n.getProperties().put("type", "function"); nodes.add(n);
+            n.getProperties().put(PROP_TYPE, "function"); nodes.add(n);
         }
 
         m = MACRO_RE.matcher(text);
@@ -137,7 +138,7 @@ public class RustStructuresDetector extends AbstractAntlrDetector {
             CodeNode n = new CodeNode(); n.setId(fp + ":macro:" + name);
             n.setKind(NodeKind.METHOD); n.setLabel(name + "!"); n.setFqn(name + "!");
             n.setFilePath(fp); n.setLineStart(findLineNumber(text, m.start()));
-            n.getProperties().put("type", "macro"); nodes.add(n);
+            n.getProperties().put(PROP_TYPE, "macro"); nodes.add(n);
         }
 
         return DetectorResult.of(nodes, edges);

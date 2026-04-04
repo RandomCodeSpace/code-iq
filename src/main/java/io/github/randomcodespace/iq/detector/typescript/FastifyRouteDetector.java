@@ -1,7 +1,6 @@
 package io.github.randomcodespace.iq.detector.typescript;
 
 import io.github.randomcodespace.iq.detector.AbstractAntlrDetector;
-import io.github.randomcodespace.iq.grammar.AntlrParserFactory;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.model.CodeEdge;
@@ -31,6 +30,9 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class FastifyRouteDetector extends AbstractAntlrDetector {
+    private static final String PROP_FASTIFY = "fastify";
+    private static final String PROP_FRAMEWORK = "framework";
+
 
     /**
      * Guard pattern: file must contain a Fastify import/require to be considered.
@@ -116,7 +118,7 @@ public class FastifyRouteDetector extends AbstractAntlrDetector {
             node.getProperties().put("protocol", "REST");
             node.getProperties().put("http_method", method);
             node.getProperties().put("path_pattern", path);
-            node.getProperties().put("framework", "fastify");
+            node.getProperties().put(PROP_FRAMEWORK, PROP_FASTIFY);
             nodes.add(node);
         }
 
@@ -148,7 +150,7 @@ public class FastifyRouteDetector extends AbstractAntlrDetector {
             node.getProperties().put("protocol", "REST");
             node.getProperties().put("http_method", method);
             node.getProperties().put("path_pattern", path);
-            node.getProperties().put("framework", "fastify");
+            node.getProperties().put(PROP_FRAMEWORK, PROP_FASTIFY);
 
             Matcher schemaMatcher = SCHEMA_PATTERN.matcher(routeBlock);
             if (schemaMatcher.find()) {
@@ -170,7 +172,7 @@ public class FastifyRouteDetector extends AbstractAntlrDetector {
             edge.setId(edgeSource + "->" + edgeTarget);
             edge.setKind(EdgeKind.IMPORTS);
             edge.setSourceId(edgeSource);
-            edge.getProperties().put("framework", "fastify");
+            edge.getProperties().put(PROP_FRAMEWORK, PROP_FASTIFY);
             edge.getProperties().put("plugin", pluginRef);
             edges.add(edge);
         }
@@ -190,7 +192,7 @@ public class FastifyRouteDetector extends AbstractAntlrDetector {
             node.setModule(moduleName);
             node.setFilePath(filePath);
             node.setLineStart(line);
-            node.getProperties().put("framework", "fastify");
+            node.getProperties().put(PROP_FRAMEWORK, PROP_FASTIFY);
             node.getProperties().put("hook_name", hookName);
             nodes.add(node);
         }

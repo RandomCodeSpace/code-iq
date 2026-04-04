@@ -1,7 +1,6 @@
 package io.github.randomcodespace.iq.detector.typescript;
 
 import io.github.randomcodespace.iq.detector.AbstractAntlrDetector;
-import io.github.randomcodespace.iq.grammar.AntlrParserFactory;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.model.CodeNode;
@@ -27,6 +26,10 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class NestJSGuardsDetector extends AbstractAntlrDetector {
+    private static final String PROP_AUTH_TYPE = "auth_type";
+    private static final String PROP_NESTJS_GUARD = "nestjs_guard";
+    private static final String PROP_ROLES = "roles";
+
 
     private static final Pattern NESTJS_IMPORT = Pattern.compile("from\\s+['\"]@nestjs/");
 
@@ -92,9 +95,9 @@ public class NestJSGuardsDetector extends AbstractAntlrDetector {
                 node.setFilePath(filePath);
                 node.setLineStart(line);
                 node.getAnnotations().add("@UseGuards");
-                node.getProperties().put("auth_type", "nestjs_guard");
+                node.getProperties().put(PROP_AUTH_TYPE, PROP_NESTJS_GUARD);
                 node.getProperties().put("guard_name", guardName);
-                node.getProperties().put("roles", List.of());
+                node.getProperties().put(PROP_ROLES, List.of());
                 nodes.add(node);
             }
         }
@@ -114,8 +117,8 @@ public class NestJSGuardsDetector extends AbstractAntlrDetector {
             node.setFilePath(filePath);
             node.setLineStart(line);
             node.getAnnotations().add("@Roles");
-            node.getProperties().put("auth_type", "nestjs_guard");
-            node.getProperties().put("roles", roles);
+            node.getProperties().put(PROP_AUTH_TYPE, PROP_NESTJS_GUARD);
+            node.getProperties().put(PROP_ROLES, roles);
             nodes.add(node);
         }
 
@@ -132,9 +135,9 @@ public class NestJSGuardsDetector extends AbstractAntlrDetector {
             node.setModule(moduleName);
             node.setFilePath(filePath);
             node.setLineStart(line);
-            node.getProperties().put("auth_type", "nestjs_guard");
+            node.getProperties().put(PROP_AUTH_TYPE, PROP_NESTJS_GUARD);
             node.getProperties().put("guard_impl", "canActivate");
-            node.getProperties().put("roles", List.of());
+            node.getProperties().put(PROP_ROLES, List.of());
             nodes.add(node);
         }
 
@@ -153,9 +156,9 @@ public class NestJSGuardsDetector extends AbstractAntlrDetector {
             node.setFilePath(filePath);
             node.setLineStart(line);
             node.getAnnotations().add("AuthGuard");
-            node.getProperties().put("auth_type", "nestjs_guard");
+            node.getProperties().put(PROP_AUTH_TYPE, PROP_NESTJS_GUARD);
             node.getProperties().put("strategy", strategy);
-            node.getProperties().put("roles", List.of());
+            node.getProperties().put(PROP_ROLES, List.of());
             nodes.add(node);
         }
 

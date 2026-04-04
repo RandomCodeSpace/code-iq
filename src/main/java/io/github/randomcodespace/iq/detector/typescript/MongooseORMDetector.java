@@ -1,7 +1,6 @@
 package io.github.randomcodespace.iq.detector.typescript;
 
 import io.github.randomcodespace.iq.detector.AbstractAntlrDetector;
-import io.github.randomcodespace.iq.grammar.AntlrParserFactory;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.model.CodeEdge;
@@ -28,6 +27,10 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class MongooseORMDetector extends AbstractAntlrDetector {
+    private static final String PROP_DEFINITION = "definition";
+    private static final String PROP_FRAMEWORK = "framework";
+    private static final String PROP_MONGOOSE = "mongoose";
+
 
     private static final Pattern MODEL_RE = Pattern.compile(
             "mongoose\\.model\\s*\\(\\s*['\"](\\w+)['\"]"
@@ -90,7 +93,7 @@ public class MongooseORMDetector extends AbstractAntlrDetector {
             node.setModule(moduleName);
             node.setFilePath(filePath);
             node.setLineStart(line);
-            node.getProperties().put("framework", "mongoose");
+            node.getProperties().put(PROP_FRAMEWORK, PROP_MONGOOSE);
             nodes.add(node);
         }
 
@@ -108,8 +111,8 @@ public class MongooseORMDetector extends AbstractAntlrDetector {
             node.setModule(moduleName);
             node.setFilePath(filePath);
             node.setLineStart(line);
-            node.getProperties().put("framework", "mongoose");
-            node.getProperties().put("definition", "schema");
+            node.getProperties().put(PROP_FRAMEWORK, PROP_MONGOOSE);
+            node.getProperties().put(PROP_DEFINITION, "schema");
             nodes.add(node);
         }
 
@@ -128,8 +131,8 @@ public class MongooseORMDetector extends AbstractAntlrDetector {
             node.setModule(moduleName);
             node.setFilePath(filePath);
             node.setLineStart(line);
-            node.getProperties().put("framework", "mongoose");
-            node.getProperties().put("definition", "model");
+            node.getProperties().put(PROP_FRAMEWORK, PROP_MONGOOSE);
+            node.getProperties().put(PROP_DEFINITION, "model");
             nodes.add(node);
         }
 
@@ -145,7 +148,7 @@ public class MongooseORMDetector extends AbstractAntlrDetector {
         }
         if (!virtuals.isEmpty()) {
             for (CodeNode node : nodes) {
-                if ("schema".equals(node.getProperties().get("definition"))) {
+                if ("schema".equals(node.getProperties().get(PROP_DEFINITION))) {
                     node.getProperties().put("virtuals", virtuals);
                 }
             }
@@ -168,7 +171,7 @@ public class MongooseORMDetector extends AbstractAntlrDetector {
                 node.setModule(moduleName);
                 node.setFilePath(filePath);
                 node.setLineStart(line);
-                node.getProperties().put("framework", "mongoose");
+                node.getProperties().put(PROP_FRAMEWORK, PROP_MONGOOSE);
                 node.getProperties().put("hook_type", hookType);
                 node.getProperties().put("event", eventName);
                 nodes.add(node);

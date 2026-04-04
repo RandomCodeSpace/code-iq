@@ -35,6 +35,9 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class PyprojectTomlDetector extends AbstractStructuredDetector {
+    private static final String PROP_DESCRIPTION = "description";
+    private static final String PROP_VERSION = "version";
+
 
     @Override
     public String getName() {
@@ -76,12 +79,12 @@ public class PyprojectTomlDetector extends AbstractStructuredDetector {
 
         Map<String, Object> props = new HashMap<>();
         props.put("package_name", pkgName);
-        String version = getString(projectSection, "version");
-        if (version == null) version = getString(poetrySection, "version");
-        if (version != null) props.put("version", version);
-        String description = getString(projectSection, "description");
-        if (description == null) description = getString(poetrySection, "description");
-        if (description != null) props.put("description", description);
+        String version = getString(projectSection, PROP_VERSION);
+        if (version == null) version = getString(poetrySection, PROP_VERSION);
+        if (version != null) props.put(PROP_VERSION, version);
+        String description = getString(projectSection, PROP_DESCRIPTION);
+        if (description == null) description = getString(poetrySection, PROP_DESCRIPTION);
+        if (description != null) props.put(PROP_DESCRIPTION, description);
 
         CodeNode moduleNode = new CodeNode(moduleId, NodeKind.MODULE, pkgName);
         moduleNode.setFqn(pkgName);

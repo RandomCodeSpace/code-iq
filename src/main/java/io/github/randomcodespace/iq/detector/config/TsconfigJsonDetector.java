@@ -33,6 +33,8 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class TsconfigJsonDetector extends AbstractStructuredDetector {
+    private static final String PROP_EXTENDS = "extends";
+
 
     private static final Pattern TSCONFIG_RE = Pattern.compile("^tsconfig(?:\\..+)?\\.json$");
     private static final List<String> TRACKED_COMPILER_OPTIONS = List.of(
@@ -75,15 +77,15 @@ public class TsconfigJsonDetector extends AbstractStructuredDetector {
         configNode.setProperties(Map.of("config_type", "tsconfig"));
         nodes.add(configNode);
 
-        // DEPENDS_ON edge for "extends"
-        String extendsVal = getString(cfg, "extends");
+        // DEPENDS_ON edge for PROP_EXTENDS
+        String extendsVal = getString(cfg, PROP_EXTENDS);
         if (extendsVal != null && !extendsVal.isEmpty()) {
             CodeEdge edge = new CodeEdge();
             edge.setId(configId + "->" + extendsVal);
             edge.setKind(EdgeKind.DEPENDS_ON);
             edge.setSourceId(configId);
             edge.setTarget(new CodeNode(extendsVal, null, null));
-            edge.setProperties(Map.of("relation", "extends"));
+            edge.setProperties(Map.of("relation", PROP_EXTENDS));
             edges.add(edge);
         }
 

@@ -25,6 +25,9 @@ import io.github.randomcodespace.iq.detector.DetectorInfo;
 )
 @Component
 public class QuarkusDetector extends AbstractRegexDetector {
+    private static final String PROP_FRAMEWORK = "framework";
+    private static final String PROP_QUARKUS = "quarkus";
+
 
     private static final Pattern QUARKUS_TEST_RE = Pattern.compile("@QuarkusTest\\b");
     private static final Pattern CONFIG_PROPERTY_RE = Pattern.compile("@ConfigProperty\\s*\\(\\s*name\\s*=\\s*\"([^\"]+)\"");
@@ -36,7 +39,7 @@ public class QuarkusDetector extends AbstractRegexDetector {
 
     @Override
     public String getName() {
-        return "quarkus";
+        return PROP_QUARKUS;
     }
 
     @Override
@@ -83,7 +86,7 @@ public class QuarkusDetector extends AbstractRegexDetector {
                 nodes.add(makeNode("quarkus:" + ctx.filePath() + ":quarkus_test:" + lineno,
                         NodeKind.CLASS, "@QuarkusTest " + (className != null ? className : "unknown"),
                         className, lineno, ctx, List.of("@QuarkusTest"),
-                        Map.of("framework", "quarkus", "test", true)));
+                        Map.of(PROP_FRAMEWORK, PROP_QUARKUS, "test", true)));
             }
 
             Matcher cpm = CONFIG_PROPERTY_RE.matcher(lines[i]);
@@ -92,7 +95,7 @@ public class QuarkusDetector extends AbstractRegexDetector {
                 nodes.add(makeNode("quarkus:" + ctx.filePath() + ":config_property:" + lineno,
                         NodeKind.CONFIG_KEY, "@ConfigProperty(" + configKey + ")",
                         configKey, lineno, ctx, List.of("@ConfigProperty"),
-                        Map.of("framework", "quarkus", "config_key", configKey)));
+                        Map.of(PROP_FRAMEWORK, PROP_QUARKUS, "config_key", configKey)));
             }
 
             Matcher cdim = CDI_SCOPE_RE.matcher(lines[i]);
@@ -102,7 +105,7 @@ public class QuarkusDetector extends AbstractRegexDetector {
                         NodeKind.MIDDLEWARE, "@" + annotation + " (CDI)",
                         className != null ? className + "." + annotation : annotation, lineno, ctx,
                         List.of("@" + annotation),
-                        Map.of("framework", "quarkus", "cdi_scope", annotation)));
+                        Map.of(PROP_FRAMEWORK, PROP_QUARKUS, "cdi_scope", annotation)));
             }
 
             Matcher sm = SCHEDULED_RE.matcher(lines[i]);
@@ -112,7 +115,7 @@ public class QuarkusDetector extends AbstractRegexDetector {
                         NodeKind.EVENT, "@Scheduled(" + scheduleExpr + ")",
                         className != null ? className + ".scheduled" : "scheduled", lineno, ctx,
                         List.of("@Scheduled"),
-                        Map.of("framework", "quarkus", "schedule", scheduleExpr)));
+                        Map.of(PROP_FRAMEWORK, PROP_QUARKUS, "schedule", scheduleExpr)));
             }
 
             if (TRANSACTIONAL_RE.matcher(lines[i]).find()) {
@@ -120,14 +123,14 @@ public class QuarkusDetector extends AbstractRegexDetector {
                         NodeKind.MIDDLEWARE, "@Transactional",
                         className != null ? className + ".transactional" : "transactional", lineno, ctx,
                         List.of("@Transactional"),
-                        Map.of("framework", "quarkus")));
+                        Map.of(PROP_FRAMEWORK, PROP_QUARKUS)));
             }
 
             if (STARTUP_RE.matcher(lines[i]).find()) {
                 nodes.add(makeNode("quarkus:" + ctx.filePath() + ":startup:" + lineno,
                         NodeKind.MIDDLEWARE, "@Startup " + (className != null ? className : "unknown"),
                         className, lineno, ctx, List.of("@Startup"),
-                        Map.of("framework", "quarkus")));
+                        Map.of(PROP_FRAMEWORK, PROP_QUARKUS)));
             }
         }
 

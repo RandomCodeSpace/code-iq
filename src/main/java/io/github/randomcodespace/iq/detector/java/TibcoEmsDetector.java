@@ -27,6 +27,11 @@ import io.github.randomcodespace.iq.detector.DetectorInfo;
 )
 @Component
 public class TibcoEmsDetector extends AbstractJavaMessagingDetector {
+    private static final String PROP_BROKER = "broker";
+    private static final String PROP_QUEUE = "queue";
+    private static final String PROP_TIBCO_EMS = "tibco_ems";
+    private static final String PROP_TOPIC = "topic";
+
 
     private static final Pattern TIBJMS_FACTORY_RE = Pattern.compile(
             "\\b(TibjmsConnectionFactory|TibjmsQueueConnectionFactory|TibjmsTopicConnectionFactory)\\b");
@@ -44,7 +49,7 @@ public class TibcoEmsDetector extends AbstractJavaMessagingDetector {
 
     @Override
     public String getName() {
-        return "tibco_ems";
+        return PROP_TIBCO_EMS;
     }
 
     @Override
@@ -94,7 +99,7 @@ public class TibcoEmsDetector extends AbstractJavaMessagingDetector {
                 node.setId(nodeId);
                 node.setKind(NodeKind.MESSAGE_QUEUE);
                 node.setLabel("ems:" + factoryType);
-                node.getProperties().put("broker", "tibco_ems");
+                node.getProperties().put(PROP_BROKER, PROP_TIBCO_EMS);
                 node.getProperties().put("factory_type", factoryType);
                 if (!serverUrls.isEmpty()) node.getProperties().put("server_url", serverUrls.get(0));
                 nodes.add(node);
@@ -116,18 +121,18 @@ public class TibcoEmsDetector extends AbstractJavaMessagingDetector {
                 String queueName = m.group(1);
                 String queueId = ensureQueueNode(queueName, seenQueues, nodes);
                 if (isProducer) addMessagingEdge(classNodeId, queueId, EdgeKind.SENDS_TO,
-                        className + " sends to " + queueName, Map.of("queue", queueName), edges);
+                        className + " sends to " + queueName, Map.of(PROP_QUEUE, queueName), edges);
                 if (isConsumer) addMessagingEdge(classNodeId, queueId, EdgeKind.RECEIVES_FROM,
-                        className + " receives from " + queueName, Map.of("queue", queueName), edges);
+                        className + " receives from " + queueName, Map.of(PROP_QUEUE, queueName), edges);
             }
             m = CREATE_TOPIC_RE.matcher(lines[i]);
             if (m.find()) {
                 String topicName = m.group(1);
                 String topicId = ensureTopicNode(topicName, seenTopics, nodes);
                 if (isProducer) addMessagingEdge(classNodeId, topicId, EdgeKind.SENDS_TO,
-                        className + " sends to " + topicName, Map.of("topic", topicName), edges);
+                        className + " sends to " + topicName, Map.of(PROP_TOPIC, topicName), edges);
                 if (isConsumer) addMessagingEdge(classNodeId, topicId, EdgeKind.RECEIVES_FROM,
-                        className + " receives from " + topicName, Map.of("topic", topicName), edges);
+                        className + " receives from " + topicName, Map.of(PROP_TOPIC, topicName), edges);
             }
         }
 
@@ -150,8 +155,8 @@ public class TibcoEmsDetector extends AbstractJavaMessagingDetector {
             node.setId(id);
             node.setKind(NodeKind.QUEUE);
             node.setLabel("ems:queue:" + name);
-            node.getProperties().put("broker", "tibco_ems");
-            node.getProperties().put("queue", name);
+            node.getProperties().put(PROP_BROKER, PROP_TIBCO_EMS);
+            node.getProperties().put(PROP_QUEUE, name);
             nodes.add(node);
         }
         return id;
@@ -165,8 +170,8 @@ public class TibcoEmsDetector extends AbstractJavaMessagingDetector {
             node.setId(id);
             node.setKind(NodeKind.TOPIC);
             node.setLabel("ems:topic:" + name);
-            node.getProperties().put("broker", "tibco_ems");
-            node.getProperties().put("topic", name);
+            node.getProperties().put(PROP_BROKER, PROP_TIBCO_EMS);
+            node.getProperties().put(PROP_TOPIC, name);
             nodes.add(node);
         }
         return id;

@@ -29,15 +29,18 @@ import java.util.TreeMap;
  */
 @Component
 public class LanguageEnricher {
+    private static final String PROP_JAVASCRIPT = "javascript";
+    private static final String PROP_TYPESCRIPT = "typescript";
+
 
     private static final Logger log = LoggerFactory.getLogger(LanguageEnricher.class);
 
     /**
      * Language alias map: normalises file-extension languages to extractor language keys.
-     * e.g. "javascript" nodes are handled by the "typescript" extractor.
+     * e.g. PROP_JAVASCRIPT nodes are handled by the PROP_TYPESCRIPT extractor.
      */
     private static final Map<String, String> LANGUAGE_ALIASES = Map.of(
-            "javascript", "typescript"
+            PROP_JAVASCRIPT, PROP_TYPESCRIPT
     );
 
     private final List<LanguageExtractor> extractors;
@@ -150,8 +153,8 @@ public class LanguageEnricher {
         if (dot < 0) return null;
         return switch (filePath.substring(dot + 1).toLowerCase()) {
             case "java" -> "java";
-            case "ts", "tsx" -> "typescript";
-            case "js", "jsx", "mjs", "cjs" -> "javascript";
+            case "ts", "tsx" -> PROP_TYPESCRIPT;
+            case "js", "jsx", "mjs", "cjs" -> PROP_JAVASCRIPT;
             case "py", "pyw" -> "python";
             case "go" -> "go";
             default -> null;

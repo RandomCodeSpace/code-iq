@@ -31,6 +31,8 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class YamlStructureDetector extends AbstractStructuredDetector {
+    private static final String PROP_YAML = "yaml";
+
 
     @Override
     public String getName() {
@@ -39,7 +41,7 @@ public class YamlStructureDetector extends AbstractStructuredDetector {
 
     @Override
     public Set<String> getSupportedLanguages() {
-        return Set.of("yaml");
+        return Set.of(PROP_YAML);
     }
 
     @Override
@@ -50,7 +52,7 @@ public class YamlStructureDetector extends AbstractStructuredDetector {
         List<CodeEdge> edges = new ArrayList<>();
 
         // CONFIG_FILE node for the file itself
-        nodes.add(buildFileNode(ctx, "yaml"));
+        nodes.add(buildFileNode(ctx, PROP_YAML));
 
         Object parsedData = ctx.parsedData();
         if (parsedData == null) {
@@ -78,7 +80,7 @@ public class YamlStructureDetector extends AbstractStructuredDetector {
         }
 
         for (String keyStr : topLevelKeys) {
-            addKeyNode(fileId, fp, keyStr, "yaml", ctx, nodes, edges);
+            addKeyNode(fileId, fp, keyStr, PROP_YAML, ctx, nodes, edges);
         }
 
         return DetectorResult.of(nodes, edges);

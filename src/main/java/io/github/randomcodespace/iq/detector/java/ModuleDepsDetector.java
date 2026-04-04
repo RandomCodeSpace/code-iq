@@ -28,6 +28,10 @@ import io.github.randomcodespace.iq.detector.DetectorInfo;
 )
 @Component
 public class ModuleDepsDetector extends AbstractRegexDetector {
+    private static final String PROP_BUILD_TOOL = "build_tool";
+    private static final String PROP_GRADLE = "gradle";
+    private static final String PROP_UNKNOWN = "unknown";
+
 
     private static final Pattern GRADLE_DEPENDENCY_RE = Pattern.compile(
             "(?:implementation|api|compile|compileOnly|runtimeOnly|testImplementation)\\s+"
@@ -49,7 +53,7 @@ public class ModuleDepsDetector extends AbstractRegexDetector {
 
     @Override
     public Set<String> getSupportedLanguages() {
-        return Set.of("java", "xml", "gradle");
+        return Set.of("java", "xml", PROP_GRADLE);
     }
 
     @Override
@@ -78,9 +82,9 @@ public class ModuleDepsDetector extends AbstractRegexDetector {
         if (depsIdx > 0) topSection = text.substring(0, depsIdx);
 
         Matcher gm = GROUP_ID_RE.matcher(topSection);
-        String groupId = gm.find() ? gm.group(1) : "unknown";
+        String groupId = gm.find() ? gm.group(1) : PROP_UNKNOWN;
         Matcher am = ARTIFACT_ID_RE.matcher(topSection);
-        String artifactId = am.find() ? am.group(1) : "unknown";
+        String artifactId = am.find() ? am.group(1) : PROP_UNKNOWN;
 
         String moduleId = "module:" + groupId + ":" + artifactId;
         CodeNode moduleNode = new CodeNode();
@@ -92,7 +96,7 @@ public class ModuleDepsDetector extends AbstractRegexDetector {
         moduleNode.setLineStart(1);
         moduleNode.getProperties().put("group_id", groupId);
         moduleNode.getProperties().put("artifact_id", artifactId);
-        moduleNode.getProperties().put("build_tool", "maven");
+        moduleNode.getProperties().put(PROP_BUILD_TOOL, "maven");
         nodes.add(moduleNode);
 
         // Sub-modules
@@ -104,7 +108,7 @@ public class ModuleDepsDetector extends AbstractRegexDetector {
             subNode.setKind(NodeKind.MODULE);
             subNode.setLabel(subModule);
             subNode.setFqn(groupId + ":" + subModule);
-            subNode.getProperties().put("build_tool", "maven");
+            subNode.getProperties().put(PROP_BUILD_TOOL, "maven");
             subNode.getProperties().put("parent", artifactId);
             nodes.add(subNode);
 
@@ -122,7 +126,7 @@ public class ModuleDepsDetector extends AbstractRegexDetector {
             Matcher dg = GROUP_ID_RE.matcher(block);
             Matcher da = ARTIFACT_ID_RE.matcher(block);
             if (da.find()) {
-                String depGroup = dg.find() ? dg.group(1) : "unknown";
+                String depGroup = dg.find() ? dg.group(1) : PROP_UNKNOWN;
                 String depArtifact = da.group(1);
                 String depId = "module:" + depGroup + ":" + depArtifact;
                 CodeEdge edge = new CodeEdge();
@@ -167,7 +171,7 @@ public class ModuleDepsDetector extends AbstractRegexDetector {
         moduleNode.setFqn(moduleName);
         moduleNode.setFilePath(ctx.filePath());
         moduleNode.setLineStart(1);
-        moduleNode.getProperties().put("build_tool", "gradle");
+        moduleNode.getProperties().put(PROP_BUILD_TOOL, PROP_GRADLE);
         nodes.add(moduleNode);
 
         for (int i = 0; i < lines.length; i++) {
@@ -217,7 +221,7 @@ public class ModuleDepsDetector extends AbstractRegexDetector {
             node.setLabel(modulePath);
             node.setFqn(modulePath);
             node.setFilePath(ctx.filePath());
-            node.getProperties().put("build_tool", "gradle");
+            node.getProperties().put(PROP_BUILD_TOOL, PROP_GRADLE);
             nodes.add(node);
         }
 

@@ -38,6 +38,10 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class JpaEntityDetector extends AbstractJavaParserDetector {
+    private static final String PROP_FIELD = "field";
+    private static final String PROP_NAME = "name";
+    private static final String PROP_TYPE = "type";
+
 
     private static final Set<String> RELATIONSHIP_ANNOTATIONS = Set.of(
             "OneToMany", "ManyToOne", "OneToOne", "ManyToMany");
@@ -125,7 +129,7 @@ public class JpaEntityDetector extends AbstractJavaParserDetector {
     private String extractTableName(ClassOrInterfaceDeclaration classDecl, String className) {
         for (AnnotationExpr ann : classDecl.getAnnotations()) {
             if (!"Table".equals(ann.getNameAsString())) continue;
-            String name = extractAnnotationStringAttr(ann, "name");
+            String name = extractAnnotationStringAttr(ann, PROP_NAME);
             if (name == null) name = extractAnnotationValue(ann);
             if (name != null) return name;
         }
@@ -146,11 +150,11 @@ public class JpaEntityDetector extends AbstractJavaParserDetector {
                                            String fieldType, List<Map<String, String>> columns) {
         for (AnnotationExpr ann : field.getAnnotations()) {
             if ("Column".equals(ann.getNameAsString())) {
-                String colName = extractAnnotationStringAttr(ann, "name");
+                String colName = extractAnnotationStringAttr(ann, PROP_NAME);
                 if (colName == null) colName = fieldName;
-                columns.add(Map.of("name", colName, "field", fieldName, "type", fieldType));
+                columns.add(Map.of(PROP_NAME, colName, PROP_FIELD, fieldName, PROP_TYPE, fieldType));
             } else if ("Id".equals(ann.getNameAsString())) {
-                columns.add(Map.of("name", fieldName, "field", fieldName, "type", fieldType));
+                columns.add(Map.of(PROP_NAME, fieldName, PROP_FIELD, fieldName, PROP_TYPE, fieldType));
             }
         }
     }
@@ -257,7 +261,7 @@ public class JpaEntityDetector extends AbstractJavaParserDetector {
                     Matcher fm = FIELD_RE.matcher(lines[k]);
                     if (fm.find()) {
                         String colName = colNameMatch.find() ? colNameMatch.group(1) : fm.group(2);
-                        columns.add(Map.of("name", colName, "field", fm.group(2), "type", fm.group(1).trim()));
+                        columns.add(Map.of(PROP_NAME, colName, PROP_FIELD, fm.group(2), PROP_TYPE, fm.group(1).trim()));
                         break;
                     }
                 }

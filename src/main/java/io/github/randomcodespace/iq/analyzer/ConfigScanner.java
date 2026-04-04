@@ -34,6 +34,22 @@ import java.util.regex.Pattern;
  */
 @Component
 public class ConfigScanner {
+    private static final String PROP_DEPENDENCY = "dependency";
+    private static final String PROP_DETECTION = "detection";
+    private static final String PROP_ELASTICSEARCH = "elasticsearch";
+    private static final String PROP_H2 = "h2";
+    private static final String PROP_KAFKA = "kafka";
+    private static final String PROP_MARIADB = "mariadb";
+    private static final String PROP_MONGO = "mongo";
+    private static final String PROP_MONGODB = "mongodb";
+    private static final String PROP_MYSQL = "mysql";
+    private static final String PROP_POM_XML = "pom.xml";
+    private static final String PROP_POSTGRESQL = "postgresql";
+    private static final String PROP_RABBITMQ = "rabbitmq";
+    private static final String PROP_REDIS = "redis";
+    private static final String PROP_SOURCE = "source";
+    private static final String PROP_SQL = "sql";
+
 
     private static final Logger log = LoggerFactory.getLogger(ConfigScanner.class);
 
@@ -152,7 +168,7 @@ public class ConfigScanner {
                     "spring.datasource",
                     dbType,
                     dsUrl,
-                    Map.of("source", "spring.datasource.url")));
+                    Map.of(PROP_SOURCE, "spring.datasource.url")));
         }
 
         // Kafka bootstrap-servers
@@ -164,9 +180,9 @@ public class ConfigScanner {
                     "topic:spring.kafka",
                     InfraEndpoint.Kind.TOPIC,
                     "spring.kafka",
-                    "kafka",
+                    PROP_KAFKA,
                     kafkaServers,
-                    Map.of("source", "spring.kafka.bootstrap-servers")));
+                    Map.of(PROP_SOURCE, "spring.kafka.bootstrap-servers")));
         }
 
         // Redis (spring.data.redis or spring.redis)
@@ -182,9 +198,9 @@ public class ConfigScanner {
                     "cache:spring.redis",
                     InfraEndpoint.Kind.CACHE,
                     "spring.redis",
-                    "redis",
+                    PROP_REDIS,
                     "redis://" + redisHost + ":" + redisPort,
-                    Map.of("source", "spring.redis.host")));
+                    Map.of(PROP_SOURCE, "spring.redis.host")));
         }
 
         // RabbitMQ
@@ -195,9 +211,9 @@ public class ConfigScanner {
                     "queue:spring.rabbitmq",
                     InfraEndpoint.Kind.QUEUE,
                     "spring.rabbitmq",
-                    "rabbitmq",
+                    PROP_RABBITMQ,
                     "amqp://" + rabbitHost + ":" + rabbitPort,
-                    Map.of("source", "spring.rabbitmq.host")));
+                    Map.of(PROP_SOURCE, "spring.rabbitmq.host")));
         }
     }
 
@@ -265,36 +281,36 @@ public class ConfigScanner {
 
         Map<String, String> props = new TreeMap<>();
         props.put("image", image);
-        props.put("source", "docker-compose");
+        props.put(PROP_SOURCE, "docker-compose");
         if (ports != null) props.put("ports", ports);
 
         if (imageBase.contains("postgres")) {
             registry.register(new InfraEndpoint("db:compose:" + svcName,
-                    InfraEndpoint.Kind.DATABASE, svcName, "postgresql", null, props));
-        } else if (imageBase.contains("mariadb")) {
+                    InfraEndpoint.Kind.DATABASE, svcName, PROP_POSTGRESQL, null, props));
+        } else if (imageBase.contains(PROP_MARIADB)) {
             registry.register(new InfraEndpoint("db:compose:" + svcName,
-                    InfraEndpoint.Kind.DATABASE, svcName, "mariadb", null, props));
-        } else if (imageBase.contains("mysql")) {
+                    InfraEndpoint.Kind.DATABASE, svcName, PROP_MARIADB, null, props));
+        } else if (imageBase.contains(PROP_MYSQL)) {
             registry.register(new InfraEndpoint("db:compose:" + svcName,
-                    InfraEndpoint.Kind.DATABASE, svcName, "mysql", null, props));
-        } else if (imageBase.contains("mongo")) {
+                    InfraEndpoint.Kind.DATABASE, svcName, PROP_MYSQL, null, props));
+        } else if (imageBase.contains(PROP_MONGO)) {
             registry.register(new InfraEndpoint("db:compose:" + svcName,
-                    InfraEndpoint.Kind.DATABASE, svcName, "mongodb", null, props));
-        } else if (imageBase.contains("redis")) {
+                    InfraEndpoint.Kind.DATABASE, svcName, PROP_MONGODB, null, props));
+        } else if (imageBase.contains(PROP_REDIS)) {
             registry.register(new InfraEndpoint("cache:compose:" + svcName,
-                    InfraEndpoint.Kind.CACHE, svcName, "redis", null, props));
-        } else if (imageBase.contains("kafka") || imageBase.contains("cp-kafka")) {
+                    InfraEndpoint.Kind.CACHE, svcName, PROP_REDIS, null, props));
+        } else if (imageBase.contains(PROP_KAFKA) || imageBase.contains("cp-kafka")) {
             registry.register(new InfraEndpoint("topic:compose:" + svcName,
-                    InfraEndpoint.Kind.TOPIC, svcName, "kafka", null, props));
-        } else if (imageBase.contains("rabbitmq")) {
+                    InfraEndpoint.Kind.TOPIC, svcName, PROP_KAFKA, null, props));
+        } else if (imageBase.contains(PROP_RABBITMQ)) {
             registry.register(new InfraEndpoint("queue:compose:" + svcName,
-                    InfraEndpoint.Kind.QUEUE, svcName, "rabbitmq", null, props));
+                    InfraEndpoint.Kind.QUEUE, svcName, PROP_RABBITMQ, null, props));
         } else if (imageBase.contains("opensearch")) {
             registry.register(new InfraEndpoint("db:compose:" + svcName,
                     InfraEndpoint.Kind.DATABASE, svcName, "opensearch", null, props));
-        } else if (imageBase.contains("elasticsearch")) {
+        } else if (imageBase.contains(PROP_ELASTICSEARCH)) {
             registry.register(new InfraEndpoint("db:compose:" + svcName,
-                    InfraEndpoint.Kind.DATABASE, svcName, "elasticsearch", null, props));
+                    InfraEndpoint.Kind.DATABASE, svcName, PROP_ELASTICSEARCH, null, props));
         } else if (imageBase.contains("cassandra")) {
             registry.register(new InfraEndpoint("db:compose:" + svcName,
                     InfraEndpoint.Kind.DATABASE, svcName, "cassandra", null, props));
@@ -360,7 +376,7 @@ public class ConfigScanner {
             if (!registry.getDatabases().containsKey(id)) {
                 registry.register(new InfraEndpoint(id, InfraEndpoint.Kind.DATABASE,
                         "database_url", detectDatabaseTypeFromUrl(dbUrl), dbUrl,
-                        Map.of("source", ".env")));
+                        Map.of(PROP_SOURCE, ".env")));
             }
         } else {
             // DB_HOST fallback
@@ -370,8 +386,8 @@ public class ConfigScanner {
                 String id = "db:env:db_host";
                 if (!registry.getDatabases().containsKey(id)) {
                     registry.register(new InfraEndpoint(id, InfraEndpoint.Kind.DATABASE,
-                            "database", "postgresql", dbHost + ":" + dbPort,
-                            Map.of("source", ".env")));
+                            "database", PROP_POSTGRESQL, dbHost + ":" + dbPort,
+                            Map.of(PROP_SOURCE, ".env")));
                 }
             }
         }
@@ -382,7 +398,7 @@ public class ConfigScanner {
             String id = "cache:env:redis_url";
             if (!registry.getCaches().containsKey(id)) {
                 registry.register(new InfraEndpoint(id, InfraEndpoint.Kind.CACHE,
-                        "redis", "redis", redisUrl, Map.of("source", ".env")));
+                        PROP_REDIS, PROP_REDIS, redisUrl, Map.of(PROP_SOURCE, ".env")));
             }
         } else {
             String redisHost = env.get("REDIS_HOST");
@@ -391,8 +407,8 @@ public class ConfigScanner {
                 String id = "cache:env:redis_host";
                 if (!registry.getCaches().containsKey(id)) {
                     registry.register(new InfraEndpoint(id, InfraEndpoint.Kind.CACHE,
-                            "redis", "redis", "redis://" + redisHost + ":" + redisPort,
-                            Map.of("source", ".env")));
+                            PROP_REDIS, PROP_REDIS, "redis://" + redisHost + ":" + redisPort,
+                            Map.of(PROP_SOURCE, ".env")));
                 }
             }
         }
@@ -406,7 +422,7 @@ public class ConfigScanner {
             String id = "topic:env:kafka_brokers";
             if (!registry.getTopics().containsKey(id)) {
                 registry.register(new InfraEndpoint(id, InfraEndpoint.Kind.TOPIC,
-                        "kafka", "kafka", kafkaBrokers, Map.of("source", ".env")));
+                        PROP_KAFKA, PROP_KAFKA, kafkaBrokers, Map.of(PROP_SOURCE, ".env")));
             }
         }
     }
@@ -416,7 +432,7 @@ public class ConfigScanner {
     // -------------------------------------------------------------------------
 
     private void scanBuildFiles(Path root, InfrastructureRegistry registry) {
-        Path pomXml = root.resolve("pom.xml");
+        Path pomXml = root.resolve(PROP_POM_XML);
         if (Files.isRegularFile(pomXml)) {
             parsePomXml(pomXml, registry);
         }
@@ -428,26 +444,26 @@ public class ConfigScanner {
             Set<String> artifactIds = extractPomArtifactIds(content);
 
             boolean hasJpa      = artifactIds.stream().anyMatch(a -> a.contains("jpa") || a.contains("hibernate") || a.contains("jdbc"));
-            boolean hasPostgres = artifactIds.contains("postgresql");
+            boolean hasPostgres = artifactIds.contains(PROP_POSTGRESQL);
             boolean hasMysql    = artifactIds.stream().anyMatch(a -> a.contains("mysql-connector"));
-            boolean hasH2       = artifactIds.contains("h2");
-            boolean hasMongo    = artifactIds.stream().anyMatch(a -> a.contains("mongo"));
-            boolean hasKafka    = artifactIds.stream().anyMatch(a -> a.contains("kafka"));
-            boolean hasRedis    = artifactIds.stream().anyMatch(a -> a.contains("redis") || a.equals("lettuce-core") || a.equals("jedis"));
-            boolean hasRabbit   = artifactIds.stream().anyMatch(a -> a.contains("amqp") || a.contains("rabbitmq"));
-            boolean hasElastic  = artifactIds.stream().anyMatch(a -> a.contains("elasticsearch"));
+            boolean hasH2       = artifactIds.contains(PROP_H2);
+            boolean hasMongo    = artifactIds.stream().anyMatch(a -> a.contains(PROP_MONGO));
+            boolean hasKafka    = artifactIds.stream().anyMatch(a -> a.contains(PROP_KAFKA));
+            boolean hasRedis    = artifactIds.stream().anyMatch(a -> a.contains(PROP_REDIS) || a.equals("lettuce-core") || a.equals("jedis"));
+            boolean hasRabbit   = artifactIds.stream().anyMatch(a -> a.contains("amqp") || a.contains(PROP_RABBITMQ));
+            boolean hasElastic  = artifactIds.stream().anyMatch(a -> a.contains(PROP_ELASTICSEARCH));
 
             if (hasJpa || hasPostgres || hasMysql || hasH2 || hasMongo) {
-                String dbType = hasPostgres ? "postgresql"
-                        : hasMysql ? "mysql"
-                        : hasMongo ? "mongodb"
-                        : hasH2    ? "h2"
-                        : "sql";
+                String dbType = hasPostgres ? PROP_POSTGRESQL
+                        : hasMysql ? PROP_MYSQL
+                        : hasMongo ? PROP_MONGODB
+                        : hasH2    ? PROP_H2
+                        : PROP_SQL;
                 String id = "db:pom:" + dbType;
                 if (!registry.getDatabases().containsKey(id)) {
                     registry.register(new InfraEndpoint(id, InfraEndpoint.Kind.DATABASE,
                             dbType, dbType, null,
-                            Map.of("source", "pom.xml", "detection", "dependency")));
+                            Map.of(PROP_SOURCE, PROP_POM_XML, PROP_DETECTION, PROP_DEPENDENCY)));
                 }
             }
 
@@ -455,8 +471,8 @@ public class ConfigScanner {
                 String id = "topic:pom:kafka";
                 if (!registry.getTopics().containsKey(id)) {
                     registry.register(new InfraEndpoint(id, InfraEndpoint.Kind.TOPIC,
-                            "kafka", "kafka", null,
-                            Map.of("source", "pom.xml", "detection", "dependency")));
+                            PROP_KAFKA, PROP_KAFKA, null,
+                            Map.of(PROP_SOURCE, PROP_POM_XML, PROP_DETECTION, PROP_DEPENDENCY)));
                 }
             }
 
@@ -464,8 +480,8 @@ public class ConfigScanner {
                 String id = "cache:pom:redis";
                 if (!registry.getCaches().containsKey(id)) {
                     registry.register(new InfraEndpoint(id, InfraEndpoint.Kind.CACHE,
-                            "redis", "redis", null,
-                            Map.of("source", "pom.xml", "detection", "dependency")));
+                            PROP_REDIS, PROP_REDIS, null,
+                            Map.of(PROP_SOURCE, PROP_POM_XML, PROP_DETECTION, PROP_DEPENDENCY)));
                 }
             }
 
@@ -473,8 +489,8 @@ public class ConfigScanner {
                 String id = "queue:pom:rabbitmq";
                 if (!registry.getQueues().containsKey(id)) {
                     registry.register(new InfraEndpoint(id, InfraEndpoint.Kind.QUEUE,
-                            "rabbitmq", "rabbitmq", null,
-                            Map.of("source", "pom.xml", "detection", "dependency")));
+                            PROP_RABBITMQ, PROP_RABBITMQ, null,
+                            Map.of(PROP_SOURCE, PROP_POM_XML, PROP_DETECTION, PROP_DEPENDENCY)));
                 }
             }
 
@@ -482,8 +498,8 @@ public class ConfigScanner {
                 String id = "db:pom:elasticsearch";
                 if (!registry.getDatabases().containsKey(id)) {
                     registry.register(new InfraEndpoint(id, InfraEndpoint.Kind.DATABASE,
-                            "elasticsearch", "elasticsearch", null,
-                            Map.of("source", "pom.xml", "detection", "dependency")));
+                            PROP_ELASTICSEARCH, PROP_ELASTICSEARCH, null,
+                            Map.of(PROP_SOURCE, PROP_POM_XML, PROP_DETECTION, PROP_DEPENDENCY)));
                 }
             }
         } catch (Exception e) {
@@ -505,17 +521,17 @@ public class ConfigScanner {
     // -------------------------------------------------------------------------
 
     private String detectDatabaseTypeFromUrl(String url) {
-        if (url == null) return "sql";
+        if (url == null) return PROP_SQL;
         String lower = url.toLowerCase();
-        if (lower.contains("postgresql") || lower.contains("postgres")) return "postgresql";
-        if (lower.contains("mysql"))      return "mysql";
-        if (lower.contains("mariadb"))    return "mariadb";
+        if (lower.contains(PROP_POSTGRESQL) || lower.contains("postgres")) return PROP_POSTGRESQL;
+        if (lower.contains(PROP_MYSQL))      return PROP_MYSQL;
+        if (lower.contains(PROP_MARIADB))    return PROP_MARIADB;
         if (lower.contains("oracle"))     return "oracle";
         if (lower.contains("sqlserver") || lower.contains("mssql")) return "sqlserver";
-        if (lower.contains("h2"))         return "h2";
+        if (lower.contains(PROP_H2))         return PROP_H2;
         if (lower.contains("sqlite"))     return "sqlite";
-        if (lower.contains("mongodb") || lower.contains("mongo")) return "mongodb";
-        return "sql";
+        if (lower.contains(PROP_MONGODB) || lower.contains(PROP_MONGO)) return PROP_MONGODB;
+        return PROP_SQL;
     }
 
     private static String coalesce(String... values) {

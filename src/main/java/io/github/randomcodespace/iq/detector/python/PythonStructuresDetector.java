@@ -8,7 +8,6 @@ import io.github.randomcodespace.iq.model.CodeEdge;
 import io.github.randomcodespace.iq.model.CodeNode;
 import io.github.randomcodespace.iq.model.EdgeKind;
 import io.github.randomcodespace.iq.model.NodeKind;
-import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
 import org.springframework.stereotype.Component;
@@ -33,6 +32,8 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class PythonStructuresDetector extends AbstractPythonAntlrDetector {
+    private static final String PROP_EXPORTED = "exported";
+
 
     // --- Regex patterns (for fallback) ---
     private static final Pattern CLASS_RE = Pattern.compile(
@@ -114,7 +115,7 @@ public class PythonStructuresDetector extends AbstractPythonAntlrDetector {
                     properties.put("async", true);
                 }
                 if (allInfo.exports != null && allInfo.exports.contains(funcName)) {
-                    properties.put("exported", true);
+                    properties.put(PROP_EXPORTED, true);
                 }
 
                 if (indent == 0) {
@@ -228,7 +229,7 @@ public class PythonStructuresDetector extends AbstractPythonAntlrDetector {
                 properties.put("async", true);
             }
             if (allInfo.exports != null && allInfo.exports.contains(funcName)) {
-                properties.put("exported", true);
+                properties.put(PROP_EXPORTED, true);
             }
 
             if (indentLen == 0) {
@@ -301,7 +302,7 @@ public class PythonStructuresDetector extends AbstractPythonAntlrDetector {
             properties.put("bases", bases);
         }
         if (allExports != null && allExports.contains(className)) {
-            properties.put("exported", true);
+            properties.put(PROP_EXPORTED, true);
         }
         return properties;
     }

@@ -1,7 +1,6 @@
 package io.github.randomcodespace.iq.detector.typescript;
 
 import io.github.randomcodespace.iq.detector.AbstractAntlrDetector;
-import io.github.randomcodespace.iq.grammar.AntlrParserFactory;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.model.CodeEdge;
@@ -28,6 +27,9 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class KafkaJSDetector extends AbstractAntlrDetector {
+    private static final String PROP_KAFKA = "kafka";
+    private static final String PROP_TOPIC = "topic";
+
 
     private static final Pattern KAFKA_NEW_RE = Pattern.compile("new\\s+Kafka\\s*\\(\\s*\\{");
     private static final Pattern PRODUCER_RE = Pattern.compile("\\.producer\\s*\\(\\s*\\)");
@@ -68,7 +70,7 @@ public class KafkaJSDetector extends AbstractAntlrDetector {
         String fp = ctx.filePath();
         String moduleName = ctx.moduleName();
 
-        if (!text.contains("Kafka") && !text.contains("kafka")) {
+        if (!text.contains("Kafka") && !text.contains(PROP_KAFKA)) {
             return DetectorResult.empty();
         }
 
@@ -90,7 +92,7 @@ public class KafkaJSDetector extends AbstractAntlrDetector {
                 node.setModule(moduleName);
                 node.setFilePath(fp);
                 node.setLineStart(lineno);
-                node.getProperties().put("broker", "kafka");
+                node.getProperties().put("broker", PROP_KAFKA);
                 node.getProperties().put("library", "kafkajs");
                 nodes.add(node);
             }
@@ -117,7 +119,7 @@ public class KafkaJSDetector extends AbstractAntlrDetector {
                 edge.setId(fileNodeId + "->produces->" + topicId);
                 edge.setKind(EdgeKind.PRODUCES);
                 edge.setSourceId(fileNodeId);
-                edge.getProperties().put("topic", topic);
+                edge.getProperties().put(PROP_TOPIC, topic);
                 edges.add(edge);
             }
 
@@ -146,7 +148,7 @@ public class KafkaJSDetector extends AbstractAntlrDetector {
                 edge.setId(fileNodeId + "->consumes->" + topicId);
                 edge.setKind(EdgeKind.CONSUMES);
                 edge.setSourceId(fileNodeId);
-                edge.getProperties().put("topic", topic);
+                edge.getProperties().put(PROP_TOPIC, topic);
                 edges.add(edge);
             }
 
@@ -185,8 +187,8 @@ public class KafkaJSDetector extends AbstractAntlrDetector {
             node.setModule(moduleName);
             node.setFilePath(fp);
             node.setLineStart(lineno);
-            node.getProperties().put("broker", "kafka");
-            node.getProperties().put("topic", topic);
+            node.getProperties().put("broker", PROP_KAFKA);
+            node.getProperties().put(PROP_TOPIC, topic);
             nodes.add(node);
         }
         return topicId;

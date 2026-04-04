@@ -16,15 +16,21 @@ import java.util.function.Function;
  * manually by FlowCommand, FlowController, and BundleCommand.</p>
  */
 public class FlowEngine {
+    private static final String PROP_AUTH = "auth";
+    private static final String PROP_CI = "ci";
+    private static final String PROP_DEPLOY = "deploy";
+    private static final String PROP_OVERVIEW = "overview";
+    private static final String PROP_RUNTIME = "runtime";
 
-    public static final List<String> AVAILABLE_VIEWS = List.of("overview", "ci", "deploy", "runtime", "auth");
+
+    public static final List<String> AVAILABLE_VIEWS = List.of(PROP_OVERVIEW, PROP_CI, PROP_DEPLOY, PROP_RUNTIME, PROP_AUTH);
 
     private static final Map<String, Function<FlowDataSource, FlowDiagram>> VIEW_BUILDERS = Map.of(
-            "overview", FlowViews::buildOverview,
-            "ci", FlowViews::buildCiView,
-            "deploy", FlowViews::buildDeployView,
-            "runtime", FlowViews::buildRuntimeView,
-            "auth", FlowViews::buildAuthView
+            PROP_OVERVIEW, FlowViews::buildOverview,
+            PROP_CI, FlowViews::buildCiView,
+            PROP_DEPLOY, FlowViews::buildDeployView,
+            PROP_RUNTIME, FlowViews::buildRuntimeView,
+            PROP_AUTH, FlowViews::buildAuthView
     );
 
     private final FlowDataSource dataSource;
@@ -76,13 +82,13 @@ public class FlowEngine {
     }
 
     public Map<String, Object> getParentContext(String nodeId) {
-        for (var viewName : List.of("ci", "deploy", "runtime", "auth")) {
+        for (var viewName : List.of(PROP_CI, PROP_DEPLOY, PROP_RUNTIME, PROP_AUTH)) {
             var diagram = generate(viewName);
             for (var sg : diagram.subgraphs()) {
                 for (var node : sg.nodes()) {
                     if (node.id().equals(nodeId)) {
                         var result = new LinkedHashMap<String, Object>();
-                        result.put("parent_view", "overview");
+                        result.put("parent_view", PROP_OVERVIEW);
                         result.put("parent_subgraph", sg.id());
                         result.put("current_view", viewName);
                         return result;

@@ -25,35 +25,40 @@ import io.github.randomcodespace.iq.detector.DetectorInfo;
 )
 @Component
 public class SessionHeaderAuthDetector extends AbstractRegexDetector {
+    private static final String PROP_API_KEY = "api_key";
+    private static final String PROP_CSRF = "csrf";
+    private static final String PROP_HEADER = "header";
+    private static final String PROP_SESSION = "session";
+
 
     private record PatternDef(Pattern regex, String authType, NodeKind nodeKind) {}
 
     private static final List<PatternDef> SESSION_PATTERNS = List.of(
-            new PatternDef(Pattern.compile("['\"]express-session['\"]"), "session", NodeKind.MIDDLEWARE),
-            new PatternDef(Pattern.compile("['\"]cookie-session['\"]"), "session", NodeKind.MIDDLEWARE),
-            new PatternDef(Pattern.compile("@SessionAttributes\\b"), "session", NodeKind.GUARD),
-            new PatternDef(Pattern.compile("\\bSessionMiddleware\\b"), "session", NodeKind.MIDDLEWARE),
-            new PatternDef(Pattern.compile("\\bHttpSession\\b"), "session", NodeKind.GUARD),
-            new PatternDef(Pattern.compile("\\bSESSION_ENGINE\\b"), "session", NodeKind.GUARD)
+            new PatternDef(Pattern.compile("['\"]express-session['\"]"), PROP_SESSION, NodeKind.MIDDLEWARE),
+            new PatternDef(Pattern.compile("['\"]cookie-session['\"]"), PROP_SESSION, NodeKind.MIDDLEWARE),
+            new PatternDef(Pattern.compile("@SessionAttributes\\b"), PROP_SESSION, NodeKind.GUARD),
+            new PatternDef(Pattern.compile("\\bSessionMiddleware\\b"), PROP_SESSION, NodeKind.MIDDLEWARE),
+            new PatternDef(Pattern.compile("\\bHttpSession\\b"), PROP_SESSION, NodeKind.GUARD),
+            new PatternDef(Pattern.compile("\\bSESSION_ENGINE\\b"), PROP_SESSION, NodeKind.GUARD)
     );
 
     private static final List<PatternDef> HEADER_PATTERNS = List.of(
-            new PatternDef(Pattern.compile("['\"]X-API-Key['\"]", Pattern.CASE_INSENSITIVE), "header", NodeKind.GUARD),
-            new PatternDef(Pattern.compile("(?:req|request|ctx)\\.headers?\\s*\\[\\s*['\"]authorization['\"]\\s*]", Pattern.CASE_INSENSITIVE), "header", NodeKind.GUARD),
-            new PatternDef(Pattern.compile("getHeader\\s*\\(\\s*['\"]Authorization['\"]", Pattern.CASE_INSENSITIVE), "header", NodeKind.GUARD)
+            new PatternDef(Pattern.compile("['\"]X-API-Key['\"]", Pattern.CASE_INSENSITIVE), PROP_HEADER, NodeKind.GUARD),
+            new PatternDef(Pattern.compile("(?:req|request|ctx)\\.headers?\\s*\\[\\s*['\"]authorization['\"]\\s*]", Pattern.CASE_INSENSITIVE), PROP_HEADER, NodeKind.GUARD),
+            new PatternDef(Pattern.compile("getHeader\\s*\\(\\s*['\"]Authorization['\"]", Pattern.CASE_INSENSITIVE), PROP_HEADER, NodeKind.GUARD)
     );
 
     private static final List<PatternDef> API_KEY_PATTERNS = List.of(
-            new PatternDef(Pattern.compile("(?:req|request)\\.headers?\\s*\\[\\s*['\"]x-api-key['\"]\\s*]", Pattern.CASE_INSENSITIVE), "api_key", NodeKind.GUARD),
-            new PatternDef(Pattern.compile("\\bapi[_-]?key\\s*[=:]\\s*", Pattern.CASE_INSENSITIVE), "api_key", NodeKind.GUARD),
-            new PatternDef(Pattern.compile("\\bvalidate_?api_?key\\b", Pattern.CASE_INSENSITIVE), "api_key", NodeKind.GUARD)
+            new PatternDef(Pattern.compile("(?:req|request)\\.headers?\\s*\\[\\s*['\"]x-api-key['\"]\\s*]", Pattern.CASE_INSENSITIVE), PROP_API_KEY, NodeKind.GUARD),
+            new PatternDef(Pattern.compile("\\bapi[_-]?key\\s*[=:]\\s*", Pattern.CASE_INSENSITIVE), PROP_API_KEY, NodeKind.GUARD),
+            new PatternDef(Pattern.compile("\\bvalidate_?api_?key\\b", Pattern.CASE_INSENSITIVE), PROP_API_KEY, NodeKind.GUARD)
     );
 
     private static final List<PatternDef> CSRF_PATTERNS = List.of(
-            new PatternDef(Pattern.compile("@csrf_protect\\b"), "csrf", NodeKind.GUARD),
-            new PatternDef(Pattern.compile("\\bcsrf_exempt\\b"), "csrf", NodeKind.GUARD),
-            new PatternDef(Pattern.compile("\\bCsrfViewMiddleware\\b"), "csrf", NodeKind.MIDDLEWARE),
-            new PatternDef(Pattern.compile("['\"]csurf['\"]"), "csrf", NodeKind.MIDDLEWARE)
+            new PatternDef(Pattern.compile("@csrf_protect\\b"), PROP_CSRF, NodeKind.GUARD),
+            new PatternDef(Pattern.compile("\\bcsrf_exempt\\b"), PROP_CSRF, NodeKind.GUARD),
+            new PatternDef(Pattern.compile("\\bCsrfViewMiddleware\\b"), PROP_CSRF, NodeKind.MIDDLEWARE),
+            new PatternDef(Pattern.compile("['\"]csurf['\"]"), PROP_CSRF, NodeKind.MIDDLEWARE)
     );
 
     private static final List<PatternDef> ALL_PATTERNS;
@@ -67,10 +72,10 @@ public class SessionHeaderAuthDetector extends AbstractRegexDetector {
     }
 
     private static final Map<String, String> ID_TAG = Map.of(
-            "session", "session",
-            "header", "header",
-            "api_key", "apikey",
-            "csrf", "csrf"
+            PROP_SESSION, PROP_SESSION,
+            PROP_HEADER, PROP_HEADER,
+            PROP_API_KEY, "apikey",
+            PROP_CSRF, PROP_CSRF
     );
 
     @Override

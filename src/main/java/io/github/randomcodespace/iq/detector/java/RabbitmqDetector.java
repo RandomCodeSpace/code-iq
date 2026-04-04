@@ -27,6 +27,10 @@ import io.github.randomcodespace.iq.detector.DetectorInfo;
 )
 @Component
 public class RabbitmqDetector extends AbstractJavaMessagingDetector {
+    private static final String PROP_BROKER = "broker";
+    private static final String PROP_EXCHANGE = "exchange";
+    private static final String PROP_RABBITMQ = "rabbitmq";
+
 
     private static final Pattern RABBIT_LISTENER_RE = Pattern.compile(
             "@RabbitListener\\s*\\(\\s*(?:.*?queues?\\s*=\\s*)?[\\{\"]?\\s*\"([^\"]+)\"");
@@ -38,7 +42,7 @@ public class RabbitmqDetector extends AbstractJavaMessagingDetector {
 
     @Override
     public String getName() {
-        return "rabbitmq";
+        return PROP_RABBITMQ;
     }
 
     @Override
@@ -82,7 +86,7 @@ public class RabbitmqDetector extends AbstractJavaMessagingDetector {
             if (!m.find()) continue;
             String exchangeOrQueue = m.group(1);
             Map<String, Object> props = new LinkedHashMap<>();
-            props.put("exchange", exchangeOrQueue);
+            props.put(PROP_EXCHANGE, exchangeOrQueue);
             Matcher rk = ROUTING_KEY_RE.matcher(lines[i]);
             if (rk.find()) props.put("routing_key", rk.group(1));
 
@@ -93,8 +97,8 @@ public class RabbitmqDetector extends AbstractJavaMessagingDetector {
                 node.setId(queueId);
                 node.setKind(NodeKind.QUEUE);
                 node.setLabel("rabbitmq:" + exchangeOrQueue);
-                node.getProperties().put("broker", "rabbitmq");
-                node.getProperties().put("exchange", exchangeOrQueue);
+                node.getProperties().put(PROP_BROKER, PROP_RABBITMQ);
+                node.getProperties().put(PROP_EXCHANGE, exchangeOrQueue);
                 nodes.add(node);
             }
 
@@ -114,8 +118,8 @@ public class RabbitmqDetector extends AbstractJavaMessagingDetector {
                 node.setLabel("rabbitmq:exchange:" + exchangeName);
                 node.setFilePath(ctx.filePath());
                 node.setLineStart(lineNum);
-                node.getProperties().put("broker", "rabbitmq");
-                node.getProperties().put("exchange", exchangeName);
+                node.getProperties().put(PROP_BROKER, PROP_RABBITMQ);
+                node.getProperties().put(PROP_EXCHANGE, exchangeName);
                 nodes.add(node);
             }
         }
@@ -131,7 +135,7 @@ public class RabbitmqDetector extends AbstractJavaMessagingDetector {
             node.setId(queueId);
             node.setKind(NodeKind.QUEUE);
             node.setLabel("rabbitmq:" + queue);
-            node.getProperties().put("broker", "rabbitmq");
+            node.getProperties().put(PROP_BROKER, PROP_RABBITMQ);
             node.getProperties().put("queue", queue);
             nodes.add(node);
         }

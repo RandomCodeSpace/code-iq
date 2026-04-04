@@ -27,6 +27,14 @@ import java.util.TreeMap;
  * <p>This class is intentionally non-instantiable. Use the static {@link #get} methods.
  */
 public final class CapabilityMatrix {
+    private static final String PROP_CPP = "cpp";
+    private static final String PROP_CSHARP = "csharp";
+    private static final String PROP_GO = "go";
+    private static final String PROP_JAVASCRIPT = "javascript";
+    private static final String PROP_PYTHON = "python";
+    private static final String PROP_RUST = "rust";
+    private static final String PROP_TYPESCRIPT = "typescript";
+
 
     // ------------------------------------------------------------------
     // Language normalisation
@@ -34,7 +42,7 @@ public final class CapabilityMatrix {
 
     /** Languages with ANTLR or JavaParser AST-level support. */
     private static final Set<String> ANTLR_LANGUAGES =
-            Set.of("typescript", "javascript", "python", "go", "csharp", "rust", "cpp");
+            Set.of(PROP_TYPESCRIPT, PROP_JAVASCRIPT, PROP_PYTHON, PROP_GO, PROP_CSHARP, PROP_RUST, PROP_CPP);
 
     /** Languages with regex/text-only detection (no grammar). */
     private static final Set<String> LEXICAL_ONLY_LANGUAGES =
@@ -234,7 +242,7 @@ public final class CapabilityMatrix {
     public static Map<String, Map<String, String>> asSerializableMap() {
         Map<String, Map<String, String>> result = new TreeMap<>();
         for (String lang : new String[]{
-                "java", "typescript", "javascript", "python", "go", "csharp", "rust", "cpp",
+                "java", PROP_TYPESCRIPT, PROP_JAVASCRIPT, PROP_PYTHON, PROP_GO, PROP_CSHARP, PROP_RUST, PROP_CPP,
                 "kotlin", "scala", "ruby", "php", "shell"}) {
             Map<CapabilityDimension, CapabilityLevel> caps = tableFor(lang);
             Map<String, String> row = new LinkedHashMap<>();
@@ -258,13 +266,13 @@ public final class CapabilityMatrix {
     private static Map<CapabilityDimension, CapabilityLevel> tableFor(String lang) {
         return switch (lang) {
             case "java"       -> JAVA_CAPS;
-            case "typescript" -> TYPESCRIPT_CAPS;
-            case "javascript" -> JAVASCRIPT_CAPS;
-            case "python"     -> PYTHON_CAPS;
-            case "go"         -> GO_CAPS;
-            case "csharp", "c#" -> CSHARP_CAPS;
-            case "cpp", "c++"   -> CPP_CAPS;
-            case "rust"       -> RUST_CAPS;
+            case PROP_TYPESCRIPT -> TYPESCRIPT_CAPS;
+            case PROP_JAVASCRIPT -> JAVASCRIPT_CAPS;
+            case PROP_PYTHON     -> PYTHON_CAPS;
+            case PROP_GO         -> GO_CAPS;
+            case PROP_CSHARP, "c#" -> CSHARP_CAPS;
+            case PROP_CPP, "c++"   -> CPP_CAPS;
+            case PROP_RUST       -> RUST_CAPS;
             default -> {
                 if (LEXICAL_ONLY_LANGUAGES.contains(lang)) yield LEXICAL_ONLY_CAPS;
                 if (ANTLR_LANGUAGES.contains(lang))        yield CSHARP_CAPS; // cpp etc → PARTIAL

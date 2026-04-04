@@ -61,6 +61,10 @@ import java.util.function.Consumer;
  */
 @Service
 public class Analyzer {
+    private static final String PROP_FRAMEWORK = "framework";
+    private static final String PROP_ROOT = "root";
+    private static final String PROP_SERVICE = "service";
+
 
     private static final Logger log = LoggerFactory.getLogger(Analyzer.class);
 
@@ -335,7 +339,7 @@ public class Analyzer {
         // 5b. Detect service boundaries and create SERVICE nodes
         report.accept("Detecting service boundaries...");
         var serviceDetector = new ServiceDetector();
-        String projectDirName = root.getFileName() != null ? root.getFileName().toString() : "root";
+        String projectDirName = root.getFileName() != null ? root.getFileName().toString() : PROP_ROOT;
         var serviceResult = serviceDetector.detect(allNodes, builder.getEdges(), projectDirName, root);
         if (!serviceResult.serviceNodes().isEmpty()) {
             serviceResult.serviceNodes().forEach(n -> n.setProvenance(builder.getProvenance()));
@@ -348,7 +352,7 @@ public class Analyzer {
         String serviceName = config.getServiceName();
         if (serviceName != null && !serviceName.isBlank()) {
             for (CodeNode node : allNodes) {
-                node.getProperties().put("service", serviceName);
+                node.getProperties().put(PROP_SERVICE, serviceName);
             }
         }
 
@@ -381,7 +385,7 @@ public class Analyzer {
         // 7b. Compute framework breakdown from node properties
         Map<String, Integer> frameworkBreakdown = new HashMap<>();
         for (CodeNode node : allNodes) {
-            Object fw = node.getProperties().get("framework");
+            Object fw = node.getProperties().get(PROP_FRAMEWORK);
             if (fw != null && !fw.toString().isEmpty()) {
                 frameworkBreakdown.merge(fw.toString(), 1, Integer::sum);
             }
@@ -611,13 +615,13 @@ public class Analyzer {
                         String svcName = config.getServiceName();
                         if (svcName != null && !svcName.isBlank()) {
                             for (CodeNode node : result.nodes()) {
-                                node.getProperties().put("service", svcName);
+                                node.getProperties().put(PROP_SERVICE, svcName);
                             }
                         }
                         // Track breakdowns
                         for (CodeNode node : result.nodes()) {
                             nodeBreakdown.merge(node.getKind().getValue(), 1, Integer::sum);
-                            Object fw = node.getProperties().get("framework");
+                            Object fw = node.getProperties().get(PROP_FRAMEWORK);
                             if (fw != null && !fw.toString().isEmpty()) {
                                 frameworkBreakdown.merge(fw.toString(), 1, Integer::sum);
                             }
@@ -971,12 +975,12 @@ public class Analyzer {
                 String svcName = config.getServiceName();
                 if (svcName != null && !svcName.isBlank()) {
                     for (CodeNode node : result.nodes()) {
-                        node.getProperties().put("service", svcName);
+                        node.getProperties().put(PROP_SERVICE, svcName);
                     }
                 }
                 for (CodeNode node : result.nodes()) {
                     nodeBreakdown.merge(node.getKind().getValue(), 1, Integer::sum);
-                    Object fw = node.getProperties().get("framework");
+                    Object fw = node.getProperties().get(PROP_FRAMEWORK);
                     if (fw != null && !fw.toString().isEmpty()) {
                         frameworkBreakdown.merge(fw.toString(), 1, Integer::sum);
                     }
@@ -1001,7 +1005,7 @@ public class Analyzer {
      * Partition discovered files into modules based on build-file boundary markers.
      * <p>
      * Files are assigned to the deepest module directory that contains them.
-     * Files with no matching module are placed in a {@code "root"} partition.
+     * Files with no matching module are placed in a {@code PROP_ROOT} partition.
      * The returned map is a {@link TreeMap} for deterministic iteration.
      *
      * @param root  absolute repository root (used only for logging)
@@ -1021,7 +1025,7 @@ public class Analyzer {
         // If no module boundaries found, treat everything as root
         if (moduleDirs.isEmpty()) {
             Map<String, List<DiscoveredFile>> single = new TreeMap<>();
-            single.put("root", new ArrayList<>(files));
+            single.put(PROP_ROOT, new ArrayList<>(files));
             return single;
         }
 
@@ -1045,7 +1049,7 @@ public class Analyzer {
                 }
             }
 
-            String key = bestModule != null ? bestModule : "root";
+            String key = bestModule != null ? bestModule : PROP_ROOT;
             result.computeIfAbsent(key, k -> new ArrayList<>()).add(file);
         }
 

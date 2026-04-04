@@ -24,6 +24,9 @@ import java.util.Properties;
  */
 @Service
 public class StructuredParser {
+    private static final String PROP_DATA = "data";
+    private static final String PROP_TYPE = "type";
+
 
     private static final Logger log = LoggerFactory.getLogger(StructuredParser.class);
 
@@ -70,10 +73,10 @@ public class StructuredParser {
 
         Map<String, Object> result = new LinkedHashMap<>();
         if (docs.size() <= 1) {
-            result.put("type", "yaml");
-            result.put("data", docs.isEmpty() ? null : docs.getFirst());
+            result.put(PROP_TYPE, "yaml");
+            result.put(PROP_DATA, docs.isEmpty() ? null : docs.getFirst());
         } else {
-            result.put("type", "yaml_multi");
+            result.put(PROP_TYPE, "yaml_multi");
             result.put("documents", docs);
         }
         return result;
@@ -83,8 +86,8 @@ public class StructuredParser {
     private Object parseJson(String content) throws Exception {
         Object data = objectMapper.readValue(content, Object.class);
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("type", "json");
-        result.put("data", data);
+        result.put(PROP_TYPE, "json");
+        result.put(PROP_DATA, data);
         return result;
     }
 
@@ -107,7 +110,7 @@ public class StructuredParser {
         var root = doc.getDocumentElement();
         // Return a simple map with root element info for structured detectors
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("type", "xml");
+        result.put(PROP_TYPE, "xml");
         result.put("file", filePath);
         result.put("rootElement", root.getTagName());
         result.put("rootNamespace", root.getNamespaceURI());
@@ -150,8 +153,8 @@ public class StructuredParser {
             }
         }
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("type", "toml");
-        result.put("data", data);
+        result.put(PROP_TYPE, "toml");
+        result.put(PROP_DATA, data);
         return result;
     }
 
@@ -180,8 +183,8 @@ public class StructuredParser {
             }
         }
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("type", "ini");
-        result.put("data", data);
+        result.put(PROP_TYPE, "ini");
+        result.put(PROP_DATA, data);
         return result;
     }
 
@@ -195,8 +198,8 @@ public class StructuredParser {
             data.put(key, props.getProperty(key));
         }
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("type", "properties");
-        result.put("data", data);
+        result.put(PROP_TYPE, "properties");
+        result.put(PROP_DATA, data);
         return result;
     }
 }

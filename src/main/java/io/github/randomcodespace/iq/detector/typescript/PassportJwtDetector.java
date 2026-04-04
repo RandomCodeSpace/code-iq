@@ -1,7 +1,6 @@
 package io.github.randomcodespace.iq.detector.typescript;
 
 import io.github.randomcodespace.iq.detector.AbstractAntlrDetector;
-import io.github.randomcodespace.iq.grammar.AntlrParserFactory;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.model.CodeNode;
@@ -27,6 +26,9 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class PassportJwtDetector extends AbstractAntlrDetector {
+    private static final String PROP_AUTH_TYPE = "auth_type";
+    private static final String PROP_JWT = "jwt";
+
 
     private static final Pattern PASSPORT_USE_PATTERN = Pattern.compile(
             "passport\\.use\\(\\s*new\\s+(\\w+Strategy)\\s*\\("
@@ -86,7 +88,7 @@ public class PassportJwtDetector extends AbstractAntlrDetector {
             node.setModule(moduleName);
             node.setFilePath(filePath);
             node.setLineStart(line);
-            node.getProperties().put("auth_type", "passport");
+            node.getProperties().put(PROP_AUTH_TYPE, "passport");
             node.getProperties().put("strategy", strategyName);
             nodes.add(node);
         }
@@ -105,7 +107,7 @@ public class PassportJwtDetector extends AbstractAntlrDetector {
             node.setModule(moduleName);
             node.setFilePath(filePath);
             node.setLineStart(line);
-            node.getProperties().put("auth_type", "jwt");
+            node.getProperties().put(PROP_AUTH_TYPE, PROP_JWT);
             node.getProperties().put("strategy", strategy);
             nodes.add(node);
         }
@@ -123,7 +125,7 @@ public class PassportJwtDetector extends AbstractAntlrDetector {
             node.setModule(moduleName);
             node.setFilePath(filePath);
             node.setLineStart(line);
-            node.getProperties().put("auth_type", "jwt");
+            node.getProperties().put(PROP_AUTH_TYPE, PROP_JWT);
             nodes.add(node);
         }
 
@@ -140,7 +142,7 @@ public class PassportJwtDetector extends AbstractAntlrDetector {
             node.setModule(moduleName);
             node.setFilePath(filePath);
             node.setLineStart(line);
-            node.getProperties().put("auth_type", "jwt");
+            node.getProperties().put(PROP_AUTH_TYPE, PROP_JWT);
             node.getProperties().put("library", "express-jwt");
             nodes.add(node);
         }
@@ -158,7 +160,7 @@ public class PassportJwtDetector extends AbstractAntlrDetector {
             node.setModule(moduleName);
             node.setFilePath(filePath);
             node.setLineStart(line);
-            node.getProperties().put("auth_type", "jwt");
+            node.getProperties().put(PROP_AUTH_TYPE, PROP_JWT);
             node.getProperties().put("library", "express-jwt");
             nodes.add(node);
         }

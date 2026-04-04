@@ -34,6 +34,8 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class ClassHierarchyDetector extends AbstractJavaParserDetector {
+    private static final String PROP_PROTECTED = "protected";
+
 
     private static final String PROP_INTERFACES = "interfaces";
     private static final String PROP_IS_ABSTRACT = "is_abstract";
@@ -184,7 +186,7 @@ public class ClassHierarchyDetector extends AbstractJavaParserDetector {
             int lineEnd = decl.getEnd().map(p -> p.line).orElse(line);
 
             String visibility = decl.isPublic() ? "public"
-                    : decl.isProtected() ? "protected"
+                    : decl.isProtected() ? PROP_PROTECTED
                     : decl.isPrivate() ? "private"
                     : "package-private";
 
@@ -229,7 +231,7 @@ public class ClassHierarchyDetector extends AbstractJavaParserDetector {
             int lineEnd = decl.getEnd().map(p -> p.line).orElse(line);
 
             String visibility = decl.isPublic() ? "public"
-                    : decl.isProtected() ? "protected"
+                    : decl.isProtected() ? PROP_PROTECTED
                     : decl.isPrivate() ? "private"
                     : "package-private";
 
@@ -255,7 +257,7 @@ public class ClassHierarchyDetector extends AbstractJavaParserDetector {
 
     private String resolveVisibility(ClassOrInterfaceDeclaration decl) {
         if (decl.isPublic()) return "public";
-        if (decl.isProtected()) return "protected";
+        if (decl.isProtected()) return PROP_PROTECTED;
         if (decl.isPrivate()) return "private";
         return "package-private";
     }
@@ -418,7 +420,7 @@ public class ClassHierarchyDetector extends AbstractJavaParserDetector {
     private String parseVisibility(String modifier) {
         if (modifier == null) return "package-private";
         String trimmed = modifier.trim();
-        if (trimmed.equals("public") || trimmed.equals("protected") || trimmed.equals("private")) {
+        if (trimmed.equals("public") || trimmed.equals(PROP_PROTECTED) || trimmed.equals("private")) {
             return trimmed;
         }
         return "package-private";

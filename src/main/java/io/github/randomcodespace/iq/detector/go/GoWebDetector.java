@@ -1,7 +1,6 @@
 package io.github.randomcodespace.iq.detector.go;
 
 import io.github.randomcodespace.iq.detector.AbstractAntlrDetector;
-import io.github.randomcodespace.iq.grammar.AntlrParserFactory;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.model.CodeNode;
@@ -25,6 +24,10 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class GoWebDetector extends AbstractAntlrDetector {
+    private static final String PROP_METHOD = "method";
+    private static final String PROP_MUX = "mux";
+    private static final String PROP_PATH = "path";
+
 
     private static final Pattern UPPER_ROUTE_RE = Pattern.compile("\\.(?<method>GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\\s*\\(\\s*\"(?<path>[^\"]*)\"", Pattern.MULTILINE);
     private static final Pattern LOWER_ROUTE_RE = Pattern.compile("\\.(?<method>Get|Post|Put|Delete|Patch|Head|Options)\\s*\\(\\s*\"(?<path>[^\"]*)\"", Pattern.MULTILINE);
@@ -51,7 +54,7 @@ public class GoWebDetector extends AbstractAntlrDetector {
         if (GIN_RE.matcher(text).find()) return "gin";
         if (ECHO_RE.matcher(text).find()) return "echo";
         if (CHI_RE.matcher(text).find()) return "chi";
-        if (MUX_RE.matcher(text).find()) return "mux";
+        if (MUX_RE.matcher(text).find()) return PROP_MUX;
         return "net_http";
     }
     @Override
@@ -73,8 +76,8 @@ public class GoWebDetector extends AbstractAntlrDetector {
         // Gin/Echo uppercase routes
         Matcher m = UPPER_ROUTE_RE.matcher(text);
         while (m.find()) {
-            String method = m.group("method");
-            String path = m.group("path");
+            String method = m.group(PROP_METHOD);
+            String path = m.group(PROP_PATH);
             int line = findLineNumber(text, m.start());
             nodes.add(endpointNode(filePath, method, path, line, framework));
         }
@@ -82,8 +85,8 @@ public class GoWebDetector extends AbstractAntlrDetector {
         // Chi lowercase routes
         m = LOWER_ROUTE_RE.matcher(text);
         while (m.find()) {
-            String method = m.group("method").toUpperCase();
-            String path = m.group("path");
+            String method = m.group(PROP_METHOD).toUpperCase();
+            String path = m.group(PROP_PATH);
             int line = findLineNumber(text, m.start());
             nodes.add(endpointNode(filePath, method, path, line, "chi"));
         }
@@ -92,10 +95,10 @@ public class GoWebDetector extends AbstractAntlrDetector {
         Set<Integer> handleFuncWithMethodPositions = new HashSet<>();
         m = HANDLEFUNC_RE.matcher(text);
         while (m.find()) {
-            String method = m.group("method");
-            String path = m.group("path");
+            String method = m.group(PROP_METHOD);
+            String path = m.group(PROP_PATH);
             int line = findLineNumber(text, m.start());
-            nodes.add(endpointNode(filePath, method, path, line, "mux"));
+            nodes.add(endpointNode(filePath, method, path, line, PROP_MUX));
             handleFuncWithMethodPositions.add(m.start());
         }
 
@@ -104,16 +107,16 @@ public class GoWebDetector extends AbstractAntlrDetector {
             m = HANDLEFUNC_NO_METHOD_RE.matcher(text);
             while (m.find()) {
                 if (handleFuncWithMethodPositions.contains(m.start())) continue;
-                String path = m.group("path");
+                String path = m.group(PROP_PATH);
                 int line = findLineNumber(text, m.start());
-                nodes.add(endpointNode(filePath, "ANY", path, line, "mux"));
+                nodes.add(endpointNode(filePath, "ANY", path, line, PROP_MUX));
             }
         }
 
         // net/http Handle/HandleFunc
         m = HTTP_HANDLE_RE.matcher(text);
         while (m.find()) {
-            String path = m.group("path");
+            String path = m.group(PROP_PATH);
             int line = findLineNumber(text, m.start());
             nodes.add(endpointNode(filePath, "ANY", path, line, "net_http"));
         }
@@ -148,7 +151,7 @@ public class GoWebDetector extends AbstractAntlrDetector {
         node.setLineStart(line);
         node.getProperties().put("framework", fw);
         node.getProperties().put("http_method", method);
-        node.getProperties().put("path", path);
+        node.getProperties().put(PROP_PATH, path);
         return node;
     }
 }

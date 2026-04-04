@@ -1,7 +1,6 @@
 package io.github.randomcodespace.iq.detector.csharp;
 
 import io.github.randomcodespace.iq.detector.AbstractAntlrDetector;
-import io.github.randomcodespace.iq.grammar.AntlrParserFactory;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.model.CodeEdge;
@@ -30,6 +29,9 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class CSharpEfcoreDetector extends AbstractAntlrDetector {
+    private static final String PROP_EFCORE = "efcore";
+    private static final String PROP_FRAMEWORK = "framework";
+
 
     private static final Pattern DBCONTEXT_RE = Pattern.compile("class\\s+(\\w+)\\s*:\\s*(?:[\\w.]+\\.)?DbContext", Pattern.MULTILINE);
     private static final Pattern DBSET_RE = Pattern.compile("DbSet<(\\w+)>", Pattern.MULTILINE);
@@ -71,7 +73,7 @@ public class CSharpEfcoreDetector extends AbstractAntlrDetector {
             node.setFqn(contextName);
             node.setFilePath(filePath);
             node.setLineStart(findLineNumber(text, m.start()));
-            node.getProperties().put("framework", "efcore");
+            node.getProperties().put(PROP_FRAMEWORK, PROP_EFCORE);
             nodes.add(node);
         }
 
@@ -87,7 +89,7 @@ public class CSharpEfcoreDetector extends AbstractAntlrDetector {
             node.setFqn(entityName);
             node.setFilePath(filePath);
             node.setLineStart(findLineNumber(text, m.start()));
-            node.getProperties().put("framework", "efcore");
+            node.getProperties().put(PROP_FRAMEWORK, PROP_EFCORE);
             nodes.add(node);
 
             for (String ctxId : contextIds) {
@@ -111,7 +113,7 @@ public class CSharpEfcoreDetector extends AbstractAntlrDetector {
             node.setFqn(migrationName);
             node.setFilePath(filePath);
             node.setLineStart(findLineNumber(text, m.start()));
-            node.getProperties().put("framework", "efcore");
+            node.getProperties().put(PROP_FRAMEWORK, PROP_EFCORE);
             nodes.add(node);
         }
 
@@ -129,7 +131,7 @@ public class CSharpEfcoreDetector extends AbstractAntlrDetector {
                 node.setFqn(tableName);
                 node.setFilePath(filePath);
                 node.setLineStart(findLineNumber(text, m.start()));
-                node.getProperties().put("framework", "efcore");
+                node.getProperties().put(PROP_FRAMEWORK, PROP_EFCORE);
                 node.getProperties().put("source", "migration");
                 nodes.add(node);
             }

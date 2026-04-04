@@ -28,6 +28,9 @@ import io.github.randomcodespace.iq.detector.DetectorInfo;
 )
 @Component
 public class MicronautDetector extends AbstractRegexDetector {
+    private static final String PROP_FRAMEWORK = "framework";
+    private static final String PROP_MICRONAUT = "micronaut";
+
 
     private static final Pattern CONTROLLER_RE = Pattern.compile("@Controller\\s*\\(\\s*\"([^\"]*)\"");
     private static final Pattern HTTP_METHOD_RE = Pattern.compile("@(Get|Post|Put|Delete)(?!Mapping)\\s*(?:\\(\\s*\"([^\"]*)\")?\\s*\\)?");
@@ -42,7 +45,7 @@ public class MicronautDetector extends AbstractRegexDetector {
 
     @Override
     public String getName() {
-        return "micronaut";
+        return PROP_MICRONAUT;
     }
 
     @Override
@@ -101,7 +104,7 @@ public class MicronautDetector extends AbstractRegexDetector {
             ctrlNode.setFilePath(ctx.filePath());
             ctrlNode.setLineStart(1);
             ctrlNode.getAnnotations().add("@Controller");
-            ctrlNode.getProperties().put("framework", "micronaut");
+            ctrlNode.getProperties().put(PROP_FRAMEWORK, PROP_MICRONAUT);
             ctrlNode.getProperties().put("path", controllerPath);
             nodes.add(ctrlNode);
         }
@@ -137,7 +140,7 @@ public class MicronautDetector extends AbstractRegexDetector {
                 node.setFilePath(ctx.filePath());
                 node.setLineStart(lineno);
                 node.getAnnotations().add("@" + hm.group(1));
-                node.getProperties().put("framework", "micronaut");
+                node.getProperties().put(PROP_FRAMEWORK, PROP_MICRONAUT);
                 node.getProperties().put("http_method", httpMethod);
                 node.getProperties().put("path", fullPath);
                 nodes.add(node);
@@ -163,7 +166,7 @@ public class MicronautDetector extends AbstractRegexDetector {
                 node.setFilePath(ctx.filePath());
                 node.setLineStart(lineno);
                 node.getAnnotations().add("@" + scope);
-                node.getProperties().put("framework", "micronaut");
+                node.getProperties().put(PROP_FRAMEWORK, PROP_MICRONAUT);
                 node.getProperties().put("bean_scope", scope);
                 nodes.add(node);
             }
@@ -181,7 +184,7 @@ public class MicronautDetector extends AbstractRegexDetector {
                 node.setFilePath(ctx.filePath());
                 node.setLineStart(lineno);
                 node.getAnnotations().add("@Client");
-                node.getProperties().put("framework", "micronaut");
+                node.getProperties().put(PROP_FRAMEWORK, PROP_MICRONAUT);
                 node.getProperties().put("client_target", clientTarget);
                 nodes.add(node);
 
@@ -204,7 +207,7 @@ public class MicronautDetector extends AbstractRegexDetector {
                 node.setFilePath(ctx.filePath());
                 node.setLineStart(lineno);
                 node.getAnnotations().add("@Inject");
-                node.getProperties().put("framework", "micronaut");
+                node.getProperties().put(PROP_FRAMEWORK, PROP_MICRONAUT);
                 nodes.add(node);
             }
 
@@ -221,7 +224,7 @@ public class MicronautDetector extends AbstractRegexDetector {
                 node.setFilePath(ctx.filePath());
                 node.setLineStart(lineno);
                 node.getAnnotations().add("@Scheduled");
-                node.getProperties().put("framework", "micronaut");
+                node.getProperties().put(PROP_FRAMEWORK, PROP_MICRONAUT);
                 node.getProperties().put("fixed_rate", rate);
                 nodes.add(node);
             }
@@ -237,7 +240,7 @@ public class MicronautDetector extends AbstractRegexDetector {
                 node.setFilePath(ctx.filePath());
                 node.setLineStart(lineno);
                 node.getAnnotations().add("@EventListener");
-                node.getProperties().put("framework", "micronaut");
+                node.getProperties().put(PROP_FRAMEWORK, PROP_MICRONAUT);
                 nodes.add(node);
             }
         }

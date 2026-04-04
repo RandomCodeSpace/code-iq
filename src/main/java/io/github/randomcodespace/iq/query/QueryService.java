@@ -24,6 +24,22 @@ import java.util.TreeMap;
 @Service
 @ConditionalOnBean(GraphStore.class)
 public class QueryService {
+    private static final String PROP_CHILDREN = "children";
+    private static final String PROP_CNT = "cnt";
+    private static final String PROP_COUNT = "count";
+    private static final String PROP_DIRECTORY = "directory";
+    private static final String PROP_FILE = "file";
+    private static final String PROP_ID = "id";
+    private static final String PROP_KIND = "kind";
+    private static final String PROP_LAYER = "layer";
+    private static final String PROP_MODULE = "module";
+    private static final String PROP_NODECOUNT = "nodeCount";
+    private static final String PROP_NODES = "nodes";
+    private static final String PROP_PATH = "path";
+    private static final String PROP_SOURCE = "source";
+    private static final String PROP_TARGET = "target";
+    private static final String PROP_TOTAL = "total";
+
 
     private final GraphStore graphStore;
     private final CodeIqConfig config;
@@ -41,18 +57,18 @@ public class QueryService {
         // Also include raw counts and breakdowns for backward compat
         Map<String, Long> nodesByKind = new LinkedHashMap<>();
         for (Map<String, Object> row : graphStore.countNodesByKind()) {
-            nodesByKind.put((String) row.get("kind"), ((Number) row.get("cnt")).longValue());
+            nodesByKind.put((String) row.get(PROP_KIND), ((Number) row.get(PROP_CNT)).longValue());
         }
         Map<String, Long> nodesByLayer = new LinkedHashMap<>();
         for (Map<String, Object> row : graphStore.countNodesByLayer()) {
-            nodesByLayer.put((String) row.get("layer"), ((Number) row.get("cnt")).longValue());
+            nodesByLayer.put((String) row.get(PROP_LAYER), ((Number) row.get(PROP_CNT)).longValue());
         }
 
         // Read from already-computed graph sub-map instead of re-querying
         @SuppressWarnings("unchecked")
         Map<String, Object> graphStats = (Map<String, Object>) result.get("graph");
         if (graphStats != null) {
-            result.put("node_count", graphStats.get("nodes"));
+            result.put("node_count", graphStats.get(PROP_NODES));
             result.put("edge_count", graphStats.get("edges"));
         } else {
             result.put("node_count", graphStore.count());
@@ -92,21 +108,21 @@ public class QueryService {
         List<Map<String, Object>> kinds = new ArrayList<>();
         rawCounts.stream()
                 .sorted((a, b) -> Long.compare(
-                        ((Number) b.get("cnt")).longValue(),
-                        ((Number) a.get("cnt")).longValue()))
+                        ((Number) b.get(PROP_CNT)).longValue(),
+                        ((Number) a.get(PROP_CNT)).longValue()))
                 .forEach(row -> {
                     Map<String, Object> m = new LinkedHashMap<>();
-                    m.put("kind", row.get("kind"));
-                    m.put("count", ((Number) row.get("cnt")).longValue());
+                    m.put(PROP_KIND, row.get(PROP_KIND));
+                    m.put(PROP_COUNT, ((Number) row.get(PROP_CNT)).longValue());
                     kinds.add(m);
                 });
         long totalNodes = rawCounts.stream()
-                .mapToLong(r -> ((Number) r.get("cnt")).longValue())
+                .mapToLong(r -> ((Number) r.get(PROP_CNT)).longValue())
                 .sum();
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("kinds", kinds);
-        result.put("total", totalNodes);
+        result.put(PROP_TOTAL, totalNodes);
         return result;
     }
 
@@ -116,11 +132,11 @@ public class QueryService {
         long total = graphStore.countByKind(kind);
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("kind", kind);
-        result.put("total", total);
+        result.put(PROP_KIND, kind);
+        result.put(PROP_TOTAL, total);
         result.put("offset", offset);
         result.put("limit", limit);
-        result.put("nodes", nodes.stream().map(this::nodeToMap).toList());
+        result.put(PROP_NODES, nodes.stream().map(this::nodeToMap).toList());
         return result;
     }
 
@@ -133,8 +149,8 @@ public class QueryService {
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("nodes", nodes.stream().map(this::nodeToMap).toList());
-        result.put("count", nodes.size());
+        result.put(PROP_NODES, nodes.stream().map(this::nodeToMap).toList());
+        result.put(PROP_COUNT, nodes.size());
         result.put("offset", offset);
         result.put("limit", limit);
         return result;
@@ -153,17 +169,17 @@ public class QueryService {
 
         List<Map<String, Object>> edges = rawEdges.stream().map(row -> {
             Map<String, Object> m = new LinkedHashMap<>();
-            m.put("id", row.get("id"));
-            m.put("kind", row.get("kind"));
-            m.put("source", row.get("sourceId"));
-            m.put("target", row.get("targetId"));
+            m.put(PROP_ID, row.get(PROP_ID));
+            m.put(PROP_KIND, row.get(PROP_KIND));
+            m.put(PROP_SOURCE, row.get("sourceId"));
+            m.put(PROP_TARGET, row.get("targetId"));
             return m;
         }).toList();
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("edges", edges);
-        result.put("count", edges.size());
-        result.put("total", total);
+        result.put(PROP_COUNT, edges.size());
+        result.put(PROP_TOTAL, total);
         return result;
     }
 
@@ -196,7 +212,7 @@ public class QueryService {
         result.put("node_id", nodeId);
         result.put("direction", direction);
         result.put("neighbors", neighbors.stream().map(this::nodeToMap).toList());
-        result.put("count", neighbors.size());
+        result.put(PROP_COUNT, neighbors.size());
         return result;
     }
 
@@ -208,9 +224,9 @@ public class QueryService {
             return null;
         }
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("source", source);
-        result.put("target", target);
-        result.put("path", path);
+        result.put(PROP_SOURCE, source);
+        result.put(PROP_TARGET, target);
+        result.put(PROP_PATH, path);
         result.put("length", path.size() - 1);
         return result;
     }
@@ -220,7 +236,7 @@ public class QueryService {
         List<List<String>> cycles = graphStore.findCycles(cappedLimit);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("cycles", cycles);
-        result.put("count", cycles.size());
+        result.put(PROP_COUNT, cycles.size());
         return result;
     }
 
@@ -230,10 +246,10 @@ public class QueryService {
         List<CodeNode> impacted = graphStore.traceImpact(nodeId, cappedDepth);
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("source", nodeId);
+        result.put(PROP_SOURCE, nodeId);
         result.put("depth", cappedDepth);
         result.put("impacted", impacted.stream().map(this::nodeToMap).toList());
-        result.put("count", impacted.size());
+        result.put(PROP_COUNT, impacted.size());
         return result;
     }
 
@@ -251,8 +267,8 @@ public class QueryService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("center", center);
         result.put("radius", cappedRadius);
-        result.put("nodes", nodes.stream().map(this::nodeToMap).toList());
-        result.put("count", nodes.size());
+        result.put(PROP_NODES, nodes.stream().map(this::nodeToMap).toList());
+        result.put(PROP_COUNT, nodes.size());
         return result;
     }
 
@@ -262,18 +278,18 @@ public class QueryService {
     public Map<String, Object> consumersOf(String targetId) {
         List<CodeNode> consumers = graphStore.findConsumers(targetId);
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("target", targetId);
+        result.put(PROP_TARGET, targetId);
         result.put("consumers", consumers.stream().map(this::nodeToMap).toList());
-        result.put("count", consumers.size());
+        result.put(PROP_COUNT, consumers.size());
         return result;
     }
 
     public Map<String, Object> producersOf(String targetId) {
         List<CodeNode> producers = graphStore.findProducers(targetId);
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("target", targetId);
+        result.put(PROP_TARGET, targetId);
         result.put("producers", producers.stream().map(this::nodeToMap).toList());
-        result.put("count", producers.size());
+        result.put(PROP_COUNT, producers.size());
         return result;
     }
 
@@ -281,27 +297,27 @@ public class QueryService {
     public Map<String, Object> callersOf(String targetId) {
         List<CodeNode> callers = graphStore.findCallers(targetId);
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("target", targetId);
+        result.put(PROP_TARGET, targetId);
         result.put("callers", callers.stream().map(this::nodeToMap).toList());
-        result.put("count", callers.size());
+        result.put(PROP_COUNT, callers.size());
         return result;
     }
 
     public Map<String, Object> dependenciesOf(String moduleId) {
         List<CodeNode> deps = graphStore.findDependencies(moduleId);
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("module", moduleId);
+        result.put(PROP_MODULE, moduleId);
         result.put("dependencies", deps.stream().map(this::nodeToMap).toList());
-        result.put("count", deps.size());
+        result.put(PROP_COUNT, deps.size());
         return result;
     }
 
     public Map<String, Object> dependentsOf(String moduleId) {
         List<CodeNode> deps = graphStore.findDependents(moduleId);
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("module", moduleId);
+        result.put(PROP_MODULE, moduleId);
         result.put("dependents", deps.stream().map(this::nodeToMap).toList());
-        result.put("count", deps.size());
+        result.put(PROP_COUNT, deps.size());
         return result;
     }
 
@@ -311,13 +327,13 @@ public class QueryService {
     public Map<String, Object> findComponentByFile(String filePath) {
         List<CodeNode> nodes = graphStore.findByFilePath(filePath);
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("file", filePath);
-        result.put("nodes", nodes.stream().map(this::nodeToMap).toList());
-        result.put("count", nodes.size());
+        result.put(PROP_FILE, filePath);
+        result.put(PROP_NODES, nodes.stream().map(this::nodeToMap).toList());
+        result.put(PROP_COUNT, nodes.size());
 
         if (!nodes.isEmpty()) {
             CodeNode first = nodes.getFirst();
-            result.put("module", first.getModule());
+            result.put(PROP_MODULE, first.getModule());
             result.put("layer", first.getLayer());
         }
         return result;
@@ -343,17 +359,17 @@ public class QueryService {
         GraphStore.FilePathResult filePathResult = graphStore.getFilePathsWithCounts(config.getMaxFiles());
         List<Map<String, Object>> rows = filePathResult.rows();
 
-        TreeNode root = new TreeNode("", "directory");
+        TreeNode root = new TreeNode("", PROP_DIRECTORY);
         for (Map<String, Object> row : rows) {
             String filePath = (String) row.get("filePath");
-            long count = ((Number) row.get("nodeCount")).longValue();
+            long count = ((Number) row.get(PROP_NODECOUNT)).longValue();
             String[] parts = filePath.split("/", -1);
             TreeNode current = root;
             for (int i = 0; i < parts.length; i++) {
                 String part = parts[i];
                 if (part.isEmpty()) continue;
                 boolean isFile = (i == parts.length - 1);
-                String type = isFile ? "file" : "directory";
+                String type = isFile ? PROP_FILE : PROP_DIRECTORY;
                 TreeNode child = current.children.computeIfAbsent(part, k -> new TreeNode(k, type));
                 if (isFile) {
                     child.nodeCount += count;
@@ -386,13 +402,13 @@ public class QueryService {
             String childPath = parentPath.isEmpty() ? child.name : parentPath + "/" + child.name;
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("name", child.name);
-            m.put("path", childPath);
-            m.put("type", "directory");
-            m.put("nodeCount", aggregateCount(child));
+            m.put(PROP_PATH, childPath);
+            m.put("type", PROP_DIRECTORY);
+            m.put(PROP_NODECOUNT, aggregateCount(child));
             if (maxDepth == null || currentDepth < maxDepth) {
-                m.put("children", buildTreeOutput(child, maxDepth, currentDepth + 1, childPath));
+                m.put(PROP_CHILDREN, buildTreeOutput(child, maxDepth, currentDepth + 1, childPath));
             } else {
-                m.put("children", List.of());
+                m.put(PROP_CHILDREN, List.of());
             }
             output.add(m);
         }
@@ -400,10 +416,10 @@ public class QueryService {
             String childPath = parentPath.isEmpty() ? child.name : parentPath + "/" + child.name;
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("name", child.name);
-            m.put("path", childPath);
-            m.put("type", "file");
-            m.put("nodeCount", child.nodeCount);
-            m.put("children", List.of());
+            m.put(PROP_PATH, childPath);
+            m.put("type", PROP_FILE);
+            m.put(PROP_NODECOUNT, child.nodeCount);
+            m.put(PROP_CHILDREN, List.of());
             output.add(m);
         }
         return output;
@@ -468,7 +484,7 @@ public class QueryService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("identifier", identifier);
         result.put("endpoints", endpoints);
-        result.put("count", endpoints.size());
+        result.put(PROP_COUNT, endpoints.size());
         result.put("searched_nodes", matches.size());
         return result;
     }
@@ -533,17 +549,17 @@ public class QueryService {
         List<Map<String, Object>> deadCode = deadNodes.stream()
                 .map(n -> {
                     Map<String, Object> m = new LinkedHashMap<>();
-                    m.put("id", n.getId());
-                    m.put("kind", n.getKind().getValue());
+                    m.put(PROP_ID, n.getId());
+                    m.put(PROP_KIND, n.getKind().getValue());
                     m.put("label", n.getLabel());
-                    m.put("file", n.getFilePath());
+                    m.put(PROP_FILE, n.getFilePath());
                     return m;
                 })
                 .toList();
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("dead_code", deadCode);
-        result.put("count", deadCode.size());
+        result.put(PROP_COUNT, deadCode.size());
         return result;
     }
 
@@ -551,15 +567,15 @@ public class QueryService {
 
     Map<String, Object> nodeToMap(CodeNode node) {
         Map<String, Object> m = new LinkedHashMap<>();
-        m.put("id", node.getId());
-        m.put("kind", node.getKind().getValue());
+        m.put(PROP_ID, node.getId());
+        m.put(PROP_KIND, node.getKind().getValue());
         m.put("label", node.getLabel());
         if (node.getFqn() != null) m.put("fqn", node.getFqn());
-        if (node.getModule() != null) m.put("module", node.getModule());
+        if (node.getModule() != null) m.put(PROP_MODULE, node.getModule());
         if (node.getFilePath() != null) m.put("file_path", node.getFilePath());
         if (node.getLineStart() != null) m.put("line_start", node.getLineStart());
         if (node.getLineEnd() != null) m.put("line_end", node.getLineEnd());
-        if (node.getLayer() != null) m.put("layer", node.getLayer());
+        if (node.getLayer() != null) m.put(PROP_LAYER, node.getLayer());
         if (node.getAnnotations() != null && !node.getAnnotations().isEmpty()) {
             m.put("annotations", node.getAnnotations());
         }
@@ -571,11 +587,11 @@ public class QueryService {
 
     private Map<String, Object> edgeToMap(CodeEdge edge) {
         Map<String, Object> m = new LinkedHashMap<>();
-        m.put("id", edge.getId());
-        m.put("kind", edge.getKind().getValue());
-        m.put("source", edge.getSourceId());
+        m.put(PROP_ID, edge.getId());
+        m.put(PROP_KIND, edge.getKind().getValue());
+        m.put(PROP_SOURCE, edge.getSourceId());
         if (edge.getTarget() != null) {
-            m.put("target", edge.getTarget().getId());
+            m.put(PROP_TARGET, edge.getTarget().getId());
             m.put("target_label", edge.getTarget().getLabel());
             m.put("target_kind", edge.getTarget().getKind().getValue());
         }

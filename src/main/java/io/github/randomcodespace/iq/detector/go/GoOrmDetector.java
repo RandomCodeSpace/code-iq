@@ -1,7 +1,6 @@
 package io.github.randomcodespace.iq.detector.go;
 
 import io.github.randomcodespace.iq.detector.AbstractAntlrDetector;
-import io.github.randomcodespace.iq.grammar.AntlrParserFactory;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.model.CodeEdge;
@@ -30,6 +29,13 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class GoOrmDetector extends AbstractAntlrDetector {
+    private static final String PROP_DATABASE_SQL = "database_sql";
+    private static final String PROP_FRAMEWORK = "framework";
+    private static final String PROP_GORM = "gorm";
+    private static final String PROP_OP = "op";
+    private static final String PROP_OPERATION = "operation";
+    private static final String PROP_SQLX = "sqlx";
+
 
     private static final Pattern GORM_MODEL_RE = Pattern.compile("type\\s+(?<name>\\w+)\\s+struct\\s*\\{[^}]*gorm\\.Model", Pattern.DOTALL);
     private static final Pattern GORM_MIGRATE_RE = Pattern.compile("\\.AutoMigrate\\s*\\(", Pattern.MULTILINE);
@@ -53,9 +59,9 @@ public class GoOrmDetector extends AbstractAntlrDetector {
     }
 
     private static String detectOrm(String text) {
-        if (HAS_GORM_RE.matcher(text).find()) return "gorm";
-        if (HAS_SQLX_RE.matcher(text).find()) return "sqlx";
-        if (HAS_DATABASE_SQL_RE.matcher(text).find()) return "database_sql";
+        if (HAS_GORM_RE.matcher(text).find()) return PROP_GORM;
+        if (HAS_SQLX_RE.matcher(text).find()) return PROP_SQLX;
+        if (HAS_DATABASE_SQL_RE.matcher(text).find()) return PROP_DATABASE_SQL;
         return null;
     }
     @Override
@@ -87,7 +93,7 @@ public class GoOrmDetector extends AbstractAntlrDetector {
             node.setFqn(filePath + "::" + modelName);
             node.setFilePath(filePath);
             node.setLineStart(line);
-            node.getProperties().put("framework", "gorm");
+            node.getProperties().put(PROP_FRAMEWORK, PROP_GORM);
             node.getProperties().put("type", "model");
             nodes.add(node);
         }
@@ -103,7 +109,7 @@ public class GoOrmDetector extends AbstractAntlrDetector {
             node.setFqn(filePath + "::AutoMigrate");
             node.setFilePath(filePath);
             node.setLineStart(line);
-            node.getProperties().put("framework", "gorm");
+            node.getProperties().put(PROP_FRAMEWORK, PROP_GORM);
             node.getProperties().put("type", "auto_migrate");
             nodes.add(node);
         }
@@ -112,7 +118,7 @@ public class GoOrmDetector extends AbstractAntlrDetector {
         if ("gorm".equals(orm)) {
             m = GORM_QUERY_RE.matcher(text);
             while (m.find()) {
-                String op = m.group("op");
+                String op = m.group(PROP_OP);
                 int line = findLineNumber(text, m.start());
                 String sourceId = "go_orm:" + filePath + ":query:" + op + ":" + line;
                 CodeEdge edge = new CodeEdge();
@@ -120,8 +126,8 @@ public class GoOrmDetector extends AbstractAntlrDetector {
                 edge.setKind(EdgeKind.QUERIES);
                 edge.setSourceId(filePath);
                 edge.setTarget(new CodeNode(sourceId, NodeKind.QUERY, "gorm." + op));
-                edge.getProperties().put("framework", "gorm");
-                edge.getProperties().put("operation", op);
+                edge.getProperties().put(PROP_FRAMEWORK, PROP_GORM);
+                edge.getProperties().put(PROP_OPERATION, op);
                 edges.add(edge);
             }
         }
@@ -129,7 +135,7 @@ public class GoOrmDetector extends AbstractAntlrDetector {
         // sqlx connections
         m = SQLX_CONNECT_RE.matcher(text);
         while (m.find()) {
-            String op = m.group("op");
+            String op = m.group(PROP_OP);
             int line = findLineNumber(text, m.start());
             CodeNode node = new CodeNode();
             node.setId("go_orm:" + filePath + ":connection:sqlx:" + line);
@@ -138,8 +144,8 @@ public class GoOrmDetector extends AbstractAntlrDetector {
             node.setFqn(filePath + "::sqlx." + op);
             node.setFilePath(filePath);
             node.setLineStart(line);
-            node.getProperties().put("framework", "sqlx");
-            node.getProperties().put("operation", op);
+            node.getProperties().put(PROP_FRAMEWORK, PROP_SQLX);
+            node.getProperties().put(PROP_OPERATION, op);
             nodes.add(node);
         }
 
@@ -147,7 +153,7 @@ public class GoOrmDetector extends AbstractAntlrDetector {
         if ("sqlx".equals(orm)) {
             m = SQLX_QUERY_RE.matcher(text);
             while (m.find()) {
-                String op = m.group("op");
+                String op = m.group(PROP_OP);
                 int line = findLineNumber(text, m.start());
                 String targetId = "go_orm:" + filePath + ":query:sqlx:" + op + ":" + line;
                 CodeEdge edge = new CodeEdge();
@@ -155,8 +161,8 @@ public class GoOrmDetector extends AbstractAntlrDetector {
                 edge.setKind(EdgeKind.QUERIES);
                 edge.setSourceId(filePath);
                 edge.setTarget(new CodeNode(targetId, NodeKind.QUERY, "sqlx." + op));
-                edge.getProperties().put("framework", "sqlx");
-                edge.getProperties().put("operation", op);
+                edge.getProperties().put(PROP_FRAMEWORK, PROP_SQLX);
+                edge.getProperties().put(PROP_OPERATION, op);
                 edges.add(edge);
             }
         }
@@ -172,8 +178,8 @@ public class GoOrmDetector extends AbstractAntlrDetector {
             node.setFqn(filePath + "::sql.Open");
             node.setFilePath(filePath);
             node.setLineStart(line);
-            node.getProperties().put("framework", "database_sql");
-            node.getProperties().put("operation", "Open");
+            node.getProperties().put(PROP_FRAMEWORK, PROP_DATABASE_SQL);
+            node.getProperties().put(PROP_OPERATION, "Open");
             nodes.add(node);
         }
 
@@ -181,7 +187,7 @@ public class GoOrmDetector extends AbstractAntlrDetector {
         if ("database_sql".equals(orm)) {
             m = SQL_QUERY_RE.matcher(text);
             while (m.find()) {
-                String op = m.group("op");
+                String op = m.group(PROP_OP);
                 int line = findLineNumber(text, m.start());
                 String targetId = "go_orm:" + filePath + ":query:sql:" + op + ":" + line;
                 CodeEdge edge = new CodeEdge();
@@ -189,8 +195,8 @@ public class GoOrmDetector extends AbstractAntlrDetector {
                 edge.setKind(EdgeKind.QUERIES);
                 edge.setSourceId(filePath);
                 edge.setTarget(new CodeNode(targetId, NodeKind.QUERY, "sql." + op));
-                edge.getProperties().put("framework", "database_sql");
-                edge.getProperties().put("operation", op);
+                edge.getProperties().put(PROP_FRAMEWORK, PROP_DATABASE_SQL);
+                edge.getProperties().put(PROP_OPERATION, op);
                 edges.add(edge);
             }
         }

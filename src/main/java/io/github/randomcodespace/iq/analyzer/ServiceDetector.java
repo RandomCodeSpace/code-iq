@@ -40,6 +40,16 @@ import java.util.regex.Pattern;
  * </ul>
  */
 public class ServiceDetector {
+    private static final String PROP_DJANGO = "django";
+    private static final String PROP_DOCKER = "docker";
+    private static final String PROP_DOTNET = "dotnet";
+    private static final String PROP_GRADLE = "gradle";
+    private static final String PROP_HASKELL = "haskell";
+    private static final String PROP_PYPROJECT_TOML = "pyproject.toml";
+    private static final String PROP_PYTHON = "python";
+    private static final String PROP_RUBY = "ruby";
+    private static final String PROP_SETUP_PY = "setup.py";
+
 
     private static final Logger log = LoggerFactory.getLogger(ServiceDetector.class);
 
@@ -50,10 +60,10 @@ public class ServiceDetector {
     private static final Map<String, String> BUILD_FILES = Map.ofEntries(
             // Java/JVM
             Map.entry("pom.xml", "maven"),
-            Map.entry("build.gradle", "gradle"),
-            Map.entry("build.gradle.kts", "gradle"),
-            Map.entry("settings.gradle", "gradle"),
-            Map.entry("settings.gradle.kts", "gradle"),
+            Map.entry("build.gradle", PROP_GRADLE),
+            Map.entry("build.gradle.kts", PROP_GRADLE),
+            Map.entry("settings.gradle", PROP_GRADLE),
+            Map.entry("settings.gradle.kts", PROP_GRADLE),
             Map.entry("build.xml", "ant"),
             Map.entry("build.sbt", "sbt"),
             Map.entry("project.clj", "leiningen"),
@@ -66,18 +76,18 @@ public class ServiceDetector {
             // Rust
             Map.entry("Cargo.toml", "cargo"),
             // Python
-            Map.entry("pyproject.toml", "python"),
-            Map.entry("setup.py", "python"),
-            Map.entry("setup.cfg", "python"),
-            Map.entry("Pipfile", "python"),
-            Map.entry("requirements.txt", "python"),
-            Map.entry("manage.py", "django"),
+            Map.entry(PROP_PYPROJECT_TOML, PROP_PYTHON),
+            Map.entry(PROP_SETUP_PY, PROP_PYTHON),
+            Map.entry("setup.cfg", PROP_PYTHON),
+            Map.entry("Pipfile", PROP_PYTHON),
+            Map.entry("requirements.txt", PROP_PYTHON),
+            Map.entry("manage.py", PROP_DJANGO),
             // Ruby
-            Map.entry("Gemfile", "ruby"),
+            Map.entry("Gemfile", PROP_RUBY),
             // PHP
             Map.entry("composer.json", "php"),
             // .NET (csproj handled by suffix match below)
-            Map.entry("Directory.Build.props", "dotnet"),
+            Map.entry("Directory.Build.props", PROP_DOTNET),
             // Swift
             Map.entry("Package.swift", "swift"),
             // Elixir
@@ -86,7 +96,7 @@ public class ServiceDetector {
             Map.entry("pubspec.yaml", "dart"),
             // Scala (also build.sbt above)
             // Haskell
-            Map.entry("stack.yaml", "haskell"),
+            Map.entry("stack.yaml", PROP_HASKELL),
             // Zig
             Map.entry("build.zig", "zig"),
             // OCaml
@@ -102,11 +112,11 @@ public class ServiceDetector {
             Map.entry("turbo.json", "turbo"),
             Map.entry("rush.json", "rush"),
             // Docker (supplemental -- doesn't override other tools)
-            Map.entry("Dockerfile", "docker"),
-            Map.entry("docker-compose.yml", "docker"),
-            Map.entry("docker-compose.yaml", "docker"),
-            Map.entry("compose.yml", "docker"),
-            Map.entry("compose.yaml", "docker")
+            Map.entry("Dockerfile", PROP_DOCKER),
+            Map.entry("docker-compose.yml", PROP_DOCKER),
+            Map.entry("docker-compose.yaml", PROP_DOCKER),
+            Map.entry("compose.yml", PROP_DOCKER),
+            Map.entry("compose.yaml", PROP_DOCKER)
     );
 
     /** File extensions matched by suffix (not exact name). */
@@ -119,12 +129,12 @@ public class ServiceDetector {
 
     /** Build tools that are supplemental (don't override real build tools). */
     private static final java.util.Set<String> SUPPLEMENTAL_TOOLS = java.util.Set.of(
-            "docker", "nx", "lerna", "turbo", "rush"
+            PROP_DOCKER, "nx", "lerna", "turbo", "rush"
     );
 
     /** Python build files ranked by priority (first match wins for a directory). */
     private static final List<String> PYTHON_BUILD_FILES = List.of(
-            "pyproject.toml", "setup.py", "requirements.txt", "manage.py"
+            PROP_PYPROJECT_TOML, PROP_SETUP_PY, "requirements.txt", "manage.py"
     );
 
     /** Regex patterns for extracting names from build file contents. */
@@ -199,11 +209,11 @@ public class ServiceDetector {
             }
             if (fileName.endsWith(CSPROJ_EXTENSION) || fileName.endsWith(FSPROJ_EXTENSION)
                     || fileName.endsWith(VBPROJ_EXTENSION)) {
-                modules.putIfAbsent(dirPath, new ModuleInfo(dirPath, "dotnet", fileName));
+                modules.putIfAbsent(dirPath, new ModuleInfo(dirPath, PROP_DOTNET, fileName));
             } else if (fileName.endsWith(GEMSPEC_EXTENSION)) {
-                modules.putIfAbsent(dirPath, new ModuleInfo(dirPath, "ruby", fileName));
+                modules.putIfAbsent(dirPath, new ModuleInfo(dirPath, PROP_RUBY, fileName));
             } else if (fileName.endsWith(CABAL_EXTENSION)) {
-                modules.putIfAbsent(dirPath, new ModuleInfo(dirPath, "haskell", fileName));
+                modules.putIfAbsent(dirPath, new ModuleInfo(dirPath, PROP_HASKELL, fileName));
             } else if (fileName.endsWith(NIMBLE_EXTENSION)) {
                 modules.putIfAbsent(dirPath, new ModuleInfo(dirPath, "nim", fileName));
             }
@@ -356,11 +366,11 @@ public class ServiceDetector {
 
                     if (name.endsWith(CSPROJ_EXTENSION) || name.endsWith(FSPROJ_EXTENSION)
                             || name.endsWith(VBPROJ_EXTENSION)) {
-                        modules.putIfAbsent(relDir, new ModuleInfo(relDir, "dotnet", name));
+                        modules.putIfAbsent(relDir, new ModuleInfo(relDir, PROP_DOTNET, name));
                     } else if (name.endsWith(GEMSPEC_EXTENSION)) {
-                        modules.putIfAbsent(relDir, new ModuleInfo(relDir, "ruby", name));
+                        modules.putIfAbsent(relDir, new ModuleInfo(relDir, PROP_RUBY, name));
                     } else if (name.endsWith(CABAL_EXTENSION)) {
-                        modules.putIfAbsent(relDir, new ModuleInfo(relDir, "haskell", name));
+                        modules.putIfAbsent(relDir, new ModuleInfo(relDir, PROP_HASKELL, name));
                     } else if (name.endsWith(NIMBLE_EXTENSION)) {
                         modules.putIfAbsent(relDir, new ModuleInfo(relDir, "nim", name));
                     } else {
@@ -436,16 +446,16 @@ public class ServiceDetector {
             String content = Files.readString(buildFile, StandardCharsets.UTF_8);
             return switch (info.buildTool()) {
                 case "maven" -> extractFromPom(content);
-                case "gradle" -> extractFromGradleSettings(content, info.buildFile());
+                case PROP_GRADLE -> extractFromGradleSettings(content, info.buildFile());
                 case "npm" -> extractFromPackageJson(content);
                 case "go" -> extractFromGoMod(content);
                 case "cargo" -> extractFromCargoToml(content);
-                case "python" -> extractFromPythonBuild(content, info.buildFile());
+                case PROP_PYTHON -> extractFromPythonBuild(content, info.buildFile());
                 case "sbt" -> extractWithPattern(content, SBT_NAME);
                 case "php" -> extractWithPattern(content, COMPOSER_NAME);
                 case "elixir" -> extractWithPattern(content, MIX_APP_NAME);
                 case "dart" -> extractWithPattern(content, PUBSPEC_NAME);
-                case "django" -> null;
+                case PROP_DJANGO -> null;
                 default -> null;
             };
         } catch (IOException e) {

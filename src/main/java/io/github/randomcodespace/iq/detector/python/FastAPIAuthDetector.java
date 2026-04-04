@@ -28,6 +28,12 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class FastAPIAuthDetector extends AbstractPythonAntlrDetector {
+    private static final String PROP_AUTH_FLOW = "auth_flow";
+    private static final String PROP_AUTH_REQUIRED = "auth_required";
+    private static final String PROP_AUTH_TYPE = "auth_type";
+    private static final String PROP_FASTAPI = "fastapi";
+    private static final String PROP_OAUTH2 = "oauth2";
+
 
     // --- Regex fallback patterns ---
     private static final Pattern DEPENDS_AUTH_RE = Pattern.compile(
@@ -143,10 +149,10 @@ public class FastAPIAuthDetector extends AbstractPythonAntlrDetector {
         node.setFilePath(filePath);
         node.setLineStart(line);
         node.setAnnotations(List.of("Depends(" + depName + ")"));
-        node.getProperties().put("auth_type", "fastapi");
-        node.getProperties().put("auth_flow", "oauth2");
+        node.getProperties().put(PROP_AUTH_TYPE, PROP_FASTAPI);
+        node.getProperties().put(PROP_AUTH_FLOW, PROP_OAUTH2);
         node.getProperties().put("dependency", depName);
-        node.getProperties().put("auth_required", true);
+        node.getProperties().put(PROP_AUTH_REQUIRED, true);
         return node;
     }
 
@@ -159,10 +165,10 @@ public class FastAPIAuthDetector extends AbstractPythonAntlrDetector {
         node.setFilePath(filePath);
         node.setLineStart(line);
         node.setAnnotations(List.of("Security(" + schemeName + ")"));
-        node.getProperties().put("auth_type", "fastapi");
-        node.getProperties().put("auth_flow", "oauth2");
+        node.getProperties().put(PROP_AUTH_TYPE, PROP_FASTAPI);
+        node.getProperties().put(PROP_AUTH_FLOW, PROP_OAUTH2);
         node.getProperties().put("scheme", schemeName);
-        node.getProperties().put("auth_required", true);
+        node.getProperties().put(PROP_AUTH_REQUIRED, true);
         return node;
     }
 
@@ -175,9 +181,9 @@ public class FastAPIAuthDetector extends AbstractPythonAntlrDetector {
         node.setFilePath(filePath);
         node.setLineStart(line);
         node.setAnnotations(List.of("HTTPBearer"));
-        node.getProperties().put("auth_type", "fastapi");
-        node.getProperties().put("auth_flow", "bearer");
-        node.getProperties().put("auth_required", true);
+        node.getProperties().put(PROP_AUTH_TYPE, PROP_FASTAPI);
+        node.getProperties().put(PROP_AUTH_FLOW, "bearer");
+        node.getProperties().put(PROP_AUTH_REQUIRED, true);
         return node;
     }
 
@@ -190,10 +196,10 @@ public class FastAPIAuthDetector extends AbstractPythonAntlrDetector {
         node.setFilePath(filePath);
         node.setLineStart(line);
         node.setAnnotations(List.of("OAuth2PasswordBearer"));
-        node.getProperties().put("auth_type", "fastapi");
-        node.getProperties().put("auth_flow", "oauth2");
+        node.getProperties().put(PROP_AUTH_TYPE, PROP_FASTAPI);
+        node.getProperties().put(PROP_AUTH_FLOW, PROP_OAUTH2);
         node.getProperties().put("token_url", tokenUrl);
-        node.getProperties().put("auth_required", true);
+        node.getProperties().put(PROP_AUTH_REQUIRED, true);
         return node;
     }
 
@@ -206,9 +212,9 @@ public class FastAPIAuthDetector extends AbstractPythonAntlrDetector {
         node.setFilePath(filePath);
         node.setLineStart(line);
         node.setAnnotations(List.of("HTTPBasic"));
-        node.getProperties().put("auth_type", "fastapi");
-        node.getProperties().put("auth_flow", "basic");
-        node.getProperties().put("auth_required", true);
+        node.getProperties().put(PROP_AUTH_TYPE, PROP_FASTAPI);
+        node.getProperties().put(PROP_AUTH_FLOW, "basic");
+        node.getProperties().put(PROP_AUTH_REQUIRED, true);
         return node;
     }
 }

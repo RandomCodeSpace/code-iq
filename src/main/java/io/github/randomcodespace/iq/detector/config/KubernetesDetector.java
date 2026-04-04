@@ -33,18 +33,32 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class KubernetesDetector extends AbstractStructuredDetector {
+    private static final String PROP_CRONJOB = "CronJob";
+    private static final String PROP_DAEMONSET = "DaemonSet";
+    private static final String PROP_DEPLOYMENT = "Deployment";
+    private static final String PROP_POD = "Pod";
+    private static final String PROP_STATEFULSET = "StatefulSet";
+    private static final String PROP_DEFAULT = "default";
+    private static final String PROP_KIND = "kind";
+    private static final String PROP_LABELS = "labels";
+    private static final String PROP_METADATA = "metadata";
+    private static final String PROP_NAME = "name";
+    private static final String PROP_NAMESPACE = "namespace";
+    private static final String PROP_SELECTOR = "selector";
+    private static final String PROP_SPEC = "spec";
+
 
     private static final Set<String> K8S_KINDS = Set.of(
-            "Deployment", "Service", "ConfigMap", "Secret", "Ingress",
-            "Pod", "StatefulSet", "DaemonSet", "Job", "CronJob",
+            PROP_DEPLOYMENT, "Service", "ConfigMap", "Secret", "Ingress",
+            PROP_POD, PROP_STATEFULSET, PROP_DAEMONSET, "Job", PROP_CRONJOB,
             "Namespace", "PersistentVolumeClaim", "ServiceAccount",
             "Role", "RoleBinding", "ClusterRole", "ClusterRoleBinding");
 
     private static final Set<String> WORKLOAD_KINDS = Set.of(
-            "Deployment", "StatefulSet", "DaemonSet", "Job", "CronJob", "Pod");
+            PROP_DEPLOYMENT, PROP_STATEFULSET, PROP_DAEMONSET, "Job", PROP_CRONJOB, PROP_POD);
 
     private static final Set<String> LABEL_TRACKING_KINDS = Set.of(
-            "Deployment", "StatefulSet", "DaemonSet");
+            PROP_DEPLOYMENT, PROP_STATEFULSET, PROP_DAEMONSET);
 
     @Override
     public String getName() {
@@ -73,20 +87,20 @@ public class KubernetesDetector extends AbstractStructuredDetector {
         List<IngressBackend> ingressBackends = new ArrayList<>();
 
         for (Map<String, Object> doc : documents) {
-            String kind = safeStr(doc.get("kind"));
-            Map<String, Object> metadata = asMap(doc.get("metadata"));
-            String name = safeStr(metadata.getOrDefault("name", "unknown"));
-            String namespace = safeStr(metadata.getOrDefault("namespace", "default"));
-            if (namespace.isEmpty()) namespace = "default";
+            String kind = safeStr(doc.get(PROP_KIND));
+            Map<String, Object> metadata = asMap(doc.get(PROP_METADATA));
+            String name = safeStr(metadata.getOrDefault(PROP_NAME, "unknown"));
+            String namespace = safeStr(metadata.getOrDefault(PROP_NAMESPACE, PROP_DEFAULT));
+            if (namespace.isEmpty()) namespace = PROP_DEFAULT;
 
             String nodeId = "k8s:" + fp + ":" + kind + ":" + namespace + "/" + name;
 
             Map<String, Object> props = new HashMap<>();
-            props.put("kind", kind);
-            props.put("namespace", namespace);
-            Object labels = metadata.get("labels");
+            props.put(PROP_KIND, kind);
+            props.put(PROP_NAMESPACE, namespace);
+            Object labels = metadata.get(PROP_LABELS);
             if (labels instanceof Map<?, ?>) {
-                props.put("labels", labels);
+                props.put(PROP_LABELS, labels);
             }
             Object annotations = metadata.get("annotations");
             if (annotations instanceof Map<?, ?>) {
@@ -101,13 +115,13 @@ public class KubernetesDetector extends AbstractStructuredDetector {
             resourceNode.setProperties(props);
             nodes.add(resourceNode);
 
-            Map<String, Object> spec = asMap(doc.get("spec"));
+            Map<String, Object> spec = asMap(doc.get(PROP_SPEC));
 
             // Extract container specs from workload resources
             if (WORKLOAD_KINDS.contains(kind)) {
                 List<Map<String, Object>> containers = extractContainers(spec, kind);
                 for (Map<String, Object> container : containers) {
-                    String cName = safeStr(container.getOrDefault("name", "unnamed"));
+                    String cName = safeStr(container.getOrDefault(PROP_NAME, "unnamed"));
                     Map<String, Object> cProps = new HashMap<>();
 
                     String image = getString(container, "image");
@@ -135,7 +149,7 @@ public class KubernetesDetector extends AbstractStructuredDetector {
                         List<String> envNames = new ArrayList<>();
                         for (Object e : envVars) {
                             Map<String, Object> em = asMap(e);
-                            String envName = getString(em, "name");
+                            String envName = getString(em, PROP_NAME);
                             if (envName != null) {
                                 envNames.add(envName);
                             }
@@ -157,13 +171,13 @@ public class KubernetesDetector extends AbstractStructuredDetector {
             // Track deployment match labels
             if (LABEL_TRACKING_KINDS.contains(kind)) {
                 Map<String, Object> template = getMap(spec, "template");
-                Map<String, Object> tmplMeta = getMap(template, "metadata");
-                Map<String, Object> tmplLabels = getMap(tmplMeta, "labels");
+                Map<String, Object> tmplMeta = getMap(template, PROP_METADATA);
+                Map<String, Object> tmplLabels = getMap(tmplMeta, PROP_LABELS);
                 for (var le : tmplLabels.entrySet()) {
                     deploymentLabels.put(le.getKey() + "=" + le.getValue(), nodeId);
                 }
 
-                Map<String, Object> selector = getMap(spec, "selector");
+                Map<String, Object> selector = getMap(spec, PROP_SELECTOR);
                 Map<String, Object> matchLabels = getMap(selector, "matchLabels");
                 for (var le : matchLabels.entrySet()) {
                     deploymentLabels.put(le.getKey() + "=" + le.getValue(), nodeId);
@@ -172,7 +186,7 @@ public class KubernetesDetector extends AbstractStructuredDetector {
 
             // Track service selectors
             if ("Service".equals(kind)) {
-                Map<String, Object> svcSelector = getMap(spec, "selector");
+                Map<String, Object> svcSelector = getMap(spec, PROP_SELECTOR);
                 if (!svcSelector.isEmpty()) {
                     serviceSelectors.add(new SelectorEntry(nodeId, svcSelector));
                 }
@@ -191,7 +205,7 @@ public class KubernetesDetector extends AbstractStructuredDetector {
                 String targetId = deploymentLabels.get(labelTag);
                 if (targetId != null) {
                     edges.add(createEdge(se.nodeId, targetId, EdgeKind.DEPENDS_ON,
-                            "service selects " + labelTag, Map.of("selector", labelTag)));
+                            "service selects " + labelTag, Map.of(PROP_SELECTOR, labelTag)));
                 }
             }
         }
@@ -199,11 +213,11 @@ public class KubernetesDetector extends AbstractStructuredDetector {
         // Resolve ingress -> service edges
         Map<String, String> serviceNameToId = new LinkedHashMap<>();
         for (Map<String, Object> doc : documents) {
-            if (!"Service".equals(doc.get("kind"))) continue;
-            Map<String, Object> meta = asMap(doc.get("metadata"));
-            String svcName = safeStr(meta.getOrDefault("name", ""));
-            String ns = safeStr(meta.getOrDefault("namespace", "default"));
-            if (ns.isEmpty()) ns = "default";
+            if (!"Service".equals(doc.get(PROP_KIND))) continue;
+            Map<String, Object> meta = asMap(doc.get(PROP_METADATA));
+            String svcName = safeStr(meta.getOrDefault(PROP_NAME, ""));
+            String ns = safeStr(meta.getOrDefault(PROP_NAMESPACE, PROP_DEFAULT));
+            if (ns.isEmpty()) ns = PROP_DEFAULT;
             serviceNameToId.put(svcName, "k8s:" + fp + ":Service:" + ns + "/" + svcName);
         }
 
@@ -230,7 +244,7 @@ public class KubernetesDetector extends AbstractStructuredDetector {
             List<Map<String, Object>> result = new ArrayList<>();
             for (Object d : docs) {
                 Map<String, Object> doc = asMap(d);
-                String docKind = getString(doc, "kind");
+                String docKind = getString(doc, PROP_KIND);
                 if (docKind != null && K8S_KINDS.contains(docKind)) {
                     result.add(doc);
                 }
@@ -240,7 +254,7 @@ public class KubernetesDetector extends AbstractStructuredDetector {
 
         if ("yaml".equals(ptype)) {
             Map<String, Object> data = getMap(pd, "data");
-            String dataKind = getString(data, "kind");
+            String dataKind = getString(data, PROP_KIND);
             if (dataKind != null && K8S_KINDS.contains(dataKind)) {
                 return List.of(data);
             }
@@ -265,12 +279,12 @@ public class KubernetesDetector extends AbstractStructuredDetector {
         Map<String, Object> workSpec = spec;
         if ("CronJob".equals(kind)) {
             Map<String, Object> jobTemplate = getMap(spec, "jobTemplate");
-            workSpec = getMap(jobTemplate, "spec");
+            workSpec = getMap(jobTemplate, PROP_SPEC);
             if (workSpec.isEmpty()) return containers;
         }
 
         Map<String, Object> template = getMap(workSpec, "template");
-        Map<String, Object> podSpec = getMap(template, "spec");
+        Map<String, Object> podSpec = getMap(template, PROP_SPEC);
 
         List<Object> cs = getList(podSpec, "containers");
         for (Object c : cs) {
@@ -296,7 +310,7 @@ public class KubernetesDetector extends AbstractStructuredDetector {
         if (!defaultBackend.isEmpty()) {
             Map<String, Object> svc = getMap(defaultBackend, "service");
             if (svc.isEmpty()) svc = defaultBackend;
-            String svcName = getString(svc, "name");
+            String svcName = getString(svc, PROP_NAME);
             if (svcName == null) svcName = getString(svc, "serviceName");
             if (svcName != null) {
                 out.add(new IngressBackend(ingressNodeId, svcName));
@@ -315,7 +329,7 @@ public class KubernetesDetector extends AbstractStructuredDetector {
                 if (backend.isEmpty()) continue;
                 Map<String, Object> svc = getMap(backend, "service");
                 if (svc.isEmpty()) svc = backend;
-                String svcName = getString(svc, "name");
+                String svcName = getString(svc, PROP_NAME);
                 if (svcName == null) svcName = getString(svc, "serviceName");
                 if (svcName != null) {
                     out.add(new IngressBackend(ingressNodeId, svcName));

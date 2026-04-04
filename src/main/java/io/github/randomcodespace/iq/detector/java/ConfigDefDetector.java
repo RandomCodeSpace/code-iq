@@ -4,10 +4,8 @@ import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
-import com.github.javaparser.ast.body.Parameter;
 import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.MethodCallExpr;
-import com.github.javaparser.ast.expr.StringLiteralExpr;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.model.CodeEdge;
@@ -37,6 +35,9 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class ConfigDefDetector extends AbstractJavaParserDetector {
+    private static final String PROP_CONFIGDEF = "ConfigDef";
+    private static final String PROP_SPRING_VALUE = "spring_value";
+
 
     // ---- Regex fallback patterns ----
     private static final Pattern CLASS_RE = Pattern.compile("(?:public\\s+)?class\\s+(\\w+)");
@@ -62,7 +63,7 @@ public class ConfigDefDetector extends AbstractJavaParserDetector {
         String text = ctx.content();
         if (text == null) return DetectorResult.empty();
 
-        boolean hasConfigDef = text.contains("ConfigDef");
+        boolean hasConfigDef = text.contains(PROP_CONFIGDEF);
         boolean hasValue = text.contains("@Value");
         boolean hasConfigProps = text.contains("@ConfigurationProperties");
 
@@ -89,7 +90,7 @@ public class ConfigDefDetector extends AbstractJavaParserDetector {
             String classNodeId = ctx.filePath() + ":" + className;
 
             // 1. Kafka ConfigDef.define() calls
-            // Discriminator: receiver must mention "ConfigDef" or "CONFIG" to avoid matching
+            // Discriminator: receiver must mention PROP_CONFIGDEF or "CONFIG" to avoid matching
             // unrelated .define() calls (per CLAUDE.md: framework detectors must have guards).
             classDecl.findAll(MethodCallExpr.class).forEach(call -> {
                 if (!"define".equals(call.getNameAsString())) return;
@@ -98,7 +99,7 @@ public class ConfigDefDetector extends AbstractJavaParserDetector {
                 boolean receiverIsConfigDef = call.getScope()
                         .map(scope -> {
                             String s = scope.toString();
-                            return s.contains("ConfigDef") || s.toUpperCase().contains("CONFIG");
+                            return s.contains(PROP_CONFIGDEF) || s.toUpperCase().contains("CONFIG");
                         })
                         .orElse(false);
                 if (!receiverIsConfigDef) return;
@@ -118,7 +119,7 @@ public class ConfigDefDetector extends AbstractJavaParserDetector {
                     extractValueKey(ann).ifPresent(key -> {
                         if (seenKeys.add(key)) {
                             int line = ann.getBegin().map(p -> p.line).orElse(1);
-                            addConfigNode(key, "spring_value", classNodeId, ctx.filePath(), line, nodes, edges);
+                            addConfigNode(key, PROP_SPRING_VALUE, classNodeId, ctx.filePath(), line, nodes, edges);
                         }
                     });
                 });
@@ -131,7 +132,7 @@ public class ConfigDefDetector extends AbstractJavaParserDetector {
                         extractValueKey(ann).ifPresent(key -> {
                             if (seenKeys.add(key)) {
                                 int line = ann.getBegin().map(p -> p.line).orElse(1);
-                                addConfigNode(key, "spring_value", classNodeId, ctx.filePath(), line, nodes, edges);
+                                addConfigNode(key, PROP_SPRING_VALUE, classNodeId, ctx.filePath(), line, nodes, edges);
                             }
                         });
                     });
@@ -225,7 +226,7 @@ public class ConfigDefDetector extends AbstractJavaParserDetector {
             while (vm.find()) {
                 String key = vm.group(1);
                 if (seenKeys.add(key)) {
-                    addConfigNode(key, "spring_value", classNodeId, ctx.filePath(), i + 1, nodes, edges);
+                    addConfigNode(key, PROP_SPRING_VALUE, classNodeId, ctx.filePath(), i + 1, nodes, edges);
                 }
             }
 

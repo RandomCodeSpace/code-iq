@@ -25,6 +25,8 @@ import io.github.randomcodespace.iq.detector.DetectorInfo;
 )
 @Component
 public class ReactComponentDetector extends AbstractRegexDetector {
+    private static final String PROP_REACT = "react";
+
 
     private static final Pattern EXPORT_DEFAULT_FUNC = Pattern.compile("export\\s+default\\s+function\\s+([A-Z]\\w*)\\s*\\(");
     private static final Pattern EXPORT_CONST_ARROW = Pattern.compile("export\\s+const\\s+([A-Z]\\w*)\\s*=\\s*\\(");
@@ -68,7 +70,7 @@ public class ReactComponentDetector extends AbstractRegexDetector {
                 String name = m.group(1);
                 if (componentNames.contains(name)) continue;
                 String sourceId = "react:" + filePath + ":component:" + name;
-                CodeNode node = FrontendDetectorHelper.createComponentNode("react", filePath, "component",
+                CodeNode node = FrontendDetectorHelper.createComponentNode(PROP_REACT, filePath, "component",
                         name, NodeKind.COMPONENT, FrontendDetectorHelper.lineAt(text, m.start()));
                 node.getProperties().put("component_type", "function");
                 nodes.add(node);
@@ -84,7 +86,7 @@ public class ReactComponentDetector extends AbstractRegexDetector {
                 String name = m.group(1);
                 if (componentNames.contains(name)) continue;
                 String sourceId = "react:" + filePath + ":component:" + name;
-                CodeNode node = FrontendDetectorHelper.createComponentNode("react", filePath, "component",
+                CodeNode node = FrontendDetectorHelper.createComponentNode(PROP_REACT, filePath, "component",
                         name, NodeKind.COMPONENT, FrontendDetectorHelper.lineAt(text, m.start()));
                 node.getProperties().put("component_type", "class");
                 nodes.add(node);
@@ -100,7 +102,7 @@ public class ReactComponentDetector extends AbstractRegexDetector {
             while (m.find()) {
                 String name = m.group(1);
                 if (hookNames.contains(name)) continue;
-                nodes.add(FrontendDetectorHelper.createComponentNode("react", filePath, "hook",
+                nodes.add(FrontendDetectorHelper.createComponentNode(PROP_REACT, filePath, "hook",
                         name, NodeKind.HOOK, FrontendDetectorHelper.lineAt(text, m.start())));
                 hookNames.add(name);
             }

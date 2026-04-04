@@ -34,6 +34,8 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class CloudFormationDetector extends AbstractStructuredDetector {
+    private static final String PROP_TYPE = "Type";
+
 
     @Override
     public String getName() {
@@ -66,7 +68,7 @@ public class CloudFormationDetector extends AbstractStructuredDetector {
                 Map<String, Object> resource = asMap(entry.getValue());
                 if (resource.isEmpty()) continue;
 
-                String resourceType = getStringOrDefault(resource, "Type", "unknown");
+                String resourceType = getStringOrDefault(resource, PROP_TYPE, "unknown");
                 String nodeId = "cfn:" + fp + ":resource:" + logicalId;
 
                 Map<String, Object> props = new HashMap<>();
@@ -107,7 +109,7 @@ public class CloudFormationDetector extends AbstractStructuredDetector {
                 Map<String, Object> paramDef = asMap(entry.getValue());
                 if (paramDef.isEmpty()) continue;
 
-                String paramType = getStringOrDefault(paramDef, "Type", "String");
+                String paramType = getStringOrDefault(paramDef, PROP_TYPE, "String");
                 Map<String, Object> props = new HashMap<>();
                 props.put("param_type", paramType);
                 props.put("cfn_type", "parameter");
@@ -179,7 +181,7 @@ public class CloudFormationDetector extends AbstractStructuredDetector {
         Map<String, Object> resources = getMap(data, "Resources");
         for (Object val : resources.values()) {
             Map<String, Object> resource = asMap(val);
-            String rtype = getString(resource, "Type");
+            String rtype = getString(resource, PROP_TYPE);
             if (rtype != null && rtype.startsWith("AWS::")) return true;
         }
         return false;

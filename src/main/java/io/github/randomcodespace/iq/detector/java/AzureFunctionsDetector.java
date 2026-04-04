@@ -28,6 +28,9 @@ import io.github.randomcodespace.iq.detector.DetectorInfo;
 )
 @Component
 public class AzureFunctionsDetector extends AbstractRegexDetector {
+    private static final String PROP_BROKER = "broker";
+    private static final String PROP_TRIGGER_TYPE = "trigger_type";
+
 
     private static final Pattern FUNCTION_NAME_RE = Pattern.compile("@FunctionName\\s*\\(\\s*\"([^\"]+)\"");
     private static final Pattern HTTP_TRIGGER_RE = Pattern.compile("@HttpTrigger\\s*\\(");
@@ -79,7 +82,7 @@ public class AzureFunctionsDetector extends AbstractRegexDetector {
             Map<String, Object> props = new LinkedHashMap<>();
 
             if (HTTP_TRIGGER_RE.matcher(contextLines).find()) {
-                props.put("trigger_type", "http");
+                props.put(PROP_TRIGGER_TYPE, "http");
                 nodes.add(funcNode(funcNodeId, funcName, className, i + 1, ctx,
                         List.of("@FunctionName", "@HttpTrigger"), props));
 
@@ -102,14 +105,14 @@ public class AzureFunctionsDetector extends AbstractRegexDetector {
             Matcher sbq = SB_QUEUE_RE.matcher(contextLines);
             if (sbq.find()) {
                 String queueName = sbq.group(1);
-                props.put("trigger_type", "serviceBusQueue");
+                props.put(PROP_TRIGGER_TYPE, "serviceBusQueue");
                 props.put("queue_name", queueName);
                 nodes.add(funcNode(funcNodeId, funcName, className, i + 1, ctx,
                         List.of("@FunctionName", "@ServiceBusQueueTrigger"), props));
 
                 String queueNodeId = "azure:servicebus:queue:" + queueName;
                 CodeNode qNode = new CodeNode(queueNodeId, NodeKind.QUEUE, "servicebus:" + queueName);
-                qNode.getProperties().put("broker", "azure_servicebus");
+                qNode.getProperties().put(PROP_BROKER, "azure_servicebus");
                 qNode.getProperties().put("queue", queueName);
                 nodes.add(qNode);
                 addEdge(queueNodeId, funcNodeId, EdgeKind.TRIGGERS,
@@ -120,14 +123,14 @@ public class AzureFunctionsDetector extends AbstractRegexDetector {
             Matcher sbt = SB_TOPIC_RE.matcher(contextLines);
             if (sbt.find()) {
                 String topicName = sbt.group(1);
-                props.put("trigger_type", "serviceBusTopic");
+                props.put(PROP_TRIGGER_TYPE, "serviceBusTopic");
                 props.put("topic_name", topicName);
                 nodes.add(funcNode(funcNodeId, funcName, className, i + 1, ctx,
                         List.of("@FunctionName", "@ServiceBusTopicTrigger"), props));
 
                 String topicNodeId = "azure:servicebus:topic:" + topicName;
                 CodeNode tNode = new CodeNode(topicNodeId, NodeKind.TOPIC, "servicebus:" + topicName);
-                tNode.getProperties().put("broker", "azure_servicebus");
+                tNode.getProperties().put(PROP_BROKER, "azure_servicebus");
                 tNode.getProperties().put("topic", topicName);
                 nodes.add(tNode);
                 addEdge(topicNodeId, funcNodeId, EdgeKind.TRIGGERS,
@@ -138,14 +141,14 @@ public class AzureFunctionsDetector extends AbstractRegexDetector {
             Matcher ehm = EH_TRIGGER_RE.matcher(contextLines);
             if (ehm.find()) {
                 String hubName = ehm.group(1);
-                props.put("trigger_type", "eventHub");
+                props.put(PROP_TRIGGER_TYPE, "eventHub");
                 props.put("event_hub_name", hubName);
                 nodes.add(funcNode(funcNodeId, funcName, className, i + 1, ctx,
                         List.of("@FunctionName", "@EventHubTrigger"), props));
 
                 String hubNodeId = "azure:eventhub:" + hubName;
                 CodeNode hNode = new CodeNode(hubNodeId, NodeKind.TOPIC, "eventhub:" + hubName);
-                hNode.getProperties().put("broker", "azure_eventhub");
+                hNode.getProperties().put(PROP_BROKER, "azure_eventhub");
                 hNode.getProperties().put("event_hub", hubName);
                 nodes.add(hNode);
                 addEdge(hubNodeId, funcNodeId, EdgeKind.TRIGGERS,
@@ -156,7 +159,7 @@ public class AzureFunctionsDetector extends AbstractRegexDetector {
             Matcher tm = TIMER_RE.matcher(contextLines);
             if (tm.find()) {
                 String schedule = tm.group(1);
-                props.put("trigger_type", "timer");
+                props.put(PROP_TRIGGER_TYPE, "timer");
                 props.put("schedule", schedule);
                 nodes.add(funcNode(funcNodeId, funcName, className, i + 1, ctx,
                         List.of("@FunctionName", "@TimerTrigger"), props));
@@ -164,7 +167,7 @@ public class AzureFunctionsDetector extends AbstractRegexDetector {
             }
 
             if (COSMOS_TRIGGER_RE.matcher(contextLines).find()) {
-                props.put("trigger_type", "cosmosDB");
+                props.put(PROP_TRIGGER_TYPE, "cosmosDB");
                 nodes.add(funcNode(funcNodeId, funcName, className, i + 1, ctx,
                         List.of("@FunctionName", "@CosmosDBTrigger"), props));
 
@@ -178,7 +181,7 @@ public class AzureFunctionsDetector extends AbstractRegexDetector {
                 continue;
             }
 
-            props.put("trigger_type", "unknown");
+            props.put(PROP_TRIGGER_TYPE, "unknown");
             nodes.add(funcNode(funcNodeId, funcName, className, i + 1, ctx,
                     List.of("@FunctionName"), props));
         }

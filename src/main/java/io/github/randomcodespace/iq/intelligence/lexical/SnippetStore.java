@@ -17,6 +17,8 @@ import java.util.Optional;
  */
 @Component
 public class SnippetStore {
+    private static final String PROP_UNKNOWN = "unknown";
+
 
     /** Maximum lines in any extracted snippet. */
     public static final int MAX_LINES = 50;
@@ -83,9 +85,9 @@ public class SnippetStore {
     }
 
     static String inferLanguage(String filePath) {
-        if (filePath == null) return "unknown";
+        if (filePath == null) return PROP_UNKNOWN;
         int dot = filePath.lastIndexOf('.');
-        if (dot < 0) return "unknown";
+        if (dot < 0) return PROP_UNKNOWN;
         return switch (filePath.substring(dot + 1).toLowerCase()) {
             case "java"              -> "java";
             case "ts", "tsx"         -> "typescript";
@@ -98,7 +100,7 @@ public class SnippetStore {
                  "h", "hpp"          -> "cpp";
             case "kt"                -> "kotlin";
             case "scala", "sc"       -> "scala";
-            default                  -> "unknown";
+            default                  -> PROP_UNKNOWN;
         };
     }
 }

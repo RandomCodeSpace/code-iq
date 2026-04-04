@@ -25,39 +25,44 @@ import io.github.randomcodespace.iq.detector.DetectorInfo;
 )
 @Component
 public class CertificateAuthDetector extends AbstractRegexDetector {
+    private static final String PROP_AZURE_AD = "azure_ad";
+    private static final String PROP_MTLS = "mtls";
+    private static final String PROP_TLS_CONFIG = "tls_config";
+    private static final String PROP_X509 = "x509";
+
 
     private record PatternDef(Pattern regex, String authType) {}
 
     private static final List<PatternDef> MTLS_PATTERNS = List.of(
-            new PatternDef(Pattern.compile("\\bssl_verify_client\\b"), "mtls"),
-            new PatternDef(Pattern.compile("\\brequestCert\\s*:\\s*true\\b"), "mtls"),
-            new PatternDef(Pattern.compile("\\bclientAuth\\s*=\\s*\"true\""), "mtls"),
-            new PatternDef(Pattern.compile("\\bX509AuthenticationFilter\\b"), "mtls"),
-            new PatternDef(Pattern.compile("\\bAddCertificateForwarding\\b"), "mtls")
+            new PatternDef(Pattern.compile("\\bssl_verify_client\\b"), PROP_MTLS),
+            new PatternDef(Pattern.compile("\\brequestCert\\s*:\\s*true\\b"), PROP_MTLS),
+            new PatternDef(Pattern.compile("\\bclientAuth\\s*=\\s*\"true\""), PROP_MTLS),
+            new PatternDef(Pattern.compile("\\bX509AuthenticationFilter\\b"), PROP_MTLS),
+            new PatternDef(Pattern.compile("\\bAddCertificateForwarding\\b"), PROP_MTLS)
     );
 
     private static final List<PatternDef> X509_PATTERNS = List.of(
-            new PatternDef(Pattern.compile("\\bX509AuthenticationFilter\\b"), "x509"),
-            new PatternDef(Pattern.compile("\\bCertificateAuthenticationDefaults\\b"), "x509"),
-            new PatternDef(Pattern.compile("\\.x509\\s*\\("), "x509")
+            new PatternDef(Pattern.compile("\\bX509AuthenticationFilter\\b"), PROP_X509),
+            new PatternDef(Pattern.compile("\\bCertificateAuthenticationDefaults\\b"), PROP_X509),
+            new PatternDef(Pattern.compile("\\.x509\\s*\\("), PROP_X509)
     );
 
     private static final List<PatternDef> TLS_CONFIG_PATTERNS = List.of(
-            new PatternDef(Pattern.compile("\\bjavax\\.net\\.ssl\\.keyStore\\b"), "tls_config"),
-            new PatternDef(Pattern.compile("\\bssl\\.SSLContext\\b"), "tls_config"),
-            new PatternDef(Pattern.compile("\\btls\\.createServer\\b"), "tls_config"),
-            new PatternDef(Pattern.compile("(?:cert|key|ca)\\s*[=:]\\s*(?:fs\\.readFileSync\\s*\\(|['\"][\\w/.\\\\-]+\\.(?:pem|crt|key|cert)['\"])"), "tls_config"),
-            new PatternDef(Pattern.compile("\\btrustStore\\b"), "tls_config")
+            new PatternDef(Pattern.compile("\\bjavax\\.net\\.ssl\\.keyStore\\b"), PROP_TLS_CONFIG),
+            new PatternDef(Pattern.compile("\\bssl\\.SSLContext\\b"), PROP_TLS_CONFIG),
+            new PatternDef(Pattern.compile("\\btls\\.createServer\\b"), PROP_TLS_CONFIG),
+            new PatternDef(Pattern.compile("(?:cert|key|ca)\\s*[=:]\\s*(?:fs\\.readFileSync\\s*\\(|['\"][\\w/.\\\\-]+\\.(?:pem|crt|key|cert)['\"])"), PROP_TLS_CONFIG),
+            new PatternDef(Pattern.compile("\\btrustStore\\b"), PROP_TLS_CONFIG)
     );
 
     private static final List<PatternDef> AZURE_AD_PATTERNS = List.of(
-            new PatternDef(Pattern.compile("\\bAzureAd\\b"), "azure_ad"),
-            new PatternDef(Pattern.compile("\\bAZURE_TENANT_ID\\b"), "azure_ad"),
-            new PatternDef(Pattern.compile("\\bAZURE_CLIENT_ID\\b"), "azure_ad"),
-            new PatternDef(Pattern.compile("\\bmsal\\b"), "azure_ad"),
-            new PatternDef(Pattern.compile("['\"]@azure/msal-browser['\"]"), "azure_ad"),
-            new PatternDef(Pattern.compile("\\bAddMicrosoftIdentityWebApi\\b"), "azure_ad"),
-            new PatternDef(Pattern.compile("\\bClientCertificateCredential\\b"), "azure_ad")
+            new PatternDef(Pattern.compile("\\bAzureAd\\b"), PROP_AZURE_AD),
+            new PatternDef(Pattern.compile("\\bAZURE_TENANT_ID\\b"), PROP_AZURE_AD),
+            new PatternDef(Pattern.compile("\\bAZURE_CLIENT_ID\\b"), PROP_AZURE_AD),
+            new PatternDef(Pattern.compile("\\bmsal\\b"), PROP_AZURE_AD),
+            new PatternDef(Pattern.compile("['\"]@azure/msal-browser['\"]"), PROP_AZURE_AD),
+            new PatternDef(Pattern.compile("\\bAddMicrosoftIdentityWebApi\\b"), PROP_AZURE_AD),
+            new PatternDef(Pattern.compile("\\bClientCertificateCredential\\b"), PROP_AZURE_AD)
     );
 
     private static final List<PatternDef> ALL_PATTERNS;

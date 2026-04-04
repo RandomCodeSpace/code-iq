@@ -34,6 +34,27 @@ import java.util.stream.Collectors;
 @Service
 @ConditionalOnBean(GraphRepository.class)
 public class GraphStore implements FlowDataSource {
+    private static final String PROP_CNT = "cnt";
+    private static final String PROP_CONNECTIONS = "connections";
+    private static final String PROP_EXT = "ext";
+    private static final String PROP_FILEPATH = "filePath";
+    private static final String PROP_ID = "id";
+    private static final String PROP_IDS = "ids";
+    private static final String PROP_KIND = "kind";
+    private static final String PROP_KINDS = "kinds";
+    private static final String PROP_LABEL = "label";
+    private static final String PROP_LAYER = "layer";
+    private static final String PROP_LIMIT = "limit";
+    private static final String PROP_METHOD = "method";
+    private static final String PROP_MODULE = "module";
+    private static final String PROP_NODEID = "nodeId";
+    private static final String PROP_OFFSET = "offset";
+    private static final String PROP_SOURCE = "source";
+    private static final String PROP_SOURCEID = "sourceId";
+    private static final String PROP_TARGET = "target";
+    private static final String PROP_TARGETID = "targetId";
+    private static final String PROP_TEXT = "text";
+
 
     private static final Logger log = LoggerFactory.getLogger(GraphStore.class);
 
@@ -79,7 +100,7 @@ public class GraphStore implements FlowDataSource {
             try (Transaction tx = graphDb.beginTx()) {
                 var result = tx.execute(
                         "MATCH (n) WITH n LIMIT 5000 DETACH DELETE n RETURN count(*) AS cnt");
-                deleted = result.hasNext() ? ((Number) result.next().get("cnt")).intValue() : 0;
+                deleted = result.hasNext() ? ((Number) result.next().get(PROP_CNT)).intValue() : 0;
                 tx.commit();
             }
         } while (deleted > 0);
@@ -147,10 +168,10 @@ public class GraphStore implements FlowDataSource {
                     continue;
                 }
                 edgeBatch.add(Map.of(
-                        "sourceId", sourceId,
-                        "targetId", targetId,
+                        PROP_SOURCEID, sourceId,
+                        PROP_TARGETID, targetId,
                         "edgeId", edge.getId(),
-                        "kind", edge.getKind().getValue()
+                        PROP_KIND, edge.getKind().getValue()
                 ));
                 created++;
             }
@@ -178,15 +199,15 @@ public class GraphStore implements FlowDataSource {
     /** Convert a CodeNode to a flat property map for Cypher SET. */
     private Map<String, Object> nodeToProps(CodeNode node) {
         Map<String, Object> props = new HashMap<>();
-        props.put("id", node.getId());
-        props.put("kind", node.getKind().getValue());
-        props.put("label", node.getLabel());
+        props.put(PROP_ID, node.getId());
+        props.put(PROP_KIND, node.getKind().getValue());
+        props.put(PROP_LABEL, node.getLabel());
         if (node.getFqn() != null) props.put("fqn", node.getFqn());
-        if (node.getModule() != null) props.put("module", node.getModule());
-        if (node.getFilePath() != null) props.put("filePath", node.getFilePath());
+        if (node.getModule() != null) props.put(PROP_MODULE, node.getModule());
+        if (node.getFilePath() != null) props.put(PROP_FILEPATH, node.getFilePath());
         if (node.getLineStart() != null) props.put("lineStart", node.getLineStart());
         if (node.getLineEnd() != null) props.put("lineEnd", node.getLineEnd());
-        if (node.getLayer() != null) props.put("layer", node.getLayer());
+        if (node.getLayer() != null) props.put(PROP_LAYER, node.getLayer());
         if (node.getAnnotations() != null && !node.getAnnotations().isEmpty()) {
             props.put("annotations", String.join(",", node.getAnnotations()));
         }
@@ -208,7 +229,7 @@ public class GraphStore implements FlowDataSource {
     public Optional<CodeNode> findById(String id) {
         try (Transaction tx = graphDb.beginTx()) {
             var result = tx.execute(
-                    "MATCH (n:CodeNode {id: $id}) RETURN n", Map.of("id", id));
+                    "MATCH (n:CodeNode {id: $id}) RETURN n", Map.of(PROP_ID, id));
             if (result.hasNext()) {
                 var neo4jNode = (org.neo4j.graphdb.Node) result.next().get("n");
                 CodeNode node = nodeFromNeo4j(neo4jNode);
@@ -235,36 +256,36 @@ public class GraphStore implements FlowDataSource {
 
     public List<CodeNode> findByKind(NodeKind kind) {
         return queryNodes("MATCH (n:CodeNode) WHERE n.kind = $kind RETURN n",
-                Map.of("kind", kind.getValue()));
+                Map.of(PROP_KIND, kind.getValue()));
     }
 
     public List<CodeNode> findByLayer(String layer) {
         return queryNodes("MATCH (n:CodeNode) WHERE n.layer = $layer RETURN n",
-                Map.of("layer", layer));
+                Map.of(PROP_LAYER, layer));
     }
 
     public List<CodeNode> findByModule(String module) {
         return queryNodes("MATCH (n:CodeNode) WHERE n.module = $module RETURN n",
-                Map.of("module", module));
+                Map.of(PROP_MODULE, module));
     }
 
     public List<CodeNode> findByFilePath(String filePath) {
         return queryNodes("MATCH (n:CodeNode) WHERE n.filePath = $filePath RETURN n",
-                Map.of("filePath", filePath));
+                Map.of(PROP_FILEPATH, filePath));
     }
 
     public List<CodeNode> search(String text) {
         return queryNodes(
                 "CALL db.index.fulltext.queryNodes('search_index', $text) "
                         + "YIELD node RETURN node AS n",
-                Map.of("text", toLuceneQuery(text)));
+                Map.of(PROP_TEXT, toLuceneQuery(text)));
     }
 
     public List<CodeNode> search(String text, int limit) {
         return queryNodes(
                 "CALL db.index.fulltext.queryNodes('search_index', $text) "
                         + "YIELD node RETURN node AS n LIMIT $limit",
-                Map.of("text", toLuceneQuery(text), "limit", limit));
+                Map.of(PROP_TEXT, toLuceneQuery(text), PROP_LIMIT, limit));
     }
 
     /**
@@ -276,7 +297,7 @@ public class GraphStore implements FlowDataSource {
         return queryNodes(
                 "CALL db.index.fulltext.queryNodes('lexical_index', $text) "
                         + "YIELD node RETURN node AS n LIMIT $limit",
-                Map.of("text", toLuceneQuery(text), "limit", limit));
+                Map.of(PROP_TEXT, toLuceneQuery(text), PROP_LIMIT, limit));
     }
 
     /**
@@ -308,7 +329,7 @@ public class GraphStore implements FlowDataSource {
     public List<CodeNode> findNeighbors(String nodeId) {
         return queryNodes(
                 "MATCH (n:CodeNode)-[r]-(m:CodeNode) WHERE n.id = $nodeId RETURN m",
-                Map.of("nodeId", nodeId));
+                Map.of(PROP_NODEID, nodeId));
     }
 
     /**
@@ -326,7 +347,7 @@ public class GraphStore implements FlowDataSource {
                             + "MATCH (n:CodeNode {id: nid})-[]-(ep:CodeNode) "
                             + "WHERE ep.kind IN $epKinds "
                             + "RETURN nid AS matchId, ep",
-                    Map.of("ids", nodeIds, "epKinds", epKinds));
+                    Map.of(PROP_IDS, nodeIds, "epKinds", epKinds));
             while (qr.hasNext()) {
                 var row = qr.next();
                 String matchId = (String) row.get("matchId");
@@ -341,20 +362,20 @@ public class GraphStore implements FlowDataSource {
     public List<CodeNode> findOutgoingNeighbors(String nodeId) {
         return queryNodes(
                 "MATCH (n:CodeNode)-[r]->(m:CodeNode) WHERE n.id = $nodeId RETURN m",
-                Map.of("nodeId", nodeId));
+                Map.of(PROP_NODEID, nodeId));
     }
 
     public List<CodeNode> findIncomingNeighbors(String nodeId) {
         return queryNodes(
                 "MATCH (n:CodeNode)<-[r]-(m:CodeNode) WHERE n.id = $nodeId RETURN m",
-                Map.of("nodeId", nodeId));
+                Map.of(PROP_NODEID, nodeId));
     }
 
     public long count() {
         try (Transaction tx = graphDb.beginTx()) {
             var result = tx.execute("MATCH (n:CodeNode) RETURN count(n) AS cnt");
             if (result.hasNext()) {
-                return ((Number) result.next().get("cnt")).longValue();
+                return ((Number) result.next().get(PROP_CNT)).longValue();
             }
             return 0;
         }
@@ -367,10 +388,10 @@ public class GraphStore implements FlowDataSource {
             var result = tx.execute(
                     "MATCH p = shortestPath((a:CodeNode {id: $source})-[*..20]-(b:CodeNode {id: $target})) "
                             + "RETURN [n IN nodes(p) | n.id] AS ids",
-                    Map.of("source", source, "target", target));
+                    Map.of(PROP_SOURCE, source, PROP_TARGET, target));
             if (result.hasNext()) {
                 @SuppressWarnings("unchecked")
-                List<String> ids = (List<String>) result.next().get("ids");
+                List<String> ids = (List<String>) result.next().get(PROP_IDS);
                 return ids;
             }
             return List.of();
@@ -386,7 +407,7 @@ public class GraphStore implements FlowDataSource {
     public List<CodeNode> traceImpact(String nodeId, int depth) {
         return queryNodes(
                 "MATCH (a:CodeNode {id: $nodeId})-[:RELATES_TO*1..$depth]->(b:CodeNode) RETURN DISTINCT b",
-                Map.of("nodeId", nodeId, "depth", depth));
+                Map.of(PROP_NODEID, nodeId, "depth", depth));
     }
 
     public List<List<String>> findCycles(int limit) {
@@ -395,10 +416,10 @@ public class GraphStore implements FlowDataSource {
             var result = tx.execute(
                     "MATCH p = (a:CodeNode)-[:RELATES_TO*2..10]->(a) "
                             + "RETURN [n IN nodes(p) | n.id] AS ids LIMIT $limit",
-                    Map.of("limit", limit));
+                    Map.of(PROP_LIMIT, limit));
             while (result.hasNext()) {
                 @SuppressWarnings("unchecked")
-                List<String> ids = (List<String>) result.next().get("ids");
+                List<String> ids = (List<String>) result.next().get(PROP_IDS);
                 cycles.add(ids);
             }
         }
@@ -409,21 +430,21 @@ public class GraphStore implements FlowDataSource {
         return queryNodes(
                 "MATCH (n:CodeNode)<-[r:RELATES_TO]-(m:CodeNode) "
                         + "WHERE n.id = $targetId AND r.kind IN ['consumes', 'listens'] RETURN m",
-                Map.of("targetId", targetId));
+                Map.of(PROP_TARGETID, targetId));
     }
 
     public List<CodeNode> findProducers(String targetId) {
         return queryNodes(
                 "MATCH (n:CodeNode)<-[r:RELATES_TO]-(m:CodeNode) "
                         + "WHERE n.id = $targetId AND r.kind IN ['produces', 'publishes'] RETURN m",
-                Map.of("targetId", targetId));
+                Map.of(PROP_TARGETID, targetId));
     }
 
     public List<CodeNode> findCallers(String targetId) {
         return queryNodes(
                 "MATCH (n:CodeNode)<-[r:RELATES_TO]-(m:CodeNode) "
                         + "WHERE n.id = $targetId AND r.kind = 'calls' RETURN m",
-                Map.of("targetId", targetId));
+                Map.of(PROP_TARGETID, targetId));
     }
 
     public List<CodeNode> findDependencies(String moduleId) {
@@ -443,22 +464,22 @@ public class GraphStore implements FlowDataSource {
     public List<CodeNode> findByKindPaginated(String kind, int offset, int limit) {
         return queryNodes(
                 "MATCH (n:CodeNode) WHERE n.kind = $kind RETURN n SKIP $offset LIMIT $limit",
-                Map.of("kind", kind, "offset", offset, "limit", limit));
+                Map.of(PROP_KIND, kind, PROP_OFFSET, offset, PROP_LIMIT, limit));
     }
 
     public List<CodeNode> findAllPaginated(int offset, int limit) {
         return queryNodes(
                 "MATCH (n:CodeNode) RETURN n SKIP $offset LIMIT $limit",
-                Map.of("offset", offset, "limit", limit));
+                Map.of(PROP_OFFSET, offset, PROP_LIMIT, limit));
     }
 
     public long countByKind(String kind) {
         try (Transaction tx = graphDb.beginTx()) {
             var result = tx.execute(
                     "MATCH (n:CodeNode) WHERE n.kind = $kind RETURN count(n) AS cnt",
-                    Map.of("kind", kind));
+                    Map.of(PROP_KIND, kind));
             if (result.hasNext()) {
-                return ((Number) result.next().get("cnt")).longValue();
+                return ((Number) result.next().get(PROP_CNT)).longValue();
             }
             return 0;
         }
@@ -470,7 +491,7 @@ public class GraphStore implements FlowDataSource {
         try (Transaction tx = graphDb.beginTx()) {
             var result = tx.execute("MATCH ()-[r:RELATES_TO]->() RETURN count(r) AS cnt");
             if (result.hasNext()) {
-                return ((Number) result.next().get("cnt")).longValue();
+                return ((Number) result.next().get(PROP_CNT)).longValue();
             }
             return 0;
         }
@@ -482,7 +503,7 @@ public class GraphStore implements FlowDataSource {
                     "MATCH (n:CodeNode) WHERE n.filePath IS NOT NULL AND n.filePath <> '' "
                             + "RETURN count(DISTINCT n.filePath) AS cnt");
             if (result.hasNext()) {
-                return ((Number) result.next().get("cnt")).longValue();
+                return ((Number) result.next().get(PROP_CNT)).longValue();
             }
             return 0;
         }
@@ -502,8 +523,8 @@ public class GraphStore implements FlowDataSource {
             while (result.hasNext()) {
                 var row = result.next();
                 Map<String, Object> m = new LinkedHashMap<>();
-                m.put("ext", row.get("ext"));
-                m.put("cnt", ((Number) row.get("cnt")).longValue());
+                m.put(PROP_EXT, row.get(PROP_EXT));
+                m.put(PROP_CNT, ((Number) row.get(PROP_CNT)).longValue());
                 rows.add(m);
             }
         }
@@ -517,8 +538,8 @@ public class GraphStore implements FlowDataSource {
             while (result.hasNext()) {
                 var row = result.next();
                 Map<String, Object> m = new LinkedHashMap<>();
-                m.put("kind", row.get("kind"));
-                m.put("cnt", ((Number) row.get("cnt")).longValue());
+                m.put(PROP_KIND, row.get(PROP_KIND));
+                m.put(PROP_CNT, ((Number) row.get(PROP_CNT)).longValue());
                 rows.add(m);
             }
         }
@@ -533,8 +554,8 @@ public class GraphStore implements FlowDataSource {
             while (result.hasNext()) {
                 var row = result.next();
                 Map<String, Object> m = new LinkedHashMap<>();
-                m.put("layer", row.get("layer"));
-                m.put("cnt", ((Number) row.get("cnt")).longValue());
+                m.put(PROP_LAYER, row.get(PROP_LAYER));
+                m.put(PROP_CNT, ((Number) row.get(PROP_CNT)).longValue());
                 rows.add(m);
             }
         }
@@ -548,14 +569,14 @@ public class GraphStore implements FlowDataSource {
                     "MATCH (s:CodeNode)-[r:RELATES_TO]->(t:CodeNode) "
                             + "RETURN r.id AS id, r.kind AS kind, s.id AS sourceId, t.id AS targetId "
                             + "SKIP $offset LIMIT $limit",
-                    Map.of("offset", offset, "limit", limit));
+                    Map.of(PROP_OFFSET, offset, PROP_LIMIT, limit));
             while (result.hasNext()) {
                 var row = result.next();
                 Map<String, Object> m = new LinkedHashMap<>();
-                m.put("id", row.get("id"));
-                m.put("kind", row.get("kind"));
-                m.put("sourceId", row.get("sourceId"));
-                m.put("targetId", row.get("targetId"));
+                m.put(PROP_ID, row.get(PROP_ID));
+                m.put(PROP_KIND, row.get(PROP_KIND));
+                m.put(PROP_SOURCEID, row.get(PROP_SOURCEID));
+                m.put(PROP_TARGETID, row.get(PROP_TARGETID));
                 rows.add(m);
             }
         }
@@ -569,14 +590,14 @@ public class GraphStore implements FlowDataSource {
                     "MATCH (s:CodeNode)-[r:RELATES_TO]->(t:CodeNode) WHERE r.kind = $kind "
                             + "RETURN r.id AS id, r.kind AS kind, s.id AS sourceId, t.id AS targetId "
                             + "SKIP $offset LIMIT $limit",
-                    Map.of("kind", kind, "offset", offset, "limit", limit));
+                    Map.of(PROP_KIND, kind, PROP_OFFSET, offset, PROP_LIMIT, limit));
             while (result.hasNext()) {
                 var row = result.next();
                 Map<String, Object> m = new LinkedHashMap<>();
-                m.put("id", row.get("id"));
-                m.put("kind", row.get("kind"));
-                m.put("sourceId", row.get("sourceId"));
-                m.put("targetId", row.get("targetId"));
+                m.put(PROP_ID, row.get(PROP_ID));
+                m.put(PROP_KIND, row.get(PROP_KIND));
+                m.put(PROP_SOURCEID, row.get(PROP_SOURCEID));
+                m.put(PROP_TARGETID, row.get(PROP_TARGETID));
                 rows.add(m);
             }
         }
@@ -599,11 +620,11 @@ public class GraphStore implements FlowDataSource {
                             + "RETURN n.filePath AS filePath, count(n) AS nodeCount "
                             + "ORDER BY n.filePath "
                             + "LIMIT $limit",
-                    Map.of("limit", (long) (maxFiles + 1)));
+                    Map.of(PROP_LIMIT, (long) (maxFiles + 1)));
             while (result.hasNext()) {
                 var row = result.next();
                 Map<String, Object> m = new LinkedHashMap<>();
-                m.put("filePath", row.get("filePath"));
+                m.put(PROP_FILEPATH, row.get(PROP_FILEPATH));
                 m.put("nodeCount", ((Number) row.get("nodeCount")).longValue());
                 rows.add(m);
             }
@@ -619,9 +640,9 @@ public class GraphStore implements FlowDataSource {
         try (Transaction tx = graphDb.beginTx()) {
             var result = tx.execute(
                     "MATCH ()-[r:RELATES_TO]->() WHERE r.kind = $kind RETURN count(r) AS cnt",
-                    Map.of("kind", kind));
+                    Map.of(PROP_KIND, kind));
             if (result.hasNext()) {
-                return ((Number) result.next().get("cnt")).longValue();
+                return ((Number) result.next().get(PROP_CNT)).longValue();
             }
             return 0;
         }
@@ -651,11 +672,11 @@ public class GraphStore implements FlowDataSource {
                         + "AND NOT n.kind IN $excludeKinds "
                         + "AND NOT EXISTS { MATCH (m)-[r:RELATES_TO]->(n) WHERE r.kind IN $semanticKinds } "
                         + "RETURN n SKIP $offset LIMIT $limit",
-                Map.of("kinds", kinds,
+                Map.of(PROP_KINDS, kinds,
                         "semanticKinds", semanticEdgeKinds,
                         "excludeKinds", excludeNodeKinds,
-                        "offset", offset,
-                        "limit", limit));
+                        PROP_OFFSET, offset,
+                        PROP_LIMIT, limit));
     }
 
     /**
@@ -668,7 +689,7 @@ public class GraphStore implements FlowDataSource {
                 "MATCH (n:CodeNode) WHERE n.kind IN $kinds "
                         + "AND NOT EXISTS { MATCH (m)-[:RELATES_TO]->(n) } "
                         + "RETURN n SKIP $offset LIMIT $limit",
-                Map.of("kinds", kinds, "offset", offset, "limit", limit));
+                Map.of(PROP_KINDS, kinds, PROP_OFFSET, offset, PROP_LIMIT, limit));
     }
 
     // --- Topology queries ---
@@ -697,10 +718,10 @@ public class GraphStore implements FlowDataSource {
             while (result.hasNext()) {
                 var row = result.next();
                 Map<String, Object> svc = new LinkedHashMap<>();
-                svc.put("id", row.get("id"));
-                svc.put("label", row.get("label"));
-                svc.put("kind", row.get("kind"));
-                svc.put("layer", row.get("layer"));
+                svc.put(PROP_ID, row.get(PROP_ID));
+                svc.put(PROP_LABEL, row.get(PROP_LABEL));
+                svc.put(PROP_KIND, row.get(PROP_KIND));
+                svc.put(PROP_LAYER, row.get(PROP_LAYER));
                 Object nc = row.get("node_count");
                 svc.put("node_count", nc instanceof Number n ? n.longValue() : 0L);
                 services.add(svc);
@@ -712,15 +733,15 @@ public class GraphStore implements FlowDataSource {
             var result = tx.execute(
                     "MATCH (n:CodeNode) WHERE n.kind IN $kinds "
                             + "RETURN n.id AS id, n.label AS label, n.kind AS kind",
-                    Map.of("kinds", infraKinds));
+                    Map.of(PROP_KINDS, infraKinds));
             while (result.hasNext()) {
                 var row = result.next();
-                String id = (String) row.get("id");
-                String kind = (String) row.get("kind");
+                String id = (String) row.get(PROP_ID);
+                String kind = (String) row.get(PROP_KIND);
                 Map<String, Object> infra = new LinkedHashMap<>();
-                infra.put("id", id);
-                infra.put("label", row.get("label"));
-                infra.put("kind", kind);
+                infra.put(PROP_ID, id);
+                infra.put(PROP_LABEL, row.get(PROP_LABEL));
+                infra.put(PROP_KIND, kind);
                 // Derive type from id prefix (e.g., "postgresql:orders-db" → "postgresql")
                 if (id != null && id.contains(":")) {
                     infra.put("type", id.split(":", 2)[0]);
@@ -737,14 +758,14 @@ public class GraphStore implements FlowDataSource {
                     "MATCH (s:CodeNode)-[r:RELATES_TO]->(t:CodeNode) "
                             + "WHERE s.kind = 'service' AND t.kind IN $kinds "
                             + "RETURN s.id AS source, t.id AS target, r.kind AS kind, count(r) AS cnt",
-                    Map.of("kinds", infraKinds));
+                    Map.of(PROP_KINDS, infraKinds));
             while (result.hasNext()) {
                 var row = result.next();
                 Map<String, Object> conn = new LinkedHashMap<>();
-                conn.put("source", row.get("source"));
-                conn.put("target", row.get("target"));
-                conn.put("kind", row.get("kind"));
-                Object cnt = row.get("cnt");
+                conn.put(PROP_SOURCE, row.get(PROP_SOURCE));
+                conn.put(PROP_TARGET, row.get(PROP_TARGET));
+                conn.put(PROP_KIND, row.get(PROP_KIND));
+                Object cnt = row.get(PROP_CNT);
                 conn.put("count", cnt instanceof Number n ? n.longValue() : 0L);
                 connections.add(conn);
             }
@@ -753,7 +774,7 @@ public class GraphStore implements FlowDataSource {
         Map<String, Object> topology = new LinkedHashMap<>();
         topology.put("services", services);
         topology.put("infrastructure", infrastructure);
-        topology.put("connections", connections);
+        topology.put(PROP_CONNECTIONS, connections);
         return topology;
     }
 
@@ -769,7 +790,7 @@ public class GraphStore implements FlowDataSource {
         result.put("languages", computeLanguageStats());
         result.put("frameworks", computeFrameworkStats());
         result.put("infra", computeInfraStats());
-        result.put("connections", computeConnectionStats());
+        result.put(PROP_CONNECTIONS, computeConnectionStats());
         result.put("auth", computeAuthStats());
         result.put("architecture", computeArchitectureStats());
         return result;
@@ -784,7 +805,7 @@ public class GraphStore implements FlowDataSource {
             case "languages" -> computeLanguageStats();
             case "frameworks" -> computeFrameworkStats();
             case "infra" -> computeInfraStats();
-            case "connections" -> computeConnectionStats();
+            case PROP_CONNECTIONS -> computeConnectionStats();
             case "auth" -> computeAuthStats();
             case "architecture" -> computeArchitectureStats();
             default -> null;
@@ -795,13 +816,13 @@ public class GraphStore implements FlowDataSource {
         Map<String, Object> graph = new LinkedHashMap<>();
         try (Transaction tx = graphDb.beginTx()) {
             var r1 = tx.execute("MATCH (n:CodeNode) RETURN count(n) AS cnt");
-            graph.put("nodes", r1.hasNext() ? ((Number) r1.next().get("cnt")).longValue() : 0L);
+            graph.put("nodes", r1.hasNext() ? ((Number) r1.next().get(PROP_CNT)).longValue() : 0L);
             var r2 = tx.execute("MATCH ()-[r:RELATES_TO]->() RETURN count(r) AS cnt");
-            graph.put("edges", r2.hasNext() ? ((Number) r2.next().get("cnt")).longValue() : 0L);
+            graph.put("edges", r2.hasNext() ? ((Number) r2.next().get(PROP_CNT)).longValue() : 0L);
             var r3 = tx.execute(
                     "MATCH (n:CodeNode) WHERE n.filePath IS NOT NULL AND n.filePath <> '' "
                             + "RETURN count(DISTINCT n.filePath) AS cnt");
-            graph.put("files", r3.hasNext() ? ((Number) r3.next().get("cnt")).longValue() : 0L);
+            graph.put("files", r3.hasNext() ? ((Number) r3.next().get(PROP_CNT)).longValue() : 0L);
         }
         return graph;
     }
@@ -816,16 +837,16 @@ public class GraphStore implements FlowDataSource {
                 var row = result.next();
                 String lang = String.valueOf(row.get("lang")).trim();
                 if (!lang.isBlank()) {
-                    langCounts.merge(lang, ((Number) row.get("cnt")).longValue(), Long::sum);
+                    langCounts.merge(lang, ((Number) row.get(PROP_CNT)).longValue(), Long::sum);
                 }
             }
         }
         if (langCounts.isEmpty()) {
             for (Map<String, Object> row : countByFileExtension()) {
-                String ext = String.valueOf(row.get("ext")).trim().toLowerCase();
+                String ext = String.valueOf(row.get(PROP_EXT)).trim().toLowerCase();
                 String lang = extensionToLanguage(ext);
                 if (lang != null) {
-                    langCounts.merge(lang, ((Number) row.get("cnt")).longValue(), Long::sum);
+                    langCounts.merge(lang, ((Number) row.get(PROP_CNT)).longValue(), Long::sum);
                 }
             }
         }
@@ -842,7 +863,7 @@ public class GraphStore implements FlowDataSource {
                 var row = result.next();
                 String fw = String.valueOf(row.get("fw")).trim();
                 if (!fw.isBlank()) {
-                    fwCounts.merge(fw, ((Number) row.get("cnt")).longValue(), Long::sum);
+                    fwCounts.merge(fw, ((Number) row.get(PROP_CNT)).longValue(), Long::sum);
                 }
             }
         }
@@ -861,7 +882,7 @@ public class GraphStore implements FlowDataSource {
                 var row = result.next();
                 String dbType = normalizeDbType(String.valueOf(row.get("dbType")));
                 if (dbType != null) {
-                    databases.merge(dbType, ((Number) row.get("cnt")).longValue(), Long::sum);
+                    databases.merge(dbType, ((Number) row.get(PROP_CNT)).longValue(), Long::sum);
                 }
             }
         }
@@ -874,7 +895,7 @@ public class GraphStore implements FlowDataSource {
                             + "RETURN coalesce(n.prop_protocol, n.label, 'unknown') AS protocol, count(n) AS cnt");
             while (result.hasNext()) {
                 var row = result.next();
-                messaging.merge(String.valueOf(row.get("protocol")), ((Number) row.get("cnt")).longValue(), Long::sum);
+                messaging.merge(String.valueOf(row.get("protocol")), ((Number) row.get(PROP_CNT)).longValue(), Long::sum);
             }
         }
         infra.put("messaging", sortByValueDesc(messaging));
@@ -886,7 +907,7 @@ public class GraphStore implements FlowDataSource {
                             + "RETURN coalesce(n.prop_resource_type, n.label, 'unknown') AS resType, count(n) AS cnt");
             while (result.hasNext()) {
                 var row = result.next();
-                cloud.merge(String.valueOf(row.get("resType")), ((Number) row.get("cnt")).longValue(), Long::sum);
+                cloud.merge(String.valueOf(row.get("resType")), ((Number) row.get(PROP_CNT)).longValue(), Long::sum);
             }
         }
         infra.put("cloud", sortByValueDesc(cloud));
@@ -904,7 +925,7 @@ public class GraphStore implements FlowDataSource {
             Map<String, Long> restByMethod = new TreeMap<>();
             while (restResult.hasNext()) {
                 var row = restResult.next();
-                restByMethod.put(String.valueOf(row.get("method")), ((Number) row.get("cnt")).longValue());
+                restByMethod.put(String.valueOf(row.get(PROP_METHOD)), ((Number) row.get(PROP_CNT)).longValue());
             }
             long restTotal = restByMethod.values().stream().mapToLong(Long::longValue).sum();
             Map<String, Object> rest = new LinkedHashMap<>();
@@ -914,19 +935,19 @@ public class GraphStore implements FlowDataSource {
 
             var grpcResult = tx.execute(
                     "MATCH (n:CodeNode) WHERE n.kind = 'endpoint' AND n.prop_protocol = 'grpc' RETURN count(n) AS cnt");
-            connections.put("grpc", grpcResult.hasNext() ? ((Number) grpcResult.next().get("cnt")).longValue() : 0L);
+            connections.put("grpc", grpcResult.hasNext() ? ((Number) grpcResult.next().get(PROP_CNT)).longValue() : 0L);
 
             var wsResult = tx.execute(
                     "MATCH (n:CodeNode) WHERE n.kind = 'websocket_endpoint' RETURN count(n) AS cnt");
-            connections.put("websocket", wsResult.hasNext() ? ((Number) wsResult.next().get("cnt")).longValue() : 0L);
+            connections.put("websocket", wsResult.hasNext() ? ((Number) wsResult.next().get(PROP_CNT)).longValue() : 0L);
 
             var prodResult = tx.execute(
                     "MATCH ()-[r:RELATES_TO]->() WHERE r.kind IN ['produces', 'publishes'] RETURN count(r) AS cnt");
-            connections.put("producers", prodResult.hasNext() ? ((Number) prodResult.next().get("cnt")).longValue() : 0L);
+            connections.put("producers", prodResult.hasNext() ? ((Number) prodResult.next().get(PROP_CNT)).longValue() : 0L);
 
             var consResult = tx.execute(
                     "MATCH ()-[r:RELATES_TO]->() WHERE r.kind IN ['consumes', 'listens'] RETURN count(r) AS cnt");
-            connections.put("consumers", consResult.hasNext() ? ((Number) consResult.next().get("cnt")).longValue() : 0L);
+            connections.put("consumers", consResult.hasNext() ? ((Number) consResult.next().get(PROP_CNT)).longValue() : 0L);
         }
         return connections;
     }
@@ -941,7 +962,7 @@ public class GraphStore implements FlowDataSource {
                 var row = guardResult.next();
                 String authType = String.valueOf(row.get("authType")).trim();
                 if (!authType.isBlank()) {
-                    authCounts.merge(authType, ((Number) row.get("cnt")).longValue(), Long::sum);
+                    authCounts.merge(authType, ((Number) row.get(PROP_CNT)).longValue(), Long::sum);
                 }
             }
             var fwResult = tx.execute(
@@ -952,7 +973,7 @@ public class GraphStore implements FlowDataSource {
                 String fw = String.valueOf(row.get("fw")).trim();
                 String authType = fw.substring("auth:".length()).trim();
                 if (!authType.isEmpty()) {
-                    authCounts.merge(authType, ((Number) row.get("cnt")).longValue(), Long::sum);
+                    authCounts.merge(authType, ((Number) row.get(PROP_CNT)).longValue(), Long::sum);
                 }
             }
         }
@@ -964,18 +985,18 @@ public class GraphStore implements FlowDataSource {
         Map<String, String> kindToLabel = Map.of(
                 "class", "classes", "interface", "interfaces",
                 "abstract_class", "abstract_classes", "enum", "enums",
-                "annotation_type", "annotation_types", "module", "modules",
-                "method", "methods");
+                "annotation_type", "annotation_types", PROP_MODULE, "modules",
+                PROP_METHOD, "methods");
         List<String> archKinds = List.of("class", "interface", "abstract_class", "enum",
-                "annotation_type", "module", "method");
+                "annotation_type", PROP_MODULE, PROP_METHOD);
         try (Transaction tx = graphDb.beginTx()) {
             var result = tx.execute(
                     "MATCH (n:CodeNode) WHERE n.kind IN $kinds RETURN n.kind AS kind, count(n) AS cnt",
-                    Map.of("kinds", archKinds));
+                    Map.of(PROP_KINDS, archKinds));
             while (result.hasNext()) {
                 var row = result.next();
-                String kind = (String) row.get("kind");
-                long cnt = ((Number) row.get("cnt")).longValue();
+                String kind = (String) row.get(PROP_KIND);
+                long cnt = ((Number) row.get(PROP_CNT)).longValue();
                 if (cnt > 0) {
                     arch.put(kindToLabel.getOrDefault(kind, kind), cnt);
                 }
@@ -1070,10 +1091,10 @@ public class GraphStore implements FlowDataSource {
                             + "RETURN r.id AS id, r.kind AS kind, s.id AS sourceId, t.id AS targetId");
             while (result.hasNext()) {
                 var row = result.next();
-                String sourceId = (String) row.get("sourceId");
-                String targetId = (String) row.get("targetId");
-                String edgeId = (String) row.get("id");
-                String kindStr = (String) row.get("kind");
+                String sourceId = (String) row.get(PROP_SOURCEID);
+                String targetId = (String) row.get(PROP_TARGETID);
+                String edgeId = (String) row.get(PROP_ID);
+                String kindStr = (String) row.get(PROP_KIND);
 
                 CodeNode source = nodeById.get(sourceId);
                 CodeNode target = nodeById.get(targetId);
@@ -1098,12 +1119,12 @@ public class GraphStore implements FlowDataSource {
         var result = tx.execute(
                 "MATCH (s:CodeNode {id: $nodeId})-[r:RELATES_TO]->(t:CodeNode) "
                         + "RETURN r.id AS id, r.kind AS kind, t.id AS targetId, t",
-                Map.of("nodeId", node.getId()));
+                Map.of(PROP_NODEID, node.getId()));
         while (result.hasNext()) {
             var row = result.next();
-            String edgeId = (String) row.get("id");
-            String kindStr = (String) row.get("kind");
-            String targetId = (String) row.get("targetId");
+            String edgeId = (String) row.get(PROP_ID);
+            String kindStr = (String) row.get(PROP_KIND);
+            String targetId = (String) row.get(PROP_TARGETID);
             EdgeKind edgeKind;
             try {
                 edgeKind = EdgeKind.fromValue(kindStr);
@@ -1122,16 +1143,16 @@ public class GraphStore implements FlowDataSource {
      * This is the key to avoiding OOM — we read only scalar properties.
      */
     private static CodeNode nodeFromNeo4j(org.neo4j.graphdb.Node neo4jNode) {
-        String id = (String) neo4jNode.getProperty("id", null);
-        String kindStr = (String) neo4jNode.getProperty("kind", null);
+        String id = (String) neo4jNode.getProperty(PROP_ID, null);
+        String kindStr = (String) neo4jNode.getProperty(PROP_KIND, null);
         NodeKind kind = kindStr != null ? NodeKind.fromValue(kindStr) : NodeKind.MODULE;
-        String label = (String) neo4jNode.getProperty("label", "");
+        String label = (String) neo4jNode.getProperty(PROP_LABEL, "");
 
         CodeNode node = new CodeNode(id, kind, label);
         node.setFqn((String) neo4jNode.getProperty("fqn", null));
-        node.setModule((String) neo4jNode.getProperty("module", null));
-        node.setFilePath((String) neo4jNode.getProperty("filePath", null));
-        node.setLayer((String) neo4jNode.getProperty("layer", null));
+        node.setModule((String) neo4jNode.getProperty(PROP_MODULE, null));
+        node.setFilePath((String) neo4jNode.getProperty(PROP_FILEPATH, null));
+        node.setLayer((String) neo4jNode.getProperty(PROP_LAYER, null));
 
         Object lineStart = neo4jNode.getProperty("lineStart", null);
         if (lineStart instanceof Number n) node.setLineStart(n.intValue());

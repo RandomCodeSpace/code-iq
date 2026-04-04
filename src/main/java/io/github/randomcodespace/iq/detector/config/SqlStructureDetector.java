@@ -31,6 +31,8 @@ import io.github.randomcodespace.iq.detector.DetectorInfo;
 )
 @Component
 public class SqlStructureDetector extends AbstractRegexDetector {
+    private static final String PROP_ENTITY_TYPE = "entity_type";
+
 
     private static final Pattern TABLE_RE = Pattern.compile(
             "CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?(?:\\w+\\.)?(\\w+)",
@@ -85,7 +87,7 @@ public class SqlStructureDetector extends AbstractRegexDetector {
                 node.setModule(ctx.moduleName());
                 node.setFilePath(filepath);
                 node.setLineStart(lineNum);
-                node.setProperties(Map.of("entity_type", "table"));
+                node.setProperties(Map.of(PROP_ENTITY_TYPE, "table"));
                 nodes.add(node);
                 continue;
             }
@@ -100,7 +102,7 @@ public class SqlStructureDetector extends AbstractRegexDetector {
                 node.setModule(ctx.moduleName());
                 node.setFilePath(filepath);
                 node.setLineStart(lineNum);
-                node.setProperties(Map.of("entity_type", "view"));
+                node.setProperties(Map.of(PROP_ENTITY_TYPE, "view"));
                 nodes.add(node);
                 currentTableId = null;
                 continue;
@@ -131,7 +133,7 @@ public class SqlStructureDetector extends AbstractRegexDetector {
                 node.setModule(ctx.moduleName());
                 node.setFilePath(filepath);
                 node.setLineStart(lineNum);
-                node.setProperties(Map.of("entity_type", "procedure"));
+                node.setProperties(Map.of(PROP_ENTITY_TYPE, "procedure"));
                 nodes.add(node);
                 currentTableId = null;
                 continue;

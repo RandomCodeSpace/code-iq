@@ -1,7 +1,6 @@
 package io.github.randomcodespace.iq.detector.csharp;
 
 import io.github.randomcodespace.iq.detector.AbstractAntlrDetector;
-import io.github.randomcodespace.iq.grammar.AntlrParserFactory;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.model.CodeEdge;
@@ -30,6 +29,9 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class CSharpMinimalApisDetector extends AbstractAntlrDetector {
+    private static final String PROP_DOTNET_MINIMAL_API = "dotnet_minimal_api";
+    private static final String PROP_FRAMEWORK = "framework";
+
 
     private static final Pattern MAP_RE = Pattern.compile("\\.Map(Get|Post|Put|Delete|Patch)\\s*\\(\\s*\"([^\"]*)\"", Pattern.MULTILINE);
     private static final Pattern BUILDER_RE = Pattern.compile("WebApplication\\.CreateBuilder\\s*\\(", Pattern.MULTILINE);
@@ -68,7 +70,7 @@ public class CSharpMinimalApisDetector extends AbstractAntlrDetector {
             node.setFqn(filePath);
             node.setFilePath(filePath);
             node.setLineStart(findLineNumber(text, bm.start()));
-            node.getProperties().put("framework", "dotnet_minimal_api");
+            node.getProperties().put(PROP_FRAMEWORK, PROP_DOTNET_MINIMAL_API);
             nodes.add(node);
         }
 
@@ -87,7 +89,7 @@ public class CSharpMinimalApisDetector extends AbstractAntlrDetector {
             node.setLineStart(line);
             node.getProperties().put("http_method", httpMethod);
             node.getProperties().put("path", path);
-            node.getProperties().put("framework", "dotnet_minimal_api");
+            node.getProperties().put(PROP_FRAMEWORK, PROP_DOTNET_MINIMAL_API);
             nodes.add(node);
 
             if (appModuleId != null) {
@@ -114,7 +116,7 @@ public class CSharpMinimalApisDetector extends AbstractAntlrDetector {
                 node.setFilePath(filePath);
                 node.setLineStart(line);
                 node.getProperties().put("guard_type", authType.toLowerCase());
-                node.getProperties().put("framework", "dotnet_minimal_api");
+                node.getProperties().put(PROP_FRAMEWORK, PROP_DOTNET_MINIMAL_API);
                 nodes.add(node);
             }
         }
