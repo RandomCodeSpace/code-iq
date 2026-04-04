@@ -52,24 +52,8 @@ public class DjangoViewDetector extends AbstractPythonAntlrDetector {
         if (text.contains("urlpatterns")) {
             Matcher urlMatcher = URL_PATTERN.matcher(text);
             while (urlMatcher.find()) {
-                String pathPattern = urlMatcher.group(1);
-                String viewRef = urlMatcher.group(2);
-                int line = findLineNumber(text, urlMatcher.start());
-
-                String nodeId = "endpoint:" + (moduleName != null ? moduleName : "") + ":ALL:" + pathPattern;
-                CodeNode node = new CodeNode();
-                node.setId(nodeId);
-                node.setKind(NodeKind.ENDPOINT);
-                node.setLabel(pathPattern);
-                node.setFqn(viewRef);
-                node.setModule(moduleName);
-                node.setFilePath(filePath);
-                node.setLineStart(line);
-                node.getProperties().put("protocol", "REST");
-                node.getProperties().put("path_pattern", pathPattern);
-                node.getProperties().put("framework", "django");
-                node.getProperties().put("view_reference", viewRef);
-                nodes.add(node);
+                nodes.add(createUrlPatternEndpoint(filePath, moduleName,
+                        findLineNumber(text, urlMatcher.start()), urlMatcher.group(1), urlMatcher.group(2)));
             }
         }
 
@@ -80,26 +64,12 @@ public class DjangoViewDetector extends AbstractPythonAntlrDetector {
                 if (classCtx.name() == null) return;
                 String className = classCtx.name().getText();
 
-                // Check if any base class contains View, ViewSet, or Mixin
                 String bases = getBaseClassesText(classCtx);
                 if (bases == null || (!bases.contains("View") && !bases.contains("ViewSet") && !bases.contains("Mixin"))) {
                     return;
                 }
 
-                int line = lineOf(classCtx);
-                String nodeId = "class:" + filePath + "::" + className;
-                CodeNode node = new CodeNode();
-                node.setId(nodeId);
-                node.setKind(NodeKind.CLASS);
-                node.setLabel(className);
-                node.setFqn(filePath + "::" + className);
-                node.setModule(moduleName);
-                node.setFilePath(filePath);
-                node.setLineStart(line);
-                node.setAnnotations(List.of("extends:" + bases.trim()));
-                node.getProperties().put("framework", "django");
-                node.getProperties().put("stereotype", "view");
-                nodes.add(node);
+                nodes.add(createCbvNode(filePath, moduleName, lineOf(classCtx), className, bases.trim()));
             }
         }, tree);
 
@@ -119,49 +89,53 @@ public class DjangoViewDetector extends AbstractPythonAntlrDetector {
         if (text.contains("urlpatterns")) {
             Matcher urlMatcher = URL_PATTERN.matcher(text);
             while (urlMatcher.find()) {
-                String pathPattern = urlMatcher.group(1);
-                String viewRef = urlMatcher.group(2);
-                int line = findLineNumber(text, urlMatcher.start());
-
-                String nodeId = "endpoint:" + (moduleName != null ? moduleName : "") + ":ALL:" + pathPattern;
-                CodeNode node = new CodeNode();
-                node.setId(nodeId);
-                node.setKind(NodeKind.ENDPOINT);
-                node.setLabel(pathPattern);
-                node.setFqn(viewRef);
-                node.setModule(moduleName);
-                node.setFilePath(filePath);
-                node.setLineStart(line);
-                node.getProperties().put("protocol", "REST");
-                node.getProperties().put("path_pattern", pathPattern);
-                node.getProperties().put("framework", "django");
-                node.getProperties().put("view_reference", viewRef);
-                nodes.add(node);
+                nodes.add(createUrlPatternEndpoint(filePath, moduleName,
+                        findLineNumber(text, urlMatcher.start()), urlMatcher.group(1), urlMatcher.group(2)));
             }
         }
 
         Matcher cbvMatcher = CBV_PATTERN.matcher(text);
         while (cbvMatcher.find()) {
-            String className = cbvMatcher.group(1);
-            String bases = cbvMatcher.group(2);
-            int line = findLineNumber(text, cbvMatcher.start());
-
-            String nodeId = "class:" + filePath + "::" + className;
-            CodeNode node = new CodeNode();
-            node.setId(nodeId);
-            node.setKind(NodeKind.CLASS);
-            node.setLabel(className);
-            node.setFqn(filePath + "::" + className);
-            node.setModule(moduleName);
-            node.setFilePath(filePath);
-            node.setLineStart(line);
-            node.setAnnotations(List.of("extends:" + bases.trim()));
-            node.getProperties().put("framework", "django");
-            node.getProperties().put("stereotype", "view");
-            nodes.add(node);
+            nodes.add(createCbvNode(filePath, moduleName,
+                    findLineNumber(text, cbvMatcher.start()), cbvMatcher.group(1), cbvMatcher.group(2).trim()));
         }
 
         return DetectorResult.of(nodes, List.of());
+    }
+
+    private static CodeNode createUrlPatternEndpoint(String filePath, String moduleName, int line,
+                                                     String pathPattern, String viewRef) {
+        String nodeId = "endpoint:" + (moduleName != null ? moduleName : "") + ":ALL:" + pathPattern;
+        CodeNode node = new CodeNode();
+        node.setId(nodeId);
+        node.setKind(NodeKind.ENDPOINT);
+        node.setLabel(pathPattern);
+        node.setFqn(viewRef);
+        node.setModule(moduleName);
+        node.setFilePath(filePath);
+        node.setLineStart(line);
+        node.getProperties().put("protocol", "REST");
+        node.getProperties().put("path_pattern", pathPattern);
+        node.getProperties().put("framework", "django");
+        node.getProperties().put("view_reference", viewRef);
+        return node;
+    }
+
+    private static CodeNode createCbvNode(String filePath, String moduleName, int line,
+                                          String className, String bases) {
+        String nodeId = "class:" + filePath + "::" + className;
+        CodeNode node = new CodeNode();
+        node.setId(nodeId);
+        node.setKind(NodeKind.CLASS);
+        node.setLabel(className);
+        node.setFqn(filePath + "::" + className);
+        node.setModule(moduleName);
+        node.setFilePath(filePath);
+        node.setLineStart(line);
+        node.setAnnotations(List.of("extends:" + bases));
+        node.getProperties().put("framework", "django");
+        node.getProperties().put("stereotype", "view");
+        return node;
     }
 
 }

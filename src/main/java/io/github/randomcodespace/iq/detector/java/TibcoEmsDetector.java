@@ -1,6 +1,5 @@
 package io.github.randomcodespace.iq.detector.java;
 
-import io.github.randomcodespace.iq.detector.AbstractRegexDetector;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.model.CodeEdge;
@@ -27,9 +26,8 @@ import io.github.randomcodespace.iq.detector.DetectorInfo;
     properties = {"broker", "queue", "topic"}
 )
 @Component
-public class TibcoEmsDetector extends AbstractRegexDetector {
+public class TibcoEmsDetector extends AbstractJavaMessagingDetector {
 
-    private static final Pattern CLASS_RE = Pattern.compile("(?:public\\s+)?class\\s+(\\w+)");
     private static final Pattern TIBJMS_FACTORY_RE = Pattern.compile(
             "\\b(TibjmsConnectionFactory|TibjmsQueueConnectionFactory|TibjmsTopicConnectionFactory)\\b");
     private static final Pattern SERVER_URL_RE = Pattern.compile("\"(tcp://[^\"]+)\"");
@@ -68,11 +66,7 @@ public class TibcoEmsDetector extends AbstractRegexDetector {
         List<CodeNode> nodes = new ArrayList<>();
         List<CodeEdge> edges = new ArrayList<>();
 
-        String className = null;
-        for (String line : lines) {
-            Matcher cm = CLASS_RE.matcher(line);
-            if (cm.find()) { className = cm.group(1); break; }
-        }
+        String className = extractClassName(text);
         if (className == null) return DetectorResult.empty();
 
         String classNodeId = ctx.filePath() + ":" + className;
@@ -121,18 +115,18 @@ public class TibcoEmsDetector extends AbstractRegexDetector {
             if (m.find()) {
                 String queueName = m.group(1);
                 String queueId = ensureQueueNode(queueName, seenQueues, nodes);
-                if (isProducer) addEdge(classNodeId, queueId, EdgeKind.SENDS_TO,
+                if (isProducer) addMessagingEdge(classNodeId, queueId, EdgeKind.SENDS_TO,
                         className + " sends to " + queueName, Map.of("queue", queueName), edges);
-                if (isConsumer) addEdge(classNodeId, queueId, EdgeKind.RECEIVES_FROM,
+                if (isConsumer) addMessagingEdge(classNodeId, queueId, EdgeKind.RECEIVES_FROM,
                         className + " receives from " + queueName, Map.of("queue", queueName), edges);
             }
             m = CREATE_TOPIC_RE.matcher(lines[i]);
             if (m.find()) {
                 String topicName = m.group(1);
                 String topicId = ensureTopicNode(topicName, seenTopics, nodes);
-                if (isProducer) addEdge(classNodeId, topicId, EdgeKind.SENDS_TO,
+                if (isProducer) addMessagingEdge(classNodeId, topicId, EdgeKind.SENDS_TO,
                         className + " sends to " + topicName, Map.of("topic", topicName), edges);
-                if (isConsumer) addEdge(classNodeId, topicId, EdgeKind.RECEIVES_FROM,
+                if (isConsumer) addMessagingEdge(classNodeId, topicId, EdgeKind.RECEIVES_FROM,
                         className + " receives from " + topicName, Map.of("topic", topicName), edges);
             }
         }
@@ -178,14 +172,4 @@ public class TibcoEmsDetector extends AbstractRegexDetector {
         return id;
     }
 
-    private void addEdge(String sourceId, String targetId, EdgeKind kind, String label,
-                         Map<String, Object> props, List<CodeEdge> edges) {
-        CodeEdge edge = new CodeEdge();
-        edge.setId(sourceId + "->" + kind.getValue() + "->" + targetId);
-        edge.setKind(kind);
-        edge.setSourceId(sourceId);
-        edge.setTarget(new CodeNode(targetId, NodeKind.QUEUE, label));
-        edge.setProperties(new LinkedHashMap<>(props));
-        edges.add(edge);
-    }
 }

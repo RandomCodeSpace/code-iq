@@ -77,80 +77,13 @@ public class PydanticModelDetector extends AbstractPythonAntlrDetector {
                 if (!bases.contains("BaseModel") && !bases.contains("BaseSettings")) return;
 
                 String baseClass = bases.trim();
-                boolean isSettings = baseClass.contains("BaseSettings");
                 int line = lineOf(classCtx);
-
-                // Extract class body for field/validator/config extraction
                 String classBody = extractClassBody(text, classCtx);
 
-                // Extract fields
-                List<String> fields = new ArrayList<>();
-                Map<String, String> fieldTypes = new LinkedHashMap<>();
-                Matcher fieldMatcher = FIELD_RE.matcher(classBody);
-                while (fieldMatcher.find()) {
-                    String fname = fieldMatcher.group(1);
-                    String ftype = fieldMatcher.group(2).trim();
-                    if (!fname.equals("class") && !fname.equals("Config") && !fname.equals("model_config")) {
-                        fields.add(fname);
-                        fieldTypes.put(fname, ftype);
-                    }
-                }
-
-                // Extract validators
-                List<String> validators = new ArrayList<>();
-                Matcher validatorMatcher = VALIDATOR_RE.matcher(classBody);
-                while (validatorMatcher.find()) {
-                    validators.add(validatorMatcher.group(1));
-                }
-
-                // Extract Config class properties
-                Map<String, String> configProps = new LinkedHashMap<>();
-                Matcher configMatch = CONFIG_CLASS_RE.matcher(classBody);
-                if (configMatch.find()) {
-                    int configBlockStart = configMatch.end();
-                    int configBlockEnd = classBody.length();
-                    Matcher configEndMatcher = CONFIG_END_RE.matcher(classBody.substring(configBlockStart));
-                    if (configEndMatcher.find()) {
-                        configBlockEnd = configBlockStart + configEndMatcher.start();
-                    }
-                    String configBlock = classBody.substring(configBlockStart, configBlockEnd);
-                    Matcher attrMatcher = CONFIG_ATTR_RE.matcher(configBlock);
-                    while (attrMatcher.find()) {
-                        configProps.put(attrMatcher.group(1), attrMatcher.group(2).trim());
-                    }
-                }
-
-                NodeKind nodeKind = isSettings ? NodeKind.CONFIG_DEFINITION : NodeKind.ENTITY;
                 String nodeId = "pydantic:" + filePath + ":model:" + className;
-
-                CodeNode node = new CodeNode();
-                node.setId(nodeId);
-                node.setKind(nodeKind);
-                node.setLabel(className);
-                node.setFqn(filePath + "::" + className);
-                node.setModule(moduleName);
-                node.setFilePath(filePath);
-                node.setLineStart(line);
-                node.setAnnotations(validators);
-                node.getProperties().put("fields", fields);
-                node.getProperties().put("field_types", fieldTypes);
-                node.getProperties().put("framework", "pydantic");
-                node.getProperties().put("base_class", baseClass);
-                if (!configProps.isEmpty()) {
-                    node.getProperties().put("config", configProps);
-                }
-                nodes.add(node);
-
+                nodes.add(createPydanticNode(nodeId, className, filePath, moduleName, line, baseClass, classBody));
                 knownModels.put(className, nodeId);
-
-                // Inheritance edge
-                if (knownModels.containsKey(baseClass)) {
-                    CodeEdge edge = new CodeEdge();
-                    edge.setId(nodeId + "->extends->" + knownModels.get(baseClass));
-                    edge.setKind(EdgeKind.EXTENDS);
-                    edge.setSourceId(nodeId);
-                    edges.add(edge);
-                }
+                addExtendsEdge(nodeId, baseClass, knownModels, edges);
             }
         }, tree);
 
@@ -176,8 +109,6 @@ public class PydanticModelDetector extends AbstractPythonAntlrDetector {
             String baseClass = classMatcher.group(2);
             int line = findLineNumber(text, classMatcher.start());
 
-            boolean isSettings = baseClass.contains("BaseSettings");
-
             int classStart = classMatcher.start();
             Matcher nextClassMatcher = NEXT_CLASS_RE.matcher(text.substring(classMatcher.end()));
             String classBody;
@@ -187,73 +118,98 @@ public class PydanticModelDetector extends AbstractPythonAntlrDetector {
                 classBody = text.substring(classStart);
             }
 
-            List<String> fields = new ArrayList<>();
-            Map<String, String> fieldTypes = new LinkedHashMap<>();
-            Matcher fieldMatcher = FIELD_RE.matcher(classBody);
-            while (fieldMatcher.find()) {
-                String fname = fieldMatcher.group(1);
-                String ftype = fieldMatcher.group(2).trim();
-                if (!fname.equals("class") && !fname.equals("Config") && !fname.equals("model_config")) {
-                    fields.add(fname);
-                    fieldTypes.put(fname, ftype);
-                }
-            }
-
-            List<String> validators = new ArrayList<>();
-            Matcher validatorMatcher = VALIDATOR_RE.matcher(classBody);
-            while (validatorMatcher.find()) {
-                validators.add(validatorMatcher.group(1));
-            }
-
-            Map<String, String> configProps = new LinkedHashMap<>();
-            Matcher configMatch = CONFIG_CLASS_RE.matcher(classBody);
-            if (configMatch.find()) {
-                int configBlockStart = configMatch.end();
-                int configBlockEnd = classBody.length();
-                Matcher configEndMatcher = CONFIG_END_RE.matcher(classBody.substring(configBlockStart));
-                if (configEndMatcher.find()) {
-                    configBlockEnd = configBlockStart + configEndMatcher.start();
-                }
-                String configBlock = classBody.substring(configBlockStart, configBlockEnd);
-                Matcher attrMatcher = CONFIG_ATTR_RE.matcher(configBlock);
-                while (attrMatcher.find()) {
-                    configProps.put(attrMatcher.group(1), attrMatcher.group(2).trim());
-                }
-            }
-
-            NodeKind nodeKind = isSettings ? NodeKind.CONFIG_DEFINITION : NodeKind.ENTITY;
             String nodeId = "pydantic:" + filePath + ":model:" + className;
-
-            CodeNode node = new CodeNode();
-            node.setId(nodeId);
-            node.setKind(nodeKind);
-            node.setLabel(className);
-            node.setFqn(filePath + "::" + className);
-            node.setModule(moduleName);
-            node.setFilePath(filePath);
-            node.setLineStart(line);
-            node.setAnnotations(validators);
-            node.getProperties().put("fields", fields);
-            node.getProperties().put("field_types", fieldTypes);
-            node.getProperties().put("framework", "pydantic");
-            node.getProperties().put("base_class", baseClass);
-            if (!configProps.isEmpty()) {
-                node.getProperties().put("config", configProps);
-            }
-            nodes.add(node);
-
+            nodes.add(createPydanticNode(nodeId, className, filePath, moduleName, line, baseClass, classBody));
             knownModels.put(className, nodeId);
-
-            if (knownModels.containsKey(baseClass)) {
-                CodeEdge edge = new CodeEdge();
-                edge.setId(nodeId + "->extends->" + knownModels.get(baseClass));
-                edge.setKind(EdgeKind.EXTENDS);
-                edge.setSourceId(nodeId);
-                edges.add(edge);
-            }
+            addExtendsEdge(nodeId, baseClass, knownModels, edges);
         }
 
         return DetectorResult.of(nodes, edges);
+    }
+
+    // --- Shared helpers ---
+
+    private static CodeNode createPydanticNode(String nodeId, String className, String filePath,
+            String moduleName, int line, String baseClass, String classBody) {
+        boolean isSettings = baseClass.contains("BaseSettings");
+
+        List<String> fields = new ArrayList<>();
+        Map<String, String> fieldTypes = extractFieldsAndTypes(classBody, fields);
+        List<String> validators = extractValidators(classBody);
+        Map<String, String> configProps = extractConfigProps(classBody);
+
+        NodeKind nodeKind = isSettings ? NodeKind.CONFIG_DEFINITION : NodeKind.ENTITY;
+
+        CodeNode node = new CodeNode();
+        node.setId(nodeId);
+        node.setKind(nodeKind);
+        node.setLabel(className);
+        node.setFqn(filePath + "::" + className);
+        node.setModule(moduleName);
+        node.setFilePath(filePath);
+        node.setLineStart(line);
+        node.setAnnotations(validators);
+        node.getProperties().put("fields", fields);
+        node.getProperties().put("field_types", fieldTypes);
+        node.getProperties().put("framework", "pydantic");
+        node.getProperties().put("base_class", baseClass);
+        if (!configProps.isEmpty()) {
+            node.getProperties().put("config", configProps);
+        }
+        return node;
+    }
+
+    private static Map<String, String> extractFieldsAndTypes(String classBody, List<String> fields) {
+        Map<String, String> fieldTypes = new LinkedHashMap<>();
+        Matcher fieldMatcher = FIELD_RE.matcher(classBody);
+        while (fieldMatcher.find()) {
+            String fname = fieldMatcher.group(1);
+            String ftype = fieldMatcher.group(2).trim();
+            if (!fname.equals("class") && !fname.equals("Config") && !fname.equals("model_config")) {
+                fields.add(fname);
+                fieldTypes.put(fname, ftype);
+            }
+        }
+        return fieldTypes;
+    }
+
+    private static List<String> extractValidators(String classBody) {
+        List<String> validators = new ArrayList<>();
+        Matcher validatorMatcher = VALIDATOR_RE.matcher(classBody);
+        while (validatorMatcher.find()) {
+            validators.add(validatorMatcher.group(1));
+        }
+        return validators;
+    }
+
+    private static Map<String, String> extractConfigProps(String classBody) {
+        Map<String, String> configProps = new LinkedHashMap<>();
+        Matcher configMatch = CONFIG_CLASS_RE.matcher(classBody);
+        if (configMatch.find()) {
+            int configBlockStart = configMatch.end();
+            int configBlockEnd = classBody.length();
+            Matcher configEndMatcher = CONFIG_END_RE.matcher(classBody.substring(configBlockStart));
+            if (configEndMatcher.find()) {
+                configBlockEnd = configBlockStart + configEndMatcher.start();
+            }
+            String configBlock = classBody.substring(configBlockStart, configBlockEnd);
+            Matcher attrMatcher = CONFIG_ATTR_RE.matcher(configBlock);
+            while (attrMatcher.find()) {
+                configProps.put(attrMatcher.group(1), attrMatcher.group(2).trim());
+            }
+        }
+        return configProps;
+    }
+
+    private static void addExtendsEdge(String nodeId, String baseClass,
+            Map<String, String> knownModels, List<CodeEdge> edges) {
+        if (knownModels.containsKey(baseClass)) {
+            CodeEdge edge = new CodeEdge();
+            edge.setId(nodeId + "->extends->" + knownModels.get(baseClass));
+            edge.setKind(EdgeKind.EXTENDS);
+            edge.setSourceId(nodeId);
+            edges.add(edge);
+        }
     }
 
 }

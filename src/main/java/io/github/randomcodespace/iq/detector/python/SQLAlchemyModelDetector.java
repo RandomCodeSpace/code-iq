@@ -70,44 +70,14 @@ public class SQLAlchemyModelDetector extends AbstractPythonDbDetector {
                 int line = lineOf(classCtx);
                 String classBody = extractClassBody(text, classCtx);
 
-                // Extract table name
-                Matcher tableMatch = TABLE_NAME.matcher(classBody);
-                String tableName = tableMatch.find() ? tableMatch.group(1) : className.toLowerCase() + "s";
-
-                // Extract columns
-                List<String> columns = new ArrayList<>();
-                Matcher colMatcher = COLUMN_PATTERN.matcher(classBody);
-                while (colMatcher.find()) {
-                    columns.add(colMatcher.group(1));
-                }
+                String tableName = extractTableName(classBody, className);
+                List<String> columns = extractColumns(classBody);
 
                 String nodeId = "entity:" + (moduleName != null ? moduleName : "") + ":" + className;
-                CodeNode node = new CodeNode();
-                node.setId(nodeId);
-                node.setKind(NodeKind.ENTITY);
-                node.setLabel(className);
-                node.setFqn(filePath + "::" + className);
-                node.setModule(moduleName);
-                node.setFilePath(filePath);
-                node.setLineStart(line);
-                node.getProperties().put("table_name", tableName);
-                node.getProperties().put("columns", columns);
-                node.getProperties().put("framework", "sqlalchemy");
-                nodes.add(node);
+                nodes.add(createEntityNode(nodeId, className, filePath, moduleName, line, tableName, columns));
                 addDbEdge(nodeId, ctx.registry(), nodes, edges);
 
-                // Relationships
-                Matcher relMatcher = RELATIONSHIP_PATTERN.matcher(classBody);
-                while (relMatcher.find()) {
-                    String targetClass = relMatcher.group(2);
-                    String targetId = "entity:" + (moduleName != null ? moduleName : "") + ":" + targetClass;
-                    CodeEdge edge = new CodeEdge();
-                    edge.setId(nodeId + "->maps_to->" + targetId);
-                    edge.setKind(EdgeKind.MAPS_TO);
-                    edge.setSourceId(nodeId);
-                    edge.setTarget(new CodeNode("*:" + targetClass, NodeKind.ENTITY, targetClass));
-                    edges.add(edge);
-                }
+                addRelationshipEdges(classBody, nodeId, moduleName, edges);
             }
         }, tree);
 
@@ -139,44 +109,64 @@ public class SQLAlchemyModelDetector extends AbstractPythonDbDetector {
                 classBody = text.substring(classStart);
             }
 
-            Matcher tableMatch = TABLE_NAME.matcher(classBody);
-            String tableName = tableMatch.find() ? tableMatch.group(1) : className.toLowerCase() + "s";
-
-            List<String> columns = new ArrayList<>();
-            Matcher colMatcher = COLUMN_PATTERN.matcher(classBody);
-            while (colMatcher.find()) {
-                columns.add(colMatcher.group(1));
-            }
+            String tableName = extractTableName(classBody, className);
+            List<String> columns = extractColumns(classBody);
 
             String nodeId = "entity:" + (moduleName != null ? moduleName : "") + ":" + className;
-            CodeNode node = new CodeNode();
-            node.setId(nodeId);
-            node.setKind(NodeKind.ENTITY);
-            node.setLabel(className);
-            node.setFqn(filePath + "::" + className);
-            node.setModule(moduleName);
-            node.setFilePath(filePath);
-            node.setLineStart(line);
-            node.getProperties().put("table_name", tableName);
-            node.getProperties().put("columns", columns);
-            node.getProperties().put("framework", "sqlalchemy");
-            nodes.add(node);
+            nodes.add(createEntityNode(nodeId, className, filePath, moduleName, line, tableName, columns));
             addDbEdge(nodeId, ctx.registry(), nodes, edges);
 
-            Matcher relMatcher = RELATIONSHIP_PATTERN.matcher(classBody);
-            while (relMatcher.find()) {
-                String targetClass = relMatcher.group(2);
-                String targetId = "entity:" + (moduleName != null ? moduleName : "") + ":" + targetClass;
-                CodeEdge edge = new CodeEdge();
-                edge.setId(nodeId + "->maps_to->" + targetId);
-                edge.setKind(EdgeKind.MAPS_TO);
-                edge.setSourceId(nodeId);
-                edge.setTarget(new CodeNode("*:" + targetClass, NodeKind.ENTITY, targetClass));
-                edges.add(edge);
-            }
+            addRelationshipEdges(classBody, nodeId, moduleName, edges);
         }
 
         return DetectorResult.of(nodes, edges);
+    }
+
+    // --- Shared helpers ---
+
+    private static String extractTableName(String classBody, String className) {
+        Matcher tableMatch = TABLE_NAME.matcher(classBody);
+        return tableMatch.find() ? tableMatch.group(1) : className.toLowerCase() + "s";
+    }
+
+    private static List<String> extractColumns(String classBody) {
+        List<String> columns = new ArrayList<>();
+        Matcher colMatcher = COLUMN_PATTERN.matcher(classBody);
+        while (colMatcher.find()) {
+            columns.add(colMatcher.group(1));
+        }
+        return columns;
+    }
+
+    private static CodeNode createEntityNode(String nodeId, String className, String filePath,
+            String moduleName, int line, String tableName, List<String> columns) {
+        CodeNode node = new CodeNode();
+        node.setId(nodeId);
+        node.setKind(NodeKind.ENTITY);
+        node.setLabel(className);
+        node.setFqn(filePath + "::" + className);
+        node.setModule(moduleName);
+        node.setFilePath(filePath);
+        node.setLineStart(line);
+        node.getProperties().put("table_name", tableName);
+        node.getProperties().put("columns", columns);
+        node.getProperties().put("framework", "sqlalchemy");
+        return node;
+    }
+
+    private static void addRelationshipEdges(String classBody, String nodeId, String moduleName,
+            List<CodeEdge> edges) {
+        Matcher relMatcher = RELATIONSHIP_PATTERN.matcher(classBody);
+        while (relMatcher.find()) {
+            String targetClass = relMatcher.group(2);
+            String targetId = "entity:" + (moduleName != null ? moduleName : "") + ":" + targetClass;
+            CodeEdge edge = new CodeEdge();
+            edge.setId(nodeId + "->maps_to->" + targetId);
+            edge.setKind(EdgeKind.MAPS_TO);
+            edge.setSourceId(nodeId);
+            edge.setTarget(new CodeNode("*:" + targetClass, NodeKind.ENTITY, targetClass));
+            edges.add(edge);
+        }
     }
 
 }

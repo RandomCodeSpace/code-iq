@@ -1,6 +1,5 @@
 package io.github.randomcodespace.iq.detector.java;
 
-import io.github.randomcodespace.iq.detector.AbstractRegexDetector;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.model.CodeEdge;
@@ -27,9 +26,8 @@ import io.github.randomcodespace.iq.detector.DetectorInfo;
     properties = {"broker", "exchange", "queue", "routing_key"}
 )
 @Component
-public class RabbitmqDetector extends AbstractRegexDetector {
+public class RabbitmqDetector extends AbstractJavaMessagingDetector {
 
-    private static final Pattern CLASS_RE = Pattern.compile("(?:public\\s+)?class\\s+(\\w+)");
     private static final Pattern RABBIT_LISTENER_RE = Pattern.compile(
             "@RabbitListener\\s*\\(\\s*(?:.*?queues?\\s*=\\s*)?[\\{\"]?\\s*\"([^\"]+)\"");
     private static final Pattern RABBIT_SEND_RE = Pattern.compile(
@@ -62,11 +60,7 @@ public class RabbitmqDetector extends AbstractRegexDetector {
         List<CodeNode> nodes = new ArrayList<>();
         List<CodeEdge> edges = new ArrayList<>();
 
-        String className = null;
-        for (String line : lines) {
-            Matcher cm = CLASS_RE.matcher(line);
-            if (cm.find()) { className = cm.group(1); break; }
-        }
+        String className = extractClassName(text);
         if (className == null) return DetectorResult.empty();
 
         String classNodeId = ctx.filePath() + ":" + className;
@@ -78,13 +72,8 @@ public class RabbitmqDetector extends AbstractRegexDetector {
             if (!m.find()) continue;
             String queue = m.group(1);
             String queueId = ensureQueueNode(queue, seenQueues, nodes);
-            CodeEdge edge = new CodeEdge();
-            edge.setId(classNodeId + "->consumes->" + queueId);
-            edge.setKind(EdgeKind.CONSUMES);
-            edge.setSourceId(classNodeId);
-            edge.setTarget(new CodeNode(queueId, NodeKind.QUEUE, queue));
-            edge.setProperties(Map.of("queue", queue));
-            edges.add(edge);
+            addMessagingEdge(classNodeId, queueId, EdgeKind.CONSUMES, queue,
+                    Map.of("queue", queue), edges);
         }
 
         // RabbitTemplate sends
@@ -109,13 +98,7 @@ public class RabbitmqDetector extends AbstractRegexDetector {
                 nodes.add(node);
             }
 
-            CodeEdge edge = new CodeEdge();
-            edge.setId(classNodeId + "->produces->" + queueId);
-            edge.setKind(EdgeKind.PRODUCES);
-            edge.setSourceId(classNodeId);
-            edge.setTarget(new CodeNode(queueId, NodeKind.QUEUE, exchangeOrQueue));
-            edge.setProperties(props);
-            edges.add(edge);
+            addMessagingEdge(classNodeId, queueId, EdgeKind.PRODUCES, exchangeOrQueue, props, edges);
         }
 
         // Exchange declarations

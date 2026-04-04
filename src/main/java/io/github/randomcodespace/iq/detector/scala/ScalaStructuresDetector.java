@@ -4,6 +4,7 @@ import io.github.randomcodespace.iq.detector.AbstractAntlrDetector;
 import io.github.randomcodespace.iq.grammar.AntlrParserFactory;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
+import io.github.randomcodespace.iq.detector.StructuresDetectorHelper;
 import io.github.randomcodespace.iq.model.CodeEdge;
 import io.github.randomcodespace.iq.model.CodeNode;
 import io.github.randomcodespace.iq.model.EdgeKind;
@@ -59,10 +60,7 @@ public class ScalaStructuresDetector extends AbstractAntlrDetector {
 
         Matcher m = IMPORT_RE.matcher(text);
         while (m.find()) {
-            CodeEdge e = new CodeEdge(); e.setId(fp + ":imports:" + m.group(1));
-            e.setKind(EdgeKind.IMPORTS); e.setSourceId(fp);
-            e.setTarget(new CodeNode(m.group(1), NodeKind.MODULE, m.group(1)));
-            edges.add(e);
+            StructuresDetectorHelper.addImportEdge(fp, m.group(1), edges);
         }
 
         m = CLASS_RE.matcher(text);
@@ -71,24 +69,15 @@ public class ScalaStructuresDetector extends AbstractAntlrDetector {
             String baseClass = m.group(2);
             String traitsStr = m.group(3);
             String nodeId = fp + ":" + className;
-            CodeNode n = new CodeNode(); n.setId(nodeId);
-            n.setKind(NodeKind.CLASS); n.setLabel(className); n.setFqn(className);
-            n.setFilePath(fp); n.setLineStart(findLineNumber(text, m.start()));
-            nodes.add(n);
+            nodes.add(StructuresDetectorHelper.createStructureNode(fp, className, NodeKind.CLASS, findLineNumber(text, m.start())));
             if (baseClass != null) {
-                CodeEdge e = new CodeEdge(); e.setId(nodeId + ":extends:" + baseClass);
-                e.setKind(EdgeKind.EXTENDS); e.setSourceId(nodeId);
-                e.setTarget(new CodeNode(baseClass, NodeKind.CLASS, baseClass));
-                edges.add(e);
+                StructuresDetectorHelper.addExtendsEdge(nodeId, baseClass, NodeKind.CLASS, edges);
             }
             if (traitsStr != null) {
                 for (String trait : traitsStr.split(",")) {
                     trait = trait.trim();
                     if (!trait.isEmpty()) {
-                        CodeEdge e = new CodeEdge(); e.setId(nodeId + ":implements:" + trait);
-                        e.setKind(EdgeKind.IMPLEMENTS); e.setSourceId(nodeId);
-                        e.setTarget(new CodeNode(trait, NodeKind.INTERFACE, trait));
-                        edges.add(e);
+                        StructuresDetectorHelper.addImplementsEdge(nodeId, trait, edges);
                     }
                 }
             }
@@ -96,31 +85,21 @@ public class ScalaStructuresDetector extends AbstractAntlrDetector {
 
         m = TRAIT_RE.matcher(text);
         while (m.find()) {
-            String name = m.group(1);
-            CodeNode n = new CodeNode(); n.setId(fp + ":" + name);
-            n.setKind(NodeKind.INTERFACE); n.setLabel(name); n.setFqn(name);
-            n.setFilePath(fp); n.setLineStart(findLineNumber(text, m.start()));
+            CodeNode n = StructuresDetectorHelper.createStructureNode(fp, m.group(1), NodeKind.INTERFACE, findLineNumber(text, m.start()));
             n.getProperties().put("type", "trait");
             nodes.add(n);
         }
 
         m = OBJECT_RE.matcher(text);
         while (m.find()) {
-            String name = m.group(1);
-            CodeNode n = new CodeNode(); n.setId(fp + ":" + name);
-            n.setKind(NodeKind.CLASS); n.setLabel(name); n.setFqn(name);
-            n.setFilePath(fp); n.setLineStart(findLineNumber(text, m.start()));
+            CodeNode n = StructuresDetectorHelper.createStructureNode(fp, m.group(1), NodeKind.CLASS, findLineNumber(text, m.start()));
             n.getProperties().put("type", "object");
             nodes.add(n);
         }
 
         m = DEF_RE.matcher(text);
         while (m.find()) {
-            String name = m.group(1);
-            CodeNode n = new CodeNode(); n.setId(fp + ":" + name);
-            n.setKind(NodeKind.METHOD); n.setLabel(name); n.setFqn(name);
-            n.setFilePath(fp); n.setLineStart(findLineNumber(text, m.start()));
-            nodes.add(n);
+            nodes.add(StructuresDetectorHelper.createStructureNode(fp, m.group(1), NodeKind.METHOD, findLineNumber(text, m.start())));
         }
 
         return DetectorResult.of(nodes, edges);

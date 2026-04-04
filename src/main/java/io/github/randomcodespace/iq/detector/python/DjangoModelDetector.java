@@ -89,18 +89,7 @@ public class DjangoModelDetector extends AbstractPythonDbDetector {
                     int line = lineOf(classCtx);
                     String nodeId = "django:" + filePath + ":manager:" + className;
                     managerNames.put(className, nodeId);
-
-                    CodeNode node = new CodeNode();
-                    node.setId(nodeId);
-                    node.setKind(NodeKind.REPOSITORY);
-                    node.setLabel(className);
-                    node.setFqn(filePath + "::" + className);
-                    node.setModule(moduleName);
-                    node.setFilePath(filePath);
-                    node.setLineStart(line);
-                    node.getProperties().put("framework", "django");
-                    node.getProperties().put("type", "manager");
-                    nodes.add(node);
+                    nodes.add(createManagerNode(nodeId, className, filePath, moduleName, line));
                 }
             }
         }, tree);
@@ -117,96 +106,18 @@ public class DjangoModelDetector extends AbstractPythonDbDetector {
                 if (bases == null || !bases.matches(".*\\bModel\\b.*")) return;
 
                 int line = lineOf(classCtx);
-                // Get class body text for field/meta extraction
                 String classBody = extractClassBody(text, classCtx);
 
-                // Extract fields
-                Map<String, String> fields = new LinkedHashMap<>();
-                Matcher fieldMatcher = FIELD_RE.matcher(classBody);
-                while (fieldMatcher.find()) {
-                    fields.put(fieldMatcher.group(1), fieldMatcher.group(2));
-                }
-
-                // Extract Meta properties
-                String tableName = null;
-                String ordering = null;
-                Matcher metaMatch = META_CLASS_RE.matcher(classBody);
-                if (metaMatch.find()) {
-                    int metaStart = metaMatch.end();
-                    int metaEnd = classBody.length();
-                    Matcher metaEndMatcher = META_END_RE.matcher(classBody.substring(metaStart));
-                    if (metaEndMatcher.find()) {
-                        metaEnd = metaStart + metaEndMatcher.start();
-                    }
-                    String metaBlock = classBody.substring(metaStart, metaEnd);
-                    Matcher tableMatch = META_TABLE_RE.matcher(metaBlock);
-                    if (tableMatch.find()) {
-                        tableName = tableMatch.group(1);
-                    }
-                    Matcher orderingMatch = META_ORDERING_RE.matcher(metaBlock);
-                    if (orderingMatch.find()) {
-                        ordering = orderingMatch.group(1);
-                    }
-                }
+                Map<String, String> fields = extractFields(classBody);
+                String[] meta = extractMeta(classBody);
 
                 String nodeId = "django:" + filePath + ":model:" + className;
-                CodeNode node = new CodeNode();
-                node.setId(nodeId);
-                node.setKind(NodeKind.ENTITY);
-                node.setLabel(className);
-                node.setFqn(filePath + "::" + className);
-                node.setModule(moduleName);
-                node.setFilePath(filePath);
-                node.setLineStart(line);
-                node.getProperties().put("fields", fields);
-                node.getProperties().put("framework", "django");
-                if (tableName != null) {
-                    node.getProperties().put("table_name", tableName);
-                }
-                if (ordering != null) {
-                    node.getProperties().put("ordering", ordering);
-                }
-                nodes.add(node);
+                nodes.add(createModelNode(nodeId, className, filePath, moduleName, line, fields, meta[0], meta[1]));
                 addDbEdge(nodeId, ctx.registry(), nodes, edges);
 
-                // FK / OneToOne edges
-                Matcher fkMatcher = FK_RE.matcher(classBody);
-                while (fkMatcher.find()) {
-                    String targetClassName = fkMatcher.group(2);
-                    String targetId = "django:" + filePath + ":model:" + targetClassName;
-                    CodeEdge edge = new CodeEdge();
-                    edge.setId(nodeId + "->depends_on->" + targetId);
-                    edge.setKind(EdgeKind.DEPENDS_ON);
-                    edge.setSourceId(nodeId);
-                    edge.setTarget(new CodeNode("*:" + targetClassName, NodeKind.ENTITY, targetClassName));
-                    edges.add(edge);
-                }
-
-                // M2M edges
-                Matcher m2mMatcher = M2M_RE.matcher(classBody);
-                while (m2mMatcher.find()) {
-                    String targetClassName = m2mMatcher.group(2);
-                    String targetId = "django:" + filePath + ":model:" + targetClassName;
-                    CodeEdge edge = new CodeEdge();
-                    edge.setId(nodeId + "->depends_on->" + targetId);
-                    edge.setKind(EdgeKind.DEPENDS_ON);
-                    edge.setSourceId(nodeId);
-                    edge.setTarget(new CodeNode("*:" + targetClassName, NodeKind.ENTITY, targetClassName));
-                    edges.add(edge);
-                }
-
-                // Manager assignments
-                Matcher maMatcher = MANAGER_ASSIGNMENT_RE.matcher(classBody);
-                while (maMatcher.find()) {
-                    String mgrClass = maMatcher.group(2);
-                    if (managerNames.containsKey(mgrClass)) {
-                        CodeEdge edge = new CodeEdge();
-                        edge.setId(nodeId + "->queries->" + managerNames.get(mgrClass));
-                        edge.setKind(EdgeKind.QUERIES);
-                        edge.setSourceId(nodeId);
-                        edges.add(edge);
-                    }
-                }
+                addFkEdges(classBody, nodeId, filePath, edges);
+                addM2mEdges(classBody, nodeId, filePath, edges);
+                addManagerAssignmentEdges(classBody, nodeId, managerNames, edges);
             }
         }, tree);
 
@@ -232,18 +143,7 @@ public class DjangoModelDetector extends AbstractPythonDbDetector {
             int line = findLineNumber(text, mgrMatcher.start());
             String nodeId = "django:" + filePath + ":manager:" + mgrName;
             managerNames.put(mgrName, nodeId);
-
-            CodeNode node = new CodeNode();
-            node.setId(nodeId);
-            node.setKind(NodeKind.REPOSITORY);
-            node.setLabel(mgrName);
-            node.setFqn(filePath + "::" + mgrName);
-            node.setModule(moduleName);
-            node.setFilePath(filePath);
-            node.setLineStart(line);
-            node.getProperties().put("framework", "django");
-            node.getProperties().put("type", "manager");
-            nodes.add(node);
+            nodes.add(createManagerNode(nodeId, mgrName, filePath, moduleName, line));
         }
 
         // Detect models
@@ -261,91 +161,135 @@ public class DjangoModelDetector extends AbstractPythonDbDetector {
                 classBody = text.substring(classStart);
             }
 
-            Map<String, String> fields = new LinkedHashMap<>();
-            Matcher fieldMatcher = FIELD_RE.matcher(classBody);
-            while (fieldMatcher.find()) {
-                fields.put(fieldMatcher.group(1), fieldMatcher.group(2));
-            }
-
-            String tableName = null;
-            String ordering = null;
-            Matcher metaMatch = META_CLASS_RE.matcher(classBody);
-            if (metaMatch.find()) {
-                int metaStart = metaMatch.end();
-                int metaEnd = classBody.length();
-                Matcher metaEndMatcher = META_END_RE.matcher(classBody.substring(metaStart));
-                if (metaEndMatcher.find()) {
-                    metaEnd = metaStart + metaEndMatcher.start();
-                }
-                String metaBlock = classBody.substring(metaStart, metaEnd);
-                Matcher tableMatch = META_TABLE_RE.matcher(metaBlock);
-                if (tableMatch.find()) {
-                    tableName = tableMatch.group(1);
-                }
-                Matcher orderingMatch = META_ORDERING_RE.matcher(metaBlock);
-                if (orderingMatch.find()) {
-                    ordering = orderingMatch.group(1);
-                }
-            }
+            Map<String, String> fields = extractFields(classBody);
+            String[] meta = extractMeta(classBody);
 
             String nodeId = "django:" + filePath + ":model:" + className;
-            CodeNode node = new CodeNode();
-            node.setId(nodeId);
-            node.setKind(NodeKind.ENTITY);
-            node.setLabel(className);
-            node.setFqn(filePath + "::" + className);
-            node.setModule(moduleName);
-            node.setFilePath(filePath);
-            node.setLineStart(line);
-            node.getProperties().put("fields", fields);
-            node.getProperties().put("framework", "django");
-            if (tableName != null) {
-                node.getProperties().put("table_name", tableName);
-            }
-            if (ordering != null) {
-                node.getProperties().put("ordering", ordering);
-            }
-            nodes.add(node);
+            nodes.add(createModelNode(nodeId, className, filePath, moduleName, line, fields, meta[0], meta[1]));
             addDbEdge(nodeId, ctx.registry(), nodes, edges);
 
-            Matcher fkMatcher = FK_RE.matcher(classBody);
-            while (fkMatcher.find()) {
-                String targetClassName = fkMatcher.group(2);
-                String targetId = "django:" + filePath + ":model:" + targetClassName;
-                CodeEdge edge = new CodeEdge();
-                edge.setId(nodeId + "->depends_on->" + targetId);
-                edge.setKind(EdgeKind.DEPENDS_ON);
-                edge.setSourceId(nodeId);
-                edge.setTarget(new CodeNode("*:" + targetClassName, NodeKind.ENTITY, targetClassName));
-                edges.add(edge);
-            }
-
-            Matcher m2mMatcher = M2M_RE.matcher(classBody);
-            while (m2mMatcher.find()) {
-                String targetClassName = m2mMatcher.group(2);
-                String targetId = "django:" + filePath + ":model:" + targetClassName;
-                CodeEdge edge = new CodeEdge();
-                edge.setId(nodeId + "->depends_on->" + targetId);
-                edge.setKind(EdgeKind.DEPENDS_ON);
-                edge.setSourceId(nodeId);
-                edge.setTarget(new CodeNode("*:" + targetClassName, NodeKind.ENTITY, targetClassName));
-                edges.add(edge);
-            }
-
-            Matcher maMatcher = MANAGER_ASSIGNMENT_RE.matcher(classBody);
-            while (maMatcher.find()) {
-                String mgrClass = maMatcher.group(2);
-                if (managerNames.containsKey(mgrClass)) {
-                    CodeEdge edge = new CodeEdge();
-                    edge.setId(nodeId + "->queries->" + managerNames.get(mgrClass));
-                    edge.setKind(EdgeKind.QUERIES);
-                    edge.setSourceId(nodeId);
-                    edges.add(edge);
-                }
-            }
+            addFkEdges(classBody, nodeId, filePath, edges);
+            addM2mEdges(classBody, nodeId, filePath, edges);
+            addManagerAssignmentEdges(classBody, nodeId, managerNames, edges);
         }
 
         return DetectorResult.of(nodes, edges);
+    }
+
+    // --- Shared helpers ---
+
+    private static CodeNode createManagerNode(String nodeId, String name, String filePath,
+            String moduleName, int line) {
+        CodeNode node = new CodeNode();
+        node.setId(nodeId);
+        node.setKind(NodeKind.REPOSITORY);
+        node.setLabel(name);
+        node.setFqn(filePath + "::" + name);
+        node.setModule(moduleName);
+        node.setFilePath(filePath);
+        node.setLineStart(line);
+        node.getProperties().put("framework", "django");
+        node.getProperties().put("type", "manager");
+        return node;
+    }
+
+    private static CodeNode createModelNode(String nodeId, String className, String filePath,
+            String moduleName, int line, Map<String, String> fields, String tableName, String ordering) {
+        CodeNode node = new CodeNode();
+        node.setId(nodeId);
+        node.setKind(NodeKind.ENTITY);
+        node.setLabel(className);
+        node.setFqn(filePath + "::" + className);
+        node.setModule(moduleName);
+        node.setFilePath(filePath);
+        node.setLineStart(line);
+        node.getProperties().put("fields", fields);
+        node.getProperties().put("framework", "django");
+        if (tableName != null) {
+            node.getProperties().put("table_name", tableName);
+        }
+        if (ordering != null) {
+            node.getProperties().put("ordering", ordering);
+        }
+        return node;
+    }
+
+    private static Map<String, String> extractFields(String classBody) {
+        Map<String, String> fields = new LinkedHashMap<>();
+        Matcher fieldMatcher = FIELD_RE.matcher(classBody);
+        while (fieldMatcher.find()) {
+            fields.put(fieldMatcher.group(1), fieldMatcher.group(2));
+        }
+        return fields;
+    }
+
+    /**
+     * Extract Meta class properties (table_name and ordering) from a class body.
+     * @return a two-element array: [tableName, ordering] (either may be null)
+     */
+    private static String[] extractMeta(String classBody) {
+        String tableName = null;
+        String ordering = null;
+        Matcher metaMatch = META_CLASS_RE.matcher(classBody);
+        if (metaMatch.find()) {
+            int metaStart = metaMatch.end();
+            int metaEnd = classBody.length();
+            Matcher metaEndMatcher = META_END_RE.matcher(classBody.substring(metaStart));
+            if (metaEndMatcher.find()) {
+                metaEnd = metaStart + metaEndMatcher.start();
+            }
+            String metaBlock = classBody.substring(metaStart, metaEnd);
+            Matcher tableMatch = META_TABLE_RE.matcher(metaBlock);
+            if (tableMatch.find()) {
+                tableName = tableMatch.group(1);
+            }
+            Matcher orderingMatch = META_ORDERING_RE.matcher(metaBlock);
+            if (orderingMatch.find()) {
+                ordering = orderingMatch.group(1);
+            }
+        }
+        return new String[]{tableName, ordering};
+    }
+
+    private static void addFkEdges(String classBody, String nodeId, String filePath, List<CodeEdge> edges) {
+        Matcher fkMatcher = FK_RE.matcher(classBody);
+        while (fkMatcher.find()) {
+            String targetClassName = fkMatcher.group(2);
+            edges.add(createDependsOnEdge(nodeId, filePath, targetClassName));
+        }
+    }
+
+    private static void addM2mEdges(String classBody, String nodeId, String filePath, List<CodeEdge> edges) {
+        Matcher m2mMatcher = M2M_RE.matcher(classBody);
+        while (m2mMatcher.find()) {
+            String targetClassName = m2mMatcher.group(2);
+            edges.add(createDependsOnEdge(nodeId, filePath, targetClassName));
+        }
+    }
+
+    private static CodeEdge createDependsOnEdge(String nodeId, String filePath, String targetClassName) {
+        String targetId = "django:" + filePath + ":model:" + targetClassName;
+        CodeEdge edge = new CodeEdge();
+        edge.setId(nodeId + "->depends_on->" + targetId);
+        edge.setKind(EdgeKind.DEPENDS_ON);
+        edge.setSourceId(nodeId);
+        edge.setTarget(new CodeNode("*:" + targetClassName, NodeKind.ENTITY, targetClassName));
+        return edge;
+    }
+
+    private static void addManagerAssignmentEdges(String classBody, String nodeId,
+            Map<String, String> managerNames, List<CodeEdge> edges) {
+        Matcher maMatcher = MANAGER_ASSIGNMENT_RE.matcher(classBody);
+        while (maMatcher.find()) {
+            String mgrClass = maMatcher.group(2);
+            if (managerNames.containsKey(mgrClass)) {
+                CodeEdge edge = new CodeEdge();
+                edge.setId(nodeId + "->queries->" + managerNames.get(mgrClass));
+                edge.setKind(EdgeKind.QUERIES);
+                edge.setSourceId(nodeId);
+                edges.add(edge);
+            }
+        }
     }
 
 }

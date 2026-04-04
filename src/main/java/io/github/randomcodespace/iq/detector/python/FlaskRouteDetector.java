@@ -89,28 +89,9 @@ public class FlaskRouteDetector extends AbstractPythonAntlrDetector {
                     int line = lineOf(dec);
 
                     for (String method : methods) {
-                        String nodeId = "endpoint:" + (moduleName != null ? moduleName : "") + ":" + method + ":" + path;
-                        CodeNode node = new CodeNode();
-                        node.setId(nodeId);
-                        node.setKind(NodeKind.ENDPOINT);
-                        node.setLabel(method + " " + path);
-                        node.setFqn(filePath + "::" + funcName);
-                        node.setModule(moduleName);
-                        node.setFilePath(filePath);
-                        node.setLineStart(line);
-                        node.getProperties().put("protocol", "REST");
-                        node.getProperties().put("http_method", method);
-                        node.getProperties().put("path_pattern", path);
-                        node.getProperties().put("framework", "flask");
-                        node.getProperties().put("blueprint", blueprint);
+                        CodeNode node = createFlaskRouteEndpoint(filePath, moduleName, line, method, path, funcName, blueprint);
                         nodes.add(node);
-
-                        String classId = "class:" + filePath + "::" + blueprint;
-                        CodeEdge edge = new CodeEdge();
-                        edge.setId(classId + "->exposes->" + nodeId);
-                        edge.setKind(EdgeKind.EXPOSES);
-                        edge.setSourceId(classId);
-                        edges.add(edge);
+                        edges.add(createExposesEdge(filePath, blueprint, node.getId()));
                     }
                 }
             }
@@ -149,32 +130,41 @@ public class FlaskRouteDetector extends AbstractPythonAntlrDetector {
             int line = findLineNumber(text, routeMatcher.start());
 
             for (String method : methods) {
-                String nodeId = "endpoint:" + (moduleName != null ? moduleName : "") + ":" + method + ":" + path;
-                CodeNode node = new CodeNode();
-                node.setId(nodeId);
-                node.setKind(NodeKind.ENDPOINT);
-                node.setLabel(method + " " + path);
-                node.setFqn(filePath + "::" + funcName);
-                node.setModule(moduleName);
-                node.setFilePath(filePath);
-                node.setLineStart(line);
-                node.getProperties().put("protocol", "REST");
-                node.getProperties().put("http_method", method);
-                node.getProperties().put("path_pattern", path);
-                node.getProperties().put("framework", "flask");
-                node.getProperties().put("blueprint", blueprint);
+                CodeNode node = createFlaskRouteEndpoint(filePath, moduleName, line, method, path, funcName, blueprint);
                 nodes.add(node);
-
-                String classId = "class:" + filePath + "::" + blueprint;
-                CodeEdge edge = new CodeEdge();
-                edge.setId(classId + "->exposes->" + nodeId);
-                edge.setKind(EdgeKind.EXPOSES);
-                edge.setSourceId(classId);
-                edges.add(edge);
+                edges.add(createExposesEdge(filePath, blueprint, node.getId()));
             }
         }
 
         return DetectorResult.of(nodes, edges);
+    }
+
+    private static CodeNode createFlaskRouteEndpoint(String filePath, String moduleName, int line,
+                                                    String method, String path, String funcName, String blueprint) {
+        String nodeId = "endpoint:" + (moduleName != null ? moduleName : "") + ":" + method + ":" + path;
+        CodeNode node = new CodeNode();
+        node.setId(nodeId);
+        node.setKind(NodeKind.ENDPOINT);
+        node.setLabel(method + " " + path);
+        node.setFqn(filePath + "::" + funcName);
+        node.setModule(moduleName);
+        node.setFilePath(filePath);
+        node.setLineStart(line);
+        node.getProperties().put("protocol", "REST");
+        node.getProperties().put("http_method", method);
+        node.getProperties().put("path_pattern", path);
+        node.getProperties().put("framework", "flask");
+        node.getProperties().put("blueprint", blueprint);
+        return node;
+    }
+
+    private static CodeEdge createExposesEdge(String filePath, String blueprint, String endpointId) {
+        String classId = "class:" + filePath + "::" + blueprint;
+        CodeEdge edge = new CodeEdge();
+        edge.setId(classId + "->exposes->" + endpointId);
+        edge.setKind(EdgeKind.EXPOSES);
+        edge.setSourceId(classId);
+        return edge;
     }
 
     private static String extractFirstStringArg(Python3Parser.ArglistContext arglist) {

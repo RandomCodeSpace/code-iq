@@ -4,6 +4,7 @@ import io.github.randomcodespace.iq.detector.AbstractAntlrDetector;
 import io.github.randomcodespace.iq.grammar.AntlrParserFactory;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
+import io.github.randomcodespace.iq.detector.StructuresDetectorHelper;
 import io.github.randomcodespace.iq.model.CodeEdge;
 import io.github.randomcodespace.iq.model.CodeNode;
 import io.github.randomcodespace.iq.model.EdgeKind;
@@ -63,11 +64,7 @@ public class KotlinStructuresDetector extends AbstractAntlrDetector {
 
         Matcher m = IMPORT_RE.matcher(text);
         while (m.find()) {
-            String target = m.group(1);
-            CodeEdge e = new CodeEdge(); e.setId(fp + ":imports:" + target);
-            e.setKind(EdgeKind.IMPORTS); e.setSourceId(fp);
-            e.setTarget(new CodeNode(target, NodeKind.MODULE, target));
-            edges.add(e);
+            StructuresDetectorHelper.addImportEdge(fp, m.group(1), edges);
         }
 
         m = CLASS_RE.matcher(text);
@@ -75,18 +72,12 @@ public class KotlinStructuresDetector extends AbstractAntlrDetector {
             String className = m.group(1);
             String supertypesStr = m.group(2);
             String nodeId = fp + ":" + className;
-            CodeNode n = new CodeNode(); n.setId(nodeId);
-            n.setKind(NodeKind.CLASS); n.setLabel(className); n.setFqn(className);
-            n.setFilePath(fp); n.setLineStart(findLineNumber(text, m.start()));
-            nodes.add(n);
+            nodes.add(StructuresDetectorHelper.createStructureNode(fp, className, NodeKind.CLASS, findLineNumber(text, m.start())));
             if (supertypesStr != null) {
                 for (String st : supertypesStr.split(",")) {
                     st = st.trim().split("\\(")[0].split("<")[0].trim();
                     if (!st.isEmpty()) {
-                        CodeEdge e = new CodeEdge(); e.setId(nodeId + ":extends:" + st);
-                        e.setKind(EdgeKind.EXTENDS); e.setSourceId(nodeId);
-                        e.setTarget(new CodeNode(st, NodeKind.CLASS, st));
-                        edges.add(e);
+                        StructuresDetectorHelper.addExtendsEdge(nodeId, st, NodeKind.CLASS, edges);
                     }
                 }
             }
@@ -94,30 +85,19 @@ public class KotlinStructuresDetector extends AbstractAntlrDetector {
 
         m = INTERFACE_RE.matcher(text);
         while (m.find()) {
-            String name = m.group(1);
-            CodeNode n = new CodeNode(); n.setId(fp + ":" + name);
-            n.setKind(NodeKind.INTERFACE); n.setLabel(name); n.setFqn(name);
-            n.setFilePath(fp); n.setLineStart(findLineNumber(text, m.start()));
-            nodes.add(n);
+            nodes.add(StructuresDetectorHelper.createStructureNode(fp, m.group(1), NodeKind.INTERFACE, findLineNumber(text, m.start())));
         }
 
         m = OBJECT_RE.matcher(text);
         while (m.find()) {
-            String name = m.group(1);
-            CodeNode n = new CodeNode(); n.setId(fp + ":" + name);
-            n.setKind(NodeKind.CLASS); n.setLabel(name); n.setFqn(name);
-            n.setFilePath(fp); n.setLineStart(findLineNumber(text, m.start()));
+            CodeNode n = StructuresDetectorHelper.createStructureNode(fp, m.group(1), NodeKind.CLASS, findLineNumber(text, m.start()));
             n.getProperties().put("type", "object");
             nodes.add(n);
         }
 
         m = FUN_RE.matcher(text);
         while (m.find()) {
-            String name = m.group(1);
-            CodeNode n = new CodeNode(); n.setId(fp + ":" + name);
-            n.setKind(NodeKind.METHOD); n.setLabel(name); n.setFqn(name);
-            n.setFilePath(fp); n.setLineStart(findLineNumber(text, m.start()));
-            nodes.add(n);
+            nodes.add(StructuresDetectorHelper.createStructureNode(fp, m.group(1), NodeKind.METHOD, findLineNumber(text, m.start())));
         }
 
         return DetectorResult.of(nodes, edges);

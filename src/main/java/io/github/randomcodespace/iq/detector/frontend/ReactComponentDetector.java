@@ -67,16 +67,9 @@ public class ReactComponentDetector extends AbstractRegexDetector {
             while (m.find()) {
                 String name = m.group(1);
                 if (componentNames.contains(name)) continue;
-                int line = text.substring(0, m.start()).split("\n", -1).length;
                 String sourceId = "react:" + filePath + ":component:" + name;
-                CodeNode node = new CodeNode();
-                node.setId(sourceId);
-                node.setKind(NodeKind.COMPONENT);
-                node.setLabel(name);
-                node.setFqn(filePath + "::" + name);
-                node.setFilePath(filePath);
-                node.setLineStart(line);
-                node.getProperties().put("framework", "react");
+                CodeNode node = FrontendDetectorHelper.createComponentNode("react", filePath, "component",
+                        name, NodeKind.COMPONENT, FrontendDetectorHelper.lineAt(text, m.start()));
                 node.getProperties().put("component_type", "function");
                 nodes.add(node);
                 componentNames.add(name);
@@ -90,16 +83,9 @@ public class ReactComponentDetector extends AbstractRegexDetector {
             while (m.find()) {
                 String name = m.group(1);
                 if (componentNames.contains(name)) continue;
-                int line = text.substring(0, m.start()).split("\n", -1).length;
                 String sourceId = "react:" + filePath + ":component:" + name;
-                CodeNode node = new CodeNode();
-                node.setId(sourceId);
-                node.setKind(NodeKind.COMPONENT);
-                node.setLabel(name);
-                node.setFqn(filePath + "::" + name);
-                node.setFilePath(filePath);
-                node.setLineStart(line);
-                node.getProperties().put("framework", "react");
+                CodeNode node = FrontendDetectorHelper.createComponentNode("react", filePath, "component",
+                        name, NodeKind.COMPONENT, FrontendDetectorHelper.lineAt(text, m.start()));
                 node.getProperties().put("component_type", "class");
                 nodes.add(node);
                 componentNames.add(name);
@@ -114,16 +100,8 @@ public class ReactComponentDetector extends AbstractRegexDetector {
             while (m.find()) {
                 String name = m.group(1);
                 if (hookNames.contains(name)) continue;
-                int line = text.substring(0, m.start()).split("\n", -1).length;
-                CodeNode node = new CodeNode();
-                node.setId("react:" + filePath + ":hook:" + name);
-                node.setKind(NodeKind.HOOK);
-                node.setLabel(name);
-                node.setFqn(filePath + "::" + name);
-                node.setFilePath(filePath);
-                node.setLineStart(line);
-                node.getProperties().put("framework", "react");
-                nodes.add(node);
+                nodes.add(FrontendDetectorHelper.createComponentNode("react", filePath, "hook",
+                        name, NodeKind.HOOK, FrontendDetectorHelper.lineAt(text, m.start())));
                 hookNames.add(name);
             }
         }

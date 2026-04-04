@@ -62,104 +62,33 @@ public class FastAPIAuthDetector extends AbstractPythonAntlrDetector {
             public void enterAtom_expr(Python3Parser.Atom_exprContext atomExpr) {
                 String text = atomExpr.getText();
 
-                // Depends(get_current_user...) / Depends(require_auth...) / Depends(auth...)
                 if (text.startsWith("Depends(")) {
                     Matcher m = DEPENDS_AUTH_RE.matcher(text);
                     if (m.find()) {
-                        int line = lineOf(atomExpr);
-                        String depName = m.group(1);
-                        CodeNode node = new CodeNode();
-                        node.setId("auth:" + filePath + ":Depends:" + line);
-                        node.setKind(NodeKind.GUARD);
-                        node.setLabel("Depends(" + depName + ")");
-                        node.setModule(moduleName);
-                        node.setFilePath(filePath);
-                        node.setLineStart(line);
-                        node.setAnnotations(List.of("Depends(" + depName + ")"));
-                        node.getProperties().put("auth_type", "fastapi");
-                        node.getProperties().put("auth_flow", "oauth2");
-                        node.getProperties().put("dependency", depName);
-                        node.getProperties().put("auth_required", true);
-                        nodes.add(node);
+                        nodes.add(createDependsGuard(filePath, moduleName, lineOf(atomExpr), m.group(1)));
                     }
                 }
 
-                // Security(scheme)
                 if (text.startsWith("Security(")) {
                     Matcher m = SECURITY_RE.matcher(text);
                     if (m.find()) {
-                        int line = lineOf(atomExpr);
-                        String schemeName = m.group(1);
-                        CodeNode node = new CodeNode();
-                        node.setId("auth:" + filePath + ":Security:" + line);
-                        node.setKind(NodeKind.GUARD);
-                        node.setLabel("Security(" + schemeName + ")");
-                        node.setModule(moduleName);
-                        node.setFilePath(filePath);
-                        node.setLineStart(line);
-                        node.setAnnotations(List.of("Security(" + schemeName + ")"));
-                        node.getProperties().put("auth_type", "fastapi");
-                        node.getProperties().put("auth_flow", "oauth2");
-                        node.getProperties().put("scheme", schemeName);
-                        node.getProperties().put("auth_required", true);
-                        nodes.add(node);
+                        nodes.add(createSecurityGuard(filePath, moduleName, lineOf(atomExpr), m.group(1)));
                     }
                 }
 
-                // HTTPBearer()
                 if (text.contains("HTTPBearer(")) {
-                    int line = lineOf(atomExpr);
-                    CodeNode node = new CodeNode();
-                    node.setId("auth:" + filePath + ":HTTPBearer:" + line);
-                    node.setKind(NodeKind.GUARD);
-                    node.setLabel("HTTPBearer()");
-                    node.setModule(moduleName);
-                    node.setFilePath(filePath);
-                    node.setLineStart(line);
-                    node.setAnnotations(List.of("HTTPBearer"));
-                    node.getProperties().put("auth_type", "fastapi");
-                    node.getProperties().put("auth_flow", "bearer");
-                    node.getProperties().put("auth_required", true);
-                    nodes.add(node);
+                    nodes.add(createHttpBearerGuard(filePath, moduleName, lineOf(atomExpr)));
                 }
 
-                // OAuth2PasswordBearer(tokenUrl=...)
                 if (text.contains("OAuth2PasswordBearer(")) {
                     Matcher m = OAUTH2_PASSWORD_BEARER_RE.matcher(text);
                     if (m.find()) {
-                        int line = lineOf(atomExpr);
-                        String tokenUrl = m.group(1);
-                        CodeNode node = new CodeNode();
-                        node.setId("auth:" + filePath + ":OAuth2PasswordBearer:" + line);
-                        node.setKind(NodeKind.GUARD);
-                        node.setLabel("OAuth2PasswordBearer(" + tokenUrl + ")");
-                        node.setModule(moduleName);
-                        node.setFilePath(filePath);
-                        node.setLineStart(line);
-                        node.setAnnotations(List.of("OAuth2PasswordBearer"));
-                        node.getProperties().put("auth_type", "fastapi");
-                        node.getProperties().put("auth_flow", "oauth2");
-                        node.getProperties().put("token_url", tokenUrl);
-                        node.getProperties().put("auth_required", true);
-                        nodes.add(node);
+                        nodes.add(createOAuth2PasswordBearerGuard(filePath, moduleName, lineOf(atomExpr), m.group(1)));
                     }
                 }
 
-                // HTTPBasic()
                 if (text.contains("HTTPBasic(")) {
-                    int line = lineOf(atomExpr);
-                    CodeNode node = new CodeNode();
-                    node.setId("auth:" + filePath + ":HTTPBasic:" + line);
-                    node.setKind(NodeKind.GUARD);
-                    node.setLabel("HTTPBasic()");
-                    node.setModule(moduleName);
-                    node.setFilePath(filePath);
-                    node.setLineStart(line);
-                    node.setAnnotations(List.of("HTTPBasic"));
-                    node.getProperties().put("auth_type", "fastapi");
-                    node.getProperties().put("auth_flow", "basic");
-                    node.getProperties().put("auth_required", true);
-                    nodes.add(node);
+                    nodes.add(createHttpBasicGuard(filePath, moduleName, lineOf(atomExpr)));
                 }
             }
         }, tree);
@@ -179,95 +108,107 @@ public class FastAPIAuthDetector extends AbstractPythonAntlrDetector {
 
         Matcher m = DEPENDS_AUTH_RE.matcher(text);
         while (m.find()) {
-            int line = findLineNumber(text, m.start());
-            String depName = m.group(1);
-            CodeNode node = new CodeNode();
-            node.setId("auth:" + filePath + ":Depends:" + line);
-            node.setKind(NodeKind.GUARD);
-            node.setLabel("Depends(" + depName + ")");
-            node.setModule(moduleName);
-            node.setFilePath(filePath);
-            node.setLineStart(line);
-            node.setAnnotations(List.of("Depends(" + depName + ")"));
-            node.getProperties().put("auth_type", "fastapi");
-            node.getProperties().put("auth_flow", "oauth2");
-            node.getProperties().put("dependency", depName);
-            node.getProperties().put("auth_required", true);
-            nodes.add(node);
+            nodes.add(createDependsGuard(filePath, moduleName, findLineNumber(text, m.start()), m.group(1)));
         }
 
         m = SECURITY_RE.matcher(text);
         while (m.find()) {
-            int line = findLineNumber(text, m.start());
-            String schemeName = m.group(1);
-            CodeNode node = new CodeNode();
-            node.setId("auth:" + filePath + ":Security:" + line);
-            node.setKind(NodeKind.GUARD);
-            node.setLabel("Security(" + schemeName + ")");
-            node.setModule(moduleName);
-            node.setFilePath(filePath);
-            node.setLineStart(line);
-            node.setAnnotations(List.of("Security(" + schemeName + ")"));
-            node.getProperties().put("auth_type", "fastapi");
-            node.getProperties().put("auth_flow", "oauth2");
-            node.getProperties().put("scheme", schemeName);
-            node.getProperties().put("auth_required", true);
-            nodes.add(node);
+            nodes.add(createSecurityGuard(filePath, moduleName, findLineNumber(text, m.start()), m.group(1)));
         }
 
         m = HTTP_BEARER_RE.matcher(text);
         while (m.find()) {
-            int line = findLineNumber(text, m.start());
-            CodeNode node = new CodeNode();
-            node.setId("auth:" + filePath + ":HTTPBearer:" + line);
-            node.setKind(NodeKind.GUARD);
-            node.setLabel("HTTPBearer()");
-            node.setModule(moduleName);
-            node.setFilePath(filePath);
-            node.setLineStart(line);
-            node.setAnnotations(List.of("HTTPBearer"));
-            node.getProperties().put("auth_type", "fastapi");
-            node.getProperties().put("auth_flow", "bearer");
-            node.getProperties().put("auth_required", true);
-            nodes.add(node);
+            nodes.add(createHttpBearerGuard(filePath, moduleName, findLineNumber(text, m.start())));
         }
 
         m = OAUTH2_PASSWORD_BEARER_RE.matcher(text);
         while (m.find()) {
-            int line = findLineNumber(text, m.start());
-            String tokenUrl = m.group(1);
-            CodeNode node = new CodeNode();
-            node.setId("auth:" + filePath + ":OAuth2PasswordBearer:" + line);
-            node.setKind(NodeKind.GUARD);
-            node.setLabel("OAuth2PasswordBearer(" + tokenUrl + ")");
-            node.setModule(moduleName);
-            node.setFilePath(filePath);
-            node.setLineStart(line);
-            node.setAnnotations(List.of("OAuth2PasswordBearer"));
-            node.getProperties().put("auth_type", "fastapi");
-            node.getProperties().put("auth_flow", "oauth2");
-            node.getProperties().put("token_url", tokenUrl);
-            node.getProperties().put("auth_required", true);
-            nodes.add(node);
+            nodes.add(createOAuth2PasswordBearerGuard(filePath, moduleName, findLineNumber(text, m.start()), m.group(1)));
         }
 
         m = HTTP_BASIC_RE.matcher(text);
         while (m.find()) {
-            int line = findLineNumber(text, m.start());
-            CodeNode node = new CodeNode();
-            node.setId("auth:" + filePath + ":HTTPBasic:" + line);
-            node.setKind(NodeKind.GUARD);
-            node.setLabel("HTTPBasic()");
-            node.setModule(moduleName);
-            node.setFilePath(filePath);
-            node.setLineStart(line);
-            node.setAnnotations(List.of("HTTPBasic"));
-            node.getProperties().put("auth_type", "fastapi");
-            node.getProperties().put("auth_flow", "basic");
-            node.getProperties().put("auth_required", true);
-            nodes.add(node);
+            nodes.add(createHttpBasicGuard(filePath, moduleName, findLineNumber(text, m.start())));
         }
 
         return DetectorResult.of(nodes, List.of());
+    }
+
+    private static CodeNode createDependsGuard(String filePath, String moduleName, int line, String depName) {
+        CodeNode node = new CodeNode();
+        node.setId("auth:" + filePath + ":Depends:" + line);
+        node.setKind(NodeKind.GUARD);
+        node.setLabel("Depends(" + depName + ")");
+        node.setModule(moduleName);
+        node.setFilePath(filePath);
+        node.setLineStart(line);
+        node.setAnnotations(List.of("Depends(" + depName + ")"));
+        node.getProperties().put("auth_type", "fastapi");
+        node.getProperties().put("auth_flow", "oauth2");
+        node.getProperties().put("dependency", depName);
+        node.getProperties().put("auth_required", true);
+        return node;
+    }
+
+    private static CodeNode createSecurityGuard(String filePath, String moduleName, int line, String schemeName) {
+        CodeNode node = new CodeNode();
+        node.setId("auth:" + filePath + ":Security:" + line);
+        node.setKind(NodeKind.GUARD);
+        node.setLabel("Security(" + schemeName + ")");
+        node.setModule(moduleName);
+        node.setFilePath(filePath);
+        node.setLineStart(line);
+        node.setAnnotations(List.of("Security(" + schemeName + ")"));
+        node.getProperties().put("auth_type", "fastapi");
+        node.getProperties().put("auth_flow", "oauth2");
+        node.getProperties().put("scheme", schemeName);
+        node.getProperties().put("auth_required", true);
+        return node;
+    }
+
+    private static CodeNode createHttpBearerGuard(String filePath, String moduleName, int line) {
+        CodeNode node = new CodeNode();
+        node.setId("auth:" + filePath + ":HTTPBearer:" + line);
+        node.setKind(NodeKind.GUARD);
+        node.setLabel("HTTPBearer()");
+        node.setModule(moduleName);
+        node.setFilePath(filePath);
+        node.setLineStart(line);
+        node.setAnnotations(List.of("HTTPBearer"));
+        node.getProperties().put("auth_type", "fastapi");
+        node.getProperties().put("auth_flow", "bearer");
+        node.getProperties().put("auth_required", true);
+        return node;
+    }
+
+    private static CodeNode createOAuth2PasswordBearerGuard(String filePath, String moduleName, int line, String tokenUrl) {
+        CodeNode node = new CodeNode();
+        node.setId("auth:" + filePath + ":OAuth2PasswordBearer:" + line);
+        node.setKind(NodeKind.GUARD);
+        node.setLabel("OAuth2PasswordBearer(" + tokenUrl + ")");
+        node.setModule(moduleName);
+        node.setFilePath(filePath);
+        node.setLineStart(line);
+        node.setAnnotations(List.of("OAuth2PasswordBearer"));
+        node.getProperties().put("auth_type", "fastapi");
+        node.getProperties().put("auth_flow", "oauth2");
+        node.getProperties().put("token_url", tokenUrl);
+        node.getProperties().put("auth_required", true);
+        return node;
+    }
+
+    private static CodeNode createHttpBasicGuard(String filePath, String moduleName, int line) {
+        CodeNode node = new CodeNode();
+        node.setId("auth:" + filePath + ":HTTPBasic:" + line);
+        node.setKind(NodeKind.GUARD);
+        node.setLabel("HTTPBasic()");
+        node.setModule(moduleName);
+        node.setFilePath(filePath);
+        node.setLineStart(line);
+        node.setAnnotations(List.of("HTTPBasic"));
+        node.getProperties().put("auth_type", "fastapi");
+        node.getProperties().put("auth_flow", "basic");
+        node.getProperties().put("auth_required", true);
+        return node;
     }
 }

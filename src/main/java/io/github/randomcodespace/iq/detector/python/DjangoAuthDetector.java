@@ -67,60 +67,20 @@ public class DjangoAuthDetector extends AbstractPythonAntlrDetector {
                     if (dec.dotted_name() == null) continue;
                     String decoratorName = dec.dotted_name().getText();
 
-                    // @login_required
                     if ("login_required".equals(decoratorName)) {
-                        int line = lineOf(dec);
-                        CodeNode node = new CodeNode();
-                        node.setId("auth:" + filePath + ":login_required:" + line);
-                        node.setKind(NodeKind.GUARD);
-                        node.setLabel("@login_required");
-                        node.setModule(moduleName);
-                        node.setFilePath(filePath);
-                        node.setLineStart(line);
-                        node.setAnnotations(List.of("@login_required"));
-                        node.getProperties().put("auth_type", "django");
-                        node.getProperties().put("permissions", List.of());
-                        node.getProperties().put("auth_required", true);
-                        nodes.add(node);
+                        nodes.add(createLoginRequiredGuard(filePath, moduleName, lineOf(dec)));
                     }
 
-                    // @permission_required("perm")
                     if ("permission_required".equals(decoratorName) && dec.arglist() != null) {
-                        int line = lineOf(dec);
                         String permission = extractFirstStringArg(dec.arglist());
                         if (permission == null) permission = "";
-                        CodeNode node = new CodeNode();
-                        node.setId("auth:" + filePath + ":permission_required:" + line);
-                        node.setKind(NodeKind.GUARD);
-                        node.setLabel("@permission_required(" + permission + ")");
-                        node.setModule(moduleName);
-                        node.setFilePath(filePath);
-                        node.setLineStart(line);
-                        node.setAnnotations(List.of("@permission_required"));
-                        node.getProperties().put("auth_type", "django");
-                        node.getProperties().put("permissions", List.of(permission));
-                        node.getProperties().put("auth_required", true);
-                        nodes.add(node);
+                        nodes.add(createPermissionRequiredGuard(filePath, moduleName, lineOf(dec), permission));
                     }
 
-                    // @user_passes_test(fn)
                     if ("user_passes_test".equals(decoratorName) && dec.arglist() != null) {
-                        int line = lineOf(dec);
                         String testFunc = extractFirstArgName(dec.arglist());
                         if (testFunc == null) testFunc = "";
-                        CodeNode node = new CodeNode();
-                        node.setId("auth:" + filePath + ":user_passes_test:" + line);
-                        node.setKind(NodeKind.GUARD);
-                        node.setLabel("@user_passes_test(" + testFunc + ")");
-                        node.setModule(moduleName);
-                        node.setFilePath(filePath);
-                        node.setLineStart(line);
-                        node.setAnnotations(List.of("@user_passes_test"));
-                        node.getProperties().put("auth_type", "django");
-                        node.getProperties().put("permissions", List.of());
-                        node.getProperties().put("test_function", testFunc);
-                        node.getProperties().put("auth_required", true);
-                        nodes.add(node);
+                        nodes.add(createUserPassesTestGuard(filePath, moduleName, lineOf(dec), testFunc));
                     }
                 }
             }
@@ -134,21 +94,7 @@ public class DjangoAuthDetector extends AbstractPythonAntlrDetector {
                 for (var arg : classCtx.arglist().argument()) {
                     String base = arg.getText().trim();
                     if (AUTH_MIXINS.containsKey(base)) {
-                        int line = lineOf(classCtx);
-                        CodeNode node = new CodeNode();
-                        node.setId("auth:" + filePath + ":" + base + ":" + line);
-                        node.setKind(NodeKind.GUARD);
-                        node.setLabel(className + "(" + base + ")");
-                        node.setModule(moduleName);
-                        node.setFilePath(filePath);
-                        node.setLineStart(line);
-                        node.setAnnotations(List.of("mixin:" + base));
-                        node.getProperties().put("auth_type", "django");
-                        node.getProperties().put("permissions", List.of());
-                        node.getProperties().put("mixin", base);
-                        node.getProperties().put("class_name", className);
-                        node.getProperties().put("auth_required", true);
-                        nodes.add(node);
+                        nodes.add(createMixinGuard(filePath, moduleName, lineOf(classCtx), className, base));
                     }
                 }
             }
@@ -169,56 +115,17 @@ public class DjangoAuthDetector extends AbstractPythonAntlrDetector {
 
         Matcher m = LOGIN_REQUIRED_RE.matcher(text);
         while (m.find()) {
-            int line = findLineNumber(text, m.start());
-            CodeNode node = new CodeNode();
-            node.setId("auth:" + filePath + ":login_required:" + line);
-            node.setKind(NodeKind.GUARD);
-            node.setLabel("@login_required");
-            node.setModule(moduleName);
-            node.setFilePath(filePath);
-            node.setLineStart(line);
-            node.setAnnotations(List.of("@login_required"));
-            node.getProperties().put("auth_type", "django");
-            node.getProperties().put("permissions", List.of());
-            node.getProperties().put("auth_required", true);
-            nodes.add(node);
+            nodes.add(createLoginRequiredGuard(filePath, moduleName, findLineNumber(text, m.start())));
         }
 
         m = PERMISSION_REQUIRED_RE.matcher(text);
         while (m.find()) {
-            int line = findLineNumber(text, m.start());
-            String permission = m.group(1);
-            CodeNode node = new CodeNode();
-            node.setId("auth:" + filePath + ":permission_required:" + line);
-            node.setKind(NodeKind.GUARD);
-            node.setLabel("@permission_required(" + permission + ")");
-            node.setModule(moduleName);
-            node.setFilePath(filePath);
-            node.setLineStart(line);
-            node.setAnnotations(List.of("@permission_required"));
-            node.getProperties().put("auth_type", "django");
-            node.getProperties().put("permissions", List.of(permission));
-            node.getProperties().put("auth_required", true);
-            nodes.add(node);
+            nodes.add(createPermissionRequiredGuard(filePath, moduleName, findLineNumber(text, m.start()), m.group(1)));
         }
 
         m = USER_PASSES_TEST_RE.matcher(text);
         while (m.find()) {
-            int line = findLineNumber(text, m.start());
-            String testFunc = m.group(1);
-            CodeNode node = new CodeNode();
-            node.setId("auth:" + filePath + ":user_passes_test:" + line);
-            node.setKind(NodeKind.GUARD);
-            node.setLabel("@user_passes_test(" + testFunc + ")");
-            node.setModule(moduleName);
-            node.setFilePath(filePath);
-            node.setLineStart(line);
-            node.setAnnotations(List.of("@user_passes_test"));
-            node.getProperties().put("auth_type", "django");
-            node.getProperties().put("permissions", List.of());
-            node.getProperties().put("test_function", testFunc);
-            node.getProperties().put("auth_required", true);
-            nodes.add(node);
+            nodes.add(createUserPassesTestGuard(filePath, moduleName, findLineNumber(text, m.start()), m.group(1)));
         }
 
         m = MIXIN_RE.matcher(text);
@@ -229,26 +136,75 @@ public class DjangoAuthDetector extends AbstractPythonAntlrDetector {
             for (String base : bases) {
                 String trimmed = base.trim();
                 if (AUTH_MIXINS.containsKey(trimmed)) {
-                    int line = findLineNumber(text, m.start());
-                    CodeNode node = new CodeNode();
-                    node.setId("auth:" + filePath + ":" + trimmed + ":" + line);
-                    node.setKind(NodeKind.GUARD);
-                    node.setLabel(className + "(" + trimmed + ")");
-                    node.setModule(moduleName);
-                    node.setFilePath(filePath);
-                    node.setLineStart(line);
-                    node.setAnnotations(List.of("mixin:" + trimmed));
-                    node.getProperties().put("auth_type", "django");
-                    node.getProperties().put("permissions", List.of());
-                    node.getProperties().put("mixin", trimmed);
-                    node.getProperties().put("class_name", className);
-                    node.getProperties().put("auth_required", true);
-                    nodes.add(node);
+                    nodes.add(createMixinGuard(filePath, moduleName, findLineNumber(text, m.start()), className, trimmed));
                 }
             }
         }
 
         return DetectorResult.of(nodes, List.of());
+    }
+
+    private static CodeNode createLoginRequiredGuard(String filePath, String moduleName, int line) {
+        CodeNode node = new CodeNode();
+        node.setId("auth:" + filePath + ":login_required:" + line);
+        node.setKind(NodeKind.GUARD);
+        node.setLabel("@login_required");
+        node.setModule(moduleName);
+        node.setFilePath(filePath);
+        node.setLineStart(line);
+        node.setAnnotations(List.of("@login_required"));
+        node.getProperties().put("auth_type", "django");
+        node.getProperties().put("permissions", List.of());
+        node.getProperties().put("auth_required", true);
+        return node;
+    }
+
+    private static CodeNode createPermissionRequiredGuard(String filePath, String moduleName, int line, String permission) {
+        CodeNode node = new CodeNode();
+        node.setId("auth:" + filePath + ":permission_required:" + line);
+        node.setKind(NodeKind.GUARD);
+        node.setLabel("@permission_required(" + permission + ")");
+        node.setModule(moduleName);
+        node.setFilePath(filePath);
+        node.setLineStart(line);
+        node.setAnnotations(List.of("@permission_required"));
+        node.getProperties().put("auth_type", "django");
+        node.getProperties().put("permissions", List.of(permission));
+        node.getProperties().put("auth_required", true);
+        return node;
+    }
+
+    private static CodeNode createUserPassesTestGuard(String filePath, String moduleName, int line, String testFunc) {
+        CodeNode node = new CodeNode();
+        node.setId("auth:" + filePath + ":user_passes_test:" + line);
+        node.setKind(NodeKind.GUARD);
+        node.setLabel("@user_passes_test(" + testFunc + ")");
+        node.setModule(moduleName);
+        node.setFilePath(filePath);
+        node.setLineStart(line);
+        node.setAnnotations(List.of("@user_passes_test"));
+        node.getProperties().put("auth_type", "django");
+        node.getProperties().put("permissions", List.of());
+        node.getProperties().put("test_function", testFunc);
+        node.getProperties().put("auth_required", true);
+        return node;
+    }
+
+    private static CodeNode createMixinGuard(String filePath, String moduleName, int line, String className, String mixin) {
+        CodeNode node = new CodeNode();
+        node.setId("auth:" + filePath + ":" + mixin + ":" + line);
+        node.setKind(NodeKind.GUARD);
+        node.setLabel(className + "(" + mixin + ")");
+        node.setModule(moduleName);
+        node.setFilePath(filePath);
+        node.setLineStart(line);
+        node.setAnnotations(List.of("mixin:" + mixin));
+        node.getProperties().put("auth_type", "django");
+        node.getProperties().put("permissions", List.of());
+        node.getProperties().put("mixin", mixin);
+        node.getProperties().put("class_name", className);
+        node.getProperties().put("auth_required", true);
+        return node;
     }
 
     private static String extractFirstStringArg(Python3Parser.ArglistContext arglist) {

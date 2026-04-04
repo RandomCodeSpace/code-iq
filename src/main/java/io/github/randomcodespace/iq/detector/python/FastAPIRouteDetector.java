@@ -101,21 +101,7 @@ public class FastAPIRouteDetector extends AbstractPythonAntlrDetector {
                     String method = methodName.toUpperCase();
                     int line = lineOf(dec);
 
-                    String nodeId = "endpoint:" + (moduleName != null ? moduleName : "") + ":" + method + ":" + fullPath;
-                    CodeNode node = new CodeNode();
-                    node.setId(nodeId);
-                    node.setKind(NodeKind.ENDPOINT);
-                    node.setLabel(method + " " + fullPath);
-                    node.setFqn(filePath + "::" + funcName);
-                    node.setModule(moduleName);
-                    node.setFilePath(filePath);
-                    node.setLineStart(line);
-                    node.getProperties().put("protocol", "REST");
-                    node.getProperties().put("http_method", method);
-                    node.getProperties().put("path_pattern", fullPath);
-                    node.getProperties().put("framework", "fastapi");
-                    node.getProperties().put("router", routerName);
-                    nodes.add(node);
+                    nodes.add(createRouteEndpoint(filePath, moduleName, line, method, fullPath, funcName, routerName));
                 }
             }
         }, tree);
@@ -151,24 +137,29 @@ public class FastAPIRouteDetector extends AbstractPythonAntlrDetector {
 
             int line = findLineNumber(text, routeMatcher.start());
 
-            String nodeId = "endpoint:" + (moduleName != null ? moduleName : "") + ":" + method + ":" + fullPath;
-            CodeNode node = new CodeNode();
-            node.setId(nodeId);
-            node.setKind(NodeKind.ENDPOINT);
-            node.setLabel(method + " " + fullPath);
-            node.setFqn(filePath + "::" + funcName);
-            node.setModule(moduleName);
-            node.setFilePath(filePath);
-            node.setLineStart(line);
-            node.getProperties().put("protocol", "REST");
-            node.getProperties().put("http_method", method);
-            node.getProperties().put("path_pattern", fullPath);
-            node.getProperties().put("framework", "fastapi");
-            node.getProperties().put("router", routerName);
-            nodes.add(node);
+            nodes.add(createRouteEndpoint(filePath, moduleName, line, method, fullPath, funcName, routerName));
         }
 
         return DetectorResult.of(nodes, List.of());
+    }
+
+    private static CodeNode createRouteEndpoint(String filePath, String moduleName, int line,
+                                                String method, String fullPath, String funcName, String routerName) {
+        String nodeId = "endpoint:" + (moduleName != null ? moduleName : "") + ":" + method + ":" + fullPath;
+        CodeNode node = new CodeNode();
+        node.setId(nodeId);
+        node.setKind(NodeKind.ENDPOINT);
+        node.setLabel(method + " " + fullPath);
+        node.setFqn(filePath + "::" + funcName);
+        node.setModule(moduleName);
+        node.setFilePath(filePath);
+        node.setLineStart(line);
+        node.getProperties().put("protocol", "REST");
+        node.getProperties().put("http_method", method);
+        node.getProperties().put("path_pattern", fullPath);
+        node.getProperties().put("framework", "fastapi");
+        node.getProperties().put("router", routerName);
+        return node;
     }
 
     /**

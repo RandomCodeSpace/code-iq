@@ -66,23 +66,10 @@ public class PythonStructuresDetector extends AbstractPythonAntlrDetector {
         String moduleName = ctx.moduleName();
 
         // Extract __all__ exports via regex (simpler than walking assignment expressions)
-        Matcher allMatch = ALL_RE.matcher(text);
-        List<String> allExports = null;
-        int allMatchStart = -1;
-        if (allMatch.find()) {
-            allMatchStart = allMatch.start();
-            String raw = allMatch.group(1);
-            allExports = new ArrayList<>();
-            Matcher qm = QUOTED_NAME_RE.matcher(raw);
-            while (qm.find()) {
-                allExports.add(qm.group(1));
-            }
-        }
+        AllExports allInfo = extractAllExports(text);
 
         // Collect decorators by looking at the text (for function/class decorator collection)
         Map<Integer, List<String>> decoratorMap = collectDecorators(text);
-        List<String> allExportsFinal = allExports;
-        int allMatchStartFinal = allMatchStart;
 
         // Track classes for enclosing-class detection
         List<String> classNames = new ArrayList<>();
@@ -100,48 +87,12 @@ public class PythonStructuresDetector extends AbstractPythonAntlrDetector {
 
                 List<String> annotations = findDecoratorsForLine(decoratorMap, line);
 
-                Map<String, Object> properties = new HashMap<>();
                 String basesStr = getBaseClassesText(classCtx);
-                if (basesStr != null && !basesStr.isBlank()) {
-                    List<String> bases = new ArrayList<>();
-                    for (String b : basesStr.split(",")) {
-                        String trimmed = b.trim();
-                        if (!trimmed.isEmpty()) {
-                            bases.add(trimmed);
-                        }
-                    }
-                    properties.put("bases", bases);
-                }
-                if (allExportsFinal != null && allExportsFinal.contains(className)) {
-                    properties.put("exported", true);
-                }
+                Map<String, Object> properties = buildBaseProperties(basesStr, className, allInfo.exports);
 
                 String nodeId = "py:" + fp + ":class:" + className;
-                CodeNode node = new CodeNode();
-                node.setId(nodeId);
-                node.setKind(NodeKind.CLASS);
-                node.setLabel(className);
-                node.setFqn(className);
-                node.setModule(moduleName);
-                node.setFilePath(fp);
-                node.setLineStart(line);
-                node.setAnnotations(annotations);
-                node.setProperties(properties);
-                nodes.add(node);
-
-                // EXTENDS edges
-                if (basesStr != null && !basesStr.isBlank()) {
-                    for (String b : basesStr.split(",")) {
-                        String base = b.trim();
-                        if (!base.isEmpty()) {
-                            CodeEdge edge = new CodeEdge();
-                            edge.setId(nodeId + "->extends->" + base);
-                            edge.setKind(EdgeKind.EXTENDS);
-                            edge.setSourceId(nodeId);
-                            edges.add(edge);
-                        }
-                    }
-                }
+                nodes.add(createClassNode(nodeId, className, fp, moduleName, line, annotations, properties));
+                addExtendsEdges(nodeId, basesStr, edges);
             }
 
             @Override
@@ -162,47 +113,21 @@ public class PythonStructuresDetector extends AbstractPythonAntlrDetector {
                 if (isAsync) {
                     properties.put("async", true);
                 }
-                if (allExportsFinal != null && allExportsFinal.contains(funcName)) {
+                if (allInfo.exports != null && allInfo.exports.contains(funcName)) {
                     properties.put("exported", true);
                 }
 
                 if (indent == 0) {
                     // Top-level function
                     String nodeId = "py:" + fp + ":func:" + funcName;
-                    CodeNode node = new CodeNode();
-                    node.setId(nodeId);
-                    node.setKind(NodeKind.METHOD);
-                    node.setLabel(funcName);
-                    node.setFqn(funcName);
-                    node.setModule(moduleName);
-                    node.setFilePath(fp);
-                    node.setLineStart(line);
-                    node.setAnnotations(annotations);
-                    node.setProperties(properties);
-                    nodes.add(node);
+                    nodes.add(createFunctionNode(nodeId, funcName, null, fp, moduleName, line, annotations, properties));
                 } else {
                     String enclosingClass = findEnclosingClass(classNames, classRanges, line);
                     if (enclosingClass != null) {
                         String nodeId = "py:" + fp + ":class:" + enclosingClass + ":method:" + funcName;
                         properties.put("class", enclosingClass);
-                        CodeNode node = new CodeNode();
-                        node.setId(nodeId);
-                        node.setKind(NodeKind.METHOD);
-                        node.setLabel(enclosingClass + "." + funcName);
-                        node.setFqn(enclosingClass + "." + funcName);
-                        node.setModule(moduleName);
-                        node.setFilePath(fp);
-                        node.setLineStart(line);
-                        node.setAnnotations(annotations);
-                        node.setProperties(properties);
-                        nodes.add(node);
-
-                        String classNodeId = "py:" + fp + ":class:" + enclosingClass;
-                        CodeEdge edge = new CodeEdge();
-                        edge.setId(classNodeId + "->defines->" + nodeId);
-                        edge.setKind(EdgeKind.DEFINES);
-                        edge.setSourceId(classNodeId);
-                        edges.add(edge);
+                        nodes.add(createFunctionNode(nodeId, funcName, enclosingClass, fp, moduleName, line, annotations, properties));
+                        addDefinesEdge("py:" + fp + ":class:" + enclosingClass, nodeId, edges);
                     }
                 }
             }
@@ -213,11 +138,7 @@ public class PythonStructuresDetector extends AbstractPythonAntlrDetector {
                 if (importCtx.dotted_as_names() != null) {
                     for (var dan : importCtx.dotted_as_names().dotted_as_name()) {
                         String importedName = dan.dotted_name().getText();
-                        CodeEdge edge = new CodeEdge();
-                        edge.setId(fp + "->imports->" + importedName);
-                        edge.setKind(EdgeKind.IMPORTS);
-                        edge.setSourceId(fp);
-                        edges.add(edge);
+                        addImportEdge(fp, importedName, edges);
                     }
                 }
             }
@@ -225,9 +146,7 @@ public class PythonStructuresDetector extends AbstractPythonAntlrDetector {
             @Override
             public void enterImport_from(Python3Parser.Import_fromContext importCtx) {
                 // from os.path import join
-                // Extract the module name from dotted_name or dots
                 StringBuilder fromModule = new StringBuilder();
-                // Count dots
                 if (importCtx.DOT() != null) {
                     for (var dot : importCtx.DOT()) {
                         fromModule.append(".");
@@ -242,28 +161,15 @@ public class PythonStructuresDetector extends AbstractPythonAntlrDetector {
                     fromModule.append(importCtx.dotted_name().getText());
                 }
                 if (fromModule.length() > 0) {
-                    CodeEdge edge = new CodeEdge();
-                    edge.setId(fp + "->imports->" + fromModule);
-                    edge.setKind(EdgeKind.IMPORTS);
-                    edge.setSourceId(fp);
-                    edges.add(edge);
+                    addImportEdge(fp, fromModule.toString(), edges);
                 }
             }
         }, tree);
 
         // __all__ module node
-        if (allExports != null) {
-            String moduleNodeId = "py:" + fp + ":module";
-            CodeNode moduleNode = new CodeNode();
-            moduleNode.setId(moduleNodeId);
-            moduleNode.setKind(NodeKind.MODULE);
-            moduleNode.setLabel(fp);
-            moduleNode.setFqn(fp);
-            moduleNode.setModule(moduleName);
-            moduleNode.setFilePath(fp);
-            moduleNode.setLineStart(findLineNumber(text, allMatchStartFinal));
-            moduleNode.getProperties().put("__all__", allExports);
-            nodes.add(moduleNode);
+        if (allInfo.exports != null) {
+            nodes.add(createModuleNode(fp, moduleName, allInfo.exports,
+                    findLineNumber(text, allInfo.matchStart)));
         }
 
         return DetectorResult.of(nodes, edges);
@@ -282,18 +188,7 @@ public class PythonStructuresDetector extends AbstractPythonAntlrDetector {
 
         Map<Integer, List<String>> decoratorMap = collectDecorators(text);
 
-        Matcher allMatch = ALL_RE.matcher(text);
-        List<String> allExports = null;
-        int allMatchStart = -1;
-        if (allMatch.find()) {
-            allMatchStart = allMatch.start();
-            String raw = allMatch.group(1);
-            allExports = new ArrayList<>();
-            Matcher qm = QUOTED_NAME_RE.matcher(raw);
-            while (qm.find()) {
-                allExports.add(qm.group(1));
-            }
-        }
+        AllExports allInfo = extractAllExports(text);
 
         List<int[]> classRanges = new ArrayList<>();
         List<String> classNames = new ArrayList<>();
@@ -311,46 +206,11 @@ public class PythonStructuresDetector extends AbstractPythonAntlrDetector {
 
             List<String> annotations = findDecoratorsForLine(decoratorMap, line);
 
-            Map<String, Object> properties = new HashMap<>();
-            if (basesStr != null && !basesStr.isBlank()) {
-                List<String> bases = new ArrayList<>();
-                for (String b : basesStr.split(",")) {
-                    String trimmed = b.trim();
-                    if (!trimmed.isEmpty()) {
-                        bases.add(trimmed);
-                    }
-                }
-                properties.put("bases", bases);
-            }
-            if (allExports != null && allExports.contains(className)) {
-                properties.put("exported", true);
-            }
+            Map<String, Object> properties = buildBaseProperties(basesStr, className, allInfo.exports);
 
             String nodeId = "py:" + fp + ":class:" + className;
-            CodeNode node = new CodeNode();
-            node.setId(nodeId);
-            node.setKind(NodeKind.CLASS);
-            node.setLabel(className);
-            node.setFqn(className);
-            node.setModule(moduleName);
-            node.setFilePath(fp);
-            node.setLineStart(line);
-            node.setAnnotations(annotations);
-            node.setProperties(properties);
-            nodes.add(node);
-
-            if (basesStr != null && !basesStr.isBlank()) {
-                for (String b : basesStr.split(",")) {
-                    String base = b.trim();
-                    if (!base.isEmpty()) {
-                        CodeEdge edge = new CodeEdge();
-                        edge.setId(nodeId + "->extends->" + base);
-                        edge.setKind(EdgeKind.EXTENDS);
-                        edge.setSourceId(nodeId);
-                        edges.add(edge);
-                    }
-                }
-            }
+            nodes.add(createClassNode(nodeId, className, fp, moduleName, line, annotations, properties));
+            addExtendsEdges(nodeId, basesStr, edges);
         }
 
         Matcher funcMatcher = FUNC_RE.matcher(text);
@@ -367,46 +227,20 @@ public class PythonStructuresDetector extends AbstractPythonAntlrDetector {
             if (isAsync) {
                 properties.put("async", true);
             }
-            if (allExports != null && allExports.contains(funcName)) {
+            if (allInfo.exports != null && allInfo.exports.contains(funcName)) {
                 properties.put("exported", true);
             }
 
             if (indentLen == 0) {
                 String nodeId = "py:" + fp + ":func:" + funcName;
-                CodeNode node = new CodeNode();
-                node.setId(nodeId);
-                node.setKind(NodeKind.METHOD);
-                node.setLabel(funcName);
-                node.setFqn(funcName);
-                node.setModule(moduleName);
-                node.setFilePath(fp);
-                node.setLineStart(line);
-                node.setAnnotations(annotations);
-                node.setProperties(properties);
-                nodes.add(node);
+                nodes.add(createFunctionNode(nodeId, funcName, null, fp, moduleName, line, annotations, properties));
             } else {
                 String enclosingClass = findEnclosingClassRegex(classNames, classRanges, line, indentLen);
                 if (enclosingClass != null) {
                     String nodeId = "py:" + fp + ":class:" + enclosingClass + ":method:" + funcName;
                     properties.put("class", enclosingClass);
-                    CodeNode node = new CodeNode();
-                    node.setId(nodeId);
-                    node.setKind(NodeKind.METHOD);
-                    node.setLabel(enclosingClass + "." + funcName);
-                    node.setFqn(enclosingClass + "." + funcName);
-                    node.setModule(moduleName);
-                    node.setFilePath(fp);
-                    node.setLineStart(line);
-                    node.setAnnotations(annotations);
-                    node.setProperties(properties);
-                    nodes.add(node);
-
-                    String classNodeId = "py:" + fp + ":class:" + enclosingClass;
-                    CodeEdge edge = new CodeEdge();
-                    edge.setId(classNodeId + "->defines->" + nodeId);
-                    edge.setKind(EdgeKind.DEFINES);
-                    edge.setSourceId(classNodeId);
-                    edges.add(edge);
+                    nodes.add(createFunctionNode(nodeId, funcName, enclosingClass, fp, moduleName, line, annotations, properties));
+                    addDefinesEdge("py:" + fp + ":class:" + enclosingClass, nodeId, edges);
                 }
             }
         }
@@ -416,40 +250,135 @@ public class PythonStructuresDetector extends AbstractPythonAntlrDetector {
             String fromModule = importMatcher.group(1);
             String importNames = importMatcher.group(2);
             if (fromModule != null) {
-                CodeEdge edge = new CodeEdge();
-                edge.setId(fp + "->imports->" + fromModule);
-                edge.setKind(EdgeKind.IMPORTS);
-                edge.setSourceId(fp);
-                edges.add(edge);
+                addImportEdge(fp, fromModule, edges);
             } else {
                 for (String name : importNames.split(",")) {
                     String trimmed = name.trim();
                     if (!trimmed.isEmpty()) {
-                        CodeEdge edge = new CodeEdge();
-                        edge.setId(fp + "->imports->" + trimmed);
-                        edge.setKind(EdgeKind.IMPORTS);
-                        edge.setSourceId(fp);
-                        edges.add(edge);
+                        addImportEdge(fp, trimmed, edges);
                     }
                 }
             }
         }
 
-        if (allExports != null) {
-            String moduleNodeId = "py:" + fp + ":module";
-            CodeNode moduleNode = new CodeNode();
-            moduleNode.setId(moduleNodeId);
-            moduleNode.setKind(NodeKind.MODULE);
-            moduleNode.setLabel(fp);
-            moduleNode.setFqn(fp);
-            moduleNode.setModule(moduleName);
-            moduleNode.setFilePath(fp);
-            moduleNode.setLineStart(findLineNumber(text, allMatchStart));
-            moduleNode.getProperties().put("__all__", allExports);
-            nodes.add(moduleNode);
+        if (allInfo.exports != null) {
+            nodes.add(createModuleNode(fp, moduleName, allInfo.exports,
+                    findLineNumber(text, allInfo.matchStart)));
         }
 
         return DetectorResult.of(nodes, edges);
+    }
+
+    // --- Shared node/edge helpers ---
+
+    private record AllExports(List<String> exports, int matchStart) {}
+
+    private static AllExports extractAllExports(String text) {
+        Matcher allMatch = ALL_RE.matcher(text);
+        if (allMatch.find()) {
+            String raw = allMatch.group(1);
+            List<String> exports = new ArrayList<>();
+            Matcher qm = QUOTED_NAME_RE.matcher(raw);
+            while (qm.find()) {
+                exports.add(qm.group(1));
+            }
+            return new AllExports(exports, allMatch.start());
+        }
+        return new AllExports(null, -1);
+    }
+
+    private static Map<String, Object> buildBaseProperties(String basesStr, String className,
+            List<String> allExports) {
+        Map<String, Object> properties = new HashMap<>();
+        if (basesStr != null && !basesStr.isBlank()) {
+            List<String> bases = new ArrayList<>();
+            for (String b : basesStr.split(",")) {
+                String trimmed = b.trim();
+                if (!trimmed.isEmpty()) {
+                    bases.add(trimmed);
+                }
+            }
+            properties.put("bases", bases);
+        }
+        if (allExports != null && allExports.contains(className)) {
+            properties.put("exported", true);
+        }
+        return properties;
+    }
+
+    private static CodeNode createClassNode(String nodeId, String className, String fp,
+            String moduleName, int line, List<String> annotations, Map<String, Object> properties) {
+        CodeNode node = new CodeNode();
+        node.setId(nodeId);
+        node.setKind(NodeKind.CLASS);
+        node.setLabel(className);
+        node.setFqn(className);
+        node.setModule(moduleName);
+        node.setFilePath(fp);
+        node.setLineStart(line);
+        node.setAnnotations(annotations);
+        node.setProperties(properties);
+        return node;
+    }
+
+    private static void addExtendsEdges(String nodeId, String basesStr, List<CodeEdge> edges) {
+        if (basesStr != null && !basesStr.isBlank()) {
+            for (String b : basesStr.split(",")) {
+                String base = b.trim();
+                if (!base.isEmpty()) {
+                    CodeEdge edge = new CodeEdge();
+                    edge.setId(nodeId + "->extends->" + base);
+                    edge.setKind(EdgeKind.EXTENDS);
+                    edge.setSourceId(nodeId);
+                    edges.add(edge);
+                }
+            }
+        }
+    }
+
+    private static CodeNode createFunctionNode(String nodeId, String funcName, String enclosingClass,
+            String fp, String moduleName, int line, List<String> annotations, Map<String, Object> properties) {
+        CodeNode node = new CodeNode();
+        node.setId(nodeId);
+        node.setKind(NodeKind.METHOD);
+        node.setLabel(enclosingClass != null ? enclosingClass + "." + funcName : funcName);
+        node.setFqn(enclosingClass != null ? enclosingClass + "." + funcName : funcName);
+        node.setModule(moduleName);
+        node.setFilePath(fp);
+        node.setLineStart(line);
+        node.setAnnotations(annotations);
+        node.setProperties(properties);
+        return node;
+    }
+
+    private static void addDefinesEdge(String classNodeId, String methodNodeId, List<CodeEdge> edges) {
+        CodeEdge edge = new CodeEdge();
+        edge.setId(classNodeId + "->defines->" + methodNodeId);
+        edge.setKind(EdgeKind.DEFINES);
+        edge.setSourceId(classNodeId);
+        edges.add(edge);
+    }
+
+    private static void addImportEdge(String fp, String importedName, List<CodeEdge> edges) {
+        CodeEdge edge = new CodeEdge();
+        edge.setId(fp + "->imports->" + importedName);
+        edge.setKind(EdgeKind.IMPORTS);
+        edge.setSourceId(fp);
+        edges.add(edge);
+    }
+
+    private static CodeNode createModuleNode(String fp, String moduleName, List<String> allExports, int line) {
+        String moduleNodeId = "py:" + fp + ":module";
+        CodeNode moduleNode = new CodeNode();
+        moduleNode.setId(moduleNodeId);
+        moduleNode.setKind(NodeKind.MODULE);
+        moduleNode.setLabel(fp);
+        moduleNode.setFqn(fp);
+        moduleNode.setModule(moduleName);
+        moduleNode.setFilePath(fp);
+        moduleNode.setLineStart(line);
+        moduleNode.getProperties().put("__all__", allExports);
+        return moduleNode;
     }
 
     // --- Helper methods ---

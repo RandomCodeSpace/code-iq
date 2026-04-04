@@ -1,6 +1,5 @@
 package io.github.randomcodespace.iq.detector.java;
 
-import io.github.randomcodespace.iq.detector.AbstractRegexDetector;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.model.CodeEdge;
@@ -27,9 +26,8 @@ import io.github.randomcodespace.iq.detector.DetectorInfo;
     properties = {"broker", "queue", "topic"}
 )
 @Component
-public class IbmMqDetector extends AbstractRegexDetector {
+public class IbmMqDetector extends AbstractJavaMessagingDetector {
 
-    private static final Pattern CLASS_RE = Pattern.compile("(?:public\\s+)?class\\s+(\\w+)");
     private static final Pattern QM_NEW_RE = Pattern.compile("new\\s+MQQueueManager\\s*\\(\\s*\"([^\"]+)\"");
     private static final Pattern ACCESS_QUEUE_RE = Pattern.compile("accessQueue\\s*\\(\\s*\"([^\"]+)\"");
     private static final Pattern MQ_TOPIC_DECL_RE = Pattern.compile("\\bMQTopic\\b");
@@ -62,11 +60,7 @@ public class IbmMqDetector extends AbstractRegexDetector {
         List<CodeNode> nodes = new ArrayList<>();
         List<CodeEdge> edges = new ArrayList<>();
 
-        String className = null;
-        for (String line : lines) {
-            Matcher cm = CLASS_RE.matcher(line);
-            if (cm.find()) { className = cm.group(1); break; }
-        }
+        String className = extractClassName(text);
         if (className == null) return DetectorResult.empty();
 
         String classNodeId = ctx.filePath() + ":" + className;
@@ -85,7 +79,7 @@ public class IbmMqDetector extends AbstractRegexDetector {
                 String qmId = ensureNode("ibmmq:qm:" + qmName, qmName, NodeKind.MESSAGE_QUEUE,
                         "ibmmq:qm:" + qmName, Map.of("broker", "ibm_mq", "queue_manager", qmName),
                         seenQms, nodes);
-                addEdge(classNodeId, qmId, EdgeKind.CONNECTS_TO,
+                addMessagingEdge(classNodeId, qmId, EdgeKind.CONNECTS_TO,
                         className + " connects to queue manager " + qmName,
                         Map.of("queue_manager", qmName), edges);
             }
@@ -99,11 +93,11 @@ public class IbmMqDetector extends AbstractRegexDetector {
                 String queueId = ensureNode("ibmmq:queue:" + queueName, queueName, NodeKind.QUEUE,
                         "ibmmq:queue:" + queueName, Map.of("broker", "ibm_mq", "queue", queueName),
                         seenQueues, nodes);
-                if (hasPut) addEdge(classNodeId, queueId, EdgeKind.SENDS_TO,
+                if (hasPut) addMessagingEdge(classNodeId, queueId, EdgeKind.SENDS_TO,
                         className + " sends to " + queueName, Map.of("queue", queueName), edges);
-                if (hasGet) addEdge(classNodeId, queueId, EdgeKind.RECEIVES_FROM,
+                if (hasGet) addMessagingEdge(classNodeId, queueId, EdgeKind.RECEIVES_FROM,
                         className + " receives from " + queueName, Map.of("queue", queueName), edges);
-                if (!hasPut && !hasGet) addEdge(classNodeId, queueId, EdgeKind.CONNECTS_TO,
+                if (!hasPut && !hasGet) addMessagingEdge(classNodeId, queueId, EdgeKind.CONNECTS_TO,
                         className + " accesses " + queueName, Map.of("queue", queueName), edges);
             }
         }
@@ -146,14 +140,4 @@ public class IbmMqDetector extends AbstractRegexDetector {
         return id;
     }
 
-    private void addEdge(String sourceId, String targetId, EdgeKind kind, String label,
-                         Map<String, Object> props, List<CodeEdge> edges) {
-        CodeEdge edge = new CodeEdge();
-        edge.setId(sourceId + "->" + kind.getValue() + "->" + targetId);
-        edge.setKind(kind);
-        edge.setSourceId(sourceId);
-        edge.setTarget(new CodeNode(targetId, NodeKind.QUEUE, label));
-        edge.setProperties(new LinkedHashMap<>(props));
-        edges.add(edge);
-    }
 }

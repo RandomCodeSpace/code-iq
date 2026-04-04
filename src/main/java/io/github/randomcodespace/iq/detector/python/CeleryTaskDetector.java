@@ -100,40 +100,17 @@ public class CeleryTaskDetector extends AbstractPythonAntlrDetector {
                     int line = lineOf(dec);
 
                     String queueId = "queue:" + (moduleName != null ? moduleName : "") + ":celery:" + taskName;
-                    CodeNode queueNode = new CodeNode();
-                    queueNode.setId(queueId);
-                    queueNode.setKind(NodeKind.QUEUE);
-                    queueNode.setLabel("celery:" + taskName);
-                    queueNode.setModule(moduleName);
-                    queueNode.setFilePath(filePath);
-                    queueNode.setLineStart(line);
-                    queueNode.getProperties().put("broker", "celery");
-                    queueNode.getProperties().put("task_name", taskName);
-                    queueNode.getProperties().put("function", funcName);
-                    nodes.add(queueNode);
+                    nodes.add(createQueueNode(queueId, taskName, funcName, moduleName, filePath, line));
 
                     String methodId = "method:" + filePath + "::" + funcName;
-                    CodeNode methodNode = new CodeNode();
-                    methodNode.setId(methodId);
-                    methodNode.setKind(NodeKind.METHOD);
-                    methodNode.setLabel(funcName);
-                    methodNode.setFqn(filePath + "::" + funcName);
-                    methodNode.setModule(moduleName);
-                    methodNode.setFilePath(filePath);
-                    methodNode.setLineStart(line);
-                    nodes.add(methodNode);
+                    nodes.add(createMethodNode(methodId, funcName, moduleName, filePath, line));
 
-                    CodeEdge consumesEdge = new CodeEdge();
-                    consumesEdge.setId(methodId + "->consumes->" + queueId);
-                    consumesEdge.setKind(EdgeKind.CONSUMES);
-                    consumesEdge.setSourceId(methodId);
-                    edges.add(consumesEdge);
+                    edges.add(createConsumesEdge(methodId, queueId));
                 }
             }
 
             @Override
             public void enterAtom_expr(Python3Parser.Atom_exprContext atomExpr) {
-                // Detect task.delay() / task.apply_async() calls
                 String exprText = atomExpr.getText();
                 Matcher callMatcher = TASK_CALL.matcher(exprText);
                 if (callMatcher.find()) {
@@ -143,11 +120,7 @@ public class CeleryTaskDetector extends AbstractPythonAntlrDetector {
                     String queueId = "queue:" + (moduleName != null ? moduleName : "") + ":celery:" + taskRef;
                     String callerId = "method:" + filePath + "::caller_l" + line;
 
-                    CodeEdge producesEdge = new CodeEdge();
-                    producesEdge.setId(callerId + "->produces->" + queueId);
-                    producesEdge.setKind(EdgeKind.PRODUCES);
-                    producesEdge.setSourceId(callerId);
-                    edges.add(producesEdge);
+                    edges.add(createProducesEdge(callerId, queueId));
                 }
             }
         }, tree);
@@ -173,34 +146,12 @@ public class CeleryTaskDetector extends AbstractPythonAntlrDetector {
             int line = findLineNumber(text, taskMatcher.start());
 
             String queueId = "queue:" + (moduleName != null ? moduleName : "") + ":celery:" + taskName;
-            CodeNode queueNode = new CodeNode();
-            queueNode.setId(queueId);
-            queueNode.setKind(NodeKind.QUEUE);
-            queueNode.setLabel("celery:" + taskName);
-            queueNode.setModule(moduleName);
-            queueNode.setFilePath(filePath);
-            queueNode.setLineStart(line);
-            queueNode.getProperties().put("broker", "celery");
-            queueNode.getProperties().put("task_name", taskName);
-            queueNode.getProperties().put("function", funcName);
-            nodes.add(queueNode);
+            nodes.add(createQueueNode(queueId, taskName, funcName, moduleName, filePath, line));
 
             String methodId = "method:" + filePath + "::" + funcName;
-            CodeNode methodNode = new CodeNode();
-            methodNode.setId(methodId);
-            methodNode.setKind(NodeKind.METHOD);
-            methodNode.setLabel(funcName);
-            methodNode.setFqn(filePath + "::" + funcName);
-            methodNode.setModule(moduleName);
-            methodNode.setFilePath(filePath);
-            methodNode.setLineStart(line);
-            nodes.add(methodNode);
+            nodes.add(createMethodNode(methodId, funcName, moduleName, filePath, line));
 
-            CodeEdge consumesEdge = new CodeEdge();
-            consumesEdge.setId(methodId + "->consumes->" + queueId);
-            consumesEdge.setKind(EdgeKind.CONSUMES);
-            consumesEdge.setSourceId(methodId);
-            edges.add(consumesEdge);
+            edges.add(createConsumesEdge(methodId, queueId));
         }
 
         Matcher callMatcher = TASK_CALL.matcher(text);
@@ -211,13 +162,53 @@ public class CeleryTaskDetector extends AbstractPythonAntlrDetector {
             String queueId = "queue:" + (moduleName != null ? moduleName : "") + ":celery:" + taskRef;
             String callerId = "method:" + filePath + "::caller_l" + line;
 
-            CodeEdge producesEdge = new CodeEdge();
-            producesEdge.setId(callerId + "->produces->" + queueId);
-            producesEdge.setKind(EdgeKind.PRODUCES);
-            producesEdge.setSourceId(callerId);
-            edges.add(producesEdge);
+            edges.add(createProducesEdge(callerId, queueId));
         }
 
         return DetectorResult.of(nodes, edges);
+    }
+
+    private static CodeNode createQueueNode(String queueId, String taskName, String funcName,
+                                            String moduleName, String filePath, int line) {
+        CodeNode node = new CodeNode();
+        node.setId(queueId);
+        node.setKind(NodeKind.QUEUE);
+        node.setLabel("celery:" + taskName);
+        node.setModule(moduleName);
+        node.setFilePath(filePath);
+        node.setLineStart(line);
+        node.getProperties().put("broker", "celery");
+        node.getProperties().put("task_name", taskName);
+        node.getProperties().put("function", funcName);
+        return node;
+    }
+
+    private static CodeNode createMethodNode(String methodId, String funcName,
+                                             String moduleName, String filePath, int line) {
+        CodeNode node = new CodeNode();
+        node.setId(methodId);
+        node.setKind(NodeKind.METHOD);
+        node.setLabel(funcName);
+        node.setFqn(filePath + "::" + funcName);
+        node.setModule(moduleName);
+        node.setFilePath(filePath);
+        node.setLineStart(line);
+        return node;
+    }
+
+    private static CodeEdge createConsumesEdge(String methodId, String queueId) {
+        CodeEdge edge = new CodeEdge();
+        edge.setId(methodId + "->consumes->" + queueId);
+        edge.setKind(EdgeKind.CONSUMES);
+        edge.setSourceId(methodId);
+        return edge;
+    }
+
+    private static CodeEdge createProducesEdge(String callerId, String queueId) {
+        CodeEdge edge = new CodeEdge();
+        edge.setId(callerId + "->produces->" + queueId);
+        edge.setKind(EdgeKind.PRODUCES);
+        edge.setSourceId(callerId);
+        return edge;
     }
 }

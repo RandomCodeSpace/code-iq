@@ -68,15 +68,8 @@ public class VueComponentDetector extends AbstractRegexDetector {
         while (m.find()) {
             String name = m.group(1);
             if (componentNames.contains(name)) continue;
-            int line = text.substring(0, m.start()).split("\n", -1).length;
-            CodeNode node = new CodeNode();
-            node.setId("vue:" + filePath + ":component:" + name);
-            node.setKind(NodeKind.COMPONENT);
-            node.setLabel(name);
-            node.setFqn(filePath + "::" + name);
-            node.setFilePath(filePath);
-            node.setLineStart(line);
-            node.getProperties().put("framework", "vue");
+            CodeNode node = FrontendDetectorHelper.createComponentNode("vue", filePath, "component",
+                    name, NodeKind.COMPONENT, FrontendDetectorHelper.lineAt(text, m.start()));
             node.getProperties().put("api_style", "composition");
             nodes.add(node);
             componentNames.add(name);
@@ -87,15 +80,8 @@ public class VueComponentDetector extends AbstractRegexDetector {
         while (m.find()) {
             String name = m.group(1);
             if (componentNames.contains(name)) continue;
-            int line = text.substring(0, m.start()).split("\n", -1).length;
-            CodeNode node = new CodeNode();
-            node.setId("vue:" + filePath + ":component:" + name);
-            node.setKind(NodeKind.COMPONENT);
-            node.setLabel(name);
-            node.setFqn(filePath + "::" + name);
-            node.setFilePath(filePath);
-            node.setLineStart(line);
-            node.getProperties().put("framework", "vue");
+            CodeNode node = FrontendDetectorHelper.createComponentNode("vue", filePath, "component",
+                    name, NodeKind.COMPONENT, FrontendDetectorHelper.lineAt(text, m.start()));
             node.getProperties().put("api_style", "options");
             nodes.add(node);
             componentNames.add(name);
@@ -106,15 +92,8 @@ public class VueComponentDetector extends AbstractRegexDetector {
         while (m.find()) {
             String compName = extractScriptSetupName(filePath);
             if (compName == null || componentNames.contains(compName)) continue;
-            int line = text.substring(0, m.start()).split("\n", -1).length;
-            CodeNode node = new CodeNode();
-            node.setId("vue:" + filePath + ":component:" + compName);
-            node.setKind(NodeKind.COMPONENT);
-            node.setLabel(compName);
-            node.setFqn(filePath + "::" + compName);
-            node.setFilePath(filePath);
-            node.setLineStart(line);
-            node.getProperties().put("framework", "vue");
+            CodeNode node = FrontendDetectorHelper.createComponentNode("vue", filePath, "component",
+                    compName, NodeKind.COMPONENT, FrontendDetectorHelper.lineAt(text, m.start()));
             node.getProperties().put("api_style", "script_setup");
             nodes.add(node);
             componentNames.add(compName);
@@ -127,16 +106,8 @@ public class VueComponentDetector extends AbstractRegexDetector {
             while (hm.find()) {
                 String name = hm.group(1);
                 if (hookNames.contains(name)) continue;
-                int line = text.substring(0, hm.start()).split("\n", -1).length;
-                CodeNode node = new CodeNode();
-                node.setId("vue:" + filePath + ":hook:" + name);
-                node.setKind(NodeKind.HOOK);
-                node.setLabel(name);
-                node.setFqn(filePath + "::" + name);
-                node.setFilePath(filePath);
-                node.setLineStart(line);
-                node.getProperties().put("framework", "vue");
-                nodes.add(node);
+                nodes.add(FrontendDetectorHelper.createComponentNode("vue", filePath, "hook",
+                        name, NodeKind.HOOK, FrontendDetectorHelper.lineAt(text, hm.start())));
                 hookNames.add(name);
             }
         }
