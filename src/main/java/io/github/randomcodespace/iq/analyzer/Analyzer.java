@@ -1153,29 +1153,47 @@ public class Analyzer {
     }
 
     /**
-     * Check whether a file is minified (e.g. *.min.js, *.bundle.js) and large
-     * enough that running detectors would be wasteful.
+     * Check whether a file is minified and large enough that running detectors
+     * would be wasteful or cause ANTLR/regex hangs.
      * <p>
-     * Heuristic: filename ends with .min.js or .bundle.js, file is &gt; 10 KB,
-     * and average line length exceeds 500 characters.
+     * Two-tier heuristic:
+     * <ol>
+     *   <li>Filename match (*.min.js, *.bundle.js, etc.) + size &gt; 10 KB + avg line &gt; 500 chars</li>
+     *   <li>Content-based: any JS/CSS/MJS file &gt; 50 KB with avg line &gt; 1000 chars (catches
+     *       minified files without .min suffix, e.g. webpack output named app.js or vendor.js)</li>
+     * </ol>
      */
     private boolean isMinified(DiscoveredFile file, String content) {
         String name = file.path().getFileName().toString();
-        if (!(name.endsWith(".min.js") || name.endsWith(".bundle.js")
-                || name.endsWith(".min.css") || name.endsWith(".min.mjs"))) {
-            return false;
-        }
+        boolean nameHint = name.endsWith(".min.js") || name.endsWith(".bundle.js")
+                || name.endsWith(".min.css") || name.endsWith(".min.mjs");
+        boolean jsOrCss = name.endsWith(".js") || name.endsWith(".mjs") || name.endsWith(".cjs")
+                || name.endsWith(".css") || name.endsWith(".jsx") || name.endsWith(".ts");
+
+        // Small files are never treated as minified
         if (file.sizeBytes() <= 10_240) {
             return false;
         }
+
         // Average line length check
-        String[] lines = content.split("\n", -1);
-        if (lines.length == 0) return false;
-        long totalChars = 0;
-        for (String line : lines) {
-            totalChars += line.length();
+        int newlines = 0;
+        for (int i = 0; i < content.length(); i++) {
+            if (content.charAt(i) == '\n') newlines++;
         }
-        return (totalChars / lines.length) > 500;
+        if (newlines == 0) newlines = 1;
+        long avgLineLen = content.length() / newlines;
+
+        // Tier 1: known minified suffixes with relaxed threshold
+        if (nameHint && avgLineLen > 500) {
+            return true;
+        }
+
+        // Tier 2: any JS/CSS file > 50 KB with very long lines (minified without .min suffix)
+        if (jsOrCss && file.sizeBytes() > 50_000 && avgLineLen > 1000) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
