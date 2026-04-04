@@ -61,6 +61,13 @@ public class GoLanguageExtractor implements LanguageExtractor {
     private static final Pattern INTERFACE_METHOD =
             Pattern.compile("^\\s+(\\w+)\\s*\\(", Pattern.MULTILINE);
 
+    /**
+     * Go receiver method: {@code func (varName StructName) MethodName(}.
+     * Captures: group(1) = struct name (with optional pointer *), group(2) = method name.
+     */
+    private static final Pattern RECEIVER_METHOD =
+            Pattern.compile("func\\s+\\(\\w+\\s+(\\*?\\w+)\\)\\s+(\\w+)\\s*\\(", Pattern.MULTILINE);
+
     @Override
     public String getLanguage() {
         return "go";
@@ -132,8 +139,13 @@ public class GoLanguageExtractor implements LanguageExtractor {
 
     /**
      * Structural interface satisfaction: if this node is a CLASS/COMPONENT (struct),
-     * find INTERFACE nodes whose method names all appear in the struct's source file.
-     * Records satisfied interface names as a type hint.
+     * find INTERFACE nodes in the registry that this struct likely satisfies.
+     *
+     * <p>Strategy: extract all method names defined via Go receiver syntax
+     * ({@code func (v StructName) MethodName(...)}) then check whether any interface
+     * label matches using Go naming convention — e.g. {@code Closer} is satisfied by
+     * method {@code Close}, {@code Reader} by {@code Read}, {@code Stringer} by
+     * {@code String}.
      */
     private Map<String, String> extractInterfaceHints(DetectorContext ctx, CodeNode node,
                                                       Map<String, CodeNode> registry) {
@@ -142,14 +154,24 @@ public class GoLanguageExtractor implements LanguageExtractor {
             return Map.of();
         }
 
+        // Collect all method names defined on this struct via Go receiver syntax
+        Set<String> receiverMethods = new LinkedHashSet<>();
+        Matcher rm = RECEIVER_METHOD.matcher(ctx.content());
+        while (rm.find()) {
+            String structName = rm.group(1).replace("*", "");
+            if (structName.equals(node.getLabel())) {
+                receiverMethods.add(rm.group(2));
+            }
+        }
+        if (receiverMethods.isEmpty()) return Map.of();
+
+        // Best-effort: interface "satisfied" if struct has a receiver method whose name
+        // starts with the interface label (Go convention: Closer→Close, Reader→Read, Stringer→String)
         List<String> satisfied = new ArrayList<>();
         for (CodeNode candidate : registry.values()) {
             if (candidate.getKind() != NodeKind.INTERFACE) continue;
-            if (candidate.getFilePath() == null) continue;
-            // We can only do best-effort matching without the interface file content here.
-            // Check by label match (struct label appears as receiver type).
-            if (node.getLabel() != null && candidate.getLabel() != null
-                    && ctx.content().contains(node.getLabel() + ") " + candidate.getLabel())) {
+            if (candidate.getLabel() == null) continue;
+            if (receiverMethods.stream().anyMatch(m -> candidate.getLabel().startsWith(m))) {
                 satisfied.add(candidate.getLabel());
             }
         }
