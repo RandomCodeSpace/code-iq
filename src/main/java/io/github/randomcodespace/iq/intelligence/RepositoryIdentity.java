@@ -48,6 +48,9 @@ public record RepositoryIdentity(
             } finally {
                 proc.destroy();
             }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return null;
         } catch (Exception e) {
             return null;
         }

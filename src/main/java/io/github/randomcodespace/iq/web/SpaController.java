@@ -4,6 +4,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 
 /**
  * Catch-all controller that forwards unmatched routes to index.html
@@ -40,7 +41,7 @@ public class SpaController {
      * Does NOT match /api/**, /mcp/**, /actuator/**, or static assets.
      */
     @GetMapping("/{path:[^\\.]*}")
-    public String catchAll() {
+    public String catchAll(@PathVariable String path) {
         return "forward:/index.html";
     }
 }

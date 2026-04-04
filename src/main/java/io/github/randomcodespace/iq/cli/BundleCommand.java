@@ -382,6 +382,8 @@ public class BundleCommand implements Callable<Integer> {
                 }
                 return count;
             }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         } catch (Exception ignored) {
             // Not a git repo or git not available
         }

@@ -102,13 +102,13 @@ class CapabilityMatrixTest {
     @Test
     void unknownLanguage_allUnsupported() {
         Map<CapabilityDimension, CapabilityLevel> caps = CapabilityMatrix.forLanguage("brainfuck");
-        assertThat(caps.values()).allMatch(l -> l == CapabilityLevel.UNSUPPORTED);
+        assertThat(caps.values()).isNotEmpty().allMatch(l -> l == CapabilityLevel.UNSUPPORTED);
     }
 
     @Test
     void nullLanguage_allUnsupported() {
         Map<CapabilityDimension, CapabilityLevel> caps = CapabilityMatrix.forLanguage(null);
-        assertThat(caps.values()).allMatch(l -> l == CapabilityLevel.UNSUPPORTED);
+        assertThat(caps.values()).isNotEmpty().allMatch(l -> l == CapabilityLevel.UNSUPPORTED);
     }
 
     @Test

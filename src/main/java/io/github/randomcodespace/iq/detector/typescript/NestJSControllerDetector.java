@@ -41,11 +41,11 @@ public class NestJSControllerDetector extends AbstractAntlrDetector {
     private static final Pattern NESTJS_IMPORT = Pattern.compile("from\\s+['\"]@nestjs/");
 
     private static final Pattern CONTROLLER_PATTERN = Pattern.compile(
-            "@Controller\\(\\s*['\"`]?([^'\"`\\)\\s]*)['\"`]?\\s*\\)(?:\\s*@\\w+\\([^)]*\\))*\\s*\\n\\s*(?:export\\s+)?class\\s+(\\w+)"
+            "@Controller\\(\\s*['\"`]?([^'\"`\\)\\s]*)['\"`]?\\s*\\)(?:\\s*@\\w+\\([^)]{0,200}\\))*\\s*\\n\\s*(?:export\\s+)?class\\s+(\\w+)"
     );
 
     private static final Pattern ROUTE_PATTERN = Pattern.compile(
-            "@(Get|Post|Put|Delete|Patch|Options|Head)\\(\\s*['\"`]?([^'\"`\\)\\s]*)['\"`]?\\s*\\)(?:\\s*@\\w+\\([^)]*\\))*\\s*\\n\\s*(?:async\\s+)?(\\w+)"
+            "@(Get|Post|Put|Delete|Patch|Options|Head)\\(\\s*['\"`]?([^'\"`\\)\\s]*)['\"`]?\\s*\\)(?:\\s*@\\w+\\([^)]{0,200}\\))*\\s*\\n\\s*(?:async\\s+)?(\\w+)"
     );
 
     @Override

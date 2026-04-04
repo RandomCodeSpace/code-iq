@@ -78,7 +78,12 @@ public class GitHubActionsDetector extends AbstractStructuredDetector {
         // YAML parses bare "on" as Boolean.TRUE
         Object onTriggers = data.get("on");
         if (onTriggers == null) {
-            onTriggers = data.get(Boolean.TRUE);
+            // SnakeYAML may parse bare 'on' key as Boolean.TRUE — search by entry value
+            onTriggers = data.entrySet().stream()
+                    .filter(e -> Boolean.TRUE.equals(e.getKey()))
+                    .map(java.util.Map.Entry::getValue)
+                    .findFirst()
+                    .orElse(null);
         }
         if (onTriggers == null) {
             onTriggers = data.get("true");

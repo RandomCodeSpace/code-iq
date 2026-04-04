@@ -35,7 +35,7 @@ public class GrpcServiceDetector extends AbstractRegexDetector {
     private static final Pattern METHOD_RE = Pattern.compile(
             "public\\s+(?:void|[\\w<>\\[\\]]+)\\s+(\\w+)\\s*\\(\\s*(\\w+)");
     private static final Pattern GRPC_STUB_RE = Pattern.compile(
-            "(\\w+)Grpc\\.new(?:Blocking|Future|)Stub\\s*\\(");
+            "(\\w+)Grpc\\.new(?:Blocking|Future)?Stub\\s*\\(");
 
     @Override
     public String getName() {

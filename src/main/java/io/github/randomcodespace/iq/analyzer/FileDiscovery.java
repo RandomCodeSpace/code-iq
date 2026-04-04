@@ -106,7 +106,10 @@ public class FileDiscovery {
             int exitCode = process.waitFor();
             process.getInputStream().close();
             return exitCode == 0;
-        } catch (IOException | InterruptedException e) {
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        } catch (IOException e) {
             return false;
         }
     }
@@ -152,7 +155,11 @@ public class FileDiscovery {
             }
             return result;
 
-        } catch (IOException | InterruptedException e) {
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("git ls-files failed, falling back to filesystem walk", e);
+            return discoverViaWalk(root);
+        } catch (IOException e) {
             log.warn("git ls-files failed, falling back to filesystem walk", e);
             return discoverViaWalk(root);
         }

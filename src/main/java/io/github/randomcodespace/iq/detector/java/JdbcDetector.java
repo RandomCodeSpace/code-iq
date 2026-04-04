@@ -33,7 +33,7 @@ public class JdbcDetector extends AbstractRegexDetector {
     private static final Pattern DRIVER_MANAGER_RE = Pattern.compile(
             "DriverManager\\s*\\.\\s*getConnection\\s*\\(\\s*\"(jdbc:[^\"]+)\"");
     private static final Pattern JDBC_TEMPLATE_RE = Pattern.compile(
-            "(?:private|protected|public|final|\\s)+"
+            "(?:private|protected|public|final)\\s+"
                     + "(?:final\\s+)?"
                     + "(JdbcTemplate|NamedParameterJdbcTemplate|JdbcClient)"
                     + "\\s+\\w+");

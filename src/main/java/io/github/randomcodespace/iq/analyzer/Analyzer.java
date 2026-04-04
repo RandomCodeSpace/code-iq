@@ -1297,6 +1297,10 @@ public class Analyzer {
             if (exitCode == 0 && sha.length() >= 7) {
                 return sha;
             }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.debug("Could not determine git HEAD", e);
+            return null;
         } catch (Exception e) {
             log.debug("Could not determine git HEAD", e);
         }
