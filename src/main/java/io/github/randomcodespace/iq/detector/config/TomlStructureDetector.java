@@ -21,7 +21,7 @@ import io.github.randomcodespace.iq.detector.ParserType;
 /**
  * Detects TOML file structures: sections, top-level keys, and file identity.
  * <p>
- * Expects parsedData to be a Map with type "toml" and "data" containing the parsed structure.
+ * Expects parsedData to be a Map with type PROP_TOML and "data" containing the parsed structure.
  */
 @DetectorInfo(
     name = "toml_structure",
@@ -34,6 +34,8 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class TomlStructureDetector extends AbstractStructuredDetector {
+    private static final String PROP_TOML = "toml";
+
 
     @Override
     public String getName() {
@@ -42,7 +44,7 @@ public class TomlStructureDetector extends AbstractStructuredDetector {
 
     @Override
     public Set<String> getSupportedLanguages() {
-        return Set.of("toml");
+        return Set.of(PROP_TOML);
     }
 
     @Override
@@ -53,7 +55,7 @@ public class TomlStructureDetector extends AbstractStructuredDetector {
         List<CodeEdge> edges = new ArrayList<>();
 
         // CONFIG_FILE node for the file itself
-        nodes.add(buildFileNode(ctx, "toml"));
+        nodes.add(buildFileNode(ctx, PROP_TOML));
 
         Object parsedData = ctx.parsedData();
         if (parsedData == null) {

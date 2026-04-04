@@ -29,6 +29,11 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class DjangoAuthDetector extends AbstractPythonAntlrDetector {
+    private static final String PROP_AUTH_REQUIRED = "auth_required";
+    private static final String PROP_AUTH_TYPE = "auth_type";
+    private static final String PROP_DJANGO = "django";
+    private static final String PROP_PERMISSIONS = "permissions";
+
 
     // --- Regex fallback patterns ---
     private static final Pattern LOGIN_REQUIRED_RE = Pattern.compile("@login_required\\b");
@@ -153,9 +158,9 @@ public class DjangoAuthDetector extends AbstractPythonAntlrDetector {
         node.setFilePath(filePath);
         node.setLineStart(line);
         node.setAnnotations(List.of("@login_required"));
-        node.getProperties().put("auth_type", "django");
-        node.getProperties().put("permissions", List.of());
-        node.getProperties().put("auth_required", true);
+        node.getProperties().put(PROP_AUTH_TYPE, PROP_DJANGO);
+        node.getProperties().put(PROP_PERMISSIONS, List.of());
+        node.getProperties().put(PROP_AUTH_REQUIRED, true);
         return node;
     }
 
@@ -168,9 +173,9 @@ public class DjangoAuthDetector extends AbstractPythonAntlrDetector {
         node.setFilePath(filePath);
         node.setLineStart(line);
         node.setAnnotations(List.of("@permission_required"));
-        node.getProperties().put("auth_type", "django");
-        node.getProperties().put("permissions", List.of(permission));
-        node.getProperties().put("auth_required", true);
+        node.getProperties().put(PROP_AUTH_TYPE, PROP_DJANGO);
+        node.getProperties().put(PROP_PERMISSIONS, List.of(permission));
+        node.getProperties().put(PROP_AUTH_REQUIRED, true);
         return node;
     }
 
@@ -183,10 +188,10 @@ public class DjangoAuthDetector extends AbstractPythonAntlrDetector {
         node.setFilePath(filePath);
         node.setLineStart(line);
         node.setAnnotations(List.of("@user_passes_test"));
-        node.getProperties().put("auth_type", "django");
-        node.getProperties().put("permissions", List.of());
+        node.getProperties().put(PROP_AUTH_TYPE, PROP_DJANGO);
+        node.getProperties().put(PROP_PERMISSIONS, List.of());
         node.getProperties().put("test_function", testFunc);
-        node.getProperties().put("auth_required", true);
+        node.getProperties().put(PROP_AUTH_REQUIRED, true);
         return node;
     }
 
@@ -199,11 +204,11 @@ public class DjangoAuthDetector extends AbstractPythonAntlrDetector {
         node.setFilePath(filePath);
         node.setLineStart(line);
         node.setAnnotations(List.of("mixin:" + mixin));
-        node.getProperties().put("auth_type", "django");
-        node.getProperties().put("permissions", List.of());
+        node.getProperties().put(PROP_AUTH_TYPE, PROP_DJANGO);
+        node.getProperties().put(PROP_PERMISSIONS, List.of());
         node.getProperties().put("mixin", mixin);
         node.getProperties().put("class_name", className);
-        node.getProperties().put("auth_required", true);
+        node.getProperties().put(PROP_AUTH_REQUIRED, true);
         return node;
     }
 

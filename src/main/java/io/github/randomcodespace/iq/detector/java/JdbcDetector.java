@@ -28,6 +28,10 @@ import io.github.randomcodespace.iq.detector.DetectorInfo;
 )
 @Component
 public class JdbcDetector extends AbstractRegexDetector {
+    private static final String PROP_DB_TYPE = "db_type";
+    private static final String PROP_HOST = "host";
+    private static final String PROP_UNKNOWN = "unknown";
+
 
     private static final Pattern CLASS_RE = Pattern.compile("(?:public\\s+)?class\\s+(\\w+)");
     private static final Pattern DRIVER_MANAGER_RE = Pattern.compile(
@@ -94,8 +98,8 @@ public class JdbcDetector extends AbstractRegexDetector {
             if (!m.find()) continue;
             String url = m.group(1);
             Map<String, String> props = parseJdbcUrl(url);
-            String dbType = props.getOrDefault("db_type", "unknown");
-            String host = props.getOrDefault("host", "unknown");
+            String dbType = props.getOrDefault(PROP_DB_TYPE, PROP_UNKNOWN);
+            String host = props.getOrDefault(PROP_HOST, PROP_UNKNOWN);
             String dbId = "db:" + dbType + ":" + host;
             ensureDbNode(dbId, dbType + "@" + host, i + 1, ctx, new LinkedHashMap<>(props), seenDbs, nodes);
             addConnectEdge(classNodeId, dbId, className + " connects to " + dbType + "@" + host, edges, nodes);
@@ -130,8 +134,8 @@ public class JdbcDetector extends AbstractRegexDetector {
                 if (!m.find()) continue;
                 String url = m.group(1);
                 Map<String, String> props = parseJdbcUrl(url);
-                String dbType = props.getOrDefault("db_type", "unknown");
-                String host = props.getOrDefault("host", "unknown");
+                String dbType = props.getOrDefault(PROP_DB_TYPE, PROP_UNKNOWN);
+                String host = props.getOrDefault(PROP_HOST, PROP_UNKNOWN);
                 String dbId = "db:" + dbType + ":" + host;
                 ensureDbNode(dbId, dbType + "@" + host, i + 1, ctx, new LinkedHashMap<>(props), seenDbs, nodes);
             }
@@ -146,8 +150,8 @@ public class JdbcDetector extends AbstractRegexDetector {
             while (urlMatcher.find()) {
                 String url = urlMatcher.group(1);
                 Map<String, String> props = parseJdbcUrl(url);
-                String dbType = props.getOrDefault("db_type", "unknown");
-                String host = props.getOrDefault("host", "unknown");
+                String dbType = props.getOrDefault(PROP_DB_TYPE, PROP_UNKNOWN);
+                String host = props.getOrDefault(PROP_HOST, PROP_UNKNOWN);
                 String dbId = "db:" + dbType + ":" + host;
                 ensureDbNode(dbId, dbType + "@" + host, i + 1, ctx, new LinkedHashMap<>(props), seenDbs, nodes);
                 addConnectEdge(classNodeId, dbId, className + " connects to " + dbType + "@" + host, edges, nodes);
@@ -162,9 +166,9 @@ public class JdbcDetector extends AbstractRegexDetector {
         props.put("connection_url", url);
         Matcher m = JDBC_URL_RE.matcher(url);
         if (m.find()) {
-            props.put("db_type", m.group(1));
+            props.put(PROP_DB_TYPE, m.group(1));
             if (m.group(2) != null) {
-                props.put("host", m.group(2));
+                props.put(PROP_HOST, m.group(2));
             }
         }
         return props;

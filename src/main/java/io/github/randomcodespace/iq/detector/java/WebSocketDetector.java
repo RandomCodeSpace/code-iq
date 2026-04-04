@@ -28,6 +28,11 @@ import io.github.randomcodespace.iq.detector.DetectorInfo;
 )
 @Component
 public class WebSocketDetector extends AbstractRegexDetector {
+    private static final String PROP_DESTINATION = "destination";
+    private static final String PROP_PROTOCOL = "protocol";
+    private static final String PROP_TYPE = "type";
+    private static final String PROP_WEBSOCKET = "websocket";
+
 
     private static final Pattern CLASS_RE = Pattern.compile("(?:public\\s+)?class\\s+(\\w+)");
     private static final Pattern SERVER_ENDPOINT_RE = Pattern.compile("@ServerEndpoint\\s*\\(\\s*(?:value\\s*=\\s*)?\"([^\"]+)\"");
@@ -42,7 +47,7 @@ public class WebSocketDetector extends AbstractRegexDetector {
 
     @Override
     public String getName() {
-        return "websocket";
+        return PROP_WEBSOCKET;
     }
 
     @Override
@@ -89,8 +94,8 @@ public class WebSocketDetector extends AbstractRegexDetector {
             node.setLineStart(lineNum);
             node.getAnnotations().add("@ServerEndpoint");
             node.getProperties().put("path", path);
-            node.getProperties().put("protocol", "websocket");
-            node.getProperties().put("type", "jsr356");
+            node.getProperties().put(PROP_PROTOCOL, PROP_WEBSOCKET);
+            node.getProperties().put(PROP_TYPE, "jsr356");
             nodes.add(node);
 
             CodeEdge edge = new CodeEdge();
@@ -120,9 +125,9 @@ public class WebSocketDetector extends AbstractRegexDetector {
             node.setFilePath(ctx.filePath());
             node.setLineStart(i + 1);
             node.getAnnotations().add("@MessageMapping");
-            node.getProperties().put("destination", destination);
-            node.getProperties().put("protocol", "websocket");
-            node.getProperties().put("type", "stomp");
+            node.getProperties().put(PROP_DESTINATION, destination);
+            node.getProperties().put(PROP_PROTOCOL, PROP_WEBSOCKET);
+            node.getProperties().put(PROP_TYPE, "stomp");
             nodes.add(node);
 
             CodeEdge edge = new CodeEdge();
@@ -143,8 +148,8 @@ public class WebSocketDetector extends AbstractRegexDetector {
                     sendNode.setId(sendId);
                     sendNode.setKind(NodeKind.WEBSOCKET_ENDPOINT);
                     sendNode.setLabel("WS TOPIC " + sendDest);
-                    sendNode.getProperties().put("destination", sendDest);
-                    sendNode.getProperties().put("protocol", "websocket");
+                    sendNode.getProperties().put(PROP_DESTINATION, sendDest);
+                    sendNode.getProperties().put(PROP_PROTOCOL, PROP_WEBSOCKET);
                     nodes.add(sendNode);
 
                     CodeEdge sendEdge = new CodeEdge();
@@ -169,8 +174,8 @@ public class WebSocketDetector extends AbstractRegexDetector {
             node.setFilePath(ctx.filePath());
             node.setLineStart(lineNum);
             node.getProperties().put("path", path);
-            node.getProperties().put("protocol", "stomp");
-            node.getProperties().put("type", "stomp_endpoint");
+            node.getProperties().put(PROP_PROTOCOL, "stomp");
+            node.getProperties().put(PROP_TYPE, "stomp_endpoint");
             nodes.add(node);
         }
 
@@ -182,7 +187,7 @@ public class WebSocketDetector extends AbstractRegexDetector {
             edge.setKind(EdgeKind.PRODUCES);
             edge.setSourceId(classNodeId);
             edge.setTarget(new CodeNode("ws:topic:" + destination, NodeKind.WEBSOCKET_ENDPOINT, destination));
-            edge.setProperties(Map.of("destination", destination));
+            edge.setProperties(Map.of(PROP_DESTINATION, destination));
             edges.add(edge);
         }
 

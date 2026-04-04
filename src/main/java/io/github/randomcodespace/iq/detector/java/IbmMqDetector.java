@@ -27,6 +27,10 @@ import io.github.randomcodespace.iq.detector.DetectorInfo;
 )
 @Component
 public class IbmMqDetector extends AbstractJavaMessagingDetector {
+    private static final String PROP_BROKER = "broker";
+    private static final String PROP_IBM_MQ = "ibm_mq";
+    private static final String PROP_QUEUE = "queue";
+
 
     private static final Pattern QM_NEW_RE = Pattern.compile("new\\s+MQQueueManager\\s*\\(\\s*\"([^\"]+)\"");
     private static final Pattern ACCESS_QUEUE_RE = Pattern.compile("accessQueue\\s*\\(\\s*\"([^\"]+)\"");
@@ -38,7 +42,7 @@ public class IbmMqDetector extends AbstractJavaMessagingDetector {
 
     @Override
     public String getName() {
-        return "ibm_mq";
+        return PROP_IBM_MQ;
     }
 
     @Override
@@ -77,7 +81,7 @@ public class IbmMqDetector extends AbstractJavaMessagingDetector {
             if (m.find()) {
                 String qmName = m.group(1);
                 String qmId = ensureNode("ibmmq:qm:" + qmName, qmName, NodeKind.MESSAGE_QUEUE,
-                        "ibmmq:qm:" + qmName, Map.of("broker", "ibm_mq", "queue_manager", qmName),
+                        "ibmmq:qm:" + qmName, Map.of(PROP_BROKER, PROP_IBM_MQ, "queue_manager", qmName),
                         seenQms, nodes);
                 addMessagingEdge(classNodeId, qmId, EdgeKind.CONNECTS_TO,
                         className + " connects to queue manager " + qmName,
@@ -91,14 +95,14 @@ public class IbmMqDetector extends AbstractJavaMessagingDetector {
             if (m.find()) {
                 String queueName = m.group(1);
                 String queueId = ensureNode("ibmmq:queue:" + queueName, queueName, NodeKind.QUEUE,
-                        "ibmmq:queue:" + queueName, Map.of("broker", "ibm_mq", "queue", queueName),
+                        "ibmmq:queue:" + queueName, Map.of(PROP_BROKER, PROP_IBM_MQ, PROP_QUEUE, queueName),
                         seenQueues, nodes);
                 if (hasPut) addMessagingEdge(classNodeId, queueId, EdgeKind.SENDS_TO,
-                        className + " sends to " + queueName, Map.of("queue", queueName), edges);
+                        className + " sends to " + queueName, Map.of(PROP_QUEUE, queueName), edges);
                 if (hasGet) addMessagingEdge(classNodeId, queueId, EdgeKind.RECEIVES_FROM,
-                        className + " receives from " + queueName, Map.of("queue", queueName), edges);
+                        className + " receives from " + queueName, Map.of(PROP_QUEUE, queueName), edges);
                 if (!hasPut && !hasGet) addMessagingEdge(classNodeId, queueId, EdgeKind.CONNECTS_TO,
-                        className + " accesses " + queueName, Map.of("queue", queueName), edges);
+                        className + " accesses " + queueName, Map.of(PROP_QUEUE, queueName), edges);
             }
         }
 
@@ -106,11 +110,11 @@ public class IbmMqDetector extends AbstractJavaMessagingDetector {
         for (int i = 0; i < lines.length; i++) {
             Matcher m = JMS_CREATE_QUEUE_RE.matcher(lines[i]);
             if (m.find()) ensureNode("ibmmq:queue:" + m.group(1), m.group(1), NodeKind.QUEUE,
-                    "ibmmq:queue:" + m.group(1), Map.of("broker", "ibm_mq", "queue", m.group(1)),
+                    "ibmmq:queue:" + m.group(1), Map.of(PROP_BROKER, PROP_IBM_MQ, PROP_QUEUE, m.group(1)),
                     seenQueues, nodes);
             m = JMS_CREATE_TOPIC_RE.matcher(lines[i]);
             if (m.find()) ensureNode("ibmmq:topic:" + m.group(1), m.group(1), NodeKind.TOPIC,
-                    "ibmmq:topic:" + m.group(1), Map.of("broker", "ibm_mq", "topic", m.group(1)),
+                    "ibmmq:topic:" + m.group(1), Map.of(PROP_BROKER, PROP_IBM_MQ, "topic", m.group(1)),
                     seenTopics, nodes);
         }
 
@@ -119,7 +123,7 @@ public class IbmMqDetector extends AbstractJavaMessagingDetector {
             node.setId("ibmmq:topic:__unknown__");
             node.setKind(NodeKind.TOPIC);
             node.setLabel("ibmmq:topic:unknown");
-            node.getProperties().put("broker", "ibm_mq");
+            node.getProperties().put(PROP_BROKER, PROP_IBM_MQ);
             nodes.add(node);
         }
 

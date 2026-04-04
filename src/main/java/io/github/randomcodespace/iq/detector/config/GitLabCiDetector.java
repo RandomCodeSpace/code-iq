@@ -33,10 +33,13 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class GitLabCiDetector extends AbstractStructuredDetector {
+    private static final String PROP_IMAGE = "image";
+    private static final String PROP_STAGE = "stage";
+
 
     private static final Set<String> GITLAB_CI_KEYWORDS = Set.of(
             "stages", "variables", "default", "workflow", "include",
-            "image", "services", "before_script", "after_script", "cache");
+            PROP_IMAGE, "services", "before_script", "after_script", "cache");
 
     private static final List<String> TOOL_KEYWORDS = List.of(
             "docker", "helm", "kubectl", "terraform", "maven", "gradle", "npm", "pip");
@@ -88,7 +91,7 @@ public class GitLabCiDetector extends AbstractStructuredDetector {
                     NodeKind.CONFIG_KEY, "stage:" + stageStr);
             stageNode.setModule(ctx.moduleName());
             stageNode.setFilePath(fp);
-            stageNode.setProperties(Map.of("stage", stageStr));
+            stageNode.setProperties(Map.of(PROP_STAGE, stageStr));
             nodes.add(stageNode);
         }
 
@@ -150,10 +153,10 @@ public class GitLabCiDetector extends AbstractStructuredDetector {
             String jobId = jobIds.get(jobName);
 
             Map<String, Object> props = new HashMap<>();
-            String stageVal = getString(jobDef, "stage");
-            if (stageVal != null) props.put("stage", stageVal);
-            String imageVal = getString(jobDef, "image");
-            if (imageVal != null) props.put("image", imageVal);
+            String stageVal = getString(jobDef, PROP_STAGE);
+            if (stageVal != null) props.put(PROP_STAGE, stageVal);
+            String imageVal = getString(jobDef, PROP_IMAGE);
+            if (imageVal != null) props.put(PROP_IMAGE, imageVal);
 
             List<Object> scripts = getList(jobDef, "script");
             List<String> tools = detectTools(scripts);

@@ -69,7 +69,7 @@ class StructuredParserTest {
     @Test
     void invalidYamlReturnsNull() {
         // SnakeYAML is quite lenient, but truly broken input should not crash
-        Object result = parser.parse("yaml", ":::\n---\n{{invalid", "bad.yaml");
+        parser.parse("yaml", ":::\n---\n{{invalid", "bad.yaml");
         // May return null or a partial parse — just don't throw
         // (SnakeYAML treats many things as strings, so this might not be null)
     }

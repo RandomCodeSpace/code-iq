@@ -1,7 +1,6 @@
 package io.github.randomcodespace.iq.detector.go;
 
 import io.github.randomcodespace.iq.detector.AbstractAntlrDetector;
-import io.github.randomcodespace.iq.grammar.AntlrParserFactory;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.model.CodeEdge;
@@ -27,6 +26,8 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class GoStructuresDetector extends AbstractAntlrDetector {
+    private static final String PROP_EXPORTED = "exported";
+
 
     private static final Pattern STRUCT_RE = Pattern.compile("type\\s+(\\w+)\\s+struct\\s*\\{");
     private static final Pattern INTERFACE_RE = Pattern.compile("type\\s+(\\w+)\\s+interface\\s*\\{");
@@ -115,7 +116,7 @@ public class GoStructuresDetector extends AbstractAntlrDetector {
             node.setFqn(pkgName != null ? pkgName + "." + name : name);
             node.setFilePath(filePath);
             node.setLineStart(findLineNumber(text, sm.start()));
-            node.getProperties().put("exported", exported);
+            node.getProperties().put(PROP_EXPORTED, exported);
             node.getProperties().put("type", "struct");
             nodes.add(node);
         }
@@ -132,7 +133,7 @@ public class GoStructuresDetector extends AbstractAntlrDetector {
             node.setFqn(pkgName != null ? pkgName + "." + name : name);
             node.setFilePath(filePath);
             node.setLineStart(findLineNumber(text, ifm.start()));
-            node.getProperties().put("exported", exported);
+            node.getProperties().put(PROP_EXPORTED, exported);
             nodes.add(node);
         }
 
@@ -151,7 +152,7 @@ public class GoStructuresDetector extends AbstractAntlrDetector {
             node.setFqn(pkgName != null ? pkgName + "." + receiver + "." + methodName : receiver + "." + methodName);
             node.setFilePath(filePath);
             node.setLineStart(findLineNumber(text, mm.start()));
-            node.getProperties().put("exported", exported);
+            node.getProperties().put(PROP_EXPORTED, exported);
             node.getProperties().put("receiver_type", receiver);
             nodes.add(node);
 
@@ -181,7 +182,7 @@ public class GoStructuresDetector extends AbstractAntlrDetector {
             node.setFqn(pkgName != null ? pkgName + "." + funcName : funcName);
             node.setFilePath(filePath);
             node.setLineStart(findLineNumber(text, fm.start()));
-            node.getProperties().put("exported", exported);
+            node.getProperties().put(PROP_EXPORTED, exported);
             node.getProperties().put("type", "function");
             nodes.add(node);
         }

@@ -35,6 +35,9 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class HelmChartDetector extends AbstractStructuredDetector {
+    private static final String PROP_TYPE = "type";
+    private static final String PROP_VERSION = "version";
+
 
     private static final Pattern VALUES_REF_RE = Pattern.compile(
             "\\{\\{\\s*\\.Values\\.([a-zA-Z0-9_.]+)\\s*\\}\\}");
@@ -76,13 +79,13 @@ public class HelmChartDetector extends AbstractStructuredDetector {
         if (data == null) return;
 
         String chartName = getStringOrDefault(data, "name", "unknown");
-        String chartVersion = getStringOrDefault(data, "version", "0.0.0");
+        String chartVersion = getStringOrDefault(data, PROP_VERSION, "0.0.0");
         String chartNodeId = "helm:" + fp + ":chart:" + chartName;
 
         Map<String, Object> props = new HashMap<>();
         props.put("chart_name", chartName);
         props.put("chart_version", chartVersion);
-        props.put("type", "helm_chart");
+        props.put(PROP_TYPE, "helm_chart");
 
         CodeNode chartNode = new CodeNode(chartNodeId, NodeKind.MODULE, "helm:" + chartName);
         chartNode.setFqn("helm:" + chartName + ":" + chartVersion);
@@ -100,7 +103,7 @@ public class HelmChartDetector extends AbstractStructuredDetector {
             String depName = getString(depMap, "name");
             if (depName == null || depName.isEmpty()) continue;
 
-            String depVersion = getStringOrDefault(depMap, "version", "");
+            String depVersion = getStringOrDefault(depMap, PROP_VERSION, "");
             String depRepo = getStringOrDefault(depMap, "repository", "");
             String depNodeId = "helm:" + fp + ":dep:" + depName;
 
@@ -108,7 +111,7 @@ public class HelmChartDetector extends AbstractStructuredDetector {
             depProps.put("chart_name", depName);
             depProps.put("chart_version", depVersion);
             depProps.put("repository", depRepo);
-            depProps.put("type", "helm_dependency");
+            depProps.put(PROP_TYPE, "helm_dependency");
 
             CodeNode depNode = new CodeNode(depNodeId, NodeKind.MODULE, "helm-dep:" + depName);
             depNode.setFqn("helm:" + depName + ":" + depVersion);
@@ -122,7 +125,7 @@ public class HelmChartDetector extends AbstractStructuredDetector {
             edge.setKind(EdgeKind.DEPENDS_ON);
             edge.setSourceId(chartNodeId);
             edge.setTarget(new CodeNode(depNodeId, null, null));
-            edge.setProperties(Map.of("version", depVersion));
+            edge.setProperties(Map.of(PROP_VERSION, depVersion));
             edges.add(edge);
         }
     }
@@ -191,7 +194,7 @@ public class HelmChartDetector extends AbstractStructuredDetector {
         if (parsedData == null) return null;
 
         Map<String, Object> pd = asMap(parsedData);
-        if (!"yaml".equals(getString(pd, "type"))) return null;
+        if (!"yaml".equals(getString(pd, PROP_TYPE))) return null;
 
         Map<String, Object> data = getMap(pd, "data");
         return data.isEmpty() ? null : data;

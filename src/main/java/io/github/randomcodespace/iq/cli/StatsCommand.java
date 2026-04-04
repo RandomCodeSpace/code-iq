@@ -36,6 +36,15 @@ import java.util.concurrent.Callable;
 @Command(name = "stats", mixinStandardHelpOptions = true,
         description = "Show rich statistics from analyzed graph")
 public class StatsCommand implements Callable<Integer> {
+    private static final String PROP_COUNT = "Count";
+    private static final String PROP_ARCHITECTURE = "architecture";
+    private static final String PROP_AUTH = "auth";
+    private static final String PROP_CONNECTIONS = "connections";
+    private static final String PROP_FRAMEWORKS = "frameworks";
+    private static final String PROP_GRAPH = "graph";
+    private static final String PROP_INFRA = "infra";
+    private static final String PROP_LANGUAGES = "languages";
+
 
     @Parameters(index = "0", defaultValue = ".", description = "Path to analyzed codebase")
     private Path path;
@@ -66,8 +75,8 @@ public class StatsCommand implements Callable<Integer> {
 
     private static final Set<String> VALID_FORMATS = Set.of("pretty", "yaml", "json", "markdown");
     private static final Set<String> VALID_CATEGORIES = Set.of(
-            "all", "graph", "languages", "frameworks", "infra",
-            "connections", "auth", "architecture");
+            "all", PROP_GRAPH, PROP_LANGUAGES, PROP_FRAMEWORKS, PROP_INFRA,
+            PROP_CONNECTIONS, PROP_AUTH, PROP_ARCHITECTURE);
 
     @Override
     public Integer call() {
@@ -136,18 +145,18 @@ public class StatsCommand implements Callable<Integer> {
         out.println();
 
         // Graph
-        if (stats.containsKey("graph")) {
+        if (stats.containsKey(PROP_GRAPH)) {
             @SuppressWarnings("unchecked")
-            Map<String, Object> graph = (Map<String, Object>) stats.get("graph");
+            Map<String, Object> graph = (Map<String, Object>) stats.get(PROP_GRAPH);
             out.println("  Graph:        " + nf.format(toLong(graph.get("nodes")))
                     + " nodes, " + nf.format(toLong(graph.get("edges")))
                     + " edges, " + nf.format(toLong(graph.get("files"))) + " files");
         }
 
         // Languages
-        if (stats.containsKey("languages")) {
+        if (stats.containsKey(PROP_LANGUAGES)) {
             @SuppressWarnings("unchecked")
-            Map<String, Object> languages = (Map<String, Object>) stats.get("languages");
+            Map<String, Object> languages = (Map<String, Object>) stats.get(PROP_LANGUAGES);
             if (!languages.isEmpty()) {
                 StringBuilder sb = new StringBuilder("  Languages:    ");
                 languages.entrySet().stream().limit(10).forEach(e ->
@@ -158,9 +167,9 @@ public class StatsCommand implements Callable<Integer> {
         }
 
         // Frameworks
-        if (stats.containsKey("frameworks")) {
+        if (stats.containsKey(PROP_FRAMEWORKS)) {
             @SuppressWarnings("unchecked")
-            Map<String, Object> frameworks = (Map<String, Object>) stats.get("frameworks");
+            Map<String, Object> frameworks = (Map<String, Object>) stats.get(PROP_FRAMEWORKS);
             if (!frameworks.isEmpty()) {
                 out.println();
                 StringBuilder sb = new StringBuilder("  Frameworks:   ");
@@ -174,7 +183,7 @@ public class StatsCommand implements Callable<Integer> {
         // Infrastructure
         if (stats.containsKey("infra")) {
             @SuppressWarnings("unchecked")
-            Map<String, Object> infra = (Map<String, Object>) stats.get("infra");
+            Map<String, Object> infra = (Map<String, Object>) stats.get(PROP_INFRA);
             boolean hasInfra = infra.values().stream()
                     .anyMatch(v -> v instanceof Map<?, ?> m && !m.isEmpty());
             if (hasInfra) {
@@ -187,9 +196,9 @@ public class StatsCommand implements Callable<Integer> {
         }
 
         // Connections
-        if (stats.containsKey("connections")) {
+        if (stats.containsKey(PROP_CONNECTIONS)) {
             @SuppressWarnings("unchecked")
-            Map<String, Object> conn = (Map<String, Object>) stats.get("connections");
+            Map<String, Object> conn = (Map<String, Object>) stats.get(PROP_CONNECTIONS);
             out.println();
             out.println("  Connections:");
 
@@ -220,7 +229,7 @@ public class StatsCommand implements Callable<Integer> {
         // Auth
         if (stats.containsKey("auth")) {
             @SuppressWarnings("unchecked")
-            Map<String, Object> auth = (Map<String, Object>) stats.get("auth");
+            Map<String, Object> auth = (Map<String, Object>) stats.get(PROP_AUTH);
             if (!auth.isEmpty()) {
                 out.println();
                 out.println("  Auth:");
@@ -230,9 +239,9 @@ public class StatsCommand implements Callable<Integer> {
         }
 
         // Architecture
-        if (stats.containsKey("architecture")) {
+        if (stats.containsKey(PROP_ARCHITECTURE)) {
             @SuppressWarnings("unchecked")
-            Map<String, Object> arch = (Map<String, Object>) stats.get("architecture");
+            Map<String, Object> arch = (Map<String, Object>) stats.get(PROP_ARCHITECTURE);
             if (!arch.isEmpty()) {
                 out.println();
                 out.println("  Architecture:");
@@ -274,7 +283,7 @@ public class StatsCommand implements Callable<Integer> {
 
         if (stats.containsKey("graph")) {
             @SuppressWarnings("unchecked")
-            Map<String, Object> graph = (Map<String, Object>) stats.get("graph");
+            Map<String, Object> graph = (Map<String, Object>) stats.get(PROP_GRAPH);
             out.println("## Graph");
             out.println();
             out.println("| Metric | Count |");
@@ -283,12 +292,12 @@ public class StatsCommand implements Callable<Integer> {
             out.println();
         }
 
-        printMarkdownSection(nf, stats, "languages", "Languages", "Language", "Count");
-        printMarkdownSection(nf, stats, "frameworks", "Frameworks", "Framework", "Count");
+        printMarkdownSection(nf, stats, PROP_LANGUAGES, "Languages", "Language", PROP_COUNT);
+        printMarkdownSection(nf, stats, PROP_FRAMEWORKS, "Frameworks", "Framework", PROP_COUNT);
 
-        if (stats.containsKey("infra")) {
+        if (stats.containsKey(PROP_INFRA)) {
             @SuppressWarnings("unchecked")
-            Map<String, Object> infra = (Map<String, Object>) stats.get("infra");
+            Map<String, Object> infra = (Map<String, Object>) stats.get(PROP_INFRA);
             out.println("## Infrastructure");
             out.println();
             for (Map.Entry<String, Object> section : infra.entrySet()) {
@@ -305,9 +314,9 @@ public class StatsCommand implements Callable<Integer> {
             }
         }
 
-        if (stats.containsKey("connections")) {
+        if (stats.containsKey(PROP_CONNECTIONS)) {
             @SuppressWarnings("unchecked")
-            Map<String, Object> conn = (Map<String, Object>) stats.get("connections");
+            Map<String, Object> conn = (Map<String, Object>) stats.get(PROP_CONNECTIONS);
             out.println("## Connections");
             out.println();
             out.println("| Type | Count |");
@@ -330,8 +339,8 @@ public class StatsCommand implements Callable<Integer> {
             out.println();
         }
 
-        printMarkdownSection(nf, stats, "auth", "Auth", "Type", "Count");
-        printMarkdownSection(nf, stats, "architecture", "Architecture", "Kind", "Count");
+        printMarkdownSection(nf, stats, PROP_AUTH, "Auth", "Type", PROP_COUNT);
+        printMarkdownSection(nf, stats, PROP_ARCHITECTURE, "Architecture", "Kind", PROP_COUNT);
 
         return 0;
     }

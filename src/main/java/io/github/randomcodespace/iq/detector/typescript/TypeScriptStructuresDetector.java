@@ -31,6 +31,9 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class TypeScriptStructuresDetector extends AbstractAntlrDetector {
+    private static final String PROP_ASYNC = "async";
+    private static final String PROP_TYPESCRIPT = "typescript";
+
 
     private static final Pattern INTERFACE_RE = Pattern.compile(
             "^\\s*(?:export\\s+)?interface\\s+(\\w+)", Pattern.MULTILINE
@@ -64,7 +67,7 @@ public class TypeScriptStructuresDetector extends AbstractAntlrDetector {
 
     @Override
     public Set<String> getSupportedLanguages() {
-        return Set.of("typescript", "javascript");
+        return Set.of(PROP_TYPESCRIPT, "javascript");
     }
 
     @Override
@@ -75,7 +78,7 @@ public class TypeScriptStructuresDetector extends AbstractAntlrDetector {
             return null; // triggers regex fallback
         }
         if ("typescript".equals(ctx.language())) {
-            return AntlrParserFactory.parse("typescript", ctx.content());
+            return AntlrParserFactory.parse(PROP_TYPESCRIPT, ctx.content());
         }
         // JavaScript files use the JS grammar (or fall back to regex if parse fails)
         return AntlrParserFactory.parse("javascript", ctx.content());
@@ -163,7 +166,7 @@ public class TypeScriptStructuresDetector extends AbstractAntlrDetector {
                 node.setFilePath(fp);
                 node.setLineStart(lineOf(ruleCtx));
                 if (ruleCtx.Async() != null) {
-                    node.getProperties().put("async", true);
+                    node.getProperties().put(PROP_ASYNC, true);
                 }
                 nodes.add(node);
             }
@@ -324,7 +327,7 @@ public class TypeScriptStructuresDetector extends AbstractAntlrDetector {
             node.setFilePath(fp);
             node.setLineStart(findLineNumber(text, m.start()));
             if (isDefault) node.getProperties().put("default", true);
-            if (isAsync) node.getProperties().put("async", true);
+            if (isAsync) node.getProperties().put(PROP_ASYNC, true);
             nodes.add(node);
             existingIds.add(nodeId);
         }
@@ -345,7 +348,7 @@ public class TypeScriptStructuresDetector extends AbstractAntlrDetector {
             node.setModule(moduleName);
             node.setFilePath(fp);
             node.setLineStart(findLineNumber(text, m.start()));
-            if (isAsync) node.getProperties().put("async", true);
+            if (isAsync) node.getProperties().put(PROP_ASYNC, true);
             nodes.add(node);
             existingIds.add(nodeId);
         }

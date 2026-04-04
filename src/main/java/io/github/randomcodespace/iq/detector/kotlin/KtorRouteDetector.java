@@ -1,7 +1,6 @@
 package io.github.randomcodespace.iq.detector.kotlin;
 
 import io.github.randomcodespace.iq.detector.AbstractAntlrDetector;
-import io.github.randomcodespace.iq.grammar.AntlrParserFactory;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.model.CodeNode;
@@ -29,6 +28,9 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class KtorRouteDetector extends AbstractAntlrDetector {
+    private static final String PROP_FRAMEWORK = "framework";
+    private static final String PROP_KTOR = "ktor";
+
 
     private static final Pattern ENDPOINT_PATTERN = Pattern.compile("\\b(get|post|put|delete|patch)\\(\\s*\"([^\"]+)\"\\s*\\)\\s*\\{");
     private static final Pattern ROUTING_PATTERN = Pattern.compile("\\brouting\\s*\\{");
@@ -99,7 +101,7 @@ public class KtorRouteDetector extends AbstractAntlrDetector {
             CodeNode n = new CodeNode(); n.setId("ktor:" + fp + ":routing:" + line);
             n.setKind(NodeKind.MODULE); n.setLabel("routing"); n.setFqn(fp + "::routing");
             n.setFilePath(fp); n.setLineStart(line);
-            n.getProperties().put("framework", "ktor"); n.getProperties().put("type", "router");
+            n.getProperties().put(PROP_FRAMEWORK, PROP_KTOR); n.getProperties().put("type", "router");
             nodes.add(n);
         }
 
@@ -114,7 +116,7 @@ public class KtorRouteDetector extends AbstractAntlrDetector {
             n.setKind(NodeKind.ENDPOINT); n.setLabel(method + " " + path);
             n.setFqn(fp + "::" + method + ":" + path); n.setFilePath(fp); n.setLineStart(line);
             n.getProperties().put("protocol", "REST"); n.getProperties().put("http_method", method);
-            n.getProperties().put("path_pattern", path); n.getProperties().put("framework", "ktor");
+            n.getProperties().put("path_pattern", path); n.getProperties().put(PROP_FRAMEWORK, PROP_KTOR);
             nodes.add(n);
         }
 
@@ -125,7 +127,7 @@ public class KtorRouteDetector extends AbstractAntlrDetector {
             CodeNode n = new CodeNode(); n.setId("ktor:" + fp + ":install:" + feature + ":" + line);
             n.setKind(NodeKind.MIDDLEWARE); n.setLabel("install:" + feature);
             n.setFqn(fp + "::install:" + feature); n.setFilePath(fp); n.setLineStart(line);
-            n.getProperties().put("framework", "ktor"); n.getProperties().put("feature", feature);
+            n.getProperties().put(PROP_FRAMEWORK, PROP_KTOR); n.getProperties().put("feature", feature);
             nodes.add(n);
         }
 
@@ -136,7 +138,7 @@ public class KtorRouteDetector extends AbstractAntlrDetector {
             CodeNode n = new CodeNode(); n.setId("ktor:" + fp + ":auth:" + authName + ":" + line);
             n.setKind(NodeKind.GUARD); n.setLabel("authenticate:" + authName);
             n.setFqn(fp + "::authenticate:" + authName); n.setFilePath(fp); n.setLineStart(line);
-            n.getProperties().put("framework", "ktor"); n.getProperties().put("auth_name", authName);
+            n.getProperties().put(PROP_FRAMEWORK, PROP_KTOR); n.getProperties().put("auth_name", authName);
             nodes.add(n);
         }
 

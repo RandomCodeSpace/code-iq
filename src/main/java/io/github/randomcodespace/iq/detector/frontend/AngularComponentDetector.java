@@ -22,6 +22,10 @@ import io.github.randomcodespace.iq.detector.DetectorInfo;
 )
 @Component
 public class AngularComponentDetector extends AbstractRegexDetector {
+    private static final String PROP_ANGULAR = "angular";
+    private static final String PROP_COMPONENT = "component";
+    private static final String PROP_DECORATOR = "decorator";
+
 
     private static final Pattern COMPONENT_DECORATOR = Pattern.compile(
             "@Component\\s*\\(\\s*\\{.*?selector\\s*:\\s*['\"]([^'\"]+)['\"].*?\\}\\s*\\)\\s*\\n?\\s*(?:export\\s+)?class\\s+(\\w+)",
@@ -71,10 +75,10 @@ public class AngularComponentDetector extends AbstractRegexDetector {
             String selector = m.group(1);
             String className = m.group(2);
             if (!seen.add(className)) continue;
-            CodeNode node = FrontendDetectorHelper.createComponentNode("angular", filePath, "component",
+            CodeNode node = FrontendDetectorHelper.createComponentNode(PROP_ANGULAR, filePath, PROP_COMPONENT,
                     className, NodeKind.COMPONENT, FrontendDetectorHelper.lineAt(text, m.start()));
             node.getProperties().put("selector", selector);
-            node.getProperties().put("decorator", "Component");
+            node.getProperties().put(PROP_DECORATOR, "Component");
             nodes.add(node);
         }
 
@@ -84,10 +88,10 @@ public class AngularComponentDetector extends AbstractRegexDetector {
             String providedIn = m.group(1);
             String className = m.group(2);
             if (!seen.add(className)) continue;
-            CodeNode node = FrontendDetectorHelper.createComponentNode("angular", filePath, "service",
+            CodeNode node = FrontendDetectorHelper.createComponentNode(PROP_ANGULAR, filePath, "service",
                     className, NodeKind.MIDDLEWARE, FrontendDetectorHelper.lineAt(text, m.start()));
             node.getProperties().put("provided_in", providedIn);
-            node.getProperties().put("decorator", "Injectable");
+            node.getProperties().put(PROP_DECORATOR, "Injectable");
             nodes.add(node);
         }
 
@@ -97,10 +101,10 @@ public class AngularComponentDetector extends AbstractRegexDetector {
             String selector = m.group(1);
             String className = m.group(2);
             if (!seen.add(className)) continue;
-            CodeNode node = FrontendDetectorHelper.createComponentNode("angular", filePath, "component",
+            CodeNode node = FrontendDetectorHelper.createComponentNode(PROP_ANGULAR, filePath, PROP_COMPONENT,
                     className, NodeKind.COMPONENT, FrontendDetectorHelper.lineAt(text, m.start()));
             node.getProperties().put("selector", selector);
-            node.getProperties().put("decorator", "Directive");
+            node.getProperties().put(PROP_DECORATOR, "Directive");
             nodes.add(node);
         }
 
@@ -110,10 +114,10 @@ public class AngularComponentDetector extends AbstractRegexDetector {
             String pipeName = m.group(1);
             String className = m.group(2);
             if (!seen.add(className)) continue;
-            CodeNode node = FrontendDetectorHelper.createComponentNode("angular", filePath, "component",
+            CodeNode node = FrontendDetectorHelper.createComponentNode(PROP_ANGULAR, filePath, PROP_COMPONENT,
                     className, NodeKind.COMPONENT, FrontendDetectorHelper.lineAt(text, m.start()));
             node.getProperties().put("pipe_name", pipeName);
-            node.getProperties().put("decorator", "Pipe");
+            node.getProperties().put(PROP_DECORATOR, "Pipe");
             nodes.add(node);
         }
 
@@ -122,9 +126,9 @@ public class AngularComponentDetector extends AbstractRegexDetector {
         while (m.find()) {
             String className = m.group(1);
             if (!seen.add(className)) continue;
-            CodeNode node = FrontendDetectorHelper.createComponentNode("angular", filePath, "component",
+            CodeNode node = FrontendDetectorHelper.createComponentNode(PROP_ANGULAR, filePath, PROP_COMPONENT,
                     className, NodeKind.COMPONENT, FrontendDetectorHelper.lineAt(text, m.start()));
-            node.getProperties().put("decorator", "NgModule");
+            node.getProperties().put(PROP_DECORATOR, "NgModule");
             nodes.add(node);
         }
 

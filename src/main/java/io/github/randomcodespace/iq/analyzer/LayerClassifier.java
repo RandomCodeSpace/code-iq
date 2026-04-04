@@ -17,6 +17,10 @@ import java.util.regex.Pattern;
  */
 @Service
 public class LayerClassifier {
+    private static final String PROP_BACKEND = "backend";
+    private static final String PROP_FRONTEND = "frontend";
+    private static final String PROP_UNKNOWN = "unknown";
+
 
     private static final Set<NodeKind> FRONTEND_NODE_KINDS = Set.of(
             NodeKind.COMPONENT, NodeKind.HOOK
@@ -67,7 +71,7 @@ public class LayerClassifier {
             "asp.net", "koa", "hapi", "fastify"
     );
 
-    // -- Fallback path heuristics (applied only to "unknown" nodes) --
+    // -- Fallback path heuristics (applied only to PROP_UNKNOWN nodes) --
 
     private static final Pattern BACKEND_PACKAGE_PATH_RE = Pattern.compile(
             "(?:^|/|\\.)(?:controller|controllers|api|web|rest|resource|resources|"
@@ -103,8 +107,8 @@ public class LayerClassifier {
      */
     String classifyOne(CodeNode node) {
         // 1. Node kind rules
-        if (FRONTEND_NODE_KINDS.contains(node.getKind())) return "frontend";
-        if (BACKEND_NODE_KINDS.contains(node.getKind())) return "backend";
+        if (FRONTEND_NODE_KINDS.contains(node.getKind())) return PROP_FRONTEND;
+        if (BACKEND_NODE_KINDS.contains(node.getKind())) return PROP_BACKEND;
         if (INFRA_NODE_KINDS.contains(node.getKind())) return "infra";
 
         // 2. Language rules
@@ -115,21 +119,21 @@ public class LayerClassifier {
 
         // 3. File path rules
         String filePath = node.getFilePath() != null ? node.getFilePath() : "";
-        if (FRONTEND_EXT_RE.matcher(filePath).find()) return "frontend";
-        if (FRONTEND_PATH_RE.matcher(filePath).find()) return "frontend";
-        if (BACKEND_PATH_RE.matcher(filePath).find()) return "backend";
+        if (FRONTEND_EXT_RE.matcher(filePath).find()) return PROP_FRONTEND;
+        if (FRONTEND_PATH_RE.matcher(filePath).find()) return PROP_FRONTEND;
+        if (BACKEND_PATH_RE.matcher(filePath).find()) return PROP_BACKEND;
 
         // 4. Framework rules
         Object fw = node.getProperties().get("framework");
         if (fw instanceof String fwStr) {
-            if (FRONTEND_FRAMEWORKS.contains(fwStr)) return "frontend";
-            if (BACKEND_FRAMEWORKS.contains(fwStr)) return "backend";
+            if (FRONTEND_FRAMEWORKS.contains(fwStr)) return PROP_FRONTEND;
+            if (BACKEND_FRAMEWORKS.contains(fwStr)) return PROP_BACKEND;
         }
 
         // 5. Shared node kinds
         if (SHARED_NODE_KINDS.contains(node.getKind())) return "shared";
 
-        // 6. Fallback: package/path heuristics for remaining "unknown" nodes
+        // 6. Fallback: package/path heuristics for remaining PROP_UNKNOWN nodes
         return classifyByPathFallback(node);
     }
 
@@ -145,10 +149,10 @@ public class LayerClassifier {
         String combined = filePath + "|" + nodeId;
 
         // Check frontend path patterns first (components, views, pages, etc.)
-        if (FRONTEND_PACKAGE_PATH_RE.matcher(combined).find()) return "frontend";
+        if (FRONTEND_PACKAGE_PATH_RE.matcher(combined).find()) return PROP_FRONTEND;
 
         // Check backend path patterns (controller, model, repository, service, etc.)
-        if (BACKEND_PACKAGE_PATH_RE.matcher(combined).find()) return "backend";
+        if (BACKEND_PACKAGE_PATH_RE.matcher(combined).find()) return PROP_BACKEND;
 
         // Check shared path patterns (config, util, common, etc.)
         if (SHARED_PACKAGE_PATH_RE.matcher(combined).find()) return "shared";
@@ -158,7 +162,7 @@ public class LayerClassifier {
             return classifyJavaByPath(filePath);
         }
 
-        return "unknown";
+        return PROP_UNKNOWN;
     }
 
     /**
@@ -168,8 +172,8 @@ public class LayerClassifier {
     private String classifyJavaByPath(String filePath) {
         // Files in src/main/java or src/main/kotlin are virtually always backend
         if (filePath.contains("src/main/java/") || filePath.contains("src/main/kotlin/")) {
-            return "backend";
+            return PROP_BACKEND;
         }
-        return "unknown";
+        return PROP_UNKNOWN;
     }
 }

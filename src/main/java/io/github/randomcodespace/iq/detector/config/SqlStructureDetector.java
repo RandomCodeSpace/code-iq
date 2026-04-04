@@ -31,6 +31,8 @@ import io.github.randomcodespace.iq.detector.DetectorInfo;
 )
 @Component
 public class SqlStructureDetector extends AbstractRegexDetector {
+    private static final String PROP_ENTITY_TYPE = "entity_type";
+
 
     private static final Pattern TABLE_RE = Pattern.compile(
             "CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?(?:\\w+\\.)?(\\w+)",
@@ -67,7 +69,6 @@ public class SqlStructureDetector extends AbstractRegexDetector {
         List<CodeNode> nodes = new ArrayList<>();
         List<CodeEdge> edges = new ArrayList<>();
 
-        String currentTable = null;
         String currentTableId = null;
 
         for (IndexedLine il : iterLines(content)) {
@@ -79,7 +80,6 @@ public class SqlStructureDetector extends AbstractRegexDetector {
             m = TABLE_RE.matcher(line);
             if (m.find()) {
                 String tableName = m.group(1);
-                currentTable = tableName;
                 currentTableId = "sql:" + filepath + ":table:" + tableName;
 
                 CodeNode node = new CodeNode(currentTableId, NodeKind.ENTITY, tableName);
@@ -87,7 +87,7 @@ public class SqlStructureDetector extends AbstractRegexDetector {
                 node.setModule(ctx.moduleName());
                 node.setFilePath(filepath);
                 node.setLineStart(lineNum);
-                node.setProperties(Map.of("entity_type", "table"));
+                node.setProperties(Map.of(PROP_ENTITY_TYPE, "table"));
                 nodes.add(node);
                 continue;
             }
@@ -102,9 +102,8 @@ public class SqlStructureDetector extends AbstractRegexDetector {
                 node.setModule(ctx.moduleName());
                 node.setFilePath(filepath);
                 node.setLineStart(lineNum);
-                node.setProperties(Map.of("entity_type", "view"));
+                node.setProperties(Map.of(PROP_ENTITY_TYPE, "view"));
                 nodes.add(node);
-                currentTable = null;
                 currentTableId = null;
                 continue;
             }
@@ -134,9 +133,8 @@ public class SqlStructureDetector extends AbstractRegexDetector {
                 node.setModule(ctx.moduleName());
                 node.setFilePath(filepath);
                 node.setLineStart(lineNum);
-                node.setProperties(Map.of("entity_type", "procedure"));
+                node.setProperties(Map.of(PROP_ENTITY_TYPE, "procedure"));
                 nodes.add(node);
-                currentTable = null;
                 currentTableId = null;
                 continue;
             }

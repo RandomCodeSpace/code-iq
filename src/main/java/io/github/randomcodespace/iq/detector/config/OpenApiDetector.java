@@ -33,13 +33,15 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class OpenApiDetector extends AbstractStructuredDetector {
+    private static final String PROP_OPENAPI = "openapi";
+
 
     private static final Set<String> HTTP_METHODS = Set.of(
             "get", "post", "put", "patch", "delete", "head", "options", "trace");
 
     @Override
     public String getName() {
-        return "openapi";
+        return PROP_OPENAPI;
     }
 
     @Override
@@ -57,7 +59,7 @@ public class OpenApiDetector extends AbstractStructuredDetector {
         if (spec.isEmpty()) return DetectorResult.empty();
 
         // Only trigger for OpenAPI or Swagger spec
-        if (!spec.containsKey("openapi") && !spec.containsKey("swagger")) {
+        if (!spec.containsKey(PROP_OPENAPI) && !spec.containsKey("swagger")) {
             return DetectorResult.empty();
         }
 
@@ -71,13 +73,13 @@ public class OpenApiDetector extends AbstractStructuredDetector {
         String apiTitle = getString(info, "title");
         if (apiTitle == null) apiTitle = filepath;
         String apiVersion = getStringOrDefault(info, "version", "");
-        Object specVersionObj = spec.get("openapi");
+        Object specVersionObj = spec.get(PROP_OPENAPI);
         if (specVersionObj == null) specVersionObj = spec.get("swagger");
         String specVersion = specVersionObj != null ? String.valueOf(specVersionObj) : "";
 
         // CONFIG_FILE node for the spec
         Map<String, Object> cfProps = new HashMap<>();
-        cfProps.put("config_type", "openapi");
+        cfProps.put("config_type", PROP_OPENAPI);
         cfProps.put("api_title", apiTitle);
         cfProps.put("api_version", apiVersion);
         cfProps.put("spec_version", specVersion);

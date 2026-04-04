@@ -11,6 +11,8 @@ import java.util.stream.Collectors;
  * Data models for flow diagrams -- the single source of truth for all renderers.
  */
 public final class FlowModels {
+    private static final String PROP_LABEL = "label";
+
 
     private FlowModels() {
     }
@@ -36,7 +38,7 @@ public final class FlowModels {
         public Map<String, Object> toMap() {
             var m = new LinkedHashMap<String, Object>();
             m.put("id", id);
-            m.put("label", label);
+            m.put(PROP_LABEL, label);
             m.put("kind", kind);
             m.put("style", style);
             m.put("properties", properties);
@@ -65,7 +67,7 @@ public final class FlowModels {
             var m = new LinkedHashMap<String, Object>();
             m.put("source", source);
             m.put("target", target);
-            m.put("label", label);
+            m.put(PROP_LABEL, label);
             m.put("style", style);
             return m;
         }
@@ -92,7 +94,7 @@ public final class FlowModels {
         public Map<String, Object> toMap() {
             var m = new LinkedHashMap<String, Object>();
             m.put("id", id);
-            m.put("label", label);
+            m.put(PROP_LABEL, label);
             m.put("drill_down_view", drillDownView);
             m.put("parent_view", parentView);
             m.put("nodes", nodes.stream().map(FlowNode::toMap).toList());

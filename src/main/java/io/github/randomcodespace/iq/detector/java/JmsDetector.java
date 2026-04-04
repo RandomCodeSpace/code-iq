@@ -27,6 +27,9 @@ import io.github.randomcodespace.iq.detector.DetectorInfo;
 )
 @Component
 public class JmsDetector extends AbstractJavaMessagingDetector {
+    private static final String PROP_DESTINATION = "destination";
+    private static final String PROP_JMS = "jms";
+
 
     private static final Pattern JMS_LISTENER_RE = Pattern.compile(
             "@JmsListener\\s*\\(\\s*(?:.*?destination\\s*=\\s*)?\"([^\"]+)\"");
@@ -36,7 +39,7 @@ public class JmsDetector extends AbstractJavaMessagingDetector {
 
     @Override
     public String getName() {
-        return "jms";
+        return PROP_JMS;
     }
 
     @Override
@@ -68,9 +71,9 @@ public class JmsDetector extends AbstractJavaMessagingDetector {
             Matcher m = JMS_LISTENER_RE.matcher(lines[i]);
             if (!m.find()) continue;
             String destination = m.group(1);
-            String queueId = ensureQueueNode("jms", destination, seenQueues, nodes);
+            String queueId = ensureQueueNode(PROP_JMS, destination, seenQueues, nodes);
             Map<String, Object> props = new LinkedHashMap<>();
-            props.put("destination", destination);
+            props.put(PROP_DESTINATION, destination);
             Matcher cf = CONTAINER_FACTORY_RE.matcher(lines[i]);
             if (cf.find()) props.put("container_factory", cf.group(1));
             addMessagingEdge(classNodeId, queueId, EdgeKind.CONSUMES,
@@ -82,10 +85,10 @@ public class JmsDetector extends AbstractJavaMessagingDetector {
             Matcher m = JMS_SEND_RE.matcher(lines[i]);
             if (!m.find()) continue;
             String destination = m.group(1);
-            String queueId = ensureQueueNode("jms", destination, seenQueues, nodes);
+            String queueId = ensureQueueNode(PROP_JMS, destination, seenQueues, nodes);
             addMessagingEdge(classNodeId, queueId, EdgeKind.PRODUCES,
                     className + " produces to " + destination,
-                    Map.of("destination", destination), edges);
+                    Map.of(PROP_DESTINATION, destination), edges);
         }
 
         return DetectorResult.of(nodes, edges);
@@ -99,7 +102,7 @@ public class JmsDetector extends AbstractJavaMessagingDetector {
             node.setKind(NodeKind.QUEUE);
             node.setLabel(broker + ":" + destination);
             node.getProperties().put("broker", broker);
-            node.getProperties().put("destination", destination);
+            node.getProperties().put(PROP_DESTINATION, destination);
             nodes.add(node);
         }
         return queueId;

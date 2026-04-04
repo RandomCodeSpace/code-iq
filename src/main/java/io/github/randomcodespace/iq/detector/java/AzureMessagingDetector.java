@@ -28,6 +28,14 @@ import io.github.randomcodespace.iq.detector.DetectorInfo;
 )
 @Component
 public class AzureMessagingDetector extends AbstractRegexDetector {
+    private static final String PROP_AZURE_EVENTHUB = "azure_eventhub";
+    private static final String PROP_AZURE_SERVICEBUS = "azure_servicebus";
+    private static final String PROP_BROKER = "broker";
+    private static final String PROP_EVENT_HUB = "event_hub";
+    private static final String PROP_QUEUE = "queue";
+    private static final String PROP_ROLE = "role";
+    private static final String PROP_TOPIC = "topic";
+
 
     private static final Pattern CLASS_RE = Pattern.compile("(?:public\\s+)?class\\s+(\\w+)");
     private static final Pattern SB_SENDER_CLIENT_RE = Pattern.compile("\\bServiceBusSenderClient\\b");
@@ -102,53 +110,53 @@ public class AzureMessagingDetector extends AbstractRegexDetector {
         for (String qname : queueNames) {
             String queueId = ensureSbQueueNode(qname, seenSbQueues, nodes);
             if (isSbSender) addMessagingEdge(classNodeId, queueId, EdgeKind.SENDS_TO,
-                    className + " sends to " + qname, Map.of("queue", qname), edges);
+                    className + " sends to " + qname, Map.of(PROP_QUEUE, qname), edges);
             if (isSbReceiver) addMessagingEdge(classNodeId, queueId, EdgeKind.RECEIVES_FROM,
-                    className + " receives from " + qname, Map.of("queue", qname), edges);
+                    className + " receives from " + qname, Map.of(PROP_QUEUE, qname), edges);
         }
 
         for (String tname : topicNames) {
             String topicId = ensureSbTopicNode(tname, seenSbTopics, nodes);
             if (isSbSender) addMessagingEdge(classNodeId, topicId, EdgeKind.SENDS_TO,
-                    className + " sends to " + tname, Map.of("topic", tname), edges);
+                    className + " sends to " + tname, Map.of(PROP_TOPIC, tname), edges);
             if (isSbReceiver) addMessagingEdge(classNodeId, topicId, EdgeKind.RECEIVES_FROM,
-                    className + " receives from " + tname, Map.of("topic", tname), edges);
+                    className + " receives from " + tname, Map.of(PROP_TOPIC, tname), edges);
         }
 
         for (String ehname : ehNames) {
             String ehId = ensureEventhubNode(ehname, seenEventHubs, nodes);
             if (isEhProducer) addMessagingEdge(classNodeId, ehId, EdgeKind.SENDS_TO,
-                    className + " sends to " + ehname, Map.of("event_hub", ehname), edges);
+                    className + " sends to " + ehname, Map.of(PROP_EVENT_HUB, ehname), edges);
             if (isEhConsumer) addMessagingEdge(classNodeId, ehId, EdgeKind.RECEIVES_FROM,
-                    className + " receives from " + ehname, Map.of("event_hub", ehname), edges);
+                    className + " receives from " + ehname, Map.of(PROP_EVENT_HUB, ehname), edges);
         }
 
         // Generic fallbacks
         if (isSbSender && queueNames.isEmpty() && topicNames.isEmpty()) {
             nodes.add(genericNode("azure:servicebus:__sender__", NodeKind.QUEUE, "azure:servicebus:sender",
-                    Map.of("broker", "azure_servicebus", "role", "sender")));
+                    Map.of(PROP_BROKER, PROP_AZURE_SERVICEBUS, PROP_ROLE, "sender")));
             addMessagingEdge(classNodeId, "azure:servicebus:__sender__", EdgeKind.SENDS_TO,
                     className + " sends to Azure Service Bus", Map.of(), edges);
         } else if (isSbReceiver && queueNames.isEmpty() && topicNames.isEmpty()) {
             nodes.add(genericNode("azure:servicebus:__receiver__", NodeKind.QUEUE, "azure:servicebus:receiver",
-                    Map.of("broker", "azure_servicebus", "role", "receiver")));
+                    Map.of(PROP_BROKER, PROP_AZURE_SERVICEBUS, PROP_ROLE, "receiver")));
             addMessagingEdge(classNodeId, "azure:servicebus:__receiver__", EdgeKind.RECEIVES_FROM,
                     className + " receives from Azure Service Bus", Map.of(), edges);
         } else if (hasSbClient && queueNames.isEmpty() && topicNames.isEmpty() && !isSbSender && !isSbReceiver) {
             nodes.add(genericNode("azure:servicebus:__client__", NodeKind.QUEUE, "azure:servicebus:client",
-                    Map.of("broker", "azure_servicebus", "role", "client")));
+                    Map.of(PROP_BROKER, PROP_AZURE_SERVICEBUS, PROP_ROLE, "client")));
             addMessagingEdge(classNodeId, "azure:servicebus:__client__", EdgeKind.CONNECTS_TO,
                     className + " connects to Azure Service Bus", Map.of(), edges);
         }
 
         if (isEhProducer && ehNames.isEmpty()) {
             nodes.add(genericNode("azure:eventhub:__producer__", NodeKind.TOPIC, "azure:eventhub:producer",
-                    Map.of("broker", "azure_eventhub", "role", "producer")));
+                    Map.of(PROP_BROKER, PROP_AZURE_EVENTHUB, PROP_ROLE, "producer")));
             addMessagingEdge(classNodeId, "azure:eventhub:__producer__", EdgeKind.SENDS_TO,
                     className + " sends to Azure Event Hub", Map.of(), edges);
         } else if (isEhConsumer && ehNames.isEmpty()) {
             nodes.add(genericNode("azure:eventhub:__consumer__", NodeKind.TOPIC, "azure:eventhub:consumer",
-                    Map.of("broker", "azure_eventhub", "role", "consumer")));
+                    Map.of(PROP_BROKER, PROP_AZURE_EVENTHUB, PROP_ROLE, "consumer")));
             addMessagingEdge(classNodeId, "azure:eventhub:__consumer__", EdgeKind.RECEIVES_FROM,
                     className + " receives from Azure Event Hub", Map.of(), edges);
         }
@@ -161,7 +169,7 @@ public class AzureMessagingDetector extends AbstractRegexDetector {
         if (!seen.contains(name)) {
             seen.add(name);
             nodes.add(genericNode(nodeId, NodeKind.QUEUE, "azure:servicebus:" + name,
-                    Map.of("broker", "azure_servicebus", "queue", name)));
+                    Map.of(PROP_BROKER, PROP_AZURE_SERVICEBUS, PROP_QUEUE, name)));
         }
         return nodeId;
     }
@@ -171,7 +179,7 @@ public class AzureMessagingDetector extends AbstractRegexDetector {
         if (!seen.contains(name)) {
             seen.add(name);
             nodes.add(genericNode(nodeId, NodeKind.TOPIC, "azure:servicebus:" + name,
-                    Map.of("broker", "azure_servicebus", "topic", name)));
+                    Map.of(PROP_BROKER, PROP_AZURE_SERVICEBUS, PROP_TOPIC, name)));
         }
         return nodeId;
     }
@@ -181,7 +189,7 @@ public class AzureMessagingDetector extends AbstractRegexDetector {
         if (!seen.contains(name)) {
             seen.add(name);
             nodes.add(genericNode(nodeId, NodeKind.TOPIC, "azure:eventhub:" + name,
-                    Map.of("broker", "azure_eventhub", "event_hub", name)));
+                    Map.of(PROP_BROKER, PROP_AZURE_EVENTHUB, PROP_EVENT_HUB, name)));
         }
         return nodeId;
     }

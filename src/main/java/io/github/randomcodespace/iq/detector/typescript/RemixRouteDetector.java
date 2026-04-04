@@ -1,7 +1,6 @@
 package io.github.randomcodespace.iq.detector.typescript;
 
 import io.github.randomcodespace.iq.detector.AbstractAntlrDetector;
-import io.github.randomcodespace.iq.grammar.AntlrParserFactory;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.model.CodeNode;
@@ -27,6 +26,11 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class RemixRouteDetector extends AbstractAntlrDetector {
+    private static final String PROP_FRAMEWORK = "framework";
+    private static final String PROP_REMIX = "remix";
+    private static final String PROP_ROUTE_PATH = "route_path";
+    private static final String PROP_TYPE = "type";
+
 
     private static final Pattern LOADER_PATTERN = Pattern.compile(
             "export\\s+(?:async\\s+)?function\\s+loader\\s*\\("
@@ -90,11 +94,11 @@ public class RemixRouteDetector extends AbstractAntlrDetector {
             node.setModule(moduleName);
             node.setFilePath(filePath);
             node.setLineStart(line);
-            node.getProperties().put("framework", "remix");
-            node.getProperties().put("type", "loader");
+            node.getProperties().put(PROP_FRAMEWORK, PROP_REMIX);
+            node.getProperties().put(PROP_TYPE, "loader");
             node.getProperties().put("http_method", "GET");
             if (routePath != null) {
-                node.getProperties().put("route_path", routePath);
+                node.getProperties().put(PROP_ROUTE_PATH, routePath);
             }
             nodes.add(node);
         }
@@ -112,11 +116,11 @@ public class RemixRouteDetector extends AbstractAntlrDetector {
             node.setModule(moduleName);
             node.setFilePath(filePath);
             node.setLineStart(line);
-            node.getProperties().put("framework", "remix");
-            node.getProperties().put("type", "action");
+            node.getProperties().put(PROP_FRAMEWORK, PROP_REMIX);
+            node.getProperties().put(PROP_TYPE, "action");
             node.getProperties().put("http_method", "POST");
             if (routePath != null) {
-                node.getProperties().put("route_path", routePath);
+                node.getProperties().put(PROP_ROUTE_PATH, routePath);
             }
             nodes.add(node);
         }
@@ -139,10 +143,10 @@ public class RemixRouteDetector extends AbstractAntlrDetector {
             node.setModule(moduleName);
             node.setFilePath(filePath);
             node.setLineStart(line);
-            node.getProperties().put("framework", "remix");
-            node.getProperties().put("type", "component");
+            node.getProperties().put(PROP_FRAMEWORK, PROP_REMIX);
+            node.getProperties().put(PROP_TYPE, "component");
             if (routePath != null) {
-                node.getProperties().put("route_path", routePath);
+                node.getProperties().put(PROP_ROUTE_PATH, routePath);
             }
             if (hasLoaderData) {
                 node.getProperties().put("uses_loader_data", true);

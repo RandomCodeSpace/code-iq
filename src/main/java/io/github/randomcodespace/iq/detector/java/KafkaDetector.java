@@ -28,6 +28,8 @@ import io.github.randomcodespace.iq.detector.DetectorInfo;
 )
 @Component
 public class KafkaDetector extends AbstractRegexDetector {
+    private static final String PROP_TOPIC = "topic";
+
 
     private static final Pattern CLASS_RE = Pattern.compile(
             "(?:(?:public|internal|private|protected|data|abstract|open|sealed|enum|inline|value)\\s+)*" +
@@ -87,7 +89,7 @@ public class KafkaDetector extends AbstractRegexDetector {
                         String topic = fallback.group(1);
                         String topicId = ensureTopicNode(topic, seenTopics, nodes, registry);
                         Map<String, Object> props = new LinkedHashMap<>();
-                        props.put("topic", topic);
+                        props.put(PROP_TOPIC, topic);
                         addEdge(classNodeId, topicId, EdgeKind.CONSUMES,
                                 className + " consumes " + topic, props, edges, nodes);
                     }
@@ -97,7 +99,7 @@ public class KafkaDetector extends AbstractRegexDetector {
             String topic = m.group(1);
             String topicId = ensureTopicNode(topic, seenTopics, nodes, registry);
             Map<String, Object> props = new LinkedHashMap<>();
-            props.put("topic", topic);
+            props.put(PROP_TOPIC, topic);
             Matcher gm = GROUP_ID_RE.matcher(lines[i]);
             if (gm.find()) props.put("group_id", gm.group(1));
             addEdge(classNodeId, topicId, EdgeKind.CONSUMES,
@@ -112,7 +114,7 @@ public class KafkaDetector extends AbstractRegexDetector {
             String topicId = ensureTopicNode(topic, seenTopics, nodes, registry);
             addEdge(classNodeId, topicId, EdgeKind.PRODUCES,
                     className + " produces to " + topic,
-                    Map.of("topic", topic), edges, nodes);
+                    Map.of(PROP_TOPIC, topic), edges, nodes);
         }
 
         return DetectorResult.of(nodes, edges);
@@ -133,7 +135,7 @@ public class KafkaDetector extends AbstractRegexDetector {
             node.setKind(NodeKind.TOPIC);
             node.setLabel("kafka:" + topic);
             node.getProperties().put("broker", "kafka");
-            node.getProperties().put("topic", topic);
+            node.getProperties().put(PROP_TOPIC, topic);
             nodes.add(node);
         }
         return topicId;

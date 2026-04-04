@@ -34,6 +34,8 @@ import java.util.Set;
 @Service
 @Profile("serving")
 public class EvidencePackAssembler {
+    private static final String PROP_UNKNOWN = "unknown";
+
 
     private final LexicalQueryService lexicalQueryService;
     private final SnippetStore snippetStore;
@@ -79,7 +81,7 @@ public class EvidencePackAssembler {
         // Determine language from filePath when available (for query planner)
         String language = request.filePath() != null
                 ? inferLanguage(request.filePath())
-                : "unknown";
+                : PROP_UNKNOWN;
 
         // Plan the query
         QueryPlan plan = queryPlanner.plan(QueryType.FIND_SYMBOL, language);
@@ -126,7 +128,7 @@ public class EvidencePackAssembler {
                     if (n.getFilePath() != null) m.put("filePath", n.getFilePath());
                     if (n.getLineStart() != null) m.put("lineStart", n.getLineStart());
                     if (n.getLineEnd() != null) m.put("lineEnd", n.getLineEnd());
-                    m.put("kind", n.getKind() != null ? n.getKind().getValue() : "unknown");
+                    m.put("kind", n.getKind() != null ? n.getKind().getValue() : PROP_UNKNOWN);
                     if (n.getProperties() != null) {
                         n.getProperties().forEach((k, v) -> {
                             if (k.startsWith("prov_") && v != null) m.put(k, v);
@@ -236,9 +238,9 @@ public class EvidencePackAssembler {
     }
 
     private static String inferLanguage(String filePath) {
-        if (filePath == null) return "unknown";
+        if (filePath == null) return PROP_UNKNOWN;
         int dot = filePath.lastIndexOf('.');
-        if (dot < 0) return "unknown";
+        if (dot < 0) return PROP_UNKNOWN;
         return switch (filePath.substring(dot + 1).toLowerCase()) {
             case "java"              -> "java";
             case "ts", "tsx"         -> "typescript";
@@ -247,7 +249,7 @@ public class EvidencePackAssembler {
             case "go"                -> "go";
             case "rs"                -> "rust";
             case "cs"                -> "csharp";
-            default                  -> "unknown";
+            default                  -> PROP_UNKNOWN;
         };
     }
 }

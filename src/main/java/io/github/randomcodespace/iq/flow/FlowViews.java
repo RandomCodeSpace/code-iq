@@ -4,7 +4,6 @@ import io.github.randomcodespace.iq.flow.FlowModels.FlowDiagram;
 import io.github.randomcodespace.iq.flow.FlowModels.FlowEdge;
 import io.github.randomcodespace.iq.flow.FlowModels.FlowNode;
 import io.github.randomcodespace.iq.flow.FlowModels.FlowSubgraph;
-import io.github.randomcodespace.iq.model.CodeEdge;
 import io.github.randomcodespace.iq.model.CodeNode;
 import io.github.randomcodespace.iq.model.EdgeKind;
 import io.github.randomcodespace.iq.model.NodeKind;
@@ -23,6 +22,26 @@ import java.util.stream.Collectors;
  * Mirrors the Python implementation's 5 views exactly.
  */
 public final class FlowViews {
+    private static final String PROP_LR = "LR";
+    private static final String PROP_APP_ENDPOINTS = "app_endpoints";
+    private static final String PROP_APP_MESSAGING = "app_messaging";
+    private static final String PROP_CI = "ci";
+    private static final String PROP_CI_JOBS = "ci_jobs";
+    private static final String PROP_CI_PIPELINES = "ci_pipelines";
+    private static final String PROP_COMPOSE = "compose";
+    private static final String PROP_COUNT = "count";
+    private static final String PROP_DOCKER = "docker";
+    private static final String PROP_ENDPOINT = "endpoint";
+    private static final String PROP_ENDPOINTS = "endpoints";
+    private static final String PROP_EP_PROTECTED = "ep_protected";
+    private static final String PROP_FRONTEND = "frontend";
+    private static final String PROP_GUARDS = "guards";
+    private static final String PROP_INFRA = "infra";
+    private static final String PROP_JOB_ = "job_";
+    private static final String PROP_K8S = "k8s";
+    private static final String PROP_MIDDLEWARE = "middleware";
+    private static final String PROP_TERRAFORM = "terraform";
+
 
     private static final String GITLAB_PREFIX = "gitlab:";
 
@@ -49,14 +68,14 @@ public final class FlowViews {
                 .filter(n -> isCiNode(n.getId()))
                 .toList();
         if (!workflows.isEmpty() || !ciJobs.isEmpty()) {
-            ciNodes.add(new FlowNode("ci_pipelines", "Pipelines x" + workflows.size(), "pipeline",
-                    Map.of("count", workflows.size())));
+            ciNodes.add(new FlowNode(PROP_CI_PIPELINES, "Pipelines x" + workflows.size(), "pipeline",
+                    Map.of(PROP_COUNT, workflows.size())));
             if (!ciJobs.isEmpty()) {
-                ciNodes.add(new FlowNode("ci_jobs", "Jobs x" + ciJobs.size(), "job",
-                        Map.of("count", ciJobs.size())));
-                edges.add(new FlowEdge("ci_pipelines", "ci_jobs"));
+                ciNodes.add(new FlowNode(PROP_CI_JOBS, "Jobs x" + ciJobs.size(), "job",
+                        Map.of(PROP_COUNT, ciJobs.size())));
+                edges.add(new FlowEdge(PROP_CI_PIPELINES, PROP_CI_JOBS));
             }
-            subgraphs.add(new FlowSubgraph("ci", "CI/CD Pipeline", ciNodes, "ci"));
+            subgraphs.add(new FlowSubgraph(PROP_CI, "CI/CD Pipeline", ciNodes, PROP_CI));
         }
 
         // Infrastructure subgraph
@@ -77,23 +96,23 @@ public final class FlowViews {
 
             var infraFlowNodes = new ArrayList<FlowNode>();
             if (!k8s.isEmpty()) {
-                infraFlowNodes.add(new FlowNode("infra_k8s", "K8s Resources x" + k8s.size(), "k8s",
-                        Map.of("count", k8s.size())));
+                infraFlowNodes.add(new FlowNode("infra_k8s", "K8s Resources x" + k8s.size(), PROP_K8S,
+                        Map.of(PROP_COUNT, k8s.size())));
             }
             if (!docker.isEmpty()) {
-                infraFlowNodes.add(new FlowNode("infra_docker", "Docker x" + docker.size(), "docker",
-                        Map.of("count", docker.size())));
+                infraFlowNodes.add(new FlowNode("infra_docker", "Docker x" + docker.size(), PROP_DOCKER,
+                        Map.of(PROP_COUNT, docker.size())));
             }
             if (!terraform.isEmpty()) {
-                infraFlowNodes.add(new FlowNode("infra_tf", "Terraform x" + terraform.size(), "terraform",
-                        Map.of("count", terraform.size())));
+                infraFlowNodes.add(new FlowNode("infra_tf", "Terraform x" + terraform.size(), PROP_TERRAFORM,
+                        Map.of(PROP_COUNT, terraform.size())));
             }
             if (!otherInfra.isEmpty()) {
-                infraFlowNodes.add(new FlowNode("infra_other", "Infra x" + otherInfra.size(), "infra",
-                        Map.of("count", otherInfra.size())));
+                infraFlowNodes.add(new FlowNode("infra_other", "Infra x" + otherInfra.size(), PROP_INFRA,
+                        Map.of(PROP_COUNT, otherInfra.size())));
             }
             if (!infraFlowNodes.isEmpty()) {
-                subgraphs.add(new FlowSubgraph("infra", "Infrastructure", infraFlowNodes, "deploy"));
+                subgraphs.add(new FlowSubgraph(PROP_INFRA, "Infrastructure", infraFlowNodes, "deploy"));
             }
         }
 
@@ -111,24 +130,24 @@ public final class FlowViews {
 
         var appNodes = new ArrayList<FlowNode>();
         if (!endpoints.isEmpty()) {
-            appNodes.add(new FlowNode("app_endpoints", "Endpoints x" + endpoints.size(), "endpoint",
-                    Map.of("count", endpoints.size())));
+            appNodes.add(new FlowNode(PROP_APP_ENDPOINTS, "Endpoints x" + endpoints.size(), PROP_ENDPOINT,
+                    Map.of(PROP_COUNT, endpoints.size())));
         }
         if (!entities.isEmpty()) {
             appNodes.add(new FlowNode("app_entities", "Entities x" + entities.size(), "entity",
-                    Map.of("count", entities.size())));
+                    Map.of(PROP_COUNT, entities.size())));
         }
         if (!components.isEmpty()) {
             appNodes.add(new FlowNode("app_components", "Components x" + components.size(), "component",
-                    Map.of("count", components.size())));
+                    Map.of(PROP_COUNT, components.size())));
         }
         if (!topics.isEmpty()) {
-            appNodes.add(new FlowNode("app_messaging", "Topics/Queues x" + topics.size(), "messaging",
-                    Map.of("count", topics.size())));
+            appNodes.add(new FlowNode(PROP_APP_MESSAGING, "Topics/Queues x" + topics.size(), "messaging",
+                    Map.of(PROP_COUNT, topics.size())));
         }
         if (!dbConns.isEmpty()) {
             appNodes.add(new FlowNode("app_database", "DB Connections x" + dbConns.size(), "database",
-                    Map.of("count", dbConns.size())));
+                    Map.of(PROP_COUNT, dbConns.size())));
         }
         if (appNodes.isEmpty() && (!classes.isEmpty() || !appMethods.isEmpty())) {
             appNodes.add(new FlowNode("app_code",
@@ -138,10 +157,10 @@ public final class FlowViews {
         if (!appNodes.isEmpty()) {
             subgraphs.add(new FlowSubgraph("app", "Application", appNodes, "runtime"));
             if (!endpoints.isEmpty() && !entities.isEmpty()) {
-                edges.add(new FlowEdge("app_endpoints", "app_entities", "queries"));
+                edges.add(new FlowEdge(PROP_APP_ENDPOINTS, "app_entities", "queries"));
             }
             if (!endpoints.isEmpty() && appNodes.stream().anyMatch(n -> "app_messaging".equals(n.id()))) {
-                edges.add(new FlowEdge("app_endpoints", "app_messaging", null, "dotted"));
+                edges.add(new FlowEdge(PROP_APP_ENDPOINTS, PROP_APP_MESSAGING, null, "dotted"));
             }
         }
 
@@ -152,15 +171,15 @@ public final class FlowViews {
             var secNodes = new ArrayList<FlowNode>();
             if (!guards.isEmpty()) {
                 secNodes.add(new FlowNode("sec_guards", "Auth Guards x" + guards.size(), "guard",
-                        Map.of("count", guards.size())));
+                        Map.of(PROP_COUNT, guards.size())));
             }
             if (!middleware.isEmpty()) {
-                secNodes.add(new FlowNode("sec_middleware", "Middleware x" + middleware.size(), "middleware",
-                        Map.of("count", middleware.size())));
+                secNodes.add(new FlowNode("sec_middleware", "Middleware x" + middleware.size(), PROP_MIDDLEWARE,
+                        Map.of(PROP_COUNT, middleware.size())));
             }
             subgraphs.add(new FlowSubgraph("security", "Security", secNodes, "auth"));
             if (!guards.isEmpty() && !endpoints.isEmpty()) {
-                edges.add(new FlowEdge("sec_guards", "app_endpoints", "protects", "thick"));
+                edges.add(new FlowEdge("sec_guards", PROP_APP_ENDPOINTS, "protects", "thick"));
             }
         }
 
@@ -169,7 +188,7 @@ public final class FlowViews {
             var infraSg = subgraphs.stream().filter(sg -> "infra".equals(sg.id())).findFirst();
             if (infraSg.isPresent() && !infraSg.get().nodes().isEmpty()) {
                 String firstInfra = infraSg.get().nodes().getFirst().id();
-                String ciSource = !ciJobs.isEmpty() ? "ci_jobs" : "ci_pipelines";
+                String ciSource = !ciJobs.isEmpty() ? PROP_CI_JOBS : PROP_CI_PIPELINES;
                 edges.add(new FlowEdge(ciSource, firstInfra, "deploys"));
             }
         }
@@ -184,13 +203,13 @@ public final class FlowViews {
         var stats = new LinkedHashMap<String, Object>();
         stats.put("total_nodes", allNodes.size());
         stats.put("total_edges", countEdges(allNodes));
-        stats.put("endpoints", endpoints.size());
+        stats.put(PROP_ENDPOINTS, endpoints.size());
         stats.put("entities", entities.size());
-        stats.put("guards", guards.size());
+        stats.put(PROP_GUARDS, guards.size());
         stats.put("components", components.size());
         stats.put("infra_resources", infraNodesRaw.size());
 
-        return new FlowDiagram("Architecture Overview", "overview", "LR",
+        return new FlowDiagram("Architecture Overview", "overview", PROP_LR,
                 subgraphs, List.of(), edges, stats);
     }
 
@@ -248,7 +267,7 @@ public final class FlowViews {
                         props.put(key, j.getProperties().get(key));
                     }
                 }
-                jobNodes.add(new FlowNode("job_" + j.getId().replace(":", "_"), j.getLabel(), "job", props));
+                jobNodes.add(new FlowNode(PROP_JOB_ + j.getId().replace(":", "_"), j.getLabel(), "job", props));
             }
             subgraphs.add(new FlowSubgraph("wf_" + wf.getId().replace(":", "_"), wf.getLabel(), jobNodes));
         }
@@ -259,8 +278,8 @@ public final class FlowViews {
             for (var edge : node.getEdges()) {
                 if (edge.getKind() == EdgeKind.DEPENDS_ON && isCiNode(edge.getSourceId())) {
                     edges.add(new FlowEdge(
-                            "job_" + edge.getSourceId().replace(":", "_"),
-                            "job_" + edge.getTarget().getId().replace(":", "_"),
+                            PROP_JOB_ + edge.getSourceId().replace(":", "_"),
+                            PROP_JOB_ + edge.getTarget().getId().replace(":", "_"),
                             "needs"));
                 }
             }
@@ -280,7 +299,7 @@ public final class FlowViews {
         stats.put("jobs", jobs.size());
         stats.put("triggers", triggers.size());
 
-        return new FlowDiagram("CI/CD Pipeline", "ci", "TD",
+        return new FlowDiagram("CI/CD Pipeline", PROP_CI, "TD",
                 subgraphs, List.of(), edges, stats);
     }
 
@@ -311,20 +330,20 @@ public final class FlowViews {
         List<CodeNode> other = infra.stream().filter(n -> !grouped.contains(n)).toList();
 
         if (!k8s.isEmpty()) {
-            subgraphs.add(new FlowSubgraph("k8s", "Kubernetes (" + k8s.size() + " resources)",
-                    makeNodes(k8s, "k8s", 20)));
+            subgraphs.add(new FlowSubgraph(PROP_K8S, "Kubernetes (" + k8s.size() + " resources)",
+                    makeNodes(k8s, PROP_K8S, 20)));
         }
         if (!compose.isEmpty()) {
-            subgraphs.add(new FlowSubgraph("compose", "Docker Compose (" + compose.size() + " services)",
-                    makeNodes(compose, "compose", 20)));
+            subgraphs.add(new FlowSubgraph(PROP_COMPOSE, "Docker Compose (" + compose.size() + " services)",
+                    makeNodes(compose, PROP_COMPOSE, 20)));
         }
         if (!tf.isEmpty()) {
-            subgraphs.add(new FlowSubgraph("terraform", "Terraform (" + tf.size() + " resources)",
+            subgraphs.add(new FlowSubgraph(PROP_TERRAFORM, "Terraform (" + tf.size() + " resources)",
                     makeNodes(tf, "tf", 20)));
         }
         if (!docker.isEmpty()) {
-            subgraphs.add(new FlowSubgraph("docker", "Docker (" + docker.size() + " images)",
-                    makeNodes(docker, "docker", 20)));
+            subgraphs.add(new FlowSubgraph(PROP_DOCKER, "Docker (" + docker.size() + " images)",
+                    makeNodes(docker, PROP_DOCKER, 20)));
         }
         if (!other.isEmpty()) {
             subgraphs.add(new FlowSubgraph("other_infra", "Other (" + other.size() + ")",
@@ -350,10 +369,10 @@ public final class FlowViews {
         }
 
         var stats = new LinkedHashMap<String, Object>();
-        stats.put("k8s", k8s.size());
-        stats.put("compose", compose.size());
-        stats.put("terraform", tf.size());
-        stats.put("docker", docker.size());
+        stats.put(PROP_K8S, k8s.size());
+        stats.put(PROP_COMPOSE, compose.size());
+        stats.put(PROP_TERRAFORM, tf.size());
+        stats.put(PROP_DOCKER, docker.size());
 
         return new FlowDiagram("Deployment Topology", "deploy", "TD",
                 subgraphs, List.of(), edges, stats);
@@ -386,11 +405,11 @@ public final class FlowViews {
                     .filter(e -> !"frontend".equals(e.getProperties().get("layer")))
                     .toList();
             if (!feEp.isEmpty()) {
-                frontendNodes.add(new FlowNode("rt_fe_endpoints", "Frontend Routes x" + feEp.size(), "endpoint"));
+                frontendNodes.add(new FlowNode("rt_fe_endpoints", "Frontend Routes x" + feEp.size(), PROP_ENDPOINT));
             }
             if (!beEp.isEmpty()) {
-                backendNodes.add(new FlowNode("rt_be_endpoints", "API Endpoints x" + beEp.size(), "endpoint",
-                        Map.of("count", beEp.size())));
+                backendNodes.add(new FlowNode("rt_be_endpoints", "API Endpoints x" + beEp.size(), PROP_ENDPOINT,
+                        Map.of(PROP_COUNT, beEp.size())));
             }
         }
 
@@ -409,7 +428,7 @@ public final class FlowViews {
         }
 
         if (!frontendNodes.isEmpty()) {
-            subgraphs.add(new FlowSubgraph("frontend", "Frontend", frontendNodes));
+            subgraphs.add(new FlowSubgraph(PROP_FRONTEND, "Frontend", frontendNodes));
         }
         if (!backendNodes.isEmpty()) {
             subgraphs.add(new FlowSubgraph("backend", "Backend", backendNodes));
@@ -427,13 +446,13 @@ public final class FlowViews {
         }
 
         var stats = new LinkedHashMap<String, Object>();
-        stats.put("endpoints", endpoints.size());
+        stats.put(PROP_ENDPOINTS, endpoints.size());
         stats.put("entities", entities.size());
         stats.put("components", components.size());
         stats.put("topics", topics.size());
         stats.put("db_connections", dbConns.size());
 
-        return new FlowDiagram("Runtime Architecture", "runtime", "LR",
+        return new FlowDiagram("Runtime Architecture", "runtime", PROP_LR,
                 subgraphs, List.of(), edges, stats);
     }
 
@@ -477,34 +496,34 @@ public final class FlowViews {
         for (var entry : guardsByType.entrySet()) {
             guardNodes.add(new FlowNode("auth_" + entry.getKey(),
                     entry.getKey() + " x" + entry.getValue().size(), "guard",
-                    Map.of("auth_type", entry.getKey(), "count", entry.getValue().size())));
+                    Map.of("auth_type", entry.getKey(), PROP_COUNT, entry.getValue().size())));
         }
         if (!middleware.isEmpty()) {
-            guardNodes.add(new FlowNode("auth_middleware", "Middleware x" + middleware.size(), "middleware",
-                    Map.of("count", middleware.size())));
+            guardNodes.add(new FlowNode("auth_middleware", "Middleware x" + middleware.size(), PROP_MIDDLEWARE,
+                    Map.of(PROP_COUNT, middleware.size())));
         }
         if (!guardNodes.isEmpty()) {
-            subgraphs.add(new FlowSubgraph("guards", "Auth Guards", guardNodes));
+            subgraphs.add(new FlowSubgraph(PROP_GUARDS, "Auth Guards", guardNodes));
         }
 
         // Endpoint coverage
         var epNodes = new ArrayList<FlowNode>();
         if (!protectedEndpoints.isEmpty()) {
-            epNodes.add(new FlowNode("ep_protected", "Protected x" + protectedEndpoints.size(), "endpoint",
-                    "success", Map.of("count", protectedEndpoints.size())));
+            epNodes.add(new FlowNode(PROP_EP_PROTECTED, "Protected x" + protectedEndpoints.size(), PROP_ENDPOINT,
+                    "success", Map.of(PROP_COUNT, protectedEndpoints.size())));
         }
         if (!unprotectedEndpoints.isEmpty()) {
-            epNodes.add(new FlowNode("ep_unprotected", "Unprotected x" + unprotectedEndpoints.size(), "endpoint",
-                    "danger", Map.of("count", unprotectedEndpoints.size())));
+            epNodes.add(new FlowNode("ep_unprotected", "Unprotected x" + unprotectedEndpoints.size(), PROP_ENDPOINT,
+                    "danger", Map.of(PROP_COUNT, unprotectedEndpoints.size())));
         }
         if (!epNodes.isEmpty()) {
-            subgraphs.add(new FlowSubgraph("endpoints", "Endpoints", epNodes));
+            subgraphs.add(new FlowSubgraph(PROP_ENDPOINTS, "Endpoints", epNodes));
         }
 
         // Edges: guards -> protected
         for (var gn : guardNodes) {
             if (epNodes.stream().anyMatch(n -> "ep_protected".equals(n.id()))) {
-                edges.add(new FlowEdge(gn.id(), "ep_protected", "protects", "thick"));
+                edges.add(new FlowEdge(gn.id(), PROP_EP_PROTECTED, "protects", "thick"));
             }
         }
 
@@ -512,13 +531,13 @@ public final class FlowViews {
                 : (double) protectedEndpoints.size() / endpoints.size() * 100;
 
         var stats = new LinkedHashMap<String, Object>();
-        stats.put("guards", guards.size());
-        stats.put("middleware", middleware.size());
+        stats.put(PROP_GUARDS, guards.size());
+        stats.put(PROP_MIDDLEWARE, middleware.size());
         stats.put("protected", protectedEndpoints.size());
         stats.put("unprotected", unprotectedEndpoints.size());
         stats.put("coverage_pct", Math.round(coverage * 10.0) / 10.0);
 
-        return new FlowDiagram("Auth & Security", "auth", "LR",
+        return new FlowDiagram("Auth & Security", "auth", PROP_LR,
                 subgraphs, List.of(), edges, stats);
     }
 
@@ -547,10 +566,10 @@ public final class FlowViews {
     private static String[] resolveGroupIndex(CodeNode node, List<CodeNode> k8s, List<CodeNode> compose,
                                                List<CodeNode> tf, List<CodeNode> docker, List<CodeNode> other) {
         int idx;
-        if ((idx = k8s.indexOf(node)) >= 0) return new String[]{"k8s", String.valueOf(idx)};
-        if ((idx = compose.indexOf(node)) >= 0) return new String[]{"compose", String.valueOf(idx)};
+        if ((idx = k8s.indexOf(node)) >= 0) return new String[]{PROP_K8S, String.valueOf(idx)};
+        if ((idx = compose.indexOf(node)) >= 0) return new String[]{PROP_COMPOSE, String.valueOf(idx)};
         if ((idx = tf.indexOf(node)) >= 0) return new String[]{"tf", String.valueOf(idx)};
-        if ((idx = docker.indexOf(node)) >= 0) return new String[]{"docker", String.valueOf(idx)};
+        if ((idx = docker.indexOf(node)) >= 0) return new String[]{PROP_DOCKER, String.valueOf(idx)};
         return new String[]{"other", String.valueOf(other.indexOf(node))};
     }
 

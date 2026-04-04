@@ -24,6 +24,10 @@ import io.github.randomcodespace.iq.detector.DetectorInfo;
 )
 @Component
 public class VueComponentDetector extends AbstractRegexDetector {
+    private static final String PROP_API_STYLE = "api_style";
+    private static final String PROP_COMPONENT = "component";
+    private static final String PROP_VUE = "vue";
+
 
     private static final Pattern DEFINE_COMPONENT_NAME = Pattern.compile(
             "export\\s+default\\s+defineComponent\\s*\\(\\s*\\{[^}]*?name\\s*:\\s*['\"]([\\w]+)['\"]",
@@ -49,7 +53,7 @@ public class VueComponentDetector extends AbstractRegexDetector {
 
     @Override
     public Set<String> getSupportedLanguages() {
-        return Set.of("typescript", "javascript", "vue");
+        return Set.of("typescript", "javascript", PROP_VUE);
     }
 
     @Override
@@ -68,9 +72,9 @@ public class VueComponentDetector extends AbstractRegexDetector {
         while (m.find()) {
             String name = m.group(1);
             if (componentNames.contains(name)) continue;
-            CodeNode node = FrontendDetectorHelper.createComponentNode("vue", filePath, "component",
+            CodeNode node = FrontendDetectorHelper.createComponentNode(PROP_VUE, filePath, PROP_COMPONENT,
                     name, NodeKind.COMPONENT, FrontendDetectorHelper.lineAt(text, m.start()));
-            node.getProperties().put("api_style", "composition");
+            node.getProperties().put(PROP_API_STYLE, "composition");
             nodes.add(node);
             componentNames.add(name);
         }
@@ -80,9 +84,9 @@ public class VueComponentDetector extends AbstractRegexDetector {
         while (m.find()) {
             String name = m.group(1);
             if (componentNames.contains(name)) continue;
-            CodeNode node = FrontendDetectorHelper.createComponentNode("vue", filePath, "component",
+            CodeNode node = FrontendDetectorHelper.createComponentNode(PROP_VUE, filePath, PROP_COMPONENT,
                     name, NodeKind.COMPONENT, FrontendDetectorHelper.lineAt(text, m.start()));
-            node.getProperties().put("api_style", "options");
+            node.getProperties().put(PROP_API_STYLE, "options");
             nodes.add(node);
             componentNames.add(name);
         }
@@ -92,9 +96,9 @@ public class VueComponentDetector extends AbstractRegexDetector {
         while (m.find()) {
             String compName = extractScriptSetupName(filePath);
             if (compName == null || componentNames.contains(compName)) continue;
-            CodeNode node = FrontendDetectorHelper.createComponentNode("vue", filePath, "component",
+            CodeNode node = FrontendDetectorHelper.createComponentNode(PROP_VUE, filePath, PROP_COMPONENT,
                     compName, NodeKind.COMPONENT, FrontendDetectorHelper.lineAt(text, m.start()));
-            node.getProperties().put("api_style", "script_setup");
+            node.getProperties().put(PROP_API_STYLE, "script_setup");
             nodes.add(node);
             componentNames.add(compName);
         }
@@ -106,7 +110,7 @@ public class VueComponentDetector extends AbstractRegexDetector {
             while (hm.find()) {
                 String name = hm.group(1);
                 if (hookNames.contains(name)) continue;
-                nodes.add(FrontendDetectorHelper.createComponentNode("vue", filePath, "hook",
+                nodes.add(FrontendDetectorHelper.createComponentNode(PROP_VUE, filePath, "hook",
                         name, NodeKind.HOOK, FrontendDetectorHelper.lineAt(text, hm.start())));
                 hookNames.add(name);
             }

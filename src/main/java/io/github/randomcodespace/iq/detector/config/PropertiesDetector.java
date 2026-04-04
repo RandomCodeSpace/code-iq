@@ -34,6 +34,8 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class PropertiesDetector extends AbstractStructuredDetector {
+    private static final String PROP_PROPERTIES = "properties";
+
 
     private static final Set<String> DB_URL_KEYWORDS = Set.of("url", "jdbc-url", "uri");
     private static final Pattern JDBC_DB_TYPE_RE = Pattern.compile(
@@ -54,12 +56,12 @@ public class PropertiesDetector extends AbstractStructuredDetector {
 
     @Override
     public String getName() {
-        return "properties";
+        return PROP_PROPERTIES;
     }
 
     @Override
     public Set<String> getSupportedLanguages() {
-        return Set.of("properties");
+        return Set.of(PROP_PROPERTIES);
     }
 
     @Override
@@ -86,7 +88,7 @@ public class PropertiesDetector extends AbstractStructuredDetector {
         fileNode.setModule(ctx.moduleName());
         fileNode.setFilePath(filepath);
         fileNode.setLineStart(1);
-        fileNode.setProperties(Map.of("format", "properties"));
+        fileNode.setProperties(Map.of("format", PROP_PROPERTIES));
         nodes.add(fileNode);
 
         // Process keys (limit to avoid node explosion)

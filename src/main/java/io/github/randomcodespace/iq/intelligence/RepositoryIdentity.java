@@ -18,15 +18,17 @@ public record RepositoryIdentity(
         String branch,
         Instant buildTimestamp
 ) {
+    private static final String PROP_HEAD = "HEAD";
+
     /**
      * Resolve repository identity from a local path using git commands.
      * Fields that cannot be determined are set to null gracefully.
      */
     public static RepositoryIdentity resolve(java.nio.file.Path repoPath) {
         String repoUrl   = runGit(repoPath, "remote", "get-url", "origin");
-        String commitSha = runGit(repoPath, "rev-parse", "HEAD");
-        String branch    = runGit(repoPath, "rev-parse", "--abbrev-ref", "HEAD");
-        // Detached HEAD produces "HEAD" rather than a branch name — normalise to null
+        String commitSha = runGit(repoPath, "rev-parse", PROP_HEAD);
+        String branch    = runGit(repoPath, "rev-parse", "--abbrev-ref", PROP_HEAD);
+        // Detached HEAD produces PROP_HEAD rather than a branch name — normalise to null
         if ("HEAD".equals(branch)) branch = null;
         return new RepositoryIdentity(repoUrl, commitSha, branch, Instant.now());
     }

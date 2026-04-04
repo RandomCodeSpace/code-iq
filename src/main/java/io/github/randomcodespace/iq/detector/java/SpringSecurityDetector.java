@@ -30,6 +30,11 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class SpringSecurityDetector extends AbstractJavaParserDetector {
+    private static final String PROP_AUTH_REQUIRED = "auth_required";
+    private static final String PROP_AUTH_TYPE = "auth_type";
+    private static final String PROP_ROLES = "roles";
+    private static final String PROP_SPRING_SECURITY = "spring_security";
+
 
     // ---- Regex fallback patterns ----
     private static final Pattern SECURED_RE = Pattern.compile(
@@ -51,7 +56,7 @@ public class SpringSecurityDetector extends AbstractJavaParserDetector {
 
     @Override
     public String getName() {
-        return "spring_security";
+        return PROP_SPRING_SECURITY;
     }
 
     @Override
@@ -85,11 +90,11 @@ public class SpringSecurityDetector extends AbstractJavaParserDetector {
                 if ("EnableWebSecurity".equals(annName)) {
                     nodes.add(guardNode("auth:" + ctx.filePath() + ":EnableWebSecurity:" + line,
                             "@EnableWebSecurity", line, ctx, List.of("@EnableWebSecurity"),
-                            Map.of("auth_type", "spring_security", "roles", List.of(), "auth_required", true)));
+                            Map.of(PROP_AUTH_TYPE, PROP_SPRING_SECURITY, PROP_ROLES, List.of(), PROP_AUTH_REQUIRED, true)));
                 } else if ("EnableMethodSecurity".equals(annName)) {
                     nodes.add(guardNode("auth:" + ctx.filePath() + ":EnableMethodSecurity:" + line,
                             "@EnableMethodSecurity", line, ctx, List.of("@EnableMethodSecurity"),
-                            Map.of("auth_type", "spring_security", "roles", List.of(), "auth_required", true)));
+                            Map.of(PROP_AUTH_TYPE, PROP_SPRING_SECURITY, PROP_ROLES, List.of(), PROP_AUTH_REQUIRED, true)));
                 }
             }
 
@@ -102,7 +107,7 @@ public class SpringSecurityDetector extends AbstractJavaParserDetector {
                     String methodName = method.getNameAsString();
                     nodes.add(guardNode("auth:" + ctx.filePath() + ":SecurityFilterChain:" + methodLine,
                             "SecurityFilterChain:" + methodName, methodLine, ctx, List.of(),
-                            Map.of("auth_type", "spring_security", "roles", List.of(), "method_name", methodName, "auth_required", true)));
+                            Map.of(PROP_AUTH_TYPE, PROP_SPRING_SECURITY, PROP_ROLES, List.of(), "method_name", methodName, PROP_AUTH_REQUIRED, true)));
                 }
 
                 for (AnnotationExpr ann : method.getAnnotations()) {
@@ -113,22 +118,22 @@ public class SpringSecurityDetector extends AbstractJavaParserDetector {
                         List<String> roles = extractRolesFromAstAnnotation(ann);
                         nodes.add(guardNode("auth:" + ctx.filePath() + ":Secured:" + line,
                                 "@Secured", line, ctx, List.of("@Secured"),
-                                Map.of("auth_type", "spring_security", "roles", roles, "auth_required", true)));
+                                Map.of(PROP_AUTH_TYPE, PROP_SPRING_SECURITY, PROP_ROLES, roles, PROP_AUTH_REQUIRED, true)));
                     } else if ("PreAuthorize".equals(annName)) {
                         String expr = extractAnnotationStringValue(ann);
                         List<String> roles = expr != null ? extractRolesFromSpel(expr) : List.of();
                         Map<String, Object> props = new LinkedHashMap<>();
-                        props.put("auth_type", "spring_security");
-                        props.put("roles", roles);
+                        props.put(PROP_AUTH_TYPE, PROP_SPRING_SECURITY);
+                        props.put(PROP_ROLES, roles);
                         if (expr != null) props.put("expression", expr);
-                        props.put("auth_required", true);
+                        props.put(PROP_AUTH_REQUIRED, true);
                         nodes.add(guardNode("auth:" + ctx.filePath() + ":PreAuthorize:" + line,
                                 "@PreAuthorize", line, ctx, List.of("@PreAuthorize"), props));
                     } else if ("RolesAllowed".equals(annName)) {
                         List<String> roles = extractRolesFromAstAnnotation(ann);
                         nodes.add(guardNode("auth:" + ctx.filePath() + ":RolesAllowed:" + line,
                                 "@RolesAllowed", line, ctx, List.of("@RolesAllowed"),
-                                Map.of("auth_type", "spring_security", "roles", roles, "auth_required", true)));
+                                Map.of(PROP_AUTH_TYPE, PROP_SPRING_SECURITY, PROP_ROLES, roles, PROP_AUTH_REQUIRED, true)));
                     }
                 }
             }
@@ -140,7 +145,7 @@ public class SpringSecurityDetector extends AbstractJavaParserDetector {
             int line = findLineNumber(text, m.start());
             nodes.add(guardNode("auth:" + ctx.filePath() + ":authorizeHttpRequests:" + line,
                     ".authorizeHttpRequests()", line, ctx, List.of(),
-                    Map.of("auth_type", "spring_security", "roles", List.of(), "auth_required", true)));
+                    Map.of(PROP_AUTH_TYPE, PROP_SPRING_SECURITY, PROP_ROLES, List.of(), PROP_AUTH_REQUIRED, true)));
         }
 
         return DetectorResult.of(nodes, List.of());
@@ -199,7 +204,7 @@ public class SpringSecurityDetector extends AbstractJavaParserDetector {
             List<String> roles = extractRolesFromAnnotation(m.group(1), m.group(2));
             nodes.add(guardNode("auth:" + ctx.filePath() + ":Secured:" + line,
                     "@Secured", line, ctx, List.of("@Secured"),
-                    Map.of("auth_type", "spring_security", "roles", roles, "auth_required", true)));
+                    Map.of(PROP_AUTH_TYPE, PROP_SPRING_SECURITY, PROP_ROLES, roles, PROP_AUTH_REQUIRED, true)));
         }
 
         for (Matcher m = PRE_AUTHORIZE_RE.matcher(text); m.find(); ) {
@@ -207,10 +212,10 @@ public class SpringSecurityDetector extends AbstractJavaParserDetector {
             String expr = m.group(1);
             List<String> roles = extractRolesFromSpel(expr);
             Map<String, Object> props = new LinkedHashMap<>();
-            props.put("auth_type", "spring_security");
-            props.put("roles", roles);
+            props.put(PROP_AUTH_TYPE, PROP_SPRING_SECURITY);
+            props.put(PROP_ROLES, roles);
             props.put("expression", expr);
-            props.put("auth_required", true);
+            props.put(PROP_AUTH_REQUIRED, true);
             nodes.add(guardNode("auth:" + ctx.filePath() + ":PreAuthorize:" + line,
                     "@PreAuthorize", line, ctx, List.of("@PreAuthorize"), props));
         }
@@ -220,21 +225,21 @@ public class SpringSecurityDetector extends AbstractJavaParserDetector {
             List<String> roles = extractRolesFromAnnotation(m.group(1), m.group(2));
             nodes.add(guardNode("auth:" + ctx.filePath() + ":RolesAllowed:" + line,
                     "@RolesAllowed", line, ctx, List.of("@RolesAllowed"),
-                    Map.of("auth_type", "spring_security", "roles", roles, "auth_required", true)));
+                    Map.of(PROP_AUTH_TYPE, PROP_SPRING_SECURITY, PROP_ROLES, roles, PROP_AUTH_REQUIRED, true)));
         }
 
         for (Matcher m = ENABLE_WEB_SECURITY_RE.matcher(text); m.find(); ) {
             int line = findLineNumber(text, m.start());
             nodes.add(guardNode("auth:" + ctx.filePath() + ":EnableWebSecurity:" + line,
                     "@EnableWebSecurity", line, ctx, List.of("@EnableWebSecurity"),
-                    Map.of("auth_type", "spring_security", "roles", List.of(), "auth_required", true)));
+                    Map.of(PROP_AUTH_TYPE, PROP_SPRING_SECURITY, PROP_ROLES, List.of(), PROP_AUTH_REQUIRED, true)));
         }
 
         for (Matcher m = ENABLE_METHOD_SECURITY_RE.matcher(text); m.find(); ) {
             int line = findLineNumber(text, m.start());
             nodes.add(guardNode("auth:" + ctx.filePath() + ":EnableMethodSecurity:" + line,
                     "@EnableMethodSecurity", line, ctx, List.of("@EnableMethodSecurity"),
-                    Map.of("auth_type", "spring_security", "roles", List.of(), "auth_required", true)));
+                    Map.of(PROP_AUTH_TYPE, PROP_SPRING_SECURITY, PROP_ROLES, List.of(), PROP_AUTH_REQUIRED, true)));
         }
 
         for (Matcher m = SECURITY_FILTER_CHAIN_RE.matcher(text); m.find(); ) {
@@ -242,14 +247,14 @@ public class SpringSecurityDetector extends AbstractJavaParserDetector {
             String methodName = m.group(1);
             nodes.add(guardNode("auth:" + ctx.filePath() + ":SecurityFilterChain:" + line,
                     "SecurityFilterChain:" + methodName, line, ctx, List.of(),
-                    Map.of("auth_type", "spring_security", "roles", List.of(), "method_name", methodName, "auth_required", true)));
+                    Map.of(PROP_AUTH_TYPE, PROP_SPRING_SECURITY, PROP_ROLES, List.of(), "method_name", methodName, PROP_AUTH_REQUIRED, true)));
         }
 
         for (Matcher m = AUTHORIZE_HTTP_REQUESTS_RE.matcher(text); m.find(); ) {
             int line = findLineNumber(text, m.start());
             nodes.add(guardNode("auth:" + ctx.filePath() + ":authorizeHttpRequests:" + line,
                     ".authorizeHttpRequests()", line, ctx, List.of(),
-                    Map.of("auth_type", "spring_security", "roles", List.of(), "auth_required", true)));
+                    Map.of(PROP_AUTH_TYPE, PROP_SPRING_SECURITY, PROP_ROLES, List.of(), PROP_AUTH_REQUIRED, true)));
         }
 
         return DetectorResult.of(nodes, List.of());

@@ -34,6 +34,11 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class SpringRestDetector extends AbstractJavaParserDetector {
+    private static final String PROP_REQUESTMAPPING = "RequestMapping";
+    private static final String PROP_CONSUMES = "consumes";
+    private static final String PROP_PATH = "path";
+    private static final String PROP_PRODUCES = "produces";
+
 
     // ---- Regex fallback patterns ----
     private static final Pattern MAPPING_RE = Pattern.compile(
@@ -134,8 +139,8 @@ public class SpringRestDetector extends AbstractJavaParserDetector {
                     if (httpMethod == null) continue;
 
                     String path = extractAnnotationPath(ann);
-                    String produces = extractAnnotationAttr(ann, "produces");
-                    String consumes = extractAnnotationAttr(ann, "consumes");
+                    String produces = extractAnnotationAttr(ann, PROP_PRODUCES);
+                    String consumes = extractAnnotationAttr(ann, PROP_CONSUMES);
 
                     String fullPath;
                     if (path != null && !path.isEmpty()) {
@@ -163,10 +168,10 @@ public class SpringRestDetector extends AbstractJavaParserDetector {
                     node.getAnnotations().add("@" + annName);
                     node.getProperties().put("framework", "spring_boot");
                     node.getProperties().put("http_method", httpMethod);
-                    node.getProperties().put("path", fullPath);
+                    node.getProperties().put(PROP_PATH, fullPath);
                     node.getProperties().put("method", methodName);
-                    if (produces != null) node.getProperties().put("produces", produces);
-                    if (consumes != null) node.getProperties().put("consumes", consumes);
+                    if (produces != null) node.getProperties().put(PROP_PRODUCES, produces);
+                    if (consumes != null) node.getProperties().put(PROP_CONSUMES, consumes);
 
                     // Extract parameter annotations
                     List<Map<String, String>> params = new ArrayList<>();
@@ -373,9 +378,9 @@ public class SpringRestDetector extends AbstractJavaParserDetector {
             node.getAnnotations().add("@" + annotationName);
             node.getProperties().put("framework", "spring_boot");
             node.getProperties().put("http_method", httpMethod);
-            node.getProperties().put("path", fullPath);
-            if (produces != null) node.getProperties().put("produces", produces);
-            if (consumes != null) node.getProperties().put("consumes", consumes);
+            node.getProperties().put(PROP_PATH, fullPath);
+            if (produces != null) node.getProperties().put(PROP_PRODUCES, produces);
+            if (consumes != null) node.getProperties().put(PROP_CONSUMES, consumes);
             nodes.add(node);
 
             CodeEdge edge = new CodeEdge();

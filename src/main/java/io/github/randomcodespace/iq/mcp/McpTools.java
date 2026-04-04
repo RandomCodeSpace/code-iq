@@ -29,7 +29,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * MCP tool definitions using Spring AI annotations.
@@ -39,6 +38,8 @@ import java.util.Set;
 @Profile("serving")
 @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "codeiq.neo4j.enabled", havingValue = "true", matchIfMissing = true)
 public class McpTools {
+    private static final String PROP_ERROR = "error";
+
 
     private final QueryService queryService;
     private final CodeIqConfig config;
@@ -93,7 +94,7 @@ public class McpTools {
         try {
             return toJson(queryService.getStats());
         } catch (Exception e) {
-            return toJson(Map.of("error", e.getMessage()));
+            return toJson(Map.of(PROP_ERROR, e.getMessage()));
         }
     }
 
@@ -103,7 +104,7 @@ public class McpTools {
         try {
             return toJson(queryService.getDetailedStats(category != null ? category : "all"));
         } catch (Exception e) {
-            return toJson(Map.of("error", e.getMessage()));
+            return toJson(Map.of(PROP_ERROR, e.getMessage()));
         }
     }
 
@@ -114,7 +115,7 @@ public class McpTools {
         try {
             return toJson(queryService.listNodes(kind, limit != null ? limit : 50, 0));
         } catch (Exception e) {
-            return toJson(Map.of("error", e.getMessage()));
+            return toJson(Map.of(PROP_ERROR, e.getMessage()));
         }
     }
 
@@ -125,7 +126,7 @@ public class McpTools {
         try {
             return toJson(queryService.listEdges(kind, limit != null ? limit : 50, 0));
         } catch (Exception e) {
-            return toJson(Map.of("error", e.getMessage()));
+            return toJson(Map.of(PROP_ERROR, e.getMessage()));
         }
     }
 
@@ -136,7 +137,7 @@ public class McpTools {
         try {
             return toJson(queryService.getNeighbors(nodeId, direction != null ? direction : "both"));
         } catch (Exception e) {
-            return toJson(Map.of("error", e.getMessage()));
+            return toJson(Map.of(PROP_ERROR, e.getMessage()));
         }
     }
 
@@ -147,7 +148,7 @@ public class McpTools {
         try {
             return toJson(queryService.egoGraph(center, radius != null ? radius : 2));
         } catch (Exception e) {
-            return toJson(Map.of("error", e.getMessage()));
+            return toJson(Map.of(PROP_ERROR, e.getMessage()));
         }
     }
 
@@ -157,7 +158,7 @@ public class McpTools {
         try {
             return toJson(queryService.findCycles(limit != null ? limit : 100));
         } catch (Exception e) {
-            return toJson(Map.of("error", e.getMessage()));
+            return toJson(Map.of(PROP_ERROR, e.getMessage()));
         }
     }
 
@@ -168,11 +169,11 @@ public class McpTools {
         try {
             Map<String, Object> result = queryService.shortestPath(source, target);
             if (result == null) {
-                return toJson(Map.of("error", "No path found between " + source + " and " + target));
+                return toJson(Map.of(PROP_ERROR, "No path found between " + source + " and " + target));
             }
             return toJson(result);
         } catch (Exception e) {
-            return toJson(Map.of("error", e.getMessage()));
+            return toJson(Map.of(PROP_ERROR, e.getMessage()));
         }
     }
 
@@ -182,7 +183,7 @@ public class McpTools {
         try {
             return toJson(queryService.consumersOf(targetId));
         } catch (Exception e) {
-            return toJson(Map.of("error", e.getMessage()));
+            return toJson(Map.of(PROP_ERROR, e.getMessage()));
         }
     }
 
@@ -192,7 +193,7 @@ public class McpTools {
         try {
             return toJson(queryService.producersOf(targetId));
         } catch (Exception e) {
-            return toJson(Map.of("error", e.getMessage()));
+            return toJson(Map.of(PROP_ERROR, e.getMessage()));
         }
     }
 
@@ -202,7 +203,7 @@ public class McpTools {
         try {
             return toJson(queryService.callersOf(targetId));
         } catch (Exception e) {
-            return toJson(Map.of("error", e.getMessage()));
+            return toJson(Map.of(PROP_ERROR, e.getMessage()));
         }
     }
 
@@ -212,7 +213,7 @@ public class McpTools {
         try {
             return toJson(queryService.dependenciesOf(moduleId));
         } catch (Exception e) {
-            return toJson(Map.of("error", e.getMessage()));
+            return toJson(Map.of(PROP_ERROR, e.getMessage()));
         }
     }
 
@@ -222,7 +223,7 @@ public class McpTools {
         try {
             return toJson(queryService.dependentsOf(moduleId));
         } catch (Exception e) {
-            return toJson(Map.of("error", e.getMessage()));
+            return toJson(Map.of(PROP_ERROR, e.getMessage()));
         }
     }
 
@@ -234,7 +235,7 @@ public class McpTools {
             int safeLimit = limit != null ? Math.min(limit, 1000) : 100;
             return toJson(queryService.findDeadCode(kind, safeLimit));
         } catch (Exception e) {
-            return toJson(Map.of("error", e.getMessage()));
+            return toJson(Map.of(PROP_ERROR, e.getMessage()));
         }
     }
 
@@ -247,14 +248,14 @@ public class McpTools {
         try {
             FlowEngine engine = resolveFlowEngine();
             if (engine == null) {
-                return toJson(Map.of("error", "No analysis data available. Run 'code-iq analyze' first."));
+                return toJson(Map.of(PROP_ERROR, "No analysis data available. Run 'code-iq analyze' first."));
             }
             FlowDiagram diagram = engine.generate(viewName);
             String rendered = engine.render(diagram, fmt);
             return rendered;
         } catch (IllegalArgumentException e) {
             Map<String, Object> error = new LinkedHashMap<>();
-            error.put("error", e.getMessage());
+            error.put(PROP_ERROR, e.getMessage());
             return toJson(error);
         }
     }
@@ -275,7 +276,7 @@ public class McpTools {
         for (String pattern : BLOCKED_PATTERNS) {
             if (java.util.regex.Pattern.compile(pattern).matcher(upper).find()) {
                 String keyword = pattern.replace("\\b", "").replace("\\s+", " ");
-                return toJson(Map.of("error", "Read-only queries only. Mutation keyword found: " + keyword));
+                return toJson(Map.of(PROP_ERROR, "Read-only queries only. Mutation keyword found: " + keyword));
             }
         }
         try {
@@ -299,7 +300,7 @@ public class McpTools {
             response.put("count", rows.size());
             return toJson(response);
         } catch (Exception e) {
-            return toJson(Map.of("error", e.getMessage()));
+            return toJson(Map.of(PROP_ERROR, e.getMessage()));
         }
     }
 
@@ -311,7 +312,7 @@ public class McpTools {
         try {
             return toJson(queryService.findComponentByFile(filePath));
         } catch (Exception e) {
-            return toJson(Map.of("error", e.getMessage()));
+            return toJson(Map.of(PROP_ERROR, e.getMessage()));
         }
     }
 
@@ -322,7 +323,7 @@ public class McpTools {
         try {
             return toJson(queryService.traceImpact(nodeId, depth != null ? depth : 3));
         } catch (Exception e) {
-            return toJson(Map.of("error", e.getMessage()));
+            return toJson(Map.of(PROP_ERROR, e.getMessage()));
         }
     }
 
@@ -332,7 +333,7 @@ public class McpTools {
         try {
             return toJson(queryService.findRelatedEndpoints(identifier));
         } catch (Exception e) {
-            return toJson(Map.of("error", e.getMessage()));
+            return toJson(Map.of(PROP_ERROR, e.getMessage()));
         }
     }
 
@@ -343,7 +344,7 @@ public class McpTools {
         try {
             return toJson(queryService.searchGraph(query, limit != null ? limit : 20));
         } catch (Exception e) {
-            return toJson(Map.of("error", e.getMessage()));
+            return toJson(Map.of(PROP_ERROR, e.getMessage()));
         }
     }
 
@@ -363,7 +364,7 @@ public class McpTools {
             }
             return toJson(result);
         } catch (Exception e) {
-            return toJson(Map.of("error", e.getMessage()));
+            return toJson(Map.of(PROP_ERROR, e.getMessage()));
         }
     }
 
@@ -377,7 +378,7 @@ public class McpTools {
             Path resolved = root.resolve(filePath).normalize();
             // Path traversal protection
             if (!resolved.startsWith(root)) {
-                return toJson(Map.of("error", "Path traversal detected"));
+                return toJson(Map.of(PROP_ERROR, "Path traversal detected"));
             }
             String content = java.nio.file.Files.readString(resolved, java.nio.charset.StandardCharsets.UTF_8);
             if (startLine != null || endLine != null) {
@@ -396,7 +397,7 @@ public class McpTools {
             }
             return content;
         } catch (Exception e) {
-            return toJson(Map.of("error", "Failed to read file: " + e.getMessage()));
+            return toJson(Map.of(PROP_ERROR, "Failed to read file: " + e.getMessage()));
         }
     }
 
@@ -407,7 +408,7 @@ public class McpTools {
         try {
             return toJson(queryService.getTopology());
         } catch (Exception e) {
-            return toJson(Map.of("error", e.getMessage()));
+            return toJson(Map.of(PROP_ERROR, e.getMessage()));
         }
     }
 
@@ -418,7 +419,7 @@ public class McpTools {
             var data = getCachedData();
             return toJson(topologyService.serviceDetail(serviceName, data.nodes(), data.edges()));
         } catch (Exception e) {
-            return toJson(Map.of("error", e.getMessage()));
+            return toJson(Map.of(PROP_ERROR, e.getMessage()));
         }
     }
 
@@ -429,7 +430,7 @@ public class McpTools {
             var data = getCachedData();
             return toJson(topologyService.serviceDependencies(serviceName, data.nodes(), data.edges()));
         } catch (Exception e) {
-            return toJson(Map.of("error", e.getMessage()));
+            return toJson(Map.of(PROP_ERROR, e.getMessage()));
         }
     }
 
@@ -440,7 +441,7 @@ public class McpTools {
             var data = getCachedData();
             return toJson(topologyService.serviceDependents(serviceName, data.nodes(), data.edges()));
         } catch (Exception e) {
-            return toJson(Map.of("error", e.getMessage()));
+            return toJson(Map.of(PROP_ERROR, e.getMessage()));
         }
     }
 
@@ -451,7 +452,7 @@ public class McpTools {
             var data = getCachedData();
             return toJson(topologyService.blastRadius(nodeId, data.nodes(), data.edges()));
         } catch (Exception e) {
-            return toJson(Map.of("error", e.getMessage()));
+            return toJson(Map.of(PROP_ERROR, e.getMessage()));
         }
     }
 
@@ -463,7 +464,7 @@ public class McpTools {
             var data = getCachedData();
             return toJson(topologyService.findPath(source, target, data.nodes(), data.edges()));
         } catch (Exception e) {
-            return toJson(Map.of("error", e.getMessage()));
+            return toJson(Map.of(PROP_ERROR, e.getMessage()));
         }
     }
 
@@ -473,7 +474,7 @@ public class McpTools {
             var data = getCachedData();
             return toJson(topologyService.findBottlenecks(data.nodes(), data.edges()));
         } catch (Exception e) {
-            return toJson(Map.of("error", e.getMessage()));
+            return toJson(Map.of(PROP_ERROR, e.getMessage()));
         }
     }
 
@@ -483,7 +484,7 @@ public class McpTools {
             var data = getCachedData();
             return toJson(topologyService.findCircularDeps(data.nodes(), data.edges()));
         } catch (Exception e) {
-            return toJson(Map.of("error", e.getMessage()));
+            return toJson(Map.of(PROP_ERROR, e.getMessage()));
         }
     }
 
@@ -493,7 +494,7 @@ public class McpTools {
             var data = getCachedData();
             return toJson(topologyService.findDeadServices(data.nodes(), data.edges()));
         } catch (Exception e) {
-            return toJson(Map.of("error", e.getMessage()));
+            return toJson(Map.of(PROP_ERROR, e.getMessage()));
         }
     }
 
@@ -504,7 +505,7 @@ public class McpTools {
             var data = getCachedData();
             return toJson(topologyService.findNode(query, data.nodes()));
         } catch (Exception e) {
-            return toJson(Map.of("error", e.getMessage()));
+            return toJson(Map.of(PROP_ERROR, e.getMessage()));
         }
     }
 
@@ -515,7 +516,7 @@ public class McpTools {
             @McpToolParam(description = "Max lines per snippet (default: config value)", required = false) Integer maxSnippetLines,
             @McpToolParam(description = "Include cross-reference nodes (default: false)", required = false) Boolean includeReferences) {
         if (evidencePackAssembler == null) {
-            return toJson(Map.of("error", "Evidence pack service unavailable. Run 'enrich' first."));
+            return toJson(Map.of(PROP_ERROR, "Evidence pack service unavailable. Run 'enrich' first."));
         }
         try {
             EvidencePackRequest request = new EvidencePackRequest(
@@ -523,19 +524,19 @@ public class McpTools {
                     Boolean.TRUE.equals(includeReferences));
             return toJson(evidencePackAssembler.assemble(request, artifactMetadata));
         } catch (Exception e) {
-            return toJson(Map.of("error", e.getMessage()));
+            return toJson(Map.of(PROP_ERROR, e.getMessage()));
         }
     }
 
     @McpTool(name = "get_artifact_metadata", description = "Return artifact metadata: repo identity, commit SHA, build timestamp, extractor versions, capability matrix snapshot, and integrity hash.")
     public String getArtifactMetadata() {
         if (artifactMetadata == null) {
-            return toJson(Map.of("error", "Artifact metadata unavailable. Run 'enrich' first."));
+            return toJson(Map.of(PROP_ERROR, "Artifact metadata unavailable. Run 'enrich' first."));
         }
         try {
             return toJson(artifactMetadata);
         } catch (Exception e) {
-            return toJson(Map.of("error", e.getMessage()));
+            return toJson(Map.of(PROP_ERROR, e.getMessage()));
         }
     }
 

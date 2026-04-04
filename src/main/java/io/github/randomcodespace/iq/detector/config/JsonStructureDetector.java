@@ -30,6 +30,8 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class JsonStructureDetector extends AbstractStructuredDetector {
+    private static final String PROP_JSON = "json";
+
 
     @Override
     public String getName() {
@@ -38,7 +40,7 @@ public class JsonStructureDetector extends AbstractStructuredDetector {
 
     @Override
     public Set<String> getSupportedLanguages() {
-        return Set.of("json");
+        return Set.of(PROP_JSON);
     }
 
     @Override
@@ -49,7 +51,7 @@ public class JsonStructureDetector extends AbstractStructuredDetector {
         List<CodeEdge> edges = new ArrayList<>();
 
         // CONFIG_FILE node for the file itself
-        nodes.add(buildFileNode(ctx, "json"));
+        nodes.add(buildFileNode(ctx, PROP_JSON));
 
         // Extract data from parsed_data
         Object parsedData = ctx.parsedData();
@@ -65,7 +67,7 @@ public class JsonStructureDetector extends AbstractStructuredDetector {
         }
 
         for (String key : data.keySet()) {
-            addKeyNode(fileId, fp, key, "json", ctx, nodes, edges);
+            addKeyNode(fileId, fp, key, PROP_JSON, ctx, nodes, edges);
         }
 
         return DetectorResult.of(nodes, edges);

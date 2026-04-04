@@ -29,6 +29,15 @@ import java.util.stream.Collectors;
  */
 @Service
 public class TopologyService {
+    private static final String PROP_CONNECTIONS = "connections";
+    private static final String PROP_ENDPOINT_COUNT = "endpoint_count";
+    private static final String PROP_ENTITY_COUNT = "entity_count";
+    private static final String PROP_SERVICE = "service";
+    private static final String PROP_SOURCE = "source";
+    private static final String PROP_TARGET = "target";
+    private static final String PROP_TOTAL_CONNECTIONS = "total_connections";
+    private static final String PROP_TYPE = "type";
+
 
     /** Edge kinds that represent runtime service-to-service connections. */
     private static final Set<EdgeKind> RUNTIME_EDGES = EnumSet.of(
@@ -59,15 +68,15 @@ public class TopologyService {
             Map<String, Object> svcMap = new LinkedHashMap<>();
             svcMap.put("name", svc.getLabel());
             svcMap.put("build_tool", svc.getProperties().getOrDefault("build_tool", "unknown"));
-            svcMap.put("endpoint_count", svc.getProperties().getOrDefault("endpoint_count", 0));
-            svcMap.put("entity_count", svc.getProperties().getOrDefault("entity_count", 0));
+            svcMap.put(PROP_ENDPOINT_COUNT, svc.getProperties().getOrDefault(PROP_ENDPOINT_COUNT, 0));
+            svcMap.put(PROP_ENTITY_COUNT, svc.getProperties().getOrDefault(PROP_ENTITY_COUNT, 0));
 
             String name = svc.getLabel();
             long outCount = connections.stream()
-                    .filter(c -> name.equals(c.get("source")))
+                    .filter(c -> name.equals(c.get(PROP_SOURCE)))
                     .count();
             long inCount = connections.stream()
-                    .filter(c -> name.equals(c.get("target")))
+                    .filter(c -> name.equals(c.get(PROP_TARGET)))
                     .count();
             svcMap.put("connections_out", outCount);
             svcMap.put("connections_in", inCount);
@@ -76,7 +85,7 @@ public class TopologyService {
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("services", services);
-        result.put("connections", connections);
+        result.put(PROP_CONNECTIONS, connections);
         result.put("service_count", services.size());
         result.put("connection_count", connections.size());
         return result;
@@ -119,8 +128,8 @@ public class TopologyService {
         // Connections involving this service
         Map<String, String> nodeToService = buildNodeToServiceMap(nodes);
         List<Map<String, Object>> connections = findCrossServiceConnections(edges, nodeToService);
-        result.put("connections", connections.stream()
-                .filter(c -> serviceName.equals(c.get("source")) || serviceName.equals(c.get("target")))
+        result.put(PROP_CONNECTIONS, connections.stream()
+                .filter(c -> serviceName.equals(c.get(PROP_SOURCE)) || serviceName.equals(c.get(PROP_TARGET)))
                 .toList());
 
         result.put("files", childNodes.stream()
@@ -141,17 +150,17 @@ public class TopologyService {
         List<Map<String, Object>> connections = findCrossServiceConnections(edges, nodeToService);
 
         List<Map<String, Object>> deps = connections.stream()
-                .filter(c -> serviceName.equals(c.get("source")))
+                .filter(c -> serviceName.equals(c.get(PROP_SOURCE)))
                 .toList();
 
         Set<String> depServices = deps.stream()
-                .map(c -> (String) c.get("target"))
+                .map(c -> (String) c.get(PROP_TARGET))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("service", serviceName);
+        result.put(PROP_SERVICE, serviceName);
         result.put("depends_on", depServices);
-        result.put("connections", deps);
+        result.put(PROP_CONNECTIONS, deps);
         result.put("count", depServices.size());
         return result;
     }
@@ -164,17 +173,17 @@ public class TopologyService {
         List<Map<String, Object>> connections = findCrossServiceConnections(edges, nodeToService);
 
         List<Map<String, Object>> deps = connections.stream()
-                .filter(c -> serviceName.equals(c.get("target")))
+                .filter(c -> serviceName.equals(c.get(PROP_TARGET)))
                 .toList();
 
         Set<String> dependentServices = deps.stream()
-                .map(c -> (String) c.get("source"))
+                .map(c -> (String) c.get(PROP_SOURCE))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("service", serviceName);
+        result.put(PROP_SERVICE, serviceName);
         result.put("depended_by", dependentServices);
-        result.put("connections", deps);
+        result.put(PROP_CONNECTIONS, deps);
         result.put("count", dependentServices.size());
         return result;
     }
@@ -238,7 +247,7 @@ public class TopologyService {
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("source", nodeId);
+        result.put(PROP_SOURCE, nodeId);
         result.put("affected_services", affectedServices);
         result.put("affected_nodes", affectedNodes);
         result.put("affected_service_count", affectedServices.size());
@@ -257,8 +266,8 @@ public class TopologyService {
         // Build service-level adjacency
         Map<String, Map<String, Map<String, Object>>> adj = new HashMap<>();
         for (Map<String, Object> conn : connections) {
-            String src = (String) conn.get("source");
-            String tgt = (String) conn.get("target");
+            String src = (String) conn.get(PROP_SOURCE);
+            String tgt = (String) conn.get(PROP_TARGET);
             adj.computeIfAbsent(src, k -> new HashMap<>()).putIfAbsent(tgt, conn);
         }
 
@@ -280,7 +289,7 @@ public class TopologyService {
                     Map<String, Object> step = new LinkedHashMap<>();
                     step.put("from", path.get(i));
                     step.put("to", path.get(i + 1));
-                    step.put("type", hop.getOrDefault("type", "unknown"));
+                    step.put(PROP_TYPE, hop.getOrDefault(PROP_TYPE, "unknown"));
                     result.add(step);
                 }
                 return result;
@@ -309,8 +318,8 @@ public class TopologyService {
         Map<String, Integer> outDegree = new HashMap<>();
 
         for (Map<String, Object> conn : connections) {
-            String src = (String) conn.get("source");
-            String tgt = (String) conn.get("target");
+            String src = (String) conn.get(PROP_SOURCE);
+            String tgt = (String) conn.get(PROP_TARGET);
             outDegree.merge(src, 1, Integer::sum);
             inDegree.merge(tgt, 1, Integer::sum);
         }
@@ -325,18 +334,18 @@ public class TopologyService {
             int total = in + out;
             if (total > 0) {
                 Map<String, Object> entry = new LinkedHashMap<>();
-                entry.put("service", name);
+                entry.put(PROP_SERVICE, name);
                 entry.put("connections_in", in);
                 entry.put("connections_out", out);
-                entry.put("total_connections", total);
+                entry.put(PROP_TOTAL_CONNECTIONS, total);
                 result.add(entry);
             }
         }
 
         // Sort by total connections descending
         result.sort((a, b) -> Integer.compare(
-                (int) b.get("total_connections"),
-                (int) a.get("total_connections")));
+                (int) b.get(PROP_TOTAL_CONNECTIONS),
+                (int) a.get(PROP_TOTAL_CONNECTIONS)));
         return result;
     }
 
@@ -350,8 +359,8 @@ public class TopologyService {
         // Build adjacency
         Map<String, Set<String>> adj = new HashMap<>();
         for (Map<String, Object> conn : connections) {
-            String src = (String) conn.get("source");
-            String tgt = (String) conn.get("target");
+            String src = (String) conn.get(PROP_SOURCE);
+            String tgt = (String) conn.get(PROP_TARGET);
             adj.computeIfAbsent(src, k -> new LinkedHashSet<>()).add(tgt);
         }
 
@@ -359,7 +368,7 @@ public class TopologyService {
         List<List<String>> cycles = new ArrayList<>();
         Set<String> allServices = new LinkedHashSet<>(adj.keySet());
         for (Map<String, Object> conn : connections) {
-            allServices.add((String) conn.get("target"));
+            allServices.add((String) conn.get(PROP_TARGET));
         }
 
         Set<String> globalVisited = new HashSet<>();
@@ -423,16 +432,16 @@ public class TopologyService {
         Map<String, CodeNode> serviceNodes = findServiceNodes(nodes);
 
         Set<String> hasIncoming = connections.stream()
-                .map(c -> (String) c.get("target"))
+                .map(c -> (String) c.get(PROP_TARGET))
                 .collect(Collectors.toSet());
 
         List<Map<String, Object>> result = new ArrayList<>();
         for (CodeNode svc : sortedValues(serviceNodes)) {
             if (!hasIncoming.contains(svc.getLabel())) {
                 Map<String, Object> entry = new LinkedHashMap<>();
-                entry.put("service", svc.getLabel());
-                entry.put("endpoint_count", svc.getProperties().getOrDefault("endpoint_count", 0));
-                entry.put("entity_count", svc.getProperties().getOrDefault("entity_count", 0));
+                entry.put(PROP_SERVICE, svc.getLabel());
+                entry.put(PROP_ENDPOINT_COUNT, svc.getProperties().getOrDefault(PROP_ENDPOINT_COUNT, 0));
+                entry.put(PROP_ENTITY_COUNT, svc.getProperties().getOrDefault(PROP_ENTITY_COUNT, 0));
                 result.add(entry);
             }
         }
@@ -485,7 +494,7 @@ public class TopologyService {
     private Map<String, String> buildNodeToServiceMap(List<CodeNode> nodes) {
         Map<String, String> map = new HashMap<>();
         for (CodeNode node : nodes) {
-            Object svc = node.getProperties().get("service");
+            Object svc = node.getProperties().get(PROP_SERVICE);
             if (svc instanceof String s && !s.isBlank()) {
                 map.put(node.getId(), s);
             }
@@ -517,9 +526,9 @@ public class TopologyService {
                 String key = sourceSvc + "->" + targetSvc + ":" + edge.getKind().getValue();
                 if (seen.add(key)) {
                     Map<String, Object> conn = new LinkedHashMap<>();
-                    conn.put("source", sourceSvc);
-                    conn.put("target", targetSvc);
-                    conn.put("type", edge.getKind().getValue());
+                    conn.put(PROP_SOURCE, sourceSvc);
+                    conn.put(PROP_TARGET, targetSvc);
+                    conn.put(PROP_TYPE, edge.getKind().getValue());
                     connections.add(conn);
                 }
             }
@@ -534,8 +543,8 @@ public class TopologyService {
         m.put("label", node.getLabel());
         if (node.getFilePath() != null) m.put("file_path", node.getFilePath());
         if (node.getLayer() != null) m.put("layer", node.getLayer());
-        Object svc = node.getProperties().get("service");
-        if (svc != null) m.put("service", svc);
+        Object svc = node.getProperties().get(PROP_SERVICE);
+        if (svc != null) m.put(PROP_SERVICE, svc);
         return m;
     }
 
@@ -553,7 +562,7 @@ public class TopologyService {
     }
 
     private static String serviceOf(CodeNode node) {
-        Object svc = node.getProperties().get("service");
+        Object svc = node.getProperties().get(PROP_SERVICE);
         return svc instanceof String s ? s : null;
     }
 }

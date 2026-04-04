@@ -1,7 +1,6 @@
 package io.github.randomcodespace.iq.detector.typescript;
 
 import io.github.randomcodespace.iq.detector.AbstractAntlrDetector;
-import io.github.randomcodespace.iq.grammar.AntlrParserFactory;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.model.CodeEdge;
@@ -28,6 +27,9 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class SequelizeORMDetector extends AbstractAntlrDetector {
+    private static final String PROP_FRAMEWORK = "framework";
+    private static final String PROP_SEQUELIZE = "sequelize";
+
 
     private static final Pattern DEFINE_RE = Pattern.compile(
             "sequelize\\.define\\s*\\(\\s*['\"](\\w+)['\"]"
@@ -92,7 +94,7 @@ public class SequelizeORMDetector extends AbstractAntlrDetector {
             node.setModule(moduleName);
             node.setFilePath(filePath);
             node.setLineStart(line);
-            node.getProperties().put("framework", "sequelize");
+            node.getProperties().put(PROP_FRAMEWORK, PROP_SEQUELIZE);
             nodes.add(node);
         }
 
@@ -111,7 +113,7 @@ public class SequelizeORMDetector extends AbstractAntlrDetector {
             node.setModule(moduleName);
             node.setFilePath(filePath);
             node.setLineStart(line);
-            node.getProperties().put("framework", "sequelize");
+            node.getProperties().put(PROP_FRAMEWORK, PROP_SEQUELIZE);
             node.getProperties().put("definition", "define");
             nodes.add(node);
         }
@@ -132,7 +134,7 @@ public class SequelizeORMDetector extends AbstractAntlrDetector {
                 node.setModule(moduleName);
                 node.setFilePath(filePath);
                 node.setLineStart(line);
-                node.getProperties().put("framework", "sequelize");
+                node.getProperties().put(PROP_FRAMEWORK, PROP_SEQUELIZE);
                 node.getProperties().put("definition", "class");
                 nodes.add(node);
             }

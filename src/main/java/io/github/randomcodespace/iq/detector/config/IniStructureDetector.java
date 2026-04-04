@@ -19,7 +19,7 @@ import io.github.randomcodespace.iq.detector.ParserType;
 /**
  * Detects INI file structures: sections, keys, and file identity.
  * <p>
- * Expects parsedData to be a Map with type "ini" and "data" containing
+ * Expects parsedData to be a Map with type PROP_INI and "data" containing
  * a Map of section names to Maps of key-value pairs.
  */
 @DetectorInfo(
@@ -33,6 +33,8 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class IniStructureDetector extends AbstractStructuredDetector {
+    private static final String PROP_INI = "ini";
+
 
     @Override
     public String getName() {
@@ -41,7 +43,7 @@ public class IniStructureDetector extends AbstractStructuredDetector {
 
     @Override
     public Set<String> getSupportedLanguages() {
-        return Set.of("ini");
+        return Set.of(PROP_INI);
     }
 
     @Override
@@ -52,7 +54,7 @@ public class IniStructureDetector extends AbstractStructuredDetector {
         List<CodeEdge> edges = new ArrayList<>();
 
         // CONFIG_FILE node for the file itself
-        nodes.add(buildFileNode(ctx, "ini"));
+        nodes.add(buildFileNode(ctx, PROP_INI));
 
         Object parsedData = ctx.parsedData();
         if (parsedData == null) {

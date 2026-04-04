@@ -1,7 +1,6 @@
 package io.github.randomcodespace.iq.detector.rust;
 
 import io.github.randomcodespace.iq.detector.AbstractAntlrDetector;
-import io.github.randomcodespace.iq.grammar.AntlrParserFactory;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.model.CodeNode;
@@ -27,6 +26,12 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class ActixWebDetector extends AbstractAntlrDetector {
+    private static final String PROP_ACTIX_WEB = "actix_web";
+    private static final String PROP_AXUM = "axum";
+    private static final String PROP_FRAMEWORK = "framework";
+    private static final String PROP_HTTP_METHOD = "http_method";
+    private static final String PROP_PATH = "path";
+
 
     private static final Pattern ACTIX_ATTR_RE = Pattern.compile("#\\[(get|post|put|delete)\\s*\\(\\s*\"([^\"]*)\"\\s*\\)\\s*\\]");
     private static final Pattern HTTP_SERVER_RE = Pattern.compile("HttpServer::new\\s*\\(");
@@ -38,7 +43,7 @@ public class ActixWebDetector extends AbstractAntlrDetector {
     private static final Pattern FN_RE = Pattern.compile("(?:pub\\s+)?(?:async\\s+)?fn\\s+(\\w+)");
 
     @Override
-    public String getName() { return "actix_web"; }
+    public String getName() { return PROP_ACTIX_WEB; }
 
     @Override
     public Set<String> getSupportedLanguages() { return Set.of("rust"); }
@@ -55,7 +60,7 @@ public class ActixWebDetector extends AbstractAntlrDetector {
         if (text == null || text.isEmpty()) return DetectorResult.empty();
 
         boolean hasMarker = false;
-        for (String marker : List.of("#[get", "#[post", "#[put", "#[delete", "HttpServer::new", "web::get", "web::post", "web::resource", "Router::new", ".layer(", "actix_web::main", "tokio::main", "actix_web", "axum")) {
+        for (String marker : List.of("#[get", "#[post", "#[put", "#[delete", "HttpServer::new", "web::get", "web::post", "web::resource", "Router::new", ".layer(", "actix_web::main", "tokio::main", PROP_ACTIX_WEB, PROP_AXUM)) {
             if (text.contains(marker)) { hasMarker = true; break; }
         }
         if (!hasMarker) return DetectorResult.empty();
@@ -84,9 +89,9 @@ public class ActixWebDetector extends AbstractAntlrDetector {
                 node.setFqn(fnName);
                 node.setFilePath(filePath);
                 node.setLineStart(lineno);
-                node.getProperties().put("framework", "actix_web");
-                node.getProperties().put("http_method", method);
-                node.getProperties().put("path", path);
+                node.getProperties().put(PROP_FRAMEWORK, PROP_ACTIX_WEB);
+                node.getProperties().put(PROP_HTTP_METHOD, method);
+                node.getProperties().put(PROP_PATH, path);
                 nodes.add(node);
             }
 
@@ -99,7 +104,7 @@ public class ActixWebDetector extends AbstractAntlrDetector {
                 node.setFqn("HttpServer");
                 node.setFilePath(filePath);
                 node.setLineStart(lineno);
-                node.getProperties().put("framework", "actix_web");
+                node.getProperties().put(PROP_FRAMEWORK, PROP_ACTIX_WEB);
                 nodes.add(node);
             }
 
@@ -115,9 +120,9 @@ public class ActixWebDetector extends AbstractAntlrDetector {
                 node.setFqn(handler);
                 node.setFilePath(filePath);
                 node.setLineStart(lineno);
-                node.getProperties().put("framework", "actix_web");
-                node.getProperties().put("http_method", method);
-                node.getProperties().put("path", path);
+                node.getProperties().put(PROP_FRAMEWORK, PROP_ACTIX_WEB);
+                node.getProperties().put(PROP_HTTP_METHOD, method);
+                node.getProperties().put(PROP_PATH, path);
                 node.getProperties().put("handler", handler);
                 nodes.add(node);
             }
@@ -132,8 +137,8 @@ public class ActixWebDetector extends AbstractAntlrDetector {
                 node.setFqn(path);
                 node.setFilePath(filePath);
                 node.setLineStart(lineno);
-                node.getProperties().put("framework", "actix_web");
-                node.getProperties().put("path", path);
+                node.getProperties().put(PROP_FRAMEWORK, PROP_ACTIX_WEB);
+                node.getProperties().put(PROP_PATH, path);
                 nodes.add(node);
             }
 
@@ -149,9 +154,9 @@ public class ActixWebDetector extends AbstractAntlrDetector {
                 node.setFqn(handler);
                 node.setFilePath(filePath);
                 node.setLineStart(lineno);
-                node.getProperties().put("framework", "axum");
-                node.getProperties().put("http_method", method);
-                node.getProperties().put("path", path);
+                node.getProperties().put(PROP_FRAMEWORK, PROP_AXUM);
+                node.getProperties().put(PROP_HTTP_METHOD, method);
+                node.getProperties().put(PROP_PATH, path);
                 node.getProperties().put("handler", handler);
                 nodes.add(node);
             }
@@ -166,7 +171,7 @@ public class ActixWebDetector extends AbstractAntlrDetector {
                 node.setFqn(mwName);
                 node.setFilePath(filePath);
                 node.setLineStart(lineno);
-                node.getProperties().put("framework", "axum");
+                node.getProperties().put(PROP_FRAMEWORK, PROP_AXUM);
                 node.getProperties().put("middleware", mwName);
                 nodes.add(node);
             }
@@ -181,7 +186,7 @@ public class ActixWebDetector extends AbstractAntlrDetector {
                 node.setFqn("main");
                 node.setFilePath(filePath);
                 node.setLineStart(lineno);
-                node.getProperties().put("framework", attr.contains("actix") ? "actix_web" : "tokio");
+                node.getProperties().put(PROP_FRAMEWORK, attr.contains("actix") ? PROP_ACTIX_WEB : "tokio");
                 nodes.add(node);
             }
         }

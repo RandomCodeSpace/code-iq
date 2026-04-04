@@ -27,6 +27,9 @@ import io.github.randomcodespace.iq.detector.DetectorInfo;
 )
 @Component
 public class TerraformDetector extends AbstractRegexDetector {
+    private static final String PROP_PROVIDER = "provider";
+    private static final String PROP_RESOURCE_TYPE = "resource_type";
+
 
     private static final Pattern RESOURCE_RE = Pattern.compile("resource\\s+\"([^\"]+)\"\\s+\"([^\"]+)\"");
     private static final Pattern DATA_RE = Pattern.compile("data\\s+\"([^\"]+)\"\\s+\"([^\"]+)\"");
@@ -58,8 +61,8 @@ public class TerraformDetector extends AbstractRegexDetector {
             n.setKind(NodeKind.INFRA_RESOURCE); n.setLabel(resourceType + "." + resourceName);
             n.setFqn(resourceType + "." + resourceName); n.setFilePath(ctx.filePath());
             n.setLineStart(findLineNumber(text, m.start()));
-            n.getProperties().put("resource_type", resourceType);
-            if (provider != null) n.getProperties().put("provider", provider);
+            n.getProperties().put(PROP_RESOURCE_TYPE, resourceType);
+            if (provider != null) n.getProperties().put(PROP_PROVIDER, provider);
             nodes.add(n);
         }
 
@@ -71,8 +74,8 @@ public class TerraformDetector extends AbstractRegexDetector {
             n.setKind(NodeKind.INFRA_RESOURCE); n.setLabel("data." + dataType + "." + dataName);
             n.setFqn("data." + dataType + "." + dataName); n.setFilePath(ctx.filePath());
             n.setLineStart(findLineNumber(text, m.start()));
-            n.getProperties().put("resource_type", dataType); n.getProperties().put("data_source", true);
-            if (provider != null) n.getProperties().put("provider", provider);
+            n.getProperties().put(PROP_RESOURCE_TYPE, dataType); n.getProperties().put("data_source", true);
+            if (provider != null) n.getProperties().put(PROP_PROVIDER, provider);
             nodes.add(n);
         }
 
@@ -119,7 +122,7 @@ public class TerraformDetector extends AbstractRegexDetector {
             n.setKind(NodeKind.INFRA_RESOURCE); n.setLabel("provider." + m.group(1));
             n.setFqn("provider." + m.group(1)); n.setFilePath(ctx.filePath());
             n.setLineStart(findLineNumber(text, m.start()));
-            n.getProperties().put("resource_type", "provider"); n.getProperties().put("provider", m.group(1));
+            n.getProperties().put(PROP_RESOURCE_TYPE, PROP_PROVIDER); n.getProperties().put(PROP_PROVIDER, m.group(1));
             nodes.add(n);
         }
 

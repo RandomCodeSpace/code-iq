@@ -30,6 +30,10 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class KafkaPythonDetector extends AbstractAntlrDetector {
+    private static final String PROP_PRODUCER = "producer";
+    private static final String PROP_ROLE = "role";
+    private static final String PROP_TOPIC = "topic";
+
 
     // --- Regex patterns ---
     private static final Pattern PRODUCER_RE = Pattern.compile(
@@ -117,7 +121,7 @@ public class KafkaPythonDetector extends AbstractAntlrDetector {
                 node.setModule(moduleName);
                 node.setFilePath(fp);
                 node.setLineStart(lineno);
-                node.getProperties().put("role", "producer");
+                node.getProperties().put(PROP_ROLE, PROP_PRODUCER);
                 nodes.add(node);
             }
         }
@@ -132,7 +136,7 @@ public class KafkaPythonDetector extends AbstractAntlrDetector {
                 node.setModule(moduleName);
                 node.setFilePath(fp);
                 node.setLineStart(lineno);
-                node.getProperties().put("role", "consumer");
+                node.getProperties().put(PROP_ROLE, "consumer");
                 nodes.add(node);
             }
         }
@@ -142,24 +146,24 @@ public class KafkaPythonDetector extends AbstractAntlrDetector {
             Matcher sm = SEND_RE.matcher(lines[i]);
             if (sm.find() && lines[i].contains("send")) {
                 String topic = sm.group(1);
-                String topicId = ensureTopic(nodes, seenTopics, fp, moduleName, topic, "producer", lineno);
+                String topicId = ensureTopic(nodes, seenTopics, fp, moduleName, topic, PROP_PRODUCER, lineno);
                 CodeEdge edge = new CodeEdge();
                 edge.setId(fileNodeId + "->produces->" + topicId);
                 edge.setKind(EdgeKind.PRODUCES);
                 edge.setSourceId(fileNodeId);
-                edge.getProperties().put("topic", topic);
+                edge.getProperties().put(PROP_TOPIC, topic);
                 edges.add(edge);
                 continue;
             }
             Matcher pm = PRODUCE_RE.matcher(lines[i]);
             if (pm.find()) {
                 String topic = pm.group(1);
-                String topicId = ensureTopic(nodes, seenTopics, fp, moduleName, topic, "producer", lineno);
+                String topicId = ensureTopic(nodes, seenTopics, fp, moduleName, topic, PROP_PRODUCER, lineno);
                 CodeEdge edge = new CodeEdge();
                 edge.setId(fileNodeId + "->produces->" + topicId);
                 edge.setKind(EdgeKind.PRODUCES);
                 edge.setSourceId(fileNodeId);
-                edge.getProperties().put("topic", topic);
+                edge.getProperties().put(PROP_TOPIC, topic);
                 edges.add(edge);
             }
         }
@@ -174,7 +178,7 @@ public class KafkaPythonDetector extends AbstractAntlrDetector {
                 edge.setId(fileNodeId + "->consumes->" + topicId);
                 edge.setKind(EdgeKind.CONSUMES);
                 edge.setSourceId(fileNodeId);
-                edge.getProperties().put("topic", topic);
+                edge.getProperties().put(PROP_TOPIC, topic);
                 edges.add(edge);
             }
         }
@@ -209,8 +213,8 @@ public class KafkaPythonDetector extends AbstractAntlrDetector {
             node.setFilePath(fp);
             node.setLineStart(lineno);
             node.getProperties().put("broker", "kafka");
-            node.getProperties().put("topic", topic);
-            node.getProperties().put("role", role);
+            node.getProperties().put(PROP_TOPIC, topic);
+            node.getProperties().put(PROP_ROLE, role);
             nodes.add(node);
         }
         return topicId;
