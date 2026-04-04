@@ -1,9 +1,7 @@
 package io.github.randomcodespace.iq.detector.python;
 
-import io.github.randomcodespace.iq.detector.AbstractAntlrDetector;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
-import io.github.randomcodespace.iq.grammar.AntlrParserFactory;
 import io.github.randomcodespace.iq.grammar.python.Python3Parser;
 import io.github.randomcodespace.iq.grammar.python.Python3ParserBaseListener;
 import io.github.randomcodespace.iq.model.CodeEdge;
@@ -33,7 +31,7 @@ import io.github.randomcodespace.iq.detector.ParserType;
     properties = {"broker", "task_name"}
 )
 @Component
-public class CeleryTaskDetector extends AbstractAntlrDetector {
+public class CeleryTaskDetector extends AbstractPythonAntlrDetector {
 
     // --- Regex patterns ---
     private static final Pattern TASK_DECORATOR = Pattern.compile(
@@ -54,20 +52,6 @@ public class CeleryTaskDetector extends AbstractAntlrDetector {
     @Override
     public String getName() {
         return "python.celery_tasks";
-    }
-
-    @Override
-    public Set<String> getSupportedLanguages() {
-        return Set.of("python");
-    }
-
-    @Override
-    protected ParseTree parse(DetectorContext ctx) {
-        // Skip ANTLR for very large files (>500KB) — regex fallback is faster
-        if (ctx.content().length() > 500_000) {
-            return null; // triggers regex fallback
-        }
-        return AntlrParserFactory.parse("python", ctx.content());
     }
 
     @Override

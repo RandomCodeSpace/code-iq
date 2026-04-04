@@ -1,9 +1,7 @@
 package io.github.randomcodespace.iq.detector.python;
 
-import io.github.randomcodespace.iq.detector.AbstractAntlrDetector;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
-import io.github.randomcodespace.iq.grammar.AntlrParserFactory;
 import io.github.randomcodespace.iq.grammar.python.Python3Parser;
 import io.github.randomcodespace.iq.grammar.python.Python3ParserBaseListener;
 import io.github.randomcodespace.iq.model.CodeNode;
@@ -32,7 +30,7 @@ import io.github.randomcodespace.iq.detector.ParserType;
     properties = {"framework", "http_method", "protocol"}
 )
 @Component
-public class FastAPIRouteDetector extends AbstractAntlrDetector {
+public class FastAPIRouteDetector extends AbstractPythonAntlrDetector {
 
     private static final Set<String> HTTP_METHODS = Set.of(
             "get", "post", "put", "delete", "patch", "options", "head"
@@ -53,20 +51,6 @@ public class FastAPIRouteDetector extends AbstractAntlrDetector {
     @Override
     public String getName() {
         return "python.fastapi_routes";
-    }
-
-    @Override
-    public Set<String> getSupportedLanguages() {
-        return Set.of("python");
-    }
-
-    @Override
-    protected ParseTree parse(DetectorContext ctx) {
-        // Skip ANTLR for very large files (>500KB) — regex fallback is faster
-        if (ctx.content().length() > 500_000) {
-            return null; // triggers regex fallback
-        }
-        return AntlrParserFactory.parse("python", ctx.content());
     }
 
     @Override

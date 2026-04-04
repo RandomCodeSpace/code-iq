@@ -21,7 +21,7 @@ class FileHasherTest {
         String hash2 = FileHasher.hash(file);
 
         assertEquals(hash1, hash2, "Same file should produce same hash");
-        assertEquals(32, hash1.length(), "MD5 hash should be 32 hex chars");
+        assertEquals(64, hash1.length(), "SHA-256 hash should be 64 hex chars");
     }
 
     @Test
@@ -40,7 +40,7 @@ class FileHasherTest {
         String hash2 = FileHasher.hashString("test content");
 
         assertEquals(hash1, hash2);
-        assertEquals(32, hash1.length());
+        assertEquals(64, hash1.length());
     }
 
     @Test

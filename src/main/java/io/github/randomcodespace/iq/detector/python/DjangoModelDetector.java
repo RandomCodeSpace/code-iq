@@ -1,9 +1,7 @@
 package io.github.randomcodespace.iq.detector.python;
 
-import io.github.randomcodespace.iq.detector.AbstractAntlrDetector;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
-import io.github.randomcodespace.iq.grammar.AntlrParserFactory;
 import io.github.randomcodespace.iq.grammar.python.Python3Parser;
 import io.github.randomcodespace.iq.grammar.python.Python3ParserBaseListener;
 import io.github.randomcodespace.iq.model.CodeEdge;
@@ -19,7 +17,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import io.github.randomcodespace.iq.detector.DetectorInfo;
@@ -36,7 +33,7 @@ import io.github.randomcodespace.iq.detector.ParserType;
     properties = {"framework", "table_name"}
 )
 @Component
-public class DjangoModelDetector extends AbstractAntlrDetector {
+public class DjangoModelDetector extends AbstractPythonDbDetector {
 
     // --- Regex patterns (used in both AST body extraction and regex fallback) ---
     private static final Pattern DJANGO_MODEL_RE = Pattern.compile(
@@ -64,27 +61,12 @@ public class DjangoModelDetector extends AbstractAntlrDetector {
     private static final Pattern MANAGER_ASSIGNMENT_RE = Pattern.compile(
             "(\\w+)\\s*=\\s*(\\w+)\\s*\\(\\s*\\)", Pattern.MULTILINE
     );
-    private static final Pattern NEXT_CLASS_RE = Pattern.compile("\\nclass\\s+\\w+");
     private static final Pattern META_CLASS_RE = Pattern.compile("class\\s+Meta\\s*:");
     private static final Pattern META_END_RE = Pattern.compile("\\n\\s{4}\\S");
 
     @Override
     public String getName() {
         return "python.django_models";
-    }
-
-    @Override
-    public Set<String> getSupportedLanguages() {
-        return Set.of("python");
-    }
-
-    @Override
-    protected ParseTree parse(DetectorContext ctx) {
-        // Skip ANTLR for very large files (>500KB) — regex fallback is faster
-        if (ctx.content().length() > 500_000) {
-            return null; // triggers regex fallback
-        }
-        return AntlrParserFactory.parse("python", ctx.content());
     }
 
     @Override
@@ -185,7 +167,7 @@ public class DjangoModelDetector extends AbstractAntlrDetector {
                     node.getProperties().put("ordering", ordering);
                 }
                 nodes.add(node);
-                DjangoModelDetector.addDbEdge(nodeId, ctx.registry(), nodes, edges);
+                addDbEdge(nodeId, ctx.registry(), nodes, edges);
 
                 // FK / OneToOne edges
                 Matcher fkMatcher = FK_RE.matcher(classBody);
@@ -366,64 +348,4 @@ public class DjangoModelDetector extends AbstractAntlrDetector {
         return DetectorResult.of(nodes, edges);
     }
 
-    private static String getBaseClassesText(Python3Parser.ClassdefContext classCtx) {
-        if (classCtx.arglist() == null) return null;
-        StringBuilder sb = new StringBuilder();
-        for (var arg : classCtx.arglist().argument()) {
-            if (sb.length() > 0) sb.append(", ");
-            sb.append(arg.getText());
-        }
-        return sb.toString();
-    }
-
-    /**
-     * Extract the text of a class body from the source using the AST context positions.
-     */
-    private static String extractClassBody(String text, Python3Parser.ClassdefContext classCtx) {
-        int start = classCtx.getStart().getStartIndex();
-        int stop = classCtx.getStop() != null ? classCtx.getStop().getStopIndex() + 1 : text.length();
-        return text.substring(Math.min(start, text.length()), Math.min(stop, text.length()));
-    }
-
-    // ==================== InfrastructureRegistry helpers ====================
-
-    static String ensureDbNode(
-            io.github.randomcodespace.iq.analyzer.InfrastructureRegistry registry,
-            List<CodeNode> nodes) {
-        String dbNodeId;
-        if (registry != null && !registry.getDatabases().isEmpty()) {
-            io.github.randomcodespace.iq.analyzer.InfraEndpoint db =
-                    registry.getDatabases().values().iterator().next();
-            dbNodeId = "infra:" + db.id();
-            if (nodes.stream().noneMatch(n -> dbNodeId.equals(n.getId()))) {
-                CodeNode dbNode = new CodeNode(dbNodeId, NodeKind.DATABASE_CONNECTION,
-                        db.name() + " (" + db.type() + ")");
-                dbNode.getProperties().put("type", db.type());
-                if (db.connectionUrl() != null) dbNode.getProperties().put("url", db.connectionUrl());
-                nodes.add(dbNode);
-            }
-        } else {
-            dbNodeId = "database:unknown";
-            if (nodes.stream().noneMatch(n -> dbNodeId.equals(n.getId()))) {
-                nodes.add(new CodeNode(dbNodeId, NodeKind.DATABASE_CONNECTION, "Database"));
-            }
-        }
-        return dbNodeId;
-    }
-
-    static void addDbEdge(String sourceId,
-            io.github.randomcodespace.iq.analyzer.InfrastructureRegistry registry,
-            List<CodeNode> nodes, List<CodeEdge> edges) {
-        String dbNodeId = ensureDbNode(registry, nodes);
-        CodeNode targetRef = nodes.stream()
-                .filter(n -> dbNodeId.equals(n.getId()))
-                .findFirst()
-                .orElseGet(() -> new CodeNode(dbNodeId, NodeKind.DATABASE_CONNECTION, "Database"));
-        CodeEdge edge = new CodeEdge();
-        edge.setId(sourceId + "->connects_to->" + dbNodeId);
-        edge.setKind(EdgeKind.CONNECTS_TO);
-        edge.setSourceId(sourceId);
-        edge.setTarget(targetRef);
-        edges.add(edge);
-    }
 }
