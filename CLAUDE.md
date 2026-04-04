@@ -44,7 +44,7 @@ Remote server (or local):
 
 ```
 index:   FileDiscovery → Parsers → Detectors (virtual threads) → GraphBuilder → H2 cache
-enrich:  H2 → Linkers → LayerClassifier → ServiceDetector → Neo4j (UNWIND bulk-load)
+enrich:  H2 → Linkers → LayerClassifier → LexicalEnricher → LanguageEnricher → ServiceDetector → Neo4j (UNWIND bulk-load)
 serve:   Neo4j → GraphStore → QueryService → REST API / MCP / Web UI
 ```
 
@@ -96,8 +96,17 @@ io.github.randomcodespace.iq
   |-- grammar/                     # ANTLR parser factory + generated parsers
   |-- graph/                       # GraphStore (Neo4j facade), GraphRepository (SDN, writes only)
   |-- health/                      # GraphHealthIndicator (Spring Actuator)
-  |-- mcp/                         # McpTools (31 @McpTool methods, read-only)
+  |-- mcp/                         # McpTools (34 @McpTool methods, read-only)
   |-- model/                       # CodeNode, CodeEdge, NodeKind (32), EdgeKind (27)
+  |-- intelligence/               # Intelligence enrichment (Phase 2-5)
+  |   |-- lexical/                # LexicalEnricher, LexicalQueryService, DocCommentExtractor, SnippetStore
+  |   |-- extractor/              # LanguageEnricher, LanguageExtractor, LanguageExtractionResult
+  |   |   |-- java/               # JavaLanguageExtractor
+  |   |   |-- typescript/         # TypeScriptLanguageExtractor
+  |   |   |-- python/             # PythonLanguageExtractor
+  |   |   |-- go/                 # GoLanguageExtractor
+  |   |-- evidence/               # EvidencePack, EvidencePackAssembler
+  |   |-- query/                  # QueryPlanner, QueryRoute, QueryPlan
   |-- query/                       # QueryService, StatsService (categorized), TopologyService
   |-- web/                         # Static resource serving (React SPA)
 ```
@@ -162,7 +171,7 @@ code-iq serve /path/to/repo          # needs enrich if using index
 
 ## Server Endpoints (all read-only)
 
-### REST API (`/api`) -- 34 endpoints
+### REST API (`/api`) -- 37 endpoints
 
 **GraphController** (`/api`):
 - `GET /api/stats` -- Rich categorized statistics (graph, languages, frameworks, infra, connections, auth, architecture)
@@ -200,8 +209,13 @@ code-iq serve /path/to/repo          # needs enrich if using index
 - `GET /api/flow/{view}/{nodeId}/children` -- Node children in flow
 - `GET /api/flow/{view}/{nodeId}/parent` -- Node parent in flow
 
-### MCP Tools (31, via `@McpTool` annotation)
-`get_stats`, `get_detailed_stats`, `query_nodes`, `query_edges`, `get_node_neighbors`, `get_ego_graph`, `find_cycles`, `find_shortest_path`, `find_consumers`, `find_producers`, `find_callers`, `find_dependencies`, `find_dependents`, `find_dead_code`, `generate_flow`, `run_cypher`, `find_component_by_file`, `trace_impact`, `find_related_endpoints`, `search_graph`, `read_file`, `get_topology`, `service_detail`, `service_dependencies`, `service_dependents`, `blast_radius`, `find_path`, `find_bottlenecks`, `find_circular_deps`, `find_dead_services`, `find_node`
+**IntelligenceController** (`/api/intelligence`):
+- `GET /api/intelligence/evidence` -- Evidence pack for a node
+- `GET /api/intelligence/manifest` -- Artifact manifest
+- `GET /api/intelligence/capabilities` -- Capability matrix
+
+### MCP Tools (34, via `@McpTool` annotation)
+`get_stats`, `get_detailed_stats`, `query_nodes`, `query_edges`, `get_node_neighbors`, `get_ego_graph`, `find_cycles`, `find_shortest_path`, `find_consumers`, `find_producers`, `find_callers`, `find_dependencies`, `find_dependents`, `find_dead_code`, `generate_flow`, `run_cypher`, `find_component_by_file`, `trace_impact`, `find_related_endpoints`, `search_graph`, `read_file`, `get_topology`, `service_detail`, `service_dependencies`, `service_dependents`, `blast_radius`, `find_path`, `find_bottlenecks`, `find_circular_deps`, `find_dead_services`, `find_node`, `get_evidence_pack`, `get_artifact_metadata`, `get_capabilities`
 
 ## Adding a New Detector
 
@@ -309,13 +323,18 @@ mvn dependency-check:check
 | `config/JacksonConfig.java` | Jackson config (FAIL_ON_UNKNOWN_PROPERTIES disabled for MCP compat) |
 | `cache/AnalysisCache.java` | H2 incremental cache |
 | `api/GraphController.java` | REST API endpoints (read-only) |
-| `mcp/McpTools.java` | 31 MCP tool definitions (`@McpTool`, read-only) |
+| `mcp/McpTools.java` | 34 MCP tool definitions (`@McpTool`, read-only) |
 | `query/QueryService.java` | Graph query operations with Spring caching |
 | `query/StatsService.java` | Rich categorized statistics (7 categories) |
 | `query/TopologyService.java` | Service topology queries |
 | `cli/IndexCommand.java` | Memory-efficient batched indexing to H2 |
 | `cli/EnrichCommand.java` | H2 → Neo4j with linkers, layers, services |
 | `cli/ServeCommand.java` | Read-only server startup |
+| `intelligence/extractor/LanguageEnricher.java` | Language-specific enrichment orchestrator (Phase 5) |
+| `intelligence/extractor/LanguageExtractor.java` | Language extractor interface |
+| `intelligence/evidence/EvidencePackAssembler.java` | Evidence pack generation |
+| `intelligence/query/QueryPlanner.java` | Intelligent query routing |
+| `intelligence/lexical/LexicalEnricher.java` | Doc comment + snippet enrichment |
 
 ## Code Conventions
 

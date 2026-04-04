@@ -39,7 +39,6 @@ import java.util.Optional;
 public class JavaLanguageExtractor implements LanguageExtractor {
 
     private static final Logger log = LoggerFactory.getLogger(JavaLanguageExtractor.class);
-    private static final ThreadLocal<JavaParser> PARSER = ThreadLocal.withInitial(JavaParser::new);
 
     @Override
     public String getLanguage() {
@@ -127,12 +126,10 @@ public class JavaLanguageExtractor implements LanguageExtractor {
     private Optional<CompilationUnit> parse(DetectorContext ctx) {
         try {
             if (ctx.content() == null || ctx.content().isEmpty()) return Optional.empty();
-            return PARSER.get().parse(ctx.content()).getResult();
+            return new JavaParser().parse(ctx.content()).getResult();
         } catch (Exception | AssertionError e) {
             log.debug("JavaParser failed for {}: {}", ctx.filePath(), e.getMessage());
             return Optional.empty();
-        } finally {
-            PARSER.remove();
         }
     }
 

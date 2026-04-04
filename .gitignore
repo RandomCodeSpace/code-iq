@@ -82,3 +82,4 @@ helm/
 # Neo4j embedded data
 neo4j-data/
 graph.db/
+.worktrees/

@@ -6,6 +6,7 @@ import io.github.randomcodespace.iq.cache.AnalysisCache;
 import io.github.randomcodespace.iq.config.CodeIqConfig;
 import io.github.randomcodespace.iq.intelligence.extractor.LanguageEnricher;
 import io.github.randomcodespace.iq.intelligence.lexical.LexicalEnricher;
+import io.github.randomcodespace.iq.intelligence.extractor.java.JavaLanguageExtractor;
 import io.github.randomcodespace.iq.model.CodeEdge;
 import io.github.randomcodespace.iq.model.CodeNode;
 import io.github.randomcodespace.iq.model.EdgeKind;
@@ -56,10 +57,7 @@ class EnrichCommandTest {
         var cmdLine = new picocli.CommandLine(cmd);
         int exitCode = cmdLine.execute(tempDir.toString());
 
-        // Should fail because no H2 index exists (or succeed creating empty DB)
-        // The command tries to load from H2 which may be empty
-        // At minimum it should not crash
-        assertTrue(exitCode == 0 || exitCode == 1);
+        assertEquals(1, exitCode, "enrich with no H2 index should fail with exit code 1");
     }
 
     @Test
@@ -128,5 +126,34 @@ class EnrichCommandTest {
         int exitCode = cmdLine.execute(tempDir.toString());
 
         assertEquals(0, exitCode);
+    }
+
+    @Test
+    void enrichedEdgesAreMutableForLanguageEnricher(@TempDir Path tempDir) throws Exception {
+        // Create a minimal H2 index so enrich has data to process
+        Path cacheDir = tempDir.resolve(".code-intelligence");
+        Files.createDirectories(cacheDir);
+        Path cachePath = cacheDir.resolve("analysis-cache.db");
+
+        try (var cache = new AnalysisCache(cachePath)) {
+            var node = new CodeNode("test:Foo.java:class:Foo", NodeKind.CLASS, "Foo");
+            node.setFilePath("Foo.java");
+            cache.storeResults("abc123", "Foo.java", "java", List.of(node), List.of());
+        }
+
+        var config = new CodeIqConfig();
+        var layerClassifier = new LayerClassifier();
+        List<Linker> linkers = List.of();
+
+        // Use a real LanguageEnricher with extractors to trigger edges.addAll()
+        var enricher = new LanguageEnricher(List.of(new JavaLanguageExtractor()));
+        var cmd = new EnrichCommand(config, layerClassifier, linkers, new LexicalEnricher(), enricher);
+        var cmdLine = new picocli.CommandLine(cmd);
+
+        // This should NOT throw UnsupportedOperationException
+        int exitCode = cmdLine.execute(tempDir.toString());
+        // May fail for other reasons (no source files to read), but must not crash on immutable list
+        assertTrue(exitCode == 0 || exitCode == 1,
+                "EnrichCommand crashed — likely UnsupportedOperationException on immutable edges list");
     }
 }

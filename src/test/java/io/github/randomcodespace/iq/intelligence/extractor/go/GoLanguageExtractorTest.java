@@ -182,7 +182,9 @@ class GoLanguageExtractorTest {
         registry.put(ifaceReader.getLabel(), ifaceReader);
         registry.put(ifaceCloser.getLabel(), ifaceCloser);
 
-        String content = "Worker) Reader\nWorker) Closer\n";
+        // Real Go receiver syntax: func (w Worker) Read(...) and func (w Worker) Close()
+        String content = "func (w Worker) Read(p []byte) (int, error) { return 0, nil }\n"
+                + "func (w Worker) Close() error { return nil }\n";
 
         DetectorContext ctx = new DetectorContext("s.go", "go", content, registry, null);
         LanguageExtractionResult r1 = extractor.extract(ctx, struct);
@@ -191,6 +193,71 @@ class GoLanguageExtractorTest {
         assertThat(r1.typeHints()).containsKey("satisfies_interfaces");
         assertThat(r1.typeHints().get("satisfies_interfaces")).isEqualTo("Closer, Reader");
         assertThat(r1.typeHints()).isEqualTo(r2.typeHints());
+    }
+
+    @Test
+    void extract_realGoReceiverSyntax_detectsInterfaceSatisfaction() {
+        var extractor = new GoLanguageExtractor();
+        String content = """
+                package main
+
+                type Worker struct {}
+
+                func (w Worker) Read(p []byte) (int, error) {
+                    return 0, nil
+                }
+
+                func (w Worker) Close() error {
+                    return nil
+                }
+                """;
+
+        CodeNode structNode = node("go:main.go:class:Worker", NodeKind.CLASS, "Worker");
+        structNode.setFilePath("main.go");
+        CodeNode readerIface = node("go:io/reader.go:interface:Reader", NodeKind.INTERFACE, "Reader");
+        readerIface.setFilePath("io/reader.go");
+        CodeNode closerIface = node("go:io/closer.go:interface:Closer", NodeKind.INTERFACE, "Closer");
+        closerIface.setFilePath("io/closer.go");
+
+        Map<String, CodeNode> registry = new java.util.LinkedHashMap<>();
+        registry.put(structNode.getId(), structNode);
+        registry.put(readerIface.getId(), readerIface);
+        registry.put(closerIface.getId(), closerIface);
+
+        var ctx = new DetectorContext("main.go", "go", content, registry, null);
+        var result = extractor.extract(ctx, structNode);
+
+        assertThat(result.typeHints()).containsKey("satisfies_interfaces");
+        assertThat(result.typeHints().get("satisfies_interfaces")).contains("Closer");
+        assertThat(result.typeHints().get("satisfies_interfaces")).contains("Reader");
+    }
+
+    @Test
+    void extract_samePkgMatchedByNameAndPath_noDuplicateEdges() {
+        var extractor = new GoLanguageExtractor();
+        String content = """
+                package main
+                import "github.com/myorg/utils"
+                import utils "github.com/myorg/utils"
+                """;
+
+        CodeNode source = node("go:main.go:package:main", NodeKind.MODULE, "main");
+        source.setFilePath("main.go");
+        CodeNode target = node("go:utils/utils.go:package:utils", NodeKind.MODULE, "utils");
+        target.setFilePath("utils/utils.go");
+
+        Map<String, CodeNode> registry = new java.util.LinkedHashMap<>();
+        registry.put(target.getId(), target);
+        registry.put(target.getLabel(), target);
+        registry.put("github.com/myorg/utils", target);
+
+        var ctx = new DetectorContext("main.go", "go", content, registry, null);
+        var result = extractor.extract(ctx, source);
+
+        long importEdges = result.symbolReferences().stream()
+                .filter(e -> e.getKind() == EdgeKind.IMPORTS)
+                .count();
+        assertThat(importEdges).isEqualTo(1);
     }
 
     private static CodeNode node(String id, NodeKind kind, String label) {

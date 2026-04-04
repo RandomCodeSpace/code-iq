@@ -137,8 +137,8 @@ public class EnrichCommand implements Callable<Integer> {
         GraphBuilder.FlushResult flushed = builder.flush();
         List<CodeEdge> recoveredEdges = builder.flushDeferred();
 
-        List<CodeNode> enrichedNodes = builder.getNodes();
-        List<CodeEdge> enrichedEdges = builder.getEdges();
+        List<CodeNode> enrichedNodes = new ArrayList<>(builder.getNodes());
+        List<CodeEdge> enrichedEdges = new ArrayList<>(builder.getEdges());
 
         int linkerNodeDelta = enrichedNodes.size() - allNodes.size();
         int linkerEdgeDelta = enrichedEdges.size() - allEdges.size();
@@ -169,8 +169,8 @@ public class EnrichCommand implements Callable<Integer> {
             // Add service nodes and edges to the builder
             builder.addNodes(serviceResult.serviceNodes());
             builder.addEdges(serviceResult.serviceEdges());
-            enrichedNodes = builder.getNodes();
-            enrichedEdges = builder.getEdges();
+            enrichedNodes = new ArrayList<>(builder.getNodes());
+            enrichedEdges = new ArrayList<>(builder.getEdges());
             CliOutput.info("  Detected " + serviceResult.serviceNodes().size() + " service(s)");
         }
 
@@ -374,11 +374,4 @@ public class EnrichCommand implements Callable<Integer> {
         }
     }
 
-    /**
-     * Sanitize relationship type for Neo4j Cypher.
-     * Neo4j relationship types must be alphanumeric + underscore.
-     */
-    private static String sanitizeRelType(String kind) {
-        return kind.replaceAll("[^A-Za-z0-9_]", "_").toUpperCase();
-    }
 }
