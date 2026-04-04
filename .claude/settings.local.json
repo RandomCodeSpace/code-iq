@@ -1,4 +1,9 @@
 {
+  "spinnerTipsEnabled": false,
   "prefersReducedMotion": true,
-  "spinnerTipsEnabled": false
+  "permissions": {
+    "allow": [
+      "Bash(rtk gain:*)"
+    ]
+  }
 }

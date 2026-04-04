@@ -39,7 +39,7 @@ class CacheCoverageTest {
 
             String hash = FileHasher.hash(empty);
             assertNotNull(hash);
-            assertEquals(32, hash.length());
+            assertEquals(64, hash.length());
             assertTrue(hash.matches("[0-9a-f]+"));
         }
 
@@ -47,7 +47,7 @@ class CacheCoverageTest {
         void hashEmptyString() {
             String hash = FileHasher.hashString("");
             assertNotNull(hash);
-            assertEquals(32, hash.length());
+            assertEquals(64, hash.length());
         }
 
         @Test
@@ -68,7 +68,7 @@ class CacheCoverageTest {
             // 1 MB string
             String large = "x".repeat(1_000_000);
             String hash = FileHasher.hashString(large);
-            assertEquals(32, hash.length());
+            assertEquals(64, hash.length());
         }
 
         @Test

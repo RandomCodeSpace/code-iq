@@ -9,9 +9,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 
 /**
- * Computes MD5 hash of file content for change detection.
- * MD5 is used because it is fast and sufficient for content-change
- * detection (not for cryptographic purposes).
+ * Computes SHA-256 hash of file content for change detection.
  */
 public final class FileHasher {
 
@@ -19,15 +17,15 @@ public final class FileHasher {
     }
 
     /**
-     * Compute the MD5 hex digest of a file's content.
+     * Compute the SHA-256 hex digest of a file's content.
      *
      * @param file path to the file
-     * @return lowercase hex MD5 hash string
+     * @return lowercase hex SHA-256 hash string
      * @throws IOException if the file cannot be read
      */
     public static String hash(Path file) throws IOException {
         try {
-            MessageDigest md = MessageDigest.getInstance("MD5");
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
             byte[] buf = new byte[8192];
             try (InputStream is = Files.newInputStream(file)) {
                 int n;
@@ -37,23 +35,23 @@ public final class FileHasher {
             }
             return HexFormat.of().formatHex(md.digest());
         } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("MD5 not available", e);
+            throw new RuntimeException("SHA-256 not available", e);
         }
     }
 
     /**
-     * Compute the MD5 hex digest of a string's content (UTF-8 bytes).
+     * Compute the SHA-256 hex digest of a string's content (UTF-8 bytes).
      *
      * @param content the string to hash
-     * @return lowercase hex MD5 hash string
+     * @return lowercase hex SHA-256 hash string
      */
     public static String hashString(String content) {
         try {
-            MessageDigest md = MessageDigest.getInstance("MD5");
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
             md.update(content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(md.digest());
         } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("MD5 not available", e);
+            throw new RuntimeException("SHA-256 not available", e);
         }
     }
 }

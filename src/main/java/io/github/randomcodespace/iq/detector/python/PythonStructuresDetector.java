@@ -1,9 +1,7 @@
 package io.github.randomcodespace.iq.detector.python;
 
-import io.github.randomcodespace.iq.detector.AbstractAntlrDetector;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
-import io.github.randomcodespace.iq.grammar.AntlrParserFactory;
 import io.github.randomcodespace.iq.grammar.python.Python3Parser;
 import io.github.randomcodespace.iq.grammar.python.Python3ParserBaseListener;
 import io.github.randomcodespace.iq.model.CodeEdge;
@@ -19,7 +17,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import io.github.randomcodespace.iq.detector.DetectorInfo;
@@ -35,7 +32,7 @@ import io.github.randomcodespace.iq.detector.ParserType;
     edgeKinds = {EdgeKind.DEFINES, EdgeKind.EXTENDS, EdgeKind.IMPORTS}
 )
 @Component
-public class PythonStructuresDetector extends AbstractAntlrDetector {
+public class PythonStructuresDetector extends AbstractPythonAntlrDetector {
 
     // --- Regex patterns (for fallback) ---
     private static final Pattern CLASS_RE = Pattern.compile(
@@ -58,20 +55,6 @@ public class PythonStructuresDetector extends AbstractAntlrDetector {
     @Override
     public String getName() {
         return "python_structures";
-    }
-
-    @Override
-    public Set<String> getSupportedLanguages() {
-        return Set.of("python");
-    }
-
-    @Override
-    protected ParseTree parse(DetectorContext ctx) {
-        // Skip ANTLR for very large files (>500KB) — regex fallback is faster
-        if (ctx.content().length() > 500_000) {
-            return null; // triggers regex fallback
-        }
-        return AntlrParserFactory.parse("python", ctx.content());
     }
 
     @Override
@@ -491,16 +474,6 @@ public class PythonStructuresDetector extends AbstractAntlrDetector {
         List<String> reversed = new ArrayList<>(decorators);
         java.util.Collections.reverse(reversed);
         return reversed;
-    }
-
-    private static String getBaseClassesText(Python3Parser.ClassdefContext classCtx) {
-        if (classCtx.arglist() == null) return null;
-        StringBuilder sb = new StringBuilder();
-        for (var arg : classCtx.arglist().argument()) {
-            if (sb.length() > 0) sb.append(", ");
-            sb.append(arg.getText());
-        }
-        return sb.toString();
     }
 
     /**
