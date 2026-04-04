@@ -176,8 +176,8 @@ public class JpaEntityDetector extends AbstractJavaParserDetector {
                                 } else {
                                     targetEntity = cit.getNameAsString();
                                 }
+                                break;
                             }
-                            break;
                         }
                     }
 
