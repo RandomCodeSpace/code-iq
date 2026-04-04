@@ -209,4 +209,73 @@ class FastAPIRouteDetectorTest {
 
         assertEquals(3, result.nodes().size());
     }
+
+    // ---- Regex fallback path (content > 500KB) ----
+
+    private static String pad(String code) {
+        return code + "\n" + "#\n".repeat(260_000);
+    }
+
+    @Test
+    void regexFallback_detectsGetRoute() {
+        String code = pad("""
+                @router.get('/items')
+                async def list_items():
+                    return []
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("api/items.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        assertTrue(result.nodes().stream().anyMatch(n -> n.getKind() == NodeKind.ENDPOINT
+                && "GET".equals(n.getProperties().get("http_method"))),
+                "regex fallback should detect @router.get endpoint");
+        assertEquals("fastapi", result.nodes().stream()
+                .filter(n -> n.getKind() == NodeKind.ENDPOINT).findFirst().orElseThrow()
+                .getProperties().get("framework"));
+    }
+
+    @Test
+    void regexFallback_detectsPostRoute() {
+        String code = pad("""
+                @app.post('/users')
+                async def create_user(user: UserCreate):
+                    return user
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("api/users.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        assertTrue(result.nodes().stream().anyMatch(n -> n.getKind() == NodeKind.ENDPOINT
+                && "POST".equals(n.getProperties().get("http_method"))),
+                "regex fallback should detect @app.post endpoint");
+    }
+
+    @Test
+    void regexFallback_appliesRouterPrefix() {
+        String code = pad("""
+                api_router = APIRouter(prefix="/api/v1")
+
+                @api_router.get('/health')
+                async def health():
+                    return {"status": "ok"}
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("api/health.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        assertTrue(result.nodes().stream().anyMatch(n -> n.getKind() == NodeKind.ENDPOINT
+                && n.getProperties().get("path_pattern") != null
+                && n.getProperties().get("path_pattern").toString().contains("/health")),
+                "regex fallback should detect route with prefix applied");
+    }
+
+    @Test
+    void regexFallback_noMatch_returnsEmpty() {
+        String code = pad("""
+                def helper():
+                    return True
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("utils.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        assertEquals(0, result.nodes().stream().filter(n -> n.getKind() == NodeKind.ENDPOINT).count());
+    }
 }

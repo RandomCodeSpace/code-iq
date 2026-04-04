@@ -236,4 +236,69 @@ class DjangoModelDetectorTest {
 
         assertTrue(result.edges().stream().anyMatch(e -> e.getKind() == EdgeKind.DEPENDS_ON));
     }
+
+    // ---- Regex fallback path (content > 500KB) ----
+
+    private static String pad(String code) {
+        return code + "\n" + "#\n".repeat(260_000);
+    }
+
+    @Test
+    void regexFallback_detectsDjangoModel() {
+        String code = pad("""
+                class Article(models.Model):
+                    title = models.CharField(max_length=200)
+                    body = models.TextField()
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("blog/models.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        assertTrue(result.nodes().stream().anyMatch(n -> n.getKind() == NodeKind.ENTITY && "Article".equals(n.getLabel())),
+                "regex fallback should detect Django model");
+        assertEquals("django", result.nodes().stream()
+                .filter(n -> n.getKind() == NodeKind.ENTITY).findFirst().orElseThrow()
+                .getProperties().get("framework"));
+    }
+
+    @Test
+    void regexFallback_detectsManager() {
+        String code = pad("""
+                class PublishedManager(models.Manager):
+                    def get_queryset(self):
+                        return super().get_queryset().filter(published=True)
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("blog/models.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        assertTrue(result.nodes().stream().anyMatch(n -> n.getKind() == NodeKind.REPOSITORY),
+                "regex fallback should detect manager");
+        assertEquals("manager", result.nodes().stream()
+                .filter(n -> n.getKind() == NodeKind.REPOSITORY).findFirst().orElseThrow()
+                .getProperties().get("type"));
+    }
+
+    @Test
+    void regexFallback_detectsModelWithMetaTableName() {
+        String code = pad("""
+                class BlogPost(models.Model):
+                    title = models.CharField(max_length=200)
+
+                    class Meta:
+                        db_table = 'blog_post_table'
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("blog/models.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        var entity = result.nodes().stream().filter(n -> n.getKind() == NodeKind.ENTITY).findFirst().orElseThrow();
+        assertEquals("blog_post_table", entity.getProperties().get("table_name"));
+    }
+
+    @Test
+    void regexFallback_emptyContent_returnsEmpty() {
+        String code = "\n" + "#\n".repeat(260_000);
+        DetectorContext ctx = DetectorTestUtils.contextFor("models.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        assertEquals(0, result.nodes().stream().filter(n -> n.getKind() == NodeKind.ENTITY).count());
+    }
 }

@@ -210,4 +210,66 @@ class FastAPIAuthDetectorTest {
         assertEquals(1, result.nodes().size());
         assertEquals("api/routes.py", result.nodes().get(0).getFilePath());
     }
+
+    // ---- Regex fallback path (content > 500KB) ----
+
+    private static String pad(String code) {
+        return code + "\n" + "#\n".repeat(260_000);
+    }
+
+    @Test
+    void regexFallback_detectsDependsAuth() {
+        String code = pad("""
+                async def get_items(user=Depends(get_current_user)):
+                    return []
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("api/routes.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        assertTrue(result.nodes().stream().anyMatch(n -> n.getKind() == NodeKind.GUARD
+                && n.getLabel().contains("get_current_user")),
+                "regex fallback should detect Depends(get_current_user)");
+        assertEquals("fastapi", result.nodes().stream()
+                .filter(n -> n.getKind() == NodeKind.GUARD).findFirst().orElseThrow()
+                .getProperties().get("auth_type"));
+    }
+
+    @Test
+    void regexFallback_detectsOAuth2PasswordBearer() {
+        String code = pad("""
+                oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token")
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("auth.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        assertTrue(result.nodes().stream().anyMatch(n -> n.getKind() == NodeKind.GUARD
+                && "oauth2".equals(n.getProperties().get("auth_flow"))),
+                "regex fallback should detect OAuth2PasswordBearer");
+    }
+
+    @Test
+    void regexFallback_detectsHTTPBearer() {
+        String code = pad("""
+                security = HTTPBearer()
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("auth.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        assertTrue(result.nodes().stream().anyMatch(n -> n.getKind() == NodeKind.GUARD
+                && "bearer".equals(n.getProperties().get("auth_flow"))),
+                "regex fallback should detect HTTPBearer");
+    }
+
+    @Test
+    void regexFallback_detectsHTTPBasic() {
+        String code = pad("""
+                basic_auth = HTTPBasic()
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("auth.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        assertTrue(result.nodes().stream().anyMatch(n -> n.getKind() == NodeKind.GUARD
+                && "basic".equals(n.getProperties().get("auth_flow"))),
+                "regex fallback should detect HTTPBasic");
+    }
 }

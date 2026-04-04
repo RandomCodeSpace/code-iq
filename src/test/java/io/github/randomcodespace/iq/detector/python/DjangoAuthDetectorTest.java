@@ -244,4 +244,71 @@ class DjangoAuthDetectorTest {
         assertTrue(result.nodes().stream()
                 .allMatch(n -> "django".equals(n.getProperties().get("auth_type"))));
     }
+
+    // ---- Regex fallback path (content > 500KB) ----
+
+    private static String pad(String code) {
+        return code + "\n" + "#\n".repeat(260_000);
+    }
+
+    @Test
+    void regexFallback_detectsLoginRequired() {
+        String code = pad("""
+                @login_required
+                def dashboard(request):
+                    return render(request, 'dashboard.html')
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("views.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        assertTrue(result.nodes().stream().anyMatch(n -> n.getKind() == NodeKind.GUARD
+                && "@login_required".equals(n.getLabel())),
+                "regex fallback should detect @login_required");
+        assertEquals("django", result.nodes().stream()
+                .filter(n -> n.getKind() == NodeKind.GUARD).findFirst().orElseThrow()
+                .getProperties().get("auth_type"));
+    }
+
+    @Test
+    void regexFallback_detectsPermissionRequired() {
+        String code = pad("""
+                @permission_required('app.view_report')
+                def report_view(request):
+                    return render(request, 'report.html')
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("views.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        assertTrue(result.nodes().stream().anyMatch(n -> n.getKind() == NodeKind.GUARD),
+                "regex fallback should detect @permission_required");
+        var guard = result.nodes().stream().filter(n -> n.getKind() == NodeKind.GUARD).findFirst().orElseThrow();
+        assertTrue(guard.getLabel().contains("app.view_report"));
+    }
+
+    @Test
+    void regexFallback_detectsUserPassesTest() {
+        String code = pad("""
+                @user_passes_test(lambda u: u.is_staff)
+                def admin_view(request):
+                    return render(request, 'admin.html')
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("views.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        assertTrue(result.nodes().stream().anyMatch(n -> n.getKind() == NodeKind.GUARD),
+                "regex fallback should detect @user_passes_test");
+    }
+
+    @Test
+    void regexFallback_detectsLoginRequiredMixin() {
+        String code = pad("""
+                class MyView(LoginRequiredMixin, View):
+                    template_name = 'my.html'
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("views.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        assertTrue(result.nodes().stream().anyMatch(n -> n.getKind() == NodeKind.GUARD),
+                "regex fallback should detect LoginRequiredMixin");
+    }
 }
