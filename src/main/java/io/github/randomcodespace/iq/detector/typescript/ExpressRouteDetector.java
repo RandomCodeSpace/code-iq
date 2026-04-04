@@ -44,11 +44,6 @@ public class ExpressRouteDetector extends AbstractTypeScriptDetector {
         return "typescript.express_routes";
     }
 
-    @Override
-    protected ParseTree parse(DetectorContext ctx) {
-        // Not called when detect() is overridden, kept for potential future use
-        return null;
-    }
 
     @Override
     protected DetectorResult detectWithAst(ParseTree tree, DetectorContext ctx) {

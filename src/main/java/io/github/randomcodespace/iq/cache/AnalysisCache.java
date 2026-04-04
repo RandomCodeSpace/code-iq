@@ -38,7 +38,15 @@ public class AnalysisCache implements Closeable {
 
     private static final Logger log = LoggerFactory.getLogger(AnalysisCache.class);
 
+    /** Bump when hash algorithm or schema changes to force cache invalidation. */
+    private static final int CACHE_VERSION = 2;
+
     private static final String SCHEMA_SQL = """
+            CREATE TABLE IF NOT EXISTS cache_meta (
+                meta_key VARCHAR PRIMARY KEY,
+                meta_value VARCHAR NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS files (
                 content_hash VARCHAR PRIMARY KEY,
                 path VARCHAR NOT NULL,
@@ -112,6 +120,35 @@ public class AnalysisCache implements Closeable {
                 try (var stmt = conn.createStatement()) {
                     stmt.execute(trimmed);
                 }
+            }
+        }
+        checkCacheVersion();
+    }
+
+    /**
+     * If the cache was created with a different version (e.g. MD5 vs SHA-256 hashes),
+     * clear all cached data so files are re-analyzed with the current algorithm.
+     */
+    private void checkCacheVersion() throws SQLException {
+        String storedVersion = null;
+        try (var ps = conn.prepareStatement("SELECT meta_value FROM cache_meta WHERE meta_key = 'version'");
+             var rs = ps.executeQuery()) {
+            if (rs.next()) {
+                storedVersion = rs.getString(1);
+            }
+        }
+        if (!String.valueOf(CACHE_VERSION).equals(storedVersion)) {
+            if (storedVersion != null) {
+                log.info("Cache version mismatch (stored={}, current={}) — clearing stale cache",
+                        storedVersion, CACHE_VERSION);
+                try (var stmt = conn.createStatement()) {
+                    stmt.execute("DELETE FROM edges");
+                    stmt.execute("DELETE FROM nodes");
+                    stmt.execute("DELETE FROM files");
+                }
+            }
+            try (var stmt = conn.createStatement()) {
+                stmt.execute("MERGE INTO cache_meta (meta_key, meta_value) VALUES ('version', '" + CACHE_VERSION + "')");
             }
         }
     }

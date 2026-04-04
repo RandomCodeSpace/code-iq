@@ -22,7 +22,7 @@ public abstract class AbstractJavaMessagingDetector extends AbstractRegexDetecto
      * Extract the first class name from the source text.
      * Returns null if no class is found.
      */
-    protected String extractClassName(String text) {
+    protected static String extractClassName(String text) {
         String[] lines = text.split("\n", -1);
         for (String line : lines) {
             Matcher cm = CLASS_RE.matcher(line);
