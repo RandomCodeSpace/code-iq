@@ -35,6 +35,11 @@ import io.github.randomcodespace.iq.detector.ParserType;
 @Component
 public class ClassHierarchyDetector extends AbstractJavaParserDetector {
 
+    private static final String PROP_INTERFACES = "interfaces";
+    private static final String PROP_IS_ABSTRACT = "is_abstract";
+    private static final String PROP_IS_FINAL = "is_final";
+    private static final String PROP_VISIBILITY = "visibility";
+
     // ---- Regex patterns for fallback ----
     private static final Pattern CLASS_DECL_RE = Pattern.compile(
             "(public\\s+|protected\\s+|private\\s+)?(abstract\\s+)?(final\\s+)?class\\s+(\\w+)"
@@ -100,9 +105,9 @@ public class ClassHierarchyDetector extends AbstractJavaParserDetector {
             }
 
             Map<String, Object> props = new LinkedHashMap<>();
-            props.put("visibility", visibility);
-            props.put("is_abstract", isAbstract);
-            props.put("is_final", isFinal);
+            props.put(PROP_VISIBILITY, visibility);
+            props.put(PROP_IS_ABSTRACT, isAbstract);
+            props.put(PROP_IS_FINAL, isFinal);
 
             // Extended types
             List<String> extendedTypes = new ArrayList<>();
@@ -111,7 +116,7 @@ public class ClassHierarchyDetector extends AbstractJavaParserDetector {
             }
             if (!extendedTypes.isEmpty()) {
                 if (isInterface) {
-                    props.put("interfaces", extendedTypes);
+                    props.put(PROP_INTERFACES, extendedTypes);
                 } else {
                     props.put("superclass", extendedTypes.get(0));
                 }
@@ -123,7 +128,7 @@ public class ClassHierarchyDetector extends AbstractJavaParserDetector {
                 implementedTypes.add(impl.getNameAsString());
             }
             if (!implementedTypes.isEmpty()) {
-                props.put("interfaces", implementedTypes);
+                props.put(PROP_INTERFACES, implementedTypes);
             }
 
             CodeNode node = new CodeNode();
@@ -189,10 +194,10 @@ public class ClassHierarchyDetector extends AbstractJavaParserDetector {
             }
 
             Map<String, Object> props = new LinkedHashMap<>();
-            props.put("visibility", visibility);
-            props.put("is_abstract", false);
-            props.put("is_final", false);
-            if (!interfaces.isEmpty()) props.put("interfaces", interfaces);
+            props.put(PROP_VISIBILITY, visibility);
+            props.put(PROP_IS_ABSTRACT, false);
+            props.put(PROP_IS_FINAL, false);
+            if (!interfaces.isEmpty()) props.put(PROP_INTERFACES, interfaces);
 
             CodeNode node = new CodeNode();
             node.setId(nodeId);
@@ -229,9 +234,9 @@ public class ClassHierarchyDetector extends AbstractJavaParserDetector {
                     : "package-private";
 
             Map<String, Object> props = new LinkedHashMap<>();
-            props.put("visibility", visibility);
-            props.put("is_abstract", false);
-            props.put("is_final", false);
+            props.put(PROP_VISIBILITY, visibility);
+            props.put(PROP_IS_ABSTRACT, false);
+            props.put(PROP_IS_FINAL, false);
 
             CodeNode node = new CodeNode();
             node.setId(nodeId);
@@ -278,11 +283,11 @@ public class ClassHierarchyDetector extends AbstractJavaParserDetector {
                 NodeKind kind = isAbstract ? NodeKind.ABSTRACT_CLASS : NodeKind.CLASS;
 
                 Map<String, Object> props = new LinkedHashMap<>();
-                props.put("visibility", visibility);
-                props.put("is_abstract", isAbstract);
-                props.put("is_final", isFinal);
+                props.put(PROP_VISIBILITY, visibility);
+                props.put(PROP_IS_ABSTRACT, isAbstract);
+                props.put(PROP_IS_FINAL, isFinal);
                 if (superclass != null) props.put("superclass", superclass);
-                if (!interfaces.isEmpty()) props.put("interfaces", interfaces);
+                if (!interfaces.isEmpty()) props.put(PROP_INTERFACES, interfaces);
 
                 CodeNode node = new CodeNode();
                 node.setId(nodeId);
@@ -322,10 +327,10 @@ public class ClassHierarchyDetector extends AbstractJavaParserDetector {
 
                 String nodeId = ctx.filePath() + ":" + name;
                 Map<String, Object> props = new LinkedHashMap<>();
-                props.put("visibility", visibility);
-                props.put("is_abstract", false);
-                props.put("is_final", false);
-                if (!extended.isEmpty()) props.put("interfaces", extended);
+                props.put(PROP_VISIBILITY, visibility);
+                props.put(PROP_IS_ABSTRACT, false);
+                props.put(PROP_IS_FINAL, false);
+                if (!extended.isEmpty()) props.put(PROP_INTERFACES, extended);
 
                 CodeNode node = new CodeNode();
                 node.setId(nodeId);
@@ -357,10 +362,10 @@ public class ClassHierarchyDetector extends AbstractJavaParserDetector {
 
                 String nodeId = ctx.filePath() + ":" + name;
                 Map<String, Object> props = new LinkedHashMap<>();
-                props.put("visibility", visibility);
-                props.put("is_abstract", false);
-                props.put("is_final", false);
-                if (!interfaces.isEmpty()) props.put("interfaces", interfaces);
+                props.put(PROP_VISIBILITY, visibility);
+                props.put(PROP_IS_ABSTRACT, false);
+                props.put(PROP_IS_FINAL, false);
+                if (!interfaces.isEmpty()) props.put(PROP_INTERFACES, interfaces);
 
                 CodeNode node = new CodeNode();
                 node.setId(nodeId);
@@ -391,9 +396,9 @@ public class ClassHierarchyDetector extends AbstractJavaParserDetector {
 
                 String nodeId = ctx.filePath() + ":" + name;
                 Map<String, Object> props = new LinkedHashMap<>();
-                props.put("visibility", visibility);
-                props.put("is_abstract", false);
-                props.put("is_final", false);
+                props.put(PROP_VISIBILITY, visibility);
+                props.put(PROP_IS_ABSTRACT, false);
+                props.put(PROP_IS_FINAL, false);
 
                 CodeNode node = new CodeNode();
                 node.setId(nodeId);

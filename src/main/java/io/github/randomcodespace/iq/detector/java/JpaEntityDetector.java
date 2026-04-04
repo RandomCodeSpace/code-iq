@@ -88,7 +88,6 @@ public class JpaEntityDetector extends AbstractJavaParserDetector {
         List<CodeEdge> edges = new ArrayList<>();
 
         cu.findAll(ClassOrInterfaceDeclaration.class).forEach(classDecl -> {
-            // Only process @Entity annotated classes
             boolean isEntity = classDecl.getAnnotations().stream()
                     .anyMatch(a -> "Entity".equals(a.getNameAsString()));
             if (!isEntity) return;
@@ -96,39 +95,8 @@ public class JpaEntityDetector extends AbstractJavaParserDetector {
             String className = classDecl.getNameAsString();
             String fqn = resolveFqn(cu, className);
             int classLine = classDecl.getBegin().map(p -> p.line).orElse(1);
-
-            // Extract table name from @Table annotation
-            String tableName = className.toLowerCase();
-            for (AnnotationExpr ann : classDecl.getAnnotations()) {
-                if ("Table".equals(ann.getNameAsString())) {
-                    String name = extractAnnotationStringAttr(ann, "name");
-                    if (name == null) {
-                        // Try bare value
-                        name = extractAnnotationValue(ann);
-                    }
-                    if (name != null) tableName = name;
-                }
-            }
-
-            // Extract columns from fields
-            List<Map<String, String>> columns = new ArrayList<>();
-            for (FieldDeclaration field : classDecl.getFields()) {
-                for (VariableDeclarator var : field.getVariables()) {
-                    String fieldName = var.getNameAsString();
-                    String fieldType = var.getTypeAsString();
-
-                    // Check for @Column annotation
-                    for (AnnotationExpr ann : field.getAnnotations()) {
-                        if ("Column".equals(ann.getNameAsString())) {
-                            String colName = extractAnnotationStringAttr(ann, "name");
-                            if (colName == null) colName = fieldName;
-                            columns.add(Map.of("name", colName, "field", fieldName, "type", fieldType));
-                        } else if ("Id".equals(ann.getNameAsString())) {
-                            columns.add(Map.of("name", fieldName, "field", fieldName, "type", fieldType));
-                        }
-                    }
-                }
-            }
+            String tableName = extractTableName(classDecl, className);
+            List<Map<String, String>> columns = extractColumns(classDecl);
 
             String entityId = ctx.filePath() + ":" + className;
             Map<String, Object> properties = new LinkedHashMap<>();
@@ -148,59 +116,92 @@ public class JpaEntityDetector extends AbstractJavaParserDetector {
             nodes.add(node);
             DetectorDbHelper.addDbEdge(entityId, ctx.registry(), nodes, edges);
 
-            // Extract relationship edges from fields
-            for (FieldDeclaration field : classDecl.getFields()) {
-                for (AnnotationExpr ann : field.getAnnotations()) {
-                    String annName = ann.getNameAsString();
-                    if (!RELATIONSHIP_ANNOTATIONS.contains(annName)) continue;
-
-                    String relType = RELATIONSHIP_TYPES.get(annName);
-
-                    // Resolve target entity
-                    String targetEntity = extractAnnotationStringAttr(ann, "targetEntity");
-                    if (targetEntity != null && targetEntity.endsWith(".class")) {
-                        targetEntity = targetEntity.replace(".class", "");
-                    }
-
-                    if (targetEntity == null) {
-                        // Try to resolve from field type / generic type argument
-                        for (VariableDeclarator var : field.getVariables()) {
-                            Type type = var.getType();
-                            if (type.isClassOrInterfaceType()) {
-                                ClassOrInterfaceType cit = type.asClassOrInterfaceType();
-                                if (cit.getTypeArguments().isPresent()) {
-                                    // Generic type like List<Order> -> Order
-                                    var typeArgs = cit.getTypeArguments().get();
-                                    if (!typeArgs.isEmpty()) {
-                                        targetEntity = typeArgs.get(0).asString();
-                                    }
-                                } else {
-                                    targetEntity = cit.getNameAsString();
-                                }
-                                break;
-                            }
-                        }
-                    }
-
-                    if (targetEntity != null) {
-                        String mappedBy = extractAnnotationStringAttr(ann, "mappedBy");
-                        Map<String, Object> edgeProps = new LinkedHashMap<>();
-                        edgeProps.put("relationship_type", relType);
-                        if (mappedBy != null) edgeProps.put("mapped_by", mappedBy);
-
-                        CodeEdge edge = new CodeEdge();
-                        edge.setId(entityId + "->maps_to->*:" + targetEntity);
-                        edge.setKind(EdgeKind.MAPS_TO);
-                        edge.setSourceId(entityId);
-                        edge.setTarget(new CodeNode("*:" + targetEntity, NodeKind.ENTITY, targetEntity));
-                        edge.setProperties(edgeProps);
-                        edges.add(edge);
-                    }
-                }
-            }
+            extractRelationshipEdges(classDecl, entityId, edges);
         });
 
         return DetectorResult.of(nodes, edges);
+    }
+
+    private String extractTableName(ClassOrInterfaceDeclaration classDecl, String className) {
+        for (AnnotationExpr ann : classDecl.getAnnotations()) {
+            if (!"Table".equals(ann.getNameAsString())) continue;
+            String name = extractAnnotationStringAttr(ann, "name");
+            if (name == null) name = extractAnnotationValue(ann);
+            if (name != null) return name;
+        }
+        return className.toLowerCase();
+    }
+
+    private List<Map<String, String>> extractColumns(ClassOrInterfaceDeclaration classDecl) {
+        List<Map<String, String>> columns = new ArrayList<>();
+        for (FieldDeclaration field : classDecl.getFields()) {
+            for (VariableDeclarator var : field.getVariables()) {
+                addColumnFromAnnotations(field, var.getNameAsString(), var.getTypeAsString(), columns);
+            }
+        }
+        return columns;
+    }
+
+    private void addColumnFromAnnotations(FieldDeclaration field, String fieldName,
+                                           String fieldType, List<Map<String, String>> columns) {
+        for (AnnotationExpr ann : field.getAnnotations()) {
+            if ("Column".equals(ann.getNameAsString())) {
+                String colName = extractAnnotationStringAttr(ann, "name");
+                if (colName == null) colName = fieldName;
+                columns.add(Map.of("name", colName, "field", fieldName, "type", fieldType));
+            } else if ("Id".equals(ann.getNameAsString())) {
+                columns.add(Map.of("name", fieldName, "field", fieldName, "type", fieldType));
+            }
+        }
+    }
+
+    private void extractRelationshipEdges(ClassOrInterfaceDeclaration classDecl,
+                                            String entityId, List<CodeEdge> edges) {
+        for (FieldDeclaration field : classDecl.getFields()) {
+            for (AnnotationExpr ann : field.getAnnotations()) {
+                String annName = ann.getNameAsString();
+                if (!RELATIONSHIP_ANNOTATIONS.contains(annName)) continue;
+
+                String relType = RELATIONSHIP_TYPES.get(annName);
+                String targetEntity = resolveTargetEntity(ann, field);
+                if (targetEntity == null) continue;
+
+                String mappedBy = extractAnnotationStringAttr(ann, "mappedBy");
+                Map<String, Object> edgeProps = new LinkedHashMap<>();
+                edgeProps.put("relationship_type", relType);
+                if (mappedBy != null) edgeProps.put("mapped_by", mappedBy);
+
+                CodeEdge edge = new CodeEdge();
+                edge.setId(entityId + "->maps_to->*:" + targetEntity);
+                edge.setKind(EdgeKind.MAPS_TO);
+                edge.setSourceId(entityId);
+                edge.setTarget(new CodeNode("*:" + targetEntity, NodeKind.ENTITY, targetEntity));
+                edge.setProperties(edgeProps);
+                edges.add(edge);
+            }
+        }
+    }
+
+    private String resolveTargetEntity(AnnotationExpr ann, FieldDeclaration field) {
+        String targetEntity = extractAnnotationStringAttr(ann, "targetEntity");
+        if (targetEntity != null && targetEntity.endsWith(".class")) {
+            targetEntity = targetEntity.replace(".class", "");
+        }
+        if (targetEntity != null) return targetEntity;
+
+        for (VariableDeclarator var : field.getVariables()) {
+            Type type = var.getType();
+            if (!type.isClassOrInterfaceType()) continue;
+            ClassOrInterfaceType cit = type.asClassOrInterfaceType();
+            if (cit.getTypeArguments().isPresent()) {
+                var typeArgs = cit.getTypeArguments().get();
+                if (!typeArgs.isEmpty()) return typeArgs.get(0).asString();
+            } else {
+                return cit.getNameAsString();
+            }
+            break;
+        }
+        return null;
     }
 
     private String extractAnnotationStringAttr(AnnotationExpr ann, String attrName) {

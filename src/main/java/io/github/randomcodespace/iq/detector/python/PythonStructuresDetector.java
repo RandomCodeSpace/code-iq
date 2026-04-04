@@ -148,12 +148,12 @@ public class PythonStructuresDetector extends AbstractPythonAntlrDetector {
                 // from os.path import join
                 StringBuilder fromModule = new StringBuilder();
                 if (importCtx.DOT() != null) {
-                    for (var dot : importCtx.DOT()) {
+                    for (var ignored : importCtx.DOT()) {
                         fromModule.append(".");
                     }
                 }
                 if (importCtx.ELLIPSIS() != null) {
-                    for (var ellipsis : importCtx.ELLIPSIS()) {
+                    for (var ignored : importCtx.ELLIPSIS()) {
                         fromModule.append("...");
                     }
                 }

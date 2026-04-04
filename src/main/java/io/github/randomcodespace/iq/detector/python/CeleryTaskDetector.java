@@ -60,7 +60,6 @@ public class CeleryTaskDetector extends AbstractPythonAntlrDetector {
         List<CodeEdge> edges = new ArrayList<>();
         String filePath = ctx.filePath();
         String moduleName = ctx.moduleName();
-        String text = ctx.content();
 
         // Walk for decorated functions (task definitions)
         ParseTreeWalker.DEFAULT.walk(new Python3ParserBaseListener() {

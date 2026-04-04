@@ -67,7 +67,6 @@ public class SqlStructureDetector extends AbstractRegexDetector {
         List<CodeNode> nodes = new ArrayList<>();
         List<CodeEdge> edges = new ArrayList<>();
 
-        String currentTable = null;
         String currentTableId = null;
 
         for (IndexedLine il : iterLines(content)) {
@@ -79,7 +78,6 @@ public class SqlStructureDetector extends AbstractRegexDetector {
             m = TABLE_RE.matcher(line);
             if (m.find()) {
                 String tableName = m.group(1);
-                currentTable = tableName;
                 currentTableId = "sql:" + filepath + ":table:" + tableName;
 
                 CodeNode node = new CodeNode(currentTableId, NodeKind.ENTITY, tableName);
@@ -104,7 +102,6 @@ public class SqlStructureDetector extends AbstractRegexDetector {
                 node.setLineStart(lineNum);
                 node.setProperties(Map.of("entity_type", "view"));
                 nodes.add(node);
-                currentTable = null;
                 currentTableId = null;
                 continue;
             }
@@ -136,7 +133,6 @@ public class SqlStructureDetector extends AbstractRegexDetector {
                 node.setLineStart(lineNum);
                 node.setProperties(Map.of("entity_type", "procedure"));
                 nodes.add(node);
-                currentTable = null;
                 currentTableId = null;
                 continue;
             }
