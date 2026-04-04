@@ -197,8 +197,9 @@ public class JpaEntityDetector extends AbstractJavaParserDetector {
             Type type = var.getType();
             if (!type.isClassOrInterfaceType()) continue;
             ClassOrInterfaceType cit = type.asClassOrInterfaceType();
-            if (cit.getTypeArguments().isPresent()) {
-                var typeArgs = cit.getTypeArguments().get();
+            var typeArgsOpt = cit.getTypeArguments();
+            if (typeArgsOpt.isPresent()) {
+                var typeArgs = typeArgsOpt.get();
                 if (!typeArgs.isEmpty()) return typeArgs.get(0).asString();
             } else {
                 return cit.getNameAsString();

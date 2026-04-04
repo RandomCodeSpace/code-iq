@@ -80,7 +80,7 @@ public class GitHubActionsDetector extends AbstractStructuredDetector {
         if (onTriggers == null) {
             // SnakeYAML may parse bare 'on' key as Boolean.TRUE — search by entry value
             onTriggers = data.entrySet().stream()
-                    .filter(e -> Boolean.TRUE.equals(e.getKey()))
+                    .filter(e -> "true".equals(String.valueOf(e.getKey())))
                     .map(java.util.Map.Entry::getValue)
                     .findFirst()
                     .orElse(null);

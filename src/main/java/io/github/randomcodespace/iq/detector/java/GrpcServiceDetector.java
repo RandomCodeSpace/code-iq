@@ -33,7 +33,7 @@ public class GrpcServiceDetector extends AbstractRegexDetector {
     private static final Pattern GRPC_IMPL_RE = Pattern.compile(
             "class\\s+(\\w+)\\s+extends\\s+(\\w+)Grpc\\.(\\w+)ImplBase");
     private static final Pattern METHOD_RE = Pattern.compile(
-            "public\\s+(?:void|[\\w<>\\[\\]]+)\\s+(\\w+)\\s*\\(\\s*(\\w+)");
+            "public\\s+[\\w<>\\[\\]]+\\s+(\\w+)\\s*\\(\\s*(\\w+)");
     private static final Pattern GRPC_STUB_RE = Pattern.compile(
             "(\\w+)Grpc\\.new(?:Blocking|Future)?Stub\\s*\\(");
 

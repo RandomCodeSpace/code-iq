@@ -211,7 +211,7 @@ public class CSharpStructuresDetector extends AbstractAntlrDetector {
                 String path = httpPath != null ? httpPath : "";
                 String fullPath;
                 if (finalClassRoute != null) {
-                    fullPath = "/" + finalClassRoute.replaceAll("(^/+|/+$)", "");
+                    fullPath = "/" + finalClassRoute.replaceAll("(^/+)|(/+$)", "");
                     if (!path.isEmpty()) fullPath = fullPath + "/" + path.replaceAll("^/+", "");
                 } else {
                     fullPath = !path.isEmpty() ? "/" + path.replaceAll("^/+", "") : "/";

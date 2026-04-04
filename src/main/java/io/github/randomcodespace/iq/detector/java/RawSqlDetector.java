@@ -27,14 +27,14 @@ public class RawSqlDetector extends AbstractRegexDetector {
 
     private static final Pattern CLASS_RE = Pattern.compile("(?:public\\s+)?class\\s+(\\w+)");
     private static final Pattern QUERY_ANNO_RE = Pattern.compile(
-            "@Query\\s*\\(\\s*(?:value\\s*=\\s*)?\"([^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"", Pattern.DOTALL);
+            "@Query\\s*\\(\\s*(?:value\\s*=\\s*)?\"([^\"\\\\]*+(?:\\\\.[^\"\\\\]*+)*+)\"", Pattern.DOTALL);
     private static final Pattern NATIVE_QUERY_RE = Pattern.compile("nativeQuery\\s*=\\s*true");
     private static final Pattern JDBC_TEMPLATE_RE = Pattern.compile(
             "(?:jdbcTemplate|namedParameterJdbcTemplate|JdbcTemplate)\\s*\\."
                     + "(?:query|queryForObject|queryForList|queryForMap|update|execute|batchUpdate)"
-                    + "\\s*\\(\\s*\"([^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"", Pattern.DOTALL);
+                    + "\\s*\\(\\s*\"([^\"\\\\]*+(?:\\\\.[^\"\\\\]*+)*+)\"", Pattern.DOTALL);
     private static final Pattern EM_QUERY_RE = Pattern.compile(
-            "(?:entityManager|em)\\s*\\.(?:createNativeQuery|createQuery)\\s*\\(\\s*\"([^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"",
+            "(?:entityManager|em)\\s*\\.(?:createNativeQuery|createQuery)\\s*\\(\\s*\"([^\"\\\\]*+(?:\\\\.[^\"\\\\]*+)*+)\"",
             Pattern.DOTALL);
     private static final Pattern TABLE_REF_RE = Pattern.compile(
             "\\b(?:FROM|JOIN|INTO|UPDATE|TABLE)\\s+(\\w+)", Pattern.CASE_INSENSITIVE);
