@@ -2,6 +2,8 @@ package io.github.randomcodespace.iq.model;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Nested;
+import org.neo4j.driver.Value;
+import org.neo4j.driver.Values;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -552,6 +554,94 @@ class ModelCoverageTest {
             assertEquals(42, node.getProperties().get("line"));
             assertEquals(true, node.getProperties().get("active"));
             assertInstanceOf(List.class, node.getProperties().get("tags"));
+        }
+    }
+
+    // ==================== NodeKindConverter ====================
+    @Nested
+    class NodeKindConverterCoverage {
+
+        private final NodeKindConverter converter = new NodeKindConverter();
+
+        @Test
+        void writeProducesLowercaseValue() {
+            Value v = converter.write(NodeKind.CLASS);
+            assertEquals("class", v.asString());
+        }
+
+        @Test
+        void writeNullThrowsOrProducesNullLikeValue() {
+            // Values.value(null) throws in the Neo4j driver — that is the expected behavior.
+            assertThrows(Exception.class, () -> converter.write(null));
+        }
+
+        @Test
+        void readReturnsCorrectKind() {
+            Value v = Values.value("endpoint");
+            assertEquals(NodeKind.ENDPOINT, converter.read(v));
+        }
+
+        @Test
+        void readNullValueReturnsNull() {
+            assertEquals(null, converter.read(Values.NULL));
+        }
+
+        @Test
+        void readNullReferenceReturnsNull() {
+            assertEquals(null, converter.read(null));
+        }
+
+        @Test
+        void writeReadRoundTripForAllKinds() {
+            for (NodeKind kind : NodeKind.values()) {
+                Value written = converter.write(kind);
+                NodeKind readBack = converter.read(written);
+                assertEquals(kind, readBack, "Round-trip failed for " + kind);
+            }
+        }
+    }
+
+    // ==================== EdgeKindConverter ====================
+    @Nested
+    class EdgeKindConverterCoverage {
+
+        private final EdgeKindConverter converter = new EdgeKindConverter();
+
+        @Test
+        void writeProducesLowercaseValue() {
+            Value v = converter.write(EdgeKind.DEPENDS_ON);
+            assertEquals("depends_on", v.asString());
+        }
+
+        @Test
+        void writeNullThrowsOrProducesNullLikeValue() {
+            // Values.value(null) throws in the Neo4j driver — that is the expected behavior.
+            assertThrows(Exception.class, () -> converter.write(null));
+        }
+
+        @Test
+        void readReturnsCorrectKind() {
+            Value v = Values.value("calls");
+            assertEquals(EdgeKind.CALLS, converter.read(v));
+        }
+
+        @Test
+        void readNullValueReturnsNull() {
+            assertEquals(null, converter.read(Values.NULL));
+        }
+
+        @Test
+        void readNullReferenceReturnsNull() {
+            assertEquals(null, converter.read(null));
+        }
+
+        @Test
+        void writeReadRoundTripForAllKinds() {
+            for (EdgeKind kind : EdgeKind.values()) {
+                Value written = converter.write(kind);
+                EdgeKind readBack = converter.read(written);
+                assertEquals(kind, readBack, "Round-trip failed for " + kind);
+            }
         }
     }
 }

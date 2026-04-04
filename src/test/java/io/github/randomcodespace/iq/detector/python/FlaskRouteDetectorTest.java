@@ -190,4 +190,68 @@ class FlaskRouteDetectorTest {
 
         assertEquals("GET", result.nodes().get(0).getProperties().get("http_method"));
     }
+
+    // ---- Regex fallback path (content > 500KB) ----
+
+    private static String pad(String code) {
+        return code + "\n" + "#\n".repeat(260_000);
+    }
+
+    @Test
+    void regexFallback_detectsRoute() {
+        String code = pad("""
+                @bp.route('/users', methods=['GET'])
+                def list_users():
+                    return jsonify(users)
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("api/users.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        assertTrue(result.nodes().stream().anyMatch(n -> n.getKind() == NodeKind.ENDPOINT
+                && "/users".equals(n.getProperties().get("path_pattern"))),
+                "regex fallback should detect @bp.route endpoint");
+        assertEquals("flask", result.nodes().stream()
+                .filter(n -> n.getKind() == NodeKind.ENDPOINT).findFirst().orElseThrow()
+                .getProperties().get("framework"));
+    }
+
+    @Test
+    void regexFallback_detectsRouteWithMultipleMethods() {
+        String code = pad("""
+                @api.route('/items/<int:id>', methods=['GET', 'PUT'])
+                def item_detail(id):
+                    pass
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("api/items.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        long endpointCount = result.nodes().stream().filter(n -> n.getKind() == NodeKind.ENDPOINT).count();
+        assertTrue(endpointCount >= 2, "regex fallback should detect one endpoint per HTTP method");
+    }
+
+    @Test
+    void regexFallback_createsExposesEdge() {
+        String code = pad("""
+                @bp.route('/ping')
+                def ping():
+                    return 'pong'
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("api/health.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        assertTrue(result.edges().stream().anyMatch(e -> e.getKind() == EdgeKind.EXPOSES),
+                "regex fallback should create EXPOSES edge from blueprint class to endpoint");
+    }
+
+    @Test
+    void regexFallback_noMatch_returnsEmpty() {
+        String code = pad("""
+                def plain_function():
+                    return True
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("utils.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        assertEquals(0, result.nodes().stream().filter(n -> n.getKind() == NodeKind.ENDPOINT).count());
+    }
 }

@@ -236,4 +236,78 @@ class PydanticModelDetectorTest {
         assertNotNull(result.nodes().get(0).getFqn());
         assertTrue(result.nodes().get(0).getFqn().contains("Response"));
     }
+
+    // ---- Regex fallback path (content > 500KB) ----
+
+    private static String pad(String code) {
+        return code + "\n" + "#\n".repeat(260_000);
+    }
+
+    @Test
+    void regexFallback_detectsBaseModel() {
+        String code = pad("""
+                class UserCreate(BaseModel):
+                    username: str
+                    email: str
+                    password: str
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("schemas.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        assertTrue(result.nodes().stream().anyMatch(n -> n.getKind() == NodeKind.ENTITY
+                && "UserCreate".equals(n.getLabel())),
+                "regex fallback should detect BaseModel subclass");
+        assertEquals("pydantic", result.nodes().stream()
+                .filter(n -> n.getKind() == NodeKind.ENTITY).findFirst().orElseThrow()
+                .getProperties().get("framework"));
+    }
+
+    @Test
+    void regexFallback_detectsBaseSettings() {
+        String code = pad("""
+                class AppSettings(BaseSettings):
+                    database_url: str
+                    debug: bool
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("config.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        assertTrue(result.nodes().stream().anyMatch(n -> n.getKind() == NodeKind.CONFIG_DEFINITION
+                && "AppSettings".equals(n.getLabel())),
+                "regex fallback should detect BaseSettings as CONFIG_DEFINITION");
+    }
+
+    @Test
+    void regexFallback_extractsFields() {
+        String code = pad("""
+                class Item(BaseModel):
+                    name: str
+                    price: float
+                    quantity: int
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("schemas.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        var node = result.nodes().stream().filter(n -> n.getKind() == NodeKind.ENTITY).findFirst().orElseThrow();
+        @SuppressWarnings("unchecked")
+        var fields = (List<?>) node.getProperties().get("fields");
+        assertNotNull(fields);
+        assertFalse(fields.isEmpty(), "fields should be extracted in regex fallback");
+    }
+
+    @Test
+    void regexFallback_detectsInheritanceBetweenModels() {
+        String code = pad("""
+                class Base(BaseModel):
+                    id: int
+
+                class User(Base):
+                    username: str
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("schemas.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        // Both classes should be detected (Base is BaseModel, User extends Base but regex only catches BaseModel/BaseSettings)
+        assertFalse(result.nodes().isEmpty(), "regex fallback should detect at least the BaseModel subclass");
+    }
 }

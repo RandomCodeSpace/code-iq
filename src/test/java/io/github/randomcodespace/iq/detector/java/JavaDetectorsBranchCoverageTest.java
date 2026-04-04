@@ -547,6 +547,58 @@ class JavaDetectorsBranchCoverageTest {
         void getSupportedLanguages() {
             assertTrue(d.getSupportedLanguages().contains("java"));
         }
+
+        // ---- Regex fallback (un-parseable Java — broken syntax triggers regex path) ----
+        // Note: we need class name to be regex-parseable but overall file to fail JavaParser.
+        // We use a valid class structure that triggers the regex path by having syntax errors
+        // outside the class keyword so JavaParser fails but CLASS_RE still finds a name.
+
+        @Test
+        void regexFallback_detectsGetMapping() {
+            // Binary garbage at start makes JavaParser fail; regex still finds class + mapping
+            String code = "\u0000\u0001\u0002 class UserCtrl {\n"
+                    + "    @GetMapping(\"/users\")\n"
+                    + "    public List list() { return null; }\n"
+                    + "}";
+            var r = d.detect(ctx("java", code));
+            assertFalse(r.nodes().isEmpty(), "regex fallback should detect @GetMapping");
+            assertEquals("GET", r.nodes().get(0).getProperties().get("http_method"));
+        }
+
+        @Test
+        void regexFallback_detectsPostMapping() {
+            String code = "\u0000 class OrderCtrl {\n"
+                    + "    @PostMapping(\"/orders\")\n"
+                    + "    public Order create() { return null; }\n"
+                    + "}";
+            var r = d.detect(ctx("java", code));
+            assertFalse(r.nodes().isEmpty(), "regex fallback should detect @PostMapping");
+            assertEquals("POST", r.nodes().get(0).getProperties().get("http_method"));
+        }
+
+        @Test
+        void regexFallback_detectsDeleteMapping() {
+            String code = "\u0000 class ItemCtrl {\n"
+                    + "    @DeleteMapping(\"/items/{id}\")\n"
+                    + "    public void delete() {}\n"
+                    + "}";
+            var r = d.detect(ctx("java", code));
+            assertFalse(r.nodes().isEmpty(), "regex fallback should detect @DeleteMapping");
+            assertEquals("DELETE", r.nodes().get(0).getProperties().get("http_method"));
+        }
+
+        @Test
+        void regexFallback_detectsClassLevelRequestMapping() {
+            String code = "@RequestMapping(\"/api/v2\")\n"
+                    + "\u0000 class ApiCtrl {\n"
+                    + "    @PutMapping(\"/resource\")\n"
+                    + "    public void update() {}\n"
+                    + "}";
+            var r = d.detect(ctx("java", code));
+            assertFalse(r.nodes().isEmpty(), "regex fallback should detect class-level prefix");
+            String path = (String) r.nodes().get(0).getProperties().get("path");
+            assertTrue(path.contains("/api/v2"), "path should include class-level prefix");
+        }
     }
 
     // ========================================================================
@@ -732,6 +784,45 @@ class JavaDetectorsBranchCoverageTest {
         void getName() {
             assertEquals("spring_security", d.getName());
         }
+
+        // ---- Regex fallback (un-parseable Java — NUL byte forces regex path) ----
+
+        @Test
+        void regexFallback_detectsSecured() {
+            String code = "\u0000 class AdminService {\n"
+                    + "    @Secured(\"ROLE_ADMIN\")\n"
+                    + "    public void adminOnly() {}\n"
+                    + "}";
+            var r = d.detect(ctx("java", code));
+            assertFalse(r.nodes().isEmpty(), "regex fallback should detect @Secured");
+            assertEquals("spring_security", r.nodes().get(0).getProperties().get("auth_type"));
+        }
+
+        @Test
+        void regexFallback_detectsPreAuthorize() {
+            String code = "\u0000 class ReportService {\n"
+                    + "    @PreAuthorize(\"hasRole('MANAGER')\")\n"
+                    + "    public void generateReport() {}\n"
+                    + "}";
+            var r = d.detect(ctx("java", code));
+            assertFalse(r.nodes().isEmpty(), "regex fallback should detect @PreAuthorize");
+        }
+
+        @Test
+        void regexFallback_detectsEnableWebSecurity() {
+            String code = "@EnableWebSecurity\n\u0000 class SecurityConfig {\n}";
+            var r = d.detect(ctx("java", code));
+            assertFalse(r.nodes().isEmpty(), "regex fallback should detect @EnableWebSecurity");
+        }
+
+        @Test
+        void regexFallback_detectsSecurityFilterChain() {
+            String code = "\u0000 class SecurityCfg {\n"
+                    + "    public SecurityFilterChain filterChain(HttpSecurity http) { return null; }\n"
+                    + "}";
+            var r = d.detect(ctx("java", code));
+            assertFalse(r.nodes().isEmpty(), "regex fallback should detect SecurityFilterChain");
+        }
     }
 
     // ========================================================================
@@ -866,6 +957,57 @@ class JavaDetectorsBranchCoverageTest {
                     }
                     """;
             DetectorTestUtils.assertDeterministic(d, ctx("java", code));
+        }
+
+        // ---- Regex fallback (un-parseable Java — NUL byte forces regex path) ----
+
+        @Test
+        void regexFallback_detectsEntityClass() {
+            // NUL byte makes JavaParser fail; @Entity is present so regex runs
+            String code = "@Entity\n"
+                    + "\u0000 class Customer {\n"
+                    + "    private Long id;\n"
+                    + "    private String name;\n"
+                    + "}";
+            var r = d.detect(ctx("java", code));
+            assertFalse(r.nodes().isEmpty(), "regex fallback should detect @Entity class");
+            assertTrue(r.nodes().stream().anyMatch(n -> n.getKind() == NodeKind.ENTITY));
+        }
+
+        @Test
+        void regexFallback_detectsTableAnnotation() {
+            String code = "@Entity\n"
+                    + "@Table(name = \"orders_table\")\n"
+                    + "\u0000 class Order {\n"
+                    + "    private Long id;\n"
+                    + "}";
+            var r = d.detect(ctx("java", code));
+            assertFalse(r.nodes().isEmpty(), "regex fallback should detect @Table name");
+            var entity = r.nodes().stream().filter(n -> n.getKind() == NodeKind.ENTITY).findFirst().orElseThrow();
+            assertEquals("orders_table", entity.getProperties().get("table_name"));
+        }
+
+        @Test
+        void regexFallback_detectsRelationship() {
+            String code = "@Entity\n"
+                    + "\u0000 class Invoice {\n"
+                    + "    private Long id;\n"
+                    + "    @ManyToOne\n"
+                    + "    private Customer customer;\n"
+                    + "}";
+            var r = d.detect(ctx("java", code));
+            assertTrue(r.edges().stream().anyMatch(e -> e.getKind() == EdgeKind.MAPS_TO),
+                    "regex fallback should create MAPS_TO edge from @ManyToOne");
+        }
+
+        @Test
+        void regexFallback_noEntityAnnotation_returnsEmpty() {
+            // No @Entity → should short-circuit before even trying JavaParser
+            String code = "public class NotAnEntity {\n"
+                    + "    private Long id;\n"
+                    + "}";
+            var r = d.detect(ctx("java", code));
+            assertTrue(r.nodes().isEmpty(), "should return empty when @Entity is absent");
         }
     }
 

@@ -28,3 +28,5 @@ jobs:
           -Dsonar.projectKey=RandomCodeSpace_code-iq
           -Dsonar.organization=randomcodespace
           -Dsonar.host.url=https://sonarcloud.io
+          "-Dsonar.exclusions=**/grammar/**,target/generated-sources/**"
+          "-Dsonar.coverage.exclusions=**/grammar/**,target/generated-sources/**"

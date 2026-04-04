@@ -208,4 +208,77 @@ class SQLAlchemyModelDetectorTest {
                 .filter(n -> n.getKind() == NodeKind.DATABASE_CONNECTION).count();
         assertEquals(1, dbCount);
     }
+
+    // ---- Regex fallback path (content > 500KB) ----
+
+    private static String pad(String code) {
+        return code + "\n" + "#\n".repeat(260_000);
+    }
+
+    @Test
+    void regexFallback_detectsBaseModel() {
+        String code = pad("""
+                class User(Base):
+                    __tablename__ = 'users'
+                    id = mapped_column(Integer, primary_key=True)
+                    name = mapped_column(String(100))
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("models.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        assertTrue(result.nodes().stream().anyMatch(n -> n.getKind() == NodeKind.ENTITY
+                && "User".equals(n.getLabel())),
+                "regex fallback should detect SQLAlchemy model");
+        assertEquals("sqlalchemy", result.nodes().stream()
+                .filter(n -> n.getKind() == NodeKind.ENTITY).findFirst().orElseThrow()
+                .getProperties().get("framework"));
+    }
+
+    @Test
+    void regexFallback_extractsTableName() {
+        String code = pad("""
+                class Order(Base):
+                    __tablename__ = 'shop_orders'
+                    id = mapped_column(Integer, primary_key=True)
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("models.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        var entity = result.nodes().stream().filter(n -> n.getKind() == NodeKind.ENTITY).findFirst().orElseThrow();
+        assertEquals("shop_orders", entity.getProperties().get("table_name"));
+    }
+
+    @Test
+    void regexFallback_detectsRelationship() {
+        String code = pad("""
+                class Post(Base):
+                    __tablename__ = 'posts'
+                    id = mapped_column(Integer, primary_key=True)
+                    author = relationship('User', back_populates='posts')
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("models.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        assertTrue(result.edges().stream().anyMatch(e -> e.getKind() == EdgeKind.MAPS_TO),
+                "regex fallback should detect relationship as MAPS_TO edge");
+    }
+
+    @Test
+    void regexFallback_extractsColumns() {
+        String code = pad("""
+                class Product(Base):
+                    __tablename__ = 'products'
+                    id = mapped_column(Integer, primary_key=True)
+                    name = mapped_column(String)
+                    price = Column(Float)
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("models.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        var entity = result.nodes().stream().filter(n -> n.getKind() == NodeKind.ENTITY).findFirst().orElseThrow();
+        @SuppressWarnings("unchecked")
+        var columns = (List<?>) entity.getProperties().get("columns");
+        assertNotNull(columns);
+        assertFalse(columns.isEmpty(), "regex fallback should extract columns");
+    }
 }

@@ -142,4 +142,103 @@ class FileDiscoveryTest {
         assertEquals(1, files.size());
         assertEquals("makefile", files.getFirst().language());
     }
+
+    @Test
+    void excludesLockFiles() throws IOException {
+        Files.writeString(tempDir.resolve("package-lock.json"), "{}");
+        Files.writeString(tempDir.resolve("yarn.lock"), "# yarn lockfile");
+        Files.writeString(tempDir.resolve("pnpm-lock.yaml"), "lockfileVersion: 5.4");
+        Files.writeString(tempDir.resolve("go.sum"), "github.com/foo v1.0.0 h1:abc");
+        Files.writeString(tempDir.resolve("Cargo.lock"), "[package]");
+        Files.writeString(tempDir.resolve("app.java"), "class App {}");
+
+        List<DiscoveredFile> files = discovery.discover(tempDir);
+
+        assertEquals(1, files.size());
+        assertEquals("java", files.getFirst().language());
+    }
+
+    @Test
+    void excludesVcsDirs() throws IOException {
+        Path gitDir = tempDir.resolve(".git/objects");
+        Files.createDirectories(gitDir);
+        Files.writeString(gitDir.resolve("packed-refs.java"), "class Foo {}");
+        Files.writeString(tempDir.resolve("main.java"), "class Main {}");
+
+        List<DiscoveredFile> files = discovery.discover(tempDir);
+
+        assertEquals(1, files.size());
+        assertEquals("main.java", files.getFirst().path().toString());
+    }
+
+    @Test
+    void excludesPythonCacheDir() throws IOException {
+        Path cacheDir = tempDir.resolve("__pycache__");
+        Files.createDirectories(cacheDir);
+        Files.writeString(cacheDir.resolve("module.py"), "x = 1");
+        Files.writeString(tempDir.resolve("app.py"), "print('hi')");
+
+        List<DiscoveredFile> files = discovery.discover(tempDir);
+
+        assertEquals(1, files.size());
+        assertEquals("python", files.getFirst().language());
+    }
+
+    @Test
+    void skipsOversizedSourceFiles() throws IOException {
+        // Create a file larger than 512KB
+        byte[] bigContent = new byte[600_000];
+        java.util.Arrays.fill(bigContent, (byte) 'x');
+        Files.write(tempDir.resolve("BigFile.java"), bigContent);
+        Files.writeString(tempDir.resolve("Small.java"), "class Small {}");
+
+        List<DiscoveredFile> files = discovery.discover(tempDir);
+
+        assertEquals(1, files.size());
+        assertEquals("Small.java", files.getFirst().path().toString());
+    }
+
+    @Test
+    void skipsOversizedConfigFiles() throws IOException {
+        // Config files (yaml) capped at 64KB
+        byte[] bigYaml = new byte[70_000];
+        java.util.Arrays.fill(bigYaml, (byte) 'x');
+        Files.write(tempDir.resolve("big.yaml"), bigYaml);
+        Files.writeString(tempDir.resolve("small.yaml"), "key: value");
+
+        List<DiscoveredFile> files = discovery.discover(tempDir);
+
+        assertEquals(1, files.size());
+        assertEquals("small.yaml", files.getFirst().path().toString());
+    }
+
+    @Test
+    void excludesCodeIqOwnDirs() throws IOException {
+        Path codeIntelDir = tempDir.resolve(".code-intelligence");
+        Path osscodeiqDir = tempDir.resolve(".osscodeiq");
+        Files.createDirectories(codeIntelDir);
+        Files.createDirectories(osscodeiqDir);
+        Files.writeString(codeIntelDir.resolve("cache.java"), "class Cache {}");
+        Files.writeString(osscodeiqDir.resolve("meta.java"), "class Meta {}");
+        Files.writeString(tempDir.resolve("src.java"), "class Src {}");
+
+        List<DiscoveredFile> files = discovery.discover(tempDir);
+
+        assertEquals(1, files.size());
+        assertEquals("src.java", files.getFirst().path().toString());
+    }
+
+    @Test
+    void pathComponentExclusionWorksForNestedDirs() throws IOException {
+        // A file in path containing "vendor" segment
+        Path vendorDir = tempDir.resolve("pkg/vendor/dep");
+        Files.createDirectories(vendorDir);
+        Files.writeString(vendorDir.resolve("lib.go"), "package main");
+        Files.writeString(tempDir.resolve("main.go"), "package main");
+
+        List<DiscoveredFile> files = discovery.discover(tempDir);
+
+        assertEquals(1, files.size());
+        assertEquals("main.go", files.getFirst().path().toString());
+    }
 }

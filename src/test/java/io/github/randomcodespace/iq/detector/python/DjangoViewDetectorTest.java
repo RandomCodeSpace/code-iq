@@ -209,4 +209,78 @@ class DjangoViewDetectorTest {
         assertEquals(1, result.nodes().size());
         assertFalse(result.nodes().get(0).getAnnotations().isEmpty());
     }
+
+    // ---- Regex fallback path (content > 500KB) ----
+
+    private static String pad(String code) {
+        return code + "\n" + "#\n".repeat(260_000);
+    }
+
+    @Test
+    void regexFallback_detectsUrlpatterns() {
+        String code = pad("""
+                urlpatterns = [
+                    path('articles/', views.article_list),
+                    path('articles/<int:pk>/', views.article_detail),
+                ]
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("urls.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        assertTrue(result.nodes().stream().anyMatch(n -> n.getKind() == NodeKind.ENDPOINT
+                && n.getLabel().equals("articles/")),
+                "regex fallback should detect urlpatterns endpoint");
+        assertEquals("django", result.nodes().stream()
+                .filter(n -> n.getKind() == NodeKind.ENDPOINT).findFirst().orElseThrow()
+                .getProperties().get("framework"));
+    }
+
+    @Test
+    void regexFallback_detectsCbv() {
+        String code = pad("""
+                class ArticleListView(ListView):
+                    model = Article
+                    template_name = 'articles/list.html'
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("views.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        assertTrue(result.nodes().stream().anyMatch(n -> n.getKind() == NodeKind.CLASS
+                && "ArticleListView".equals(n.getLabel())),
+                "regex fallback should detect class-based view");
+        assertEquals("django", result.nodes().stream()
+                .filter(n -> n.getKind() == NodeKind.CLASS).findFirst().orElseThrow()
+                .getProperties().get("framework"));
+    }
+
+    @Test
+    void regexFallback_detectsMultipleEndpoints() {
+        String code = pad("""
+                urlpatterns = [
+                    path('users/', views.user_list),
+                    path('users/<int:pk>/', views.user_detail),
+                    path('users/create/', views.user_create),
+                ]
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("urls.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        long endpointCount = result.nodes().stream().filter(n -> n.getKind() == NodeKind.ENDPOINT).count();
+        assertTrue(endpointCount >= 3, "regex fallback should detect all url patterns");
+    }
+
+    @Test
+    void regexFallback_noMatch_returnsEmpty() {
+        String code = pad("""
+                from django.db import models
+
+                class SomeModel(models.Model):
+                    name = models.CharField(max_length=100)
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("models.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        assertEquals(0, result.nodes().stream().filter(n -> n.getKind() == NodeKind.ENDPOINT).count(),
+                "regex fallback should not detect endpoints in models file");
+    }
 }

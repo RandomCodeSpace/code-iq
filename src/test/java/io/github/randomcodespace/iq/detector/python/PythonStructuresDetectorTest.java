@@ -338,4 +338,74 @@ class PythonStructuresDetectorTest {
                 .findFirst().orElseThrow();
         assertEquals("Service", methodNode.getProperties().get("class"));
     }
+
+    // ---- Regex fallback path (content > 500KB) ----
+
+    private static String pad(String code) {
+        return code + "\n" + "#\n".repeat(260_000);
+    }
+
+    @Test
+    void regexFallback_detectsClass() {
+        String code = pad("""
+                class MyService(BaseService):
+                    def process(self):
+                        pass
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("mymod.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        assertTrue(result.nodes().stream().anyMatch(n -> n.getKind() == NodeKind.CLASS && "MyService".equals(n.getLabel())),
+                "regex fallback should detect class");
+    }
+
+    @Test
+    void regexFallback_detectsFunction() {
+        String code = pad("""
+                def compute_total(items):
+                    return sum(items)
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("utils.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        assertTrue(result.nodes().stream().anyMatch(n -> n.getKind() == NodeKind.METHOD && "compute_total".equals(n.getLabel())),
+                "regex fallback should detect top-level function");
+    }
+
+    @Test
+    void regexFallback_detectsExtendsEdge() {
+        String code = pad("""
+                class Animal:
+                    pass
+
+                class Dog(Animal):
+                    def bark(self):
+                        pass
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("pets.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        assertTrue(result.edges().stream().anyMatch(e -> e.getKind() == EdgeKind.EXTENDS),
+                "regex fallback should create EXTENDS edge");
+    }
+
+    @Test
+    void regexFallback_detectsAllExports() {
+        String code = pad("""
+                __all__ = ['MyClass', 'helper_func']
+
+                class MyClass:
+                    pass
+
+                def helper_func():
+                    pass
+                """);
+        DetectorContext ctx = DetectorTestUtils.contextFor("mymod.py", "python", code);
+        DetectorResult result = detector.detect(ctx);
+
+        assertTrue(result.nodes().stream().anyMatch(n -> n.getKind() == NodeKind.CLASS),
+                "regex fallback should detect class");
+        assertTrue(result.nodes().stream().anyMatch(n -> n.getKind() == NodeKind.METHOD),
+                "regex fallback should detect function");
+    }
 }
