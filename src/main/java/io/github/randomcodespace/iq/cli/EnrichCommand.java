@@ -169,8 +169,8 @@ public class EnrichCommand implements Callable<Integer> {
             // Add service nodes and edges to the builder
             builder.addNodes(serviceResult.serviceNodes());
             builder.addEdges(serviceResult.serviceEdges());
-            enrichedNodes = builder.getNodes();
-            enrichedEdges = builder.getEdges();
+            enrichedNodes = new ArrayList<>(builder.getNodes());
+            enrichedEdges = new ArrayList<>(builder.getEdges());
             CliOutput.info("  Detected " + serviceResult.serviceNodes().size() + " service(s)");
         }
 
