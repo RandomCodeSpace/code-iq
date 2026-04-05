@@ -183,10 +183,47 @@ class McpToolsExpandedTest {
     }
 
     @Test
-    void runCypherShouldBlockCall() throws IOException {
+    void runCypherShouldBlockNonDbCall() throws IOException {
+        // Non-db CALL statements (mutation procedures) must be blocked
+        String result = mcpTools.runCypher("CALL apoc.create.node(['Label'], {name: 'test'})");
+        Map<String, Object> parsed = parseJson(result);
+        assertNotNull(parsed.get("error"), "Non-db CALL should be blocked");
+    }
+
+    @Test
+    void runCypherShouldBlockCallCustomProcedure() throws IOException {
+        String result = mcpTools.runCypher("CALL custom.mutate()");
+        Map<String, Object> parsed = parseJson(result);
+        assertNotNull(parsed.get("error"), "Custom CALL should be blocked");
+    }
+
+    @Test
+    void runCypherShouldAllowCallDbIndexes() throws IOException {
+        // CALL db.* is read-only (indexes, schema, fulltext search)
+        Transaction tx = mock(Transaction.class);
+        Result queryResult = mock(Result.class);
+        when(graphDb.beginTx()).thenReturn(tx);
+        when(tx.execute("CALL db.indexes()")).thenReturn(queryResult);
+        when(queryResult.columns()).thenReturn(List.of("name"));
+        when(queryResult.hasNext()).thenReturn(false);
+
         String result = mcpTools.runCypher("CALL db.indexes()");
         Map<String, Object> parsed = parseJson(result);
-        assertNotNull(parsed.get("error"));
+        assertNotNull(parsed.get("rows"), "CALL db.indexes() should be allowed");
+    }
+
+    @Test
+    void runCypherShouldAllowCallDbFulltextSearch() throws IOException {
+        Transaction tx = mock(Transaction.class);
+        Result queryResult = mock(Result.class);
+        when(graphDb.beginTx()).thenReturn(tx);
+        when(tx.execute("CALL db.index.fulltext.queryNodes('lexical_index', 'search')")).thenReturn(queryResult);
+        when(queryResult.columns()).thenReturn(List.of("node"));
+        when(queryResult.hasNext()).thenReturn(false);
+
+        String result = mcpTools.runCypher("CALL db.index.fulltext.queryNodes('lexical_index', 'search')");
+        Map<String, Object> parsed = parseJson(result);
+        assertNotNull(parsed.get("rows"), "CALL db.index.fulltext should be allowed");
     }
 
     @Test

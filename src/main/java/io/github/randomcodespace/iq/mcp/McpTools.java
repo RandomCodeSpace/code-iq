@@ -268,16 +268,26 @@ public class McpTools {
     @McpTool(name = "run_cypher", description = "Execute a read-only Cypher query against the Neo4j graph database.")
     public String runCypher(
             @McpToolParam(description = "Cypher query string") String query) {
-        // Block any mutation keywords anywhere in the query (defense-in-depth)
-        String upper = query.trim().toUpperCase();
-        List<String> BLOCKED_PATTERNS = List.of(
-                "\\bCREATE\\b", "\\bDELETE\\b", "\\bDETACH\\b", "\\bSET\\b",
-                "\\bREMOVE\\b", "\\bMERGE\\b", "\\bDROP\\b", "\\bFOREACH\\b",
-                "\\bLOAD\\s+CSV\\b", "\\bCALL\\s+(?!db\\.)\\b");
-        for (String pattern : BLOCKED_PATTERNS) {
-            if (java.util.regex.Pattern.compile(pattern).matcher(upper).find()) {
-                String keyword = pattern.replace("\\b", "").replace("\\s+", " ");
-                return toJson(Map.of(PROP_ERROR, "Read-only queries only. Mutation keyword found: " + keyword));
+        // Block mutation keywords (defense-in-depth). Uses case-insensitive matching
+        // so the original query casing is preserved for Neo4j execution.
+        // CALL db.* is explicitly allowed (read-only: fulltext search, schema, indexes).
+        String trimmed = query.trim();
+        List<java.util.regex.Pattern> BLOCKED_PATTERNS = List.of(
+                java.util.regex.Pattern.compile("\\bCREATE\\b", java.util.regex.Pattern.CASE_INSENSITIVE),
+                java.util.regex.Pattern.compile("\\bDELETE\\b", java.util.regex.Pattern.CASE_INSENSITIVE),
+                java.util.regex.Pattern.compile("\\bDETACH\\b", java.util.regex.Pattern.CASE_INSENSITIVE),
+                java.util.regex.Pattern.compile("\\bSET\\b", java.util.regex.Pattern.CASE_INSENSITIVE),
+                java.util.regex.Pattern.compile("\\bREMOVE\\b", java.util.regex.Pattern.CASE_INSENSITIVE),
+                java.util.regex.Pattern.compile("\\bMERGE\\b", java.util.regex.Pattern.CASE_INSENSITIVE),
+                java.util.regex.Pattern.compile("\\bDROP\\b", java.util.regex.Pattern.CASE_INSENSITIVE),
+                java.util.regex.Pattern.compile("\\bFOREACH\\b", java.util.regex.Pattern.CASE_INSENSITIVE),
+                java.util.regex.Pattern.compile("\\bLOAD\\s+CSV\\b", java.util.regex.Pattern.CASE_INSENSITIVE),
+                // Allow CALL db.* (read-only procedures: indexes, schema, fulltext search)
+                // Block all other CALL forms (mutation procedures like apoc.create, apoc.merge)
+                java.util.regex.Pattern.compile("\\bCALL\\s+(?!db\\.)", java.util.regex.Pattern.CASE_INSENSITIVE));
+        for (var pattern : BLOCKED_PATTERNS) {
+            if (pattern.matcher(trimmed).find()) {
+                return toJson(Map.of(PROP_ERROR, "Read-only queries only. Mutation keyword found: " + pattern.pattern()));
             }
         }
         try {
