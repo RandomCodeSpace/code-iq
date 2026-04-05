@@ -121,7 +121,7 @@ public final class AntlrParserFactory {
         };
         long parseMs = java.time.Duration.between(parseStart, java.time.Instant.now()).toMillis();
         if (parseMs > 2000) {
-            log.warn("\uD83D\uDC22 SLOW ANTLR: {} parse took {}ms ({} bytes)", language, parseMs, content.length());
+            log.warn("🐢 SLOW ANTLR: {} parse took {}ms ({} bytes)", language, parseMs, content.length());
         }
 
         // Cache the result for subsequent detectors on the same file
