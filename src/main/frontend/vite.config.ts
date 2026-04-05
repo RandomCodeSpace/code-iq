@@ -13,12 +13,13 @@ export default defineConfig({
     outDir: '../resources/static',
     emptyOutDir: false,
     sourcemap: false,
-    chunkSizeWarningLimit: 600,
+    chunkSizeWarningLimit: 1200,
     rollupOptions: {
       output: {
         manualChunks: {
           'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-monaco': ['@monaco-editor/react'],
+          'vendor-antd': ['antd', '@ant-design/icons'],
+          'vendor-echarts': ['echarts', 'echarts-for-react'],
         },
       },
     },
@@ -27,8 +28,6 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:8080',
       '/mcp': 'http://localhost:8080',
-      '/v3': 'http://localhost:8080',
-      '/swagger-ui': 'http://localhost:8080',
     },
   },
 });
