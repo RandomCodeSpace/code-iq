@@ -278,8 +278,11 @@ public class Analyzer {
                             DetectorResult result = analyzeFile(file, root, detectorRegistry);
                             resultSlots[idx] = result;
                             if (result != null && (!result.nodes().isEmpty() || !result.edges().isEmpty())) {
+                                FileClassifier.FileType ft = FileClassifier.classify(file.path(), file.language());
+                                String snippet = computeSnippetFromFile(root.resolve(file.path()), ft);
                                 cacheRef.storeResults(hash, file.path().toString(), file.language(),
-                                        result.nodes(), result.edges());
+                                        result.nodes(), result.edges(), "DETECTED", "antlr",
+                                        ft.name().toLowerCase(), snippet);
                             }
                         } catch (IOException e) {
                             log.debug("Could not hash file {}", file.path(), e);
@@ -583,8 +586,11 @@ public class Analyzer {
                                     DetectorResult result = analyzeFile(file, root, detectorRegistry);
                                     resultSlots[idx] = result;
                                     if (result != null && (!result.nodes().isEmpty() || !result.edges().isEmpty())) {
+                                        FileClassifier.FileType ft = FileClassifier.classify(file.path(), file.language());
+                                        String snippet = computeSnippetFromFile(root.resolve(file.path()), ft);
                                         cache.storeResults(hash, file.path().toString(), file.language(),
-                                                result.nodes(), result.edges());
+                                                result.nodes(), result.edges(), "DETECTED", "antlr",
+                                                ft.name().toLowerCase(), snippet);
                                     }
                                 } catch (IOException e) {
                                     log.debug("Could not hash file {}", file.path(), e);
@@ -1002,8 +1008,13 @@ public class Analyzer {
                         DetectorResult result = analyzeFileWithRegistry(file, root, detectorRegistry, infraRegistry, cachedContent);
                         slots[idx] = result;
                         if (result != null && (!result.nodes().isEmpty() || !result.edges().isEmpty())) {
+                            FileClassifier.FileType ft = FileClassifier.classify(file.path(), file.language());
+                            String snippet = cachedContent != null
+                                    ? computeSnippet(cachedContent, ft)
+                                    : computeSnippetFromFile(root.resolve(file.path()), ft);
                             cache.storeResults(hash, file.path().toString(), file.language(),
-                                    result.nodes(), result.edges());
+                                    result.nodes(), result.edges(), "DETECTED", "antlr",
+                                    ft.name().toLowerCase(), snippet);
                         }
                     } catch (IOException e) {
                         log.debug("Could not hash {}", file.path(), e);
@@ -1183,6 +1194,19 @@ public class Analyzer {
                                             String preReadContent) {
         Instant fileStart = Instant.now();
 
+        // Classify file type before reading content
+        FileClassifier.FileType fileType = FileClassifier.classify(file.path(), file.language());
+
+        // Binary files: inventory-only node, no content read needed
+        if (fileType == FileClassifier.FileType.BINARY) {
+            return createInventoryNode(file, "binary");
+        }
+
+        // Generated files: inventory-only node, skip detectors
+        if (fileType == FileClassifier.FileType.GENERATED) {
+            return createInventoryNode(file, "generated");
+        }
+
         String content;
         if (preReadContent != null) {
             content = preReadContent;
@@ -1197,6 +1221,16 @@ public class Analyzer {
             }
         }
 
+        // Test files: inventory-only node with file_type=test
+        if (fileType == FileClassifier.FileType.TEST) {
+            return createInventoryNode(file, "test");
+        }
+
+        // Text files (unknown language): inventory-only node
+        if (fileType == FileClassifier.FileType.TEXT) {
+            return createInventoryNode(file, "text");
+        }
+
         if (isMinified(file, content)) {
             log.debug("Skipping detectors for minified file: {}", file.path());
             String moduleName = DetectorUtils.deriveModuleName(file.path().toString(), file.language());
@@ -1206,9 +1240,12 @@ public class Analyzer {
                     file.path().getFileName().toString());
             node.setFilePath(file.path().toString());
             node.setModule(moduleName);
-            node.setProperties(new java.util.LinkedHashMap<>(Map.of("minified", true)));
+            node.setProperties(new java.util.LinkedHashMap<>(Map.of("minified", true, "file_type", "minified")));
             return DetectorResult.of(List.of(node), List.of());
         }
+
+        // SOURCE and CONFIG files: run detectors
+        String fileTypeStr = (fileType == FileClassifier.FileType.CONFIG) ? "config" : "source";
 
         Object parsedData = null;
         if (STRUCTURED_LANGUAGES.contains(file.language())) {
@@ -1258,12 +1295,12 @@ public class Analyzer {
             log.info("🐢 SLOW: {} took {}ms", file.path(), fileMs);
         }
 
-        if (moduleName != null) {
-            for (CodeNode node : allNodes) {
-                if (node.getModule() == null || node.getModule().isEmpty()) {
-                    node.setModule(moduleName);
-                }
+        // Set module and file_type on all nodes
+        for (CodeNode node : allNodes) {
+            if (moduleName != null && (node.getModule() == null || node.getModule().isEmpty())) {
+                node.setModule(moduleName);
             }
+            node.getProperties().put("file_type", fileTypeStr);
         }
 
         return DetectorResult.of(allNodes, allEdges);
@@ -1359,6 +1396,19 @@ public class Analyzer {
         Instant fileStart = Instant.now();
         Path absPath = repoPath.resolve(file.path());
 
+        // Classify file type before reading content
+        FileClassifier.FileType fileType = FileClassifier.classify(file.path(), file.language());
+
+        // Binary files: inventory-only node, no content read needed
+        if (fileType == FileClassifier.FileType.BINARY) {
+            return createInventoryNode(file, "binary");
+        }
+
+        // Generated files: inventory-only node, skip detectors
+        if (fileType == FileClassifier.FileType.GENERATED) {
+            return createInventoryNode(file, "generated");
+        }
+
         // Read file content
         String content;
         try {
@@ -1367,6 +1417,16 @@ public class Analyzer {
         } catch (IOException e) {
             log.debug("Could not read file: {}", absPath, e);
             return DetectorResult.empty();
+        }
+
+        // Test files: inventory-only node with file_type=test
+        if (fileType == FileClassifier.FileType.TEST) {
+            return createInventoryNode(file, "test");
+        }
+
+        // Text files (unknown language): inventory-only node
+        if (fileType == FileClassifier.FileType.TEXT) {
+            return createInventoryNode(file, "text");
         }
 
         // Minified file detection: create a node with minified=true but skip detectors
@@ -1379,9 +1439,12 @@ public class Analyzer {
                     file.path().getFileName().toString());
             node.setFilePath(file.path().toString());
             node.setModule(moduleName);
-            node.setProperties(new java.util.LinkedHashMap<>(Map.of("minified", true)));
+            node.setProperties(new java.util.LinkedHashMap<>(Map.of("minified", true, "file_type", "minified")));
             return DetectorResult.of(List.of(node), List.of());
         }
+
+        // SOURCE and CONFIG files: run detectors
+        String fileTypeStr = (fileType == FileClassifier.FileType.CONFIG) ? "config" : "source";
 
         // Parse structured data if applicable
         Object parsedData = null;
@@ -1440,16 +1503,32 @@ public class Analyzer {
             log.info("🐢 SLOW: {} took {}ms", file.path(), fileMs);
         }
 
-        // Set module on all nodes that don't have one yet
-        if (moduleName != null) {
-            for (CodeNode node : allNodes) {
-                if (node.getModule() == null || node.getModule().isEmpty()) {
-                    node.setModule(moduleName);
-                }
+        // Set module and file_type on all nodes
+        for (CodeNode node : allNodes) {
+            if (moduleName != null && (node.getModule() == null || node.getModule().isEmpty())) {
+                node.setModule(moduleName);
             }
+            node.getProperties().put("file_type", fileTypeStr);
         }
 
         return DetectorResult.of(allNodes, allEdges);
+    }
+
+    /**
+     * Create an inventory-only node for files that should not have detectors run.
+     */
+    private static DetectorResult createInventoryNode(DiscoveredFile file, String fileType) {
+        String moduleName = DetectorUtils.deriveModuleName(file.path().toString(), file.language());
+        CodeNode node = new CodeNode(
+                "file:" + file.path() + ":module:" + (moduleName != null ? moduleName : file.path().getFileName().toString()),
+                NodeKind.MODULE,
+                file.path().getFileName().toString());
+        node.setFilePath(file.path().toString());
+        node.setModule(moduleName);
+        node.setProperties(new java.util.LinkedHashMap<>(Map.of(
+                "file_type", fileType,
+                "language", file.language() != null ? file.language() : "")));
+        return DetectorResult.of(List.of(node), List.of());
     }
 
     /**
@@ -1542,6 +1621,38 @@ public class Analyzer {
             log.debug("Could not determine git HEAD", e);
         }
         return null;
+    }
+
+    /**
+     * Read file content and compute snippet. Returns null on error or for binary files.
+     */
+    private static String computeSnippetFromFile(Path absPath, FileClassifier.FileType fileType) {
+        if (fileType == FileClassifier.FileType.BINARY) return null;
+        try {
+            byte[] raw = Files.readAllBytes(absPath);
+            String content = DetectorUtils.decodeContent(raw);
+            return computeSnippet(content, fileType);
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Compute a snippet from file content for storage in H2.
+     * Returns the first 200 lines, capped at 10KB, or null for binary files.
+     */
+    static String computeSnippet(String content, FileClassifier.FileType fileType) {
+        if (fileType == FileClassifier.FileType.BINARY) return null;
+        if (content == null || content.isEmpty()) return null;
+        // First 200 lines, max 10KB
+        String[] lines = content.split("\n", 201);
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < Math.min(lines.length, 200); i++) {
+            if (sb.length() + lines[i].length() > 10_000) break;
+            if (i > 0) sb.append('\n');
+            sb.append(lines[i]);
+        }
+        return sb.toString();
     }
 
     /**

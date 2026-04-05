@@ -41,7 +41,7 @@ public class AnalysisCache implements Closeable {
     private static final Logger log = LoggerFactory.getLogger(AnalysisCache.class);
 
     /** Bump when hash algorithm or schema changes to force cache invalidation. */
-    private static final int CACHE_VERSION = 3;
+    private static final int CACHE_VERSION = 4;
 
     private static final String SCHEMA_SQL = """
             CREATE TABLE IF NOT EXISTS cache_meta (
@@ -55,7 +55,9 @@ public class AnalysisCache implements Closeable {
                 language VARCHAR NOT NULL,
                 parsed_at VARCHAR NOT NULL,
                 status VARCHAR DEFAULT 'DETECTED',
-                detection_method VARCHAR DEFAULT 'antlr'
+                detection_method VARCHAR DEFAULT 'antlr',
+                file_type VARCHAR DEFAULT 'source',
+                snippet VARCHAR
             );
 
             CREATE TABLE IF NOT EXISTS nodes (
@@ -253,6 +255,26 @@ public class AnalysisCache implements Closeable {
     public void storeResults(String contentHash, String filePath, String language,
                              List<CodeNode> nodes, List<CodeEdge> edges,
                              String status, String detectionMethod) {
+        storeResults(contentHash, filePath, language, nodes, edges, status, detectionMethod, "source", null);
+    }
+
+    /**
+     * Persist analysis results for a single file with file type and snippet.
+     *
+     * @param contentHash     content hash key
+     * @param filePath        file path
+     * @param language        programming language
+     * @param nodes           detected nodes
+     * @param edges           detected edges
+     * @param status          file status (e.g. "DETECTED", "filtered")
+     * @param detectionMethod detection method used (e.g. "antlr", "regex_fallback", "none")
+     * @param fileType        file type classification (e.g. "source", "test", "config", "binary")
+     * @param snippet         first 200 lines of the file content (max 10KB), or null
+     */
+    public void storeResults(String contentHash, String filePath, String language,
+                             List<CodeNode> nodes, List<CodeEdge> edges,
+                             String status, String detectionMethod,
+                             String fileType, String snippet) {
         rwLock.writeLock().lock();
         try {
             conn.setAutoCommit(false);
@@ -260,13 +282,15 @@ public class AnalysisCache implements Closeable {
 
             // Upsert file record (H2 MySQL mode supports INSERT ... ON DUPLICATE KEY UPDATE)
             try (var stmt = conn.prepareStatement(
-                    "MERGE INTO files (content_hash, path, language, parsed_at, status, detection_method) KEY (content_hash) VALUES (?, ?, ?, ?, ?, ?)")) {
+                    "MERGE INTO files (content_hash, path, language, parsed_at, status, detection_method, file_type, snippet) KEY (content_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")) {
                 stmt.setString(1, contentHash);
                 stmt.setString(2, filePath);
                 stmt.setString(3, language);
                 stmt.setString(4, now);
                 stmt.setString(5, status);
                 stmt.setString(6, detectionMethod);
+                stmt.setString(7, fileType);
+                stmt.setString(8, snippet);
                 stmt.execute();
             }
 
@@ -549,6 +573,43 @@ public class AnalysisCache implements Closeable {
             rwLock.writeLock().unlock();
         }
     }
+
+    /**
+     * Search file snippets for the given query string.
+     *
+     * @param query text to search for (case-sensitive substring match)
+     * @return list of matching snippet results ordered by path
+     */
+    public List<SnippetResult> searchSnippets(String query) {
+        rwLock.readLock().lock();
+        try {
+            List<SnippetResult> results = new ArrayList<>();
+            try (var stmt = conn.prepareStatement(
+                    "SELECT path, language, file_type, snippet FROM files WHERE snippet LIKE ? ORDER BY path")) {
+                stmt.setString(1, "%" + query + "%");
+                try (ResultSet rs = stmt.executeQuery()) {
+                    while (rs.next()) {
+                        results.add(new SnippetResult(
+                                rs.getString(1),
+                                rs.getString(2),
+                                rs.getString(3),
+                                rs.getString(4)));
+                    }
+                }
+            }
+            return results;
+        } catch (SQLException e) {
+            log.debug("Snippet search failed for query '{}'", query, e);
+            return List.of();
+        } finally {
+            rwLock.readLock().unlock();
+        }
+    }
+
+    /**
+     * A snippet search result.
+     */
+    public record SnippetResult(String path, String language, String fileType, String snippet) {}
 
     @Override
     public void close() {
