@@ -56,9 +56,7 @@ public class NestJSControllerDetector extends AbstractTypeScriptDetector {
         // Use the dedicated TypeScript ANTLR grammar for parsing;
         // detection itself still uses regex for NestJS-specific decorator patterns,
         // but the TS grammar is available for future AST-based enhancement.
-        if (ctx.content().length() > 500_000) {
-            return null;
-        }
+        // Size guard is centralized in AntlrParserFactory.parse() (200KB limit)
         return AntlrParserFactory.parse("typescript", ctx.content());
     }
 

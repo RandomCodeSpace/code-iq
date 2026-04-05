@@ -62,6 +62,15 @@ public abstract class AbstractAntlrDetector extends AbstractRegexDetector {
     }
 
     /**
+     * Run regex-only detection, bypassing ANTLR entirely.
+     * Used when ANTLR times out on a file — ensures the file still produces
+     * nodes/edges via regex fallback instead of being skipped (zero data loss).
+     */
+    public DetectorResult detectRegexOnly(DetectorContext ctx) {
+        return detectWithRegex(ctx);
+    }
+
+    /**
      * Create a lexer from source content with error output suppressed.
      *
      * @param factory function to create the lexer (e.g. {@code MyLexer::new})

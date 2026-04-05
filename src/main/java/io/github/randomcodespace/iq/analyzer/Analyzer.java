@@ -7,6 +7,7 @@ import io.github.randomcodespace.iq.cli.VersionCommand;
 import io.github.randomcodespace.iq.config.CodeIqConfig;
 import io.github.randomcodespace.iq.config.ProjectConfig;
 import io.github.randomcodespace.iq.config.ProjectConfigLoader;
+import io.github.randomcodespace.iq.detector.AbstractAntlrDetector;
 import io.github.randomcodespace.iq.detector.Detector;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorRegistry;
@@ -297,7 +298,9 @@ public class Analyzer {
                     futures.get(i).get(30, java.util.concurrent.TimeUnit.SECONDS);
                 } catch (java.util.concurrent.TimeoutException e) {
                     futures.get(i).cancel(true);
-                    log.warn("Analysis timed out for {} (30s limit), skipping", files.get(i).path());
+                    DiscoveredFile timedOutFile = files.get(i);
+                    log.warn("⏱️ ANTLR timed out for {} (30s), running regex fallback", timedOutFile.path());
+                    resultSlots[i] = analyzeFileRegexOnly(timedOutFile, root, detectorRegistry);
                 } catch (ExecutionException e) {
                     log.warn("Analysis failed for {}", files.get(i).path(), e.getCause());
                 } catch (InterruptedException e) {
@@ -586,7 +589,10 @@ public class Analyzer {
                             futures.get(i).get(30, java.util.concurrent.TimeUnit.SECONDS);
                         } catch (java.util.concurrent.TimeoutException e) {
                             futures.get(i).cancel(true);
-                            log.warn("Analysis timed out for {} (30s limit), skipping", batch.get(i).path());
+                            // Zero data loss: run regex-only fallback instead of skipping
+                            DiscoveredFile timedOutFile = batch.get(i);
+                            log.warn("⏱️ ANTLR timed out for {} (30s), running regex fallback", timedOutFile.path());
+                            resultSlots[i] = analyzeFileRegexOnly(timedOutFile, root, detectorRegistry);
                         } catch (ExecutionException e) {
                             log.warn("Analysis failed for {}", batch.get(i).path(), e.getCause());
                         } catch (InterruptedException e) {
@@ -963,7 +969,9 @@ public class Analyzer {
                 futures.get(i).get(30, java.util.concurrent.TimeUnit.SECONDS);
             } catch (java.util.concurrent.TimeoutException e) {
                 futures.get(i).cancel(true);
-                log.warn("Analysis timed out for {} (30s limit), skipping", batch.get(i).path());
+                DiscoveredFile timedOutFile = batch.get(i);
+                log.warn("⏱️ ANTLR timed out for {} (30s), running regex fallback", timedOutFile.path());
+                slots[i] = analyzeFileRegexOnly(timedOutFile, root, detectorRegistry);
             } catch (ExecutionException e) {
                 log.warn("Analysis failed for {}", batch.get(i).path(), e.getCause());
             } catch (InterruptedException e) {
@@ -1348,6 +1356,58 @@ public class Analyzer {
             }
         }
 
+        return DetectorResult.of(allNodes, allEdges);
+    }
+
+    /**
+     * Regex-only analysis fallback for files where ANTLR timed out.
+     * Ensures zero data loss — every file produces nodes via regex detection.
+     * Nodes are tagged with detection_method=regex_fallback.
+     */
+    private DetectorResult analyzeFileRegexOnly(DiscoveredFile file, Path repoPath,
+            DetectorRegistry detectorRegistry) {
+        Path absPath = repoPath.resolve(file.path());
+        String content;
+        try {
+            byte[] raw = Files.readAllBytes(absPath);
+            content = DetectorUtils.decodeContent(raw);
+        } catch (IOException e) {
+            log.debug("Could not read file for regex fallback: {}", absPath, e);
+            return DetectorResult.empty();
+        }
+
+        String moduleName = DetectorUtils.deriveModuleName(file.path().toString(), file.language());
+        var ctx = new DetectorContext(file.path().toString(), file.language(), content, null, moduleName);
+
+        List<Detector> detectors = detectorRegistry.detectorsForLanguage(file.language());
+        var allNodes = new ArrayList<CodeNode>();
+        var allEdges = new ArrayList<io.github.randomcodespace.iq.model.CodeEdge>();
+
+        for (Detector detector : detectors) {
+            try {
+                DetectorResult result;
+                if (detector instanceof AbstractAntlrDetector antlrDet) {
+                    result = antlrDet.detectRegexOnly(ctx);
+                } else {
+                    result = detector.detect(ctx);
+                }
+                allNodes.addAll(result.nodes());
+                allEdges.addAll(result.edges());
+            } catch (Throwable e) {
+                log.debug("Regex fallback detector {} failed on {}: {}",
+                        detector.getName(), file.path(), e.getMessage());
+            }
+        }
+
+        // Tag all nodes with detection method so users know quality level
+        for (CodeNode node : allNodes) {
+            node.getProperties().put("detection_method", "regex_fallback");
+            if (moduleName != null && (node.getModule() == null || node.getModule().isEmpty())) {
+                node.setModule(moduleName);
+            }
+        }
+
+        AntlrParserFactory.clearCache();
         return DetectorResult.of(allNodes, allEdges);
     }
 

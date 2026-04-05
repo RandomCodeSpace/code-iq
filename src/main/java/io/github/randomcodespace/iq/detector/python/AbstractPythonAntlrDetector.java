@@ -27,10 +27,7 @@ public abstract class AbstractPythonAntlrDetector extends AbstractAntlrDetector 
 
     @Override
     protected ParseTree parse(DetectorContext ctx) {
-        // Skip ANTLR for very large files (>500KB) — regex fallback is faster
-        if (ctx.content().length() > 500_000) {
-            return null;
-        }
+        // Size guard is centralized in AntlrParserFactory.parse() (200KB limit)
         return AntlrParserFactory.parse("python", ctx.content());
     }
 

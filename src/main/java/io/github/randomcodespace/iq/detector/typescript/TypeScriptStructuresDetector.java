@@ -79,11 +79,7 @@ public class TypeScriptStructuresDetector extends AbstractTypeScriptDetector {
 
     @Override
     protected ParseTree parse(DetectorContext ctx) {
-        // Use the dedicated TypeScript ANTLR grammar for .ts files;
-        // for .js files or very large files, fall back to regex
-        if (ctx.content().length() > 500_000) {
-            return null; // triggers regex fallback
-        }
+        // Size guard is centralized in AntlrParserFactory.parse() (200KB limit)
         if ("typescript".equals(ctx.language())) {
             return AntlrParserFactory.parse(PROP_TYPESCRIPT, ctx.content());
         }

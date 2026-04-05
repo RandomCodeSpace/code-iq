@@ -94,9 +94,11 @@ public final class AntlrParserFactory {
         }
 
         // Skip files that are too large for ANTLR — regex fallback handles them.
-        // Files >500KB cause exponential parse times in some grammars (especially TS/JS).
-        if (content.length() > 500_000) {
-            log.debug("Skipping ANTLR parse for {} ({} bytes > 500KB limit)", language, content.length());
+        // Files >200KB can cause exponential parse times in some grammars (especially TS/JS).
+        // This is a deterministic, size-based guard — same result regardless of CPU speed.
+        if (content.length() > 200_000) {
+            log.debug("Skipping ANTLR parse for {} ({} bytes > 200KB limit), regex fallback will handle",
+                    language, content.length());
             return null;
         }
 
