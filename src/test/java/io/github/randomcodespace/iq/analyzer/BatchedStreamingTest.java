@@ -89,7 +89,7 @@ class BatchedStreamingTest {
         assertEquals(0, result.edgeCount());
 
         // Verify H2 has data
-        Path cachePath = tempDir.resolve(".code-intelligence").resolve("analysis-cache.db");
+        Path cachePath = tempDir.resolve(".code-iq/cache").resolve("analysis-cache.db");
         try (var cache = new AnalysisCache(cachePath)) {
             long nodeCount = cache.getNodeCount();
             assertEquals(10, nodeCount, "H2 should have 10 nodes");

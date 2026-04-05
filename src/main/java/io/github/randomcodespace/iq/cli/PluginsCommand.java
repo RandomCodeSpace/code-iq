@@ -344,7 +344,7 @@ public class PluginsCommand implements Runnable {
                     private static final Set<String> SKIP_DIRS = Set.of(
                             "node_modules", ".git", "build", "target", "dist",
                             "__pycache__", "venv", ".venv", ".gradle",
-                            ".idea", ".vscode", ".code-intelligence");
+                            ".idea", ".vscode", ".code-iq", ".code-intelligence");
 
                     @Override
                     public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {

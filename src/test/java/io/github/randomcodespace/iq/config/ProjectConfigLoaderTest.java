@@ -21,12 +21,12 @@ class ProjectConfigLoaderTest {
                 max_depth: 5
                 max_radius: 3
                 """;
-        Files.writeString(tempDir.resolve(".osscodeiq.yml"), yamlContent, StandardCharsets.UTF_8);
+        Files.writeString(tempDir.resolve(".code-iq.yml"), yamlContent, StandardCharsets.UTF_8);
 
         var config = new CodeIqConfig();
         boolean loaded = ProjectConfigLoader.loadIfPresent(tempDir, config);
 
-        assertTrue(loaded, "Should find and load .osscodeiq.yml");
+        assertTrue(loaded, "Should find and load .code-iq.yml");
         assertEquals(".my-cache", config.getCacheDir());
         assertEquals(5, config.getMaxDepth());
         assertEquals(3, config.getMaxRadius());
@@ -38,21 +38,21 @@ class ProjectConfigLoaderTest {
                 cache_dir: custom-cache
                 max_depth: 7
                 """;
-        Files.writeString(tempDir.resolve(".osscodeiq.yaml"), yamlContent, StandardCharsets.UTF_8);
+        Files.writeString(tempDir.resolve(".code-iq.yaml"), yamlContent, StandardCharsets.UTF_8);
 
         var config = new CodeIqConfig();
         boolean loaded = ProjectConfigLoader.loadIfPresent(tempDir, config);
 
-        assertTrue(loaded, "Should find and load .osscodeiq.yaml");
+        assertTrue(loaded, "Should find and load .code-iq.yaml");
         assertEquals("custom-cache", config.getCacheDir());
         assertEquals(7, config.getMaxDepth());
     }
 
     @Test
     void ymlTakesPrecedenceOverYaml(@TempDir Path tempDir) throws IOException {
-        Files.writeString(tempDir.resolve(".osscodeiq.yml"),
+        Files.writeString(tempDir.resolve(".code-iq.yml"),
                 "cache_dir: from-yml\n", StandardCharsets.UTF_8);
-        Files.writeString(tempDir.resolve(".osscodeiq.yaml"),
+        Files.writeString(tempDir.resolve(".code-iq.yaml"),
                 "cache_dir: from-yaml\n", StandardCharsets.UTF_8);
 
         var config = new CodeIqConfig();
@@ -68,7 +68,7 @@ class ProjectConfigLoaderTest {
 
         assertFalse(loaded, "Should return false when no config file exists");
         // Config should retain defaults
-        assertEquals(".code-intelligence", config.getCacheDir());
+        assertEquals(".code-iq/cache", config.getCacheDir());
         assertEquals(10, config.getMaxDepth());
     }
 
@@ -92,7 +92,7 @@ class ProjectConfigLoaderTest {
         boolean loaded = ProjectConfigLoader.loadIfPresent(tempDir, config);
 
         assertFalse(loaded, "Should not crash on invalid YAML");
-        assertEquals(".code-intelligence", config.getCacheDir());
+        assertEquals(".code-iq/cache", config.getCacheDir());
     }
 
     @Test
@@ -106,7 +106,7 @@ class ProjectConfigLoaderTest {
         assertTrue(loaded);
         assertEquals(3, config.getMaxDepth());
         // Other values should remain at defaults
-        assertEquals(".code-intelligence", config.getCacheDir());
+        assertEquals(".code-iq/cache", config.getCacheDir());
         assertEquals(10, config.getMaxRadius());
     }
 }

@@ -19,7 +19,7 @@ class CodeIqConfigTest {
 
     @Test
     void defaultCacheDirIsCodeIntelligence() {
-        assertEquals(".code-intelligence", new CodeIqConfig().getCacheDir());
+        assertEquals(".code-iq/cache", new CodeIqConfig().getCacheDir());
     }
 
     @Test
@@ -54,7 +54,7 @@ class CodeIqConfigTest {
 
     @Test
     void defaultGraphPathIsDotOssCodeIq() {
-        assertEquals(".osscodeiq/graph.db", new CodeIqConfig().getGraph().getPath());
+        assertEquals(".code-iq/graph/graph.db", new CodeIqConfig().getGraph().getPath());
     }
 
     @Test

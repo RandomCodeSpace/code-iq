@@ -47,7 +47,7 @@ public class FileDiscovery {
             // Go / Rust
             "vendor",
             // Code-IQ own dirs
-            ".code-intelligence", ".osscodeiq"
+            ".code-iq", ".code-intelligence", ".osscodeiq"
     );
 
     /** Files to always skip (lock files, generated). */

@@ -24,9 +24,9 @@ management:
 
 codeiq:
   root-path: "."
-  cache-dir: ".code-intelligence"
+  cache-dir: ".code-iq/cache"
   graph:
-    path: ".osscodeiq/graph.db"
+    path: ".code-iq/graph/graph.db"
   max-depth: 10
   max-radius: 10
   batch-size: 500

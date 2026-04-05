@@ -40,7 +40,7 @@ class StatsCommandTest {
         System.setErr(new PrintStream(captureErr, true, StandardCharsets.UTF_8));
         statsService = new StatsService();
         config = new CodeIqConfig();
-        config.setCacheDir(".code-intelligence");
+        config.setCacheDir(".code-iq/cache");
     }
 
     @AfterEach
@@ -56,7 +56,7 @@ class StatsCommandTest {
     }
 
     private void populateCache(Path root) {
-        Path cachePath = root.resolve(".code-intelligence").resolve("analysis-cache.db");
+        Path cachePath = root.resolve(".code-iq/cache").resolve("analysis-cache.db");
         try (AnalysisCache cache = new AnalysisCache(cachePath)) {
             // Create some sample nodes
             var n1 = new CodeNode("n1", NodeKind.CLASS, "UserService");

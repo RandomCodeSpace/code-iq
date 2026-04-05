@@ -90,7 +90,7 @@ public class CodeIqApplication implements CommandLineRunner, ExitCodeGenerator {
             if (graphOverride != null) {
                 graphDbPath = java.nio.file.Path.of(graphOverride).toAbsolutePath().normalize();
             } else {
-                graphDbPath = root.resolve(".osscodeiq/graph.db");
+                graphDbPath = root.resolve(".code-iq/graph/graph.db");
             }
 
             // Point Neo4j config to the graph path (enriched or new empty db).

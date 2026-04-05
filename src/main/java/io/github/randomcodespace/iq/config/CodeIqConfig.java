@@ -20,8 +20,8 @@ public class CodeIqConfig {
     /** Root path of the codebase to analyze. */
     private String rootPath = ".";
 
-    /** Cache directory name (legacy name kept for backward compatibility). */
-    private String cacheDir = ".code-intelligence";
+    /** Cache directory relative to repo root. */
+    private String cacheDir = ".code-iq/cache";
 
     /** Maximum traversal depth for graph queries. */
     private int maxDepth = 10;
@@ -45,7 +45,7 @@ public class CodeIqConfig {
     private int maxSnippetLines = 50;
 
     public static class Graph {
-        private String path = ".osscodeiq/graph.db";
+        private String path = ".code-iq/graph/graph.db";
 
         public String getPath() { return path; }
         public void setPath(String path) { this.path = path; }

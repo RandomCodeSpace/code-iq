@@ -63,7 +63,7 @@ class EnrichCommandTest {
     @Test
     void enrichWithIndexedData(@TempDir Path tempDir) throws Exception {
         // Create H2 index with some test data
-        Path cacheDir = tempDir.resolve(".code-intelligence");
+        Path cacheDir = tempDir.resolve(".code-iq/cache");
         Files.createDirectories(cacheDir);
         Path cachePath = cacheDir.resolve("analysis-cache.db");
 
@@ -100,7 +100,7 @@ class EnrichCommandTest {
     @Test
     void enrichClassifiesLayers(@TempDir Path tempDir) throws Exception {
         // Create H2 index with frontend and backend nodes
-        Path cacheDir = tempDir.resolve(".code-intelligence");
+        Path cacheDir = tempDir.resolve(".code-iq/cache");
         Files.createDirectories(cacheDir);
         Path cachePath = cacheDir.resolve("analysis-cache.db");
 
@@ -131,7 +131,7 @@ class EnrichCommandTest {
     @Test
     void enrichedEdgesAreMutableForLanguageEnricher(@TempDir Path tempDir) throws Exception {
         // Create a minimal H2 index so enrich has data to process
-        Path cacheDir = tempDir.resolve(".code-intelligence");
+        Path cacheDir = tempDir.resolve(".code-iq/cache");
         Files.createDirectories(cacheDir);
         Path cachePath = cacheDir.resolve("analysis-cache.db");
 

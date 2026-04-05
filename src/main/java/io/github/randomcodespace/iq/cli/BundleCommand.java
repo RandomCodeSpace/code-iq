@@ -105,7 +105,7 @@ public class BundleCommand implements Callable<Integer> {
         // Resolve paths
         Path neo4jDir = graphDirOption != null
                 ? graphDirOption.toAbsolutePath().normalize()
-                : root.resolve(".osscodeiq/graph.db");
+                : root.resolve(".code-iq/graph/graph.db");
         Path h2Dir = root.resolve(config.getCacheDir());
 
         // Validate Neo4j graph exists

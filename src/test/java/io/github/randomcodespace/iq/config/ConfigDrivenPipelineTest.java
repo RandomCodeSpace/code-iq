@@ -130,7 +130,7 @@ class ConfigDrivenPipelineTest {
                 exclude:
                   - "**/generated/**"
                 """;
-        Files.writeString(tempDir.resolve(".osscodeiq.yml"), yamlContent, StandardCharsets.UTF_8);
+        Files.writeString(tempDir.resolve(".code-iq.yml"), yamlContent, StandardCharsets.UTF_8);
 
         ProjectConfig config = ProjectConfigLoader.loadProjectConfig(tempDir);
 

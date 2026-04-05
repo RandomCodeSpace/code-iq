@@ -215,12 +215,12 @@ class FileDiscoveryTest {
 
     @Test
     void excludesCodeIqOwnDirs() throws IOException {
-        Path codeIntelDir = tempDir.resolve(".code-intelligence");
-        Path osscodeiqDir = tempDir.resolve(".osscodeiq");
-        Files.createDirectories(codeIntelDir);
-        Files.createDirectories(osscodeiqDir);
-        Files.writeString(codeIntelDir.resolve("cache.java"), "class Cache {}");
-        Files.writeString(osscodeiqDir.resolve("meta.java"), "class Meta {}");
+        Path codeIqDir = tempDir.resolve(".code-iq");
+        Files.createDirectories(codeIqDir);
+        Files.writeString(codeIqDir.resolve("cache.java"), "class Cache {}");
+        Path codeIqCacheDir = tempDir.resolve(".code-iq/cache");
+        Files.createDirectories(codeIqCacheDir);
+        Files.writeString(codeIqCacheDir.resolve("meta.java"), "class Meta {}");
         Files.writeString(tempDir.resolve("src.java"), "class Src {}");
 
         List<DiscoveredFile> files = discovery.discover(tempDir);

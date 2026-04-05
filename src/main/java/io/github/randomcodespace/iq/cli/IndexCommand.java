@@ -78,8 +78,22 @@ public class IndexCommand implements Callable<Integer> {
         NumberFormat nf = NumberFormat.getIntegerInstance(Locale.US);
         int cores = parallelism != null ? parallelism : Runtime.getRuntime().availableProcessors();
 
-        // --no-cache overrides --incremental
+        // --no-cache overrides --incremental and deletes existing cache DB
         boolean useIncremental = incremental && !noCache;
+        if (noCache) {
+            Path cacheDir = root.resolve(config.getCacheDir());
+            if (java.nio.file.Files.exists(cacheDir)) {
+                try {
+                    try (var walk = java.nio.file.Files.walk(cacheDir)) {
+                        walk.sorted(java.util.Comparator.reverseOrder())
+                                .forEach(p -> { try { java.nio.file.Files.deleteIfExists(p); } catch (Exception ignored) {} });
+                    }
+                    CliOutput.info("  Deleted existing cache at " + cacheDir);
+                } catch (Exception e) {
+                    CliOutput.warn("  Could not delete cache: " + e.getMessage());
+                }
+            }
+        }
 
         CliOutput.step("[*]", "Indexing " + root + " ...");
         CliOutput.info("  (batch size: " + effectiveBatchSize + " files, "
@@ -112,7 +126,7 @@ public class IndexCommand implements Callable<Integer> {
         });
 
         CliOutput.printResultSummary(result, nf);
-        CliOutput.info("  Store:   H2 (.code-intelligence/analysis-cache)");
+        CliOutput.info("  Store:   H2 (.code-iq/cache/analysis-cache)");
 
         System.out.println();
         CliOutput.info("  Next step: code-iq enrich " + root);

@@ -67,7 +67,7 @@ class TopologyCommandExtendedTest {
      * then use the real AnalysisCache to populate it.
      */
     private Path createRealCache(Path tempDir) throws IOException {
-        Path cacheDir = tempDir.resolve(".code-intelligence");
+        Path cacheDir = tempDir.resolve(".code-iq/cache");
         Files.createDirectories(cacheDir);
         Path dbPath = cacheDir.resolve("analysis-cache.db");
 
@@ -111,7 +111,7 @@ class TopologyCommandExtendedTest {
         createRealCache(tempDir);
 
         var config = new CodeIqConfig();
-        config.setCacheDir(".code-intelligence");
+        config.setCacheDir(".code-iq/cache");
         var svc = new TopologyService();
         var cmd = new TopologyCommand(config, svc);
         var cmdLine = new picocli.CommandLine(cmd);
@@ -131,7 +131,7 @@ class TopologyCommandExtendedTest {
         createRealCache(tempDir);
 
         var config = new CodeIqConfig();
-        config.setCacheDir(".code-intelligence");
+        config.setCacheDir(".code-iq/cache");
         var svc = new TopologyService();
         var cmd = new TopologyCommand(config, svc);
         var cmdLine = new picocli.CommandLine(cmd);
@@ -150,7 +150,7 @@ class TopologyCommandExtendedTest {
         createRealCache(tempDir);
 
         var config = new CodeIqConfig();
-        config.setCacheDir(".code-intelligence");
+        config.setCacheDir(".code-iq/cache");
         var svc = new TopologyService();
         var cmd = new TopologyCommand(config, svc);
         var cmdLine = new picocli.CommandLine(cmd);
@@ -168,7 +168,7 @@ class TopologyCommandExtendedTest {
         createRealCache(tempDir);
 
         var config = new CodeIqConfig();
-        config.setCacheDir(".code-intelligence");
+        config.setCacheDir(".code-iq/cache");
         var svc = new TopologyService();
         var cmd = new TopologyCommand(config, svc);
         var cmdLine = new picocli.CommandLine(cmd);
@@ -184,7 +184,7 @@ class TopologyCommandExtendedTest {
         createRealCache(tempDir);
 
         var config = new CodeIqConfig();
-        config.setCacheDir(".code-intelligence");
+        config.setCacheDir(".code-iq/cache");
         var svc = new TopologyService();
         var cmd = new TopologyCommand(config, svc);
         var cmdLine = new picocli.CommandLine(cmd);
@@ -203,7 +203,7 @@ class TopologyCommandExtendedTest {
         createRealCache(tempDir);
 
         var config = new CodeIqConfig();
-        config.setCacheDir(".code-intelligence");
+        config.setCacheDir(".code-iq/cache");
         var svc = new TopologyService();
         var cmd = new TopologyCommand(config, svc);
         var cmdLine = new picocli.CommandLine(cmd);
@@ -221,7 +221,7 @@ class TopologyCommandExtendedTest {
         createRealCache(tempDir);
 
         var config = new CodeIqConfig();
-        config.setCacheDir(".code-intelligence");
+        config.setCacheDir(".code-iq/cache");
         var svc = mock(TopologyService.class);
         when(svc.getTopology(anyList(), anyList()))
                 .thenThrow(new RuntimeException("topology failed"));
@@ -239,7 +239,7 @@ class TopologyCommandExtendedTest {
 
     @Test
     void prettyPrintWithConnections(@TempDir Path tempDir) throws IOException {
-        Path cacheDir = tempDir.resolve(".code-intelligence");
+        Path cacheDir = tempDir.resolve(".code-iq/cache");
         Files.createDirectories(cacheDir);
         Path dbPath = cacheDir.resolve("analysis-cache.db");
 
@@ -256,7 +256,7 @@ class TopologyCommandExtendedTest {
         }
 
         var config = new CodeIqConfig();
-        config.setCacheDir(".code-intelligence");
+        config.setCacheDir(".code-iq/cache");
         var svc = new TopologyService();
         var cmd = new TopologyCommand(config, svc);
         var cmdLine = new picocli.CommandLine(cmd);

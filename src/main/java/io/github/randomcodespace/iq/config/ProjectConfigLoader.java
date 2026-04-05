@@ -23,7 +23,7 @@ import java.util.Map;
 public final class ProjectConfigLoader {
 
     private static final Logger log = LoggerFactory.getLogger(ProjectConfigLoader.class);
-    private static final String[] CONFIG_FILE_NAMES = {".osscodeiq.yml", ".osscodeiq.yaml"};
+    private static final String[] CONFIG_FILE_NAMES = {".code-iq.yml", ".code-iq.yaml", ".osscodeiq.yml", ".osscodeiq.yaml"};
 
     private ProjectConfigLoader() {
         // utility class
