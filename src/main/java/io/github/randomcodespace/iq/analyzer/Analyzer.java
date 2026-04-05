@@ -252,11 +252,7 @@ public class Analyzer {
         var cacheHitsCounter = new java.util.concurrent.atomic.AtomicInteger(0);
 
         final DetectorRegistry detectorRegistry = effectiveRegistry;
-        var executorService = parallelism != null && parallelism > 0
-                ? Executors.newFixedThreadPool(parallelism, Thread.ofPlatform().daemon(true).factory())
-                : Executors.newVirtualThreadPerTaskExecutor();
-        try {
-            var executor = executorService;
+        try (var executor = createExecutor(parallelism)) {
             List<Future<?>> futures = new ArrayList<>(files.size());
             for (int i = 0; i < files.size(); i++) {
                 final int idx = i;
@@ -309,8 +305,6 @@ public class Analyzer {
                     log.warn("Analysis interrupted for {}", files.get(i).path());
                 }
             }
-        } finally {
-            shutdownExecutor(executorService);
         }
 
         if (cache != null && cacheHitsCounter.get() > 0) {
@@ -537,10 +531,7 @@ public class Analyzer {
             cache.clear();
         }
 
-        var batchExecutorService = parallelism != null && parallelism > 0
-                ? Executors.newFixedThreadPool(parallelism, Thread.ofPlatform().daemon(true).factory())
-                : Executors.newVirtualThreadPerTaskExecutor();
-        try {
+        try (var batchExecutor = createExecutor(parallelism)) {
         List<DiscoveredFile> batch = new ArrayList<>(batchSize);
         for (int fileIdx = 0; fileIdx < files.size(); fileIdx++) {
             batch.add(files.get(fileIdx));
@@ -559,7 +550,7 @@ public class Analyzer {
                     for (int i = 0; i < batch.size(); i++) {
                         final int idx = i;
                         final DiscoveredFile file = batch.get(idx);
-                        futures.add(batchExecutorService.submit(() -> {
+                        futures.add(batchExecutor.submit(() -> {
                             if (incremental) {
                                 try {
                                     Path absPath = root.resolve(file.path());
@@ -665,8 +656,6 @@ public class Analyzer {
                 batch.clear();
             }
         }
-        } finally {
-            shutdownExecutor(batchExecutorService);
         }
 
         if (cacheHits > 0) {
@@ -819,16 +808,11 @@ public class Analyzer {
         Map<String, Integer> edgeBreakdown = new HashMap<>();
         Map<String, Integer> frameworkBreakdown = new HashMap<>();
 
-        var executorService = parallelism != null && parallelism > 0
-                ? Executors.newFixedThreadPool(parallelism, Thread.ofPlatform().daemon(true).factory())
-                : Executors.newVirtualThreadPerTaskExecutor();
-
         // Process modules in sorted order for determinism
         List<String> sortedModuleKeys = new ArrayList<>(modules.keySet());
         sortedModuleKeys.sort(String::compareTo);
 
-        try {
-            var executor = executorService;
+        try (var executor = createExecutor(parallelism)) {
             List<DiscoveredFile> pendingBatch = new ArrayList<>(batchSize);
             int moduleIndex = 0;
 
@@ -868,7 +852,7 @@ public class Analyzer {
                     pendingBatch.add(file);
                     if (pendingBatch.size() >= batchSize) {
                         batchNumber++;
-                        var batchResult = processSmartBatch(pendingBatch, root, executor,
+                        var batchResult = processSmartBatch(pendingBatch, root, executor.delegate(),
                                 detectorRegistry, infraRegistry, incremental, cache,
                                 nodeBreakdown, edgeBreakdown, frameworkBreakdown,
                                 batchNumber, report);
@@ -884,7 +868,7 @@ public class Analyzer {
             // Flush remaining files
             if (!pendingBatch.isEmpty()) {
                 batchNumber++;
-                var batchResult = processSmartBatch(pendingBatch, root, executor,
+                var batchResult = processSmartBatch(pendingBatch, root, executor.delegate(),
                         detectorRegistry, infraRegistry, incremental, cache,
                         nodeBreakdown, edgeBreakdown, frameworkBreakdown,
                         batchNumber, report);
@@ -894,8 +878,6 @@ public class Analyzer {
                 cacheHits += batchResult[3];
                 pendingBatch.clear();
             }
-        } finally {
-            shutdownExecutor(executorService);
         }
 
         if (filesSkipped > 0) {
@@ -1197,19 +1179,36 @@ public class Analyzer {
      *       minified files without .min suffix, e.g. webpack output named app.js or vendor.js)</li>
      * </ol>
      */
-    private static void shutdownExecutor(java.util.concurrent.ExecutorService executor) {
-        executor.shutdown();
-        try {
-            if (!executor.awaitTermination(10, java.util.concurrent.TimeUnit.SECONDS)) {
-                executor.shutdownNow();
-                if (!executor.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS)) {
-                    log.warn("Executor did not terminate cleanly; stuck ANTLR threads will be reclaimed at JVM exit");
+    /**
+     * Wrapper around ExecutorService that implements AutoCloseable with a bounded
+     * shutdown — prevents the default close() from hanging up to 24 hours on stuck
+     * ANTLR threads.
+     */
+    private record BoundedExecutor(java.util.concurrent.ExecutorService delegate) implements AutoCloseable {
+        <T> Future<T> submit(java.util.concurrent.Callable<T> task) { return delegate.submit(task); }
+
+        @Override
+        public void close() {
+            delegate.shutdown();
+            try {
+                if (!delegate.awaitTermination(10, java.util.concurrent.TimeUnit.SECONDS)) {
+                    delegate.shutdownNow();
+                    if (!delegate.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                        log.warn("Executor did not terminate cleanly; stuck ANTLR threads will be reclaimed at JVM exit");
+                    }
                 }
+            } catch (InterruptedException e) {
+                delegate.shutdownNow();
+                Thread.currentThread().interrupt();
             }
-        } catch (InterruptedException e) {
-            executor.shutdownNow();
-            Thread.currentThread().interrupt();
         }
+    }
+
+    private BoundedExecutor createExecutor(Integer parallelism) {
+        var exec = parallelism != null && parallelism > 0
+                ? Executors.newFixedThreadPool(parallelism, Thread.ofPlatform().daemon(true).factory())
+                : Executors.newVirtualThreadPerTaskExecutor();
+        return new BoundedExecutor(exec);
     }
 
     private boolean isMinified(DiscoveredFile file, String content) {
