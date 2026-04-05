@@ -101,7 +101,8 @@ public class LanguageEnricher {
             return;
         }
 
-        // Process files in parallel with per-file timeout
+        // Process files with per-file timeout.
+        // Uses virtual threads for parallelism on large codebases.
         var newEdges = java.util.Collections.synchronizedList(new ArrayList<CodeEdge>());
         var edgesAdded = new java.util.concurrent.atomic.AtomicInteger(0);
         var typeHintsAdded = new java.util.concurrent.atomic.AtomicInteger(0);
@@ -151,7 +152,8 @@ public class LanguageEnricher {
                 }));
             }
 
-            // Collect with per-file timeout
+            // Collect results in deterministic order (alphabetical by file path,
+            // matching the TreeMap iteration order of tasks)
             for (int i = 0; i < futures.size(); i++) {
                 try {
                     futures.get(i).get(30, TimeUnit.SECONDS);

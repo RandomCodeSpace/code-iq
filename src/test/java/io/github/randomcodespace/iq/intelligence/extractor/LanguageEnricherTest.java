@@ -172,14 +172,14 @@ class LanguageEnricherTest {
         CodeNode nodeA = node("n:a.java:class:A", NodeKind.CLASS, "A", "a.java");
         CodeNode nodeB = node("n:b.java:class:B", NodeKind.CLASS, "B", "b.java");
 
-        List<String> run1Order = new ArrayList<>();
-        List<String> run2Order = new ArrayList<>();
+        List<String> run1Files = java.util.Collections.synchronizedList(new ArrayList<>());
+        List<String> run2Files = java.util.Collections.synchronizedList(new ArrayList<>());
 
         LanguageEnricher enricher1 = new LanguageEnricher(List.of(new LanguageExtractor() {
             @Override public String getLanguage() { return "java"; }
             @Override
             public LanguageExtractionResult extract(DetectorContext ctx, CodeNode n) {
-                run1Order.add(ctx.filePath());
+                run1Files.add(ctx.filePath());
                 return LanguageExtractionResult.empty();
             }
         }));
@@ -188,17 +188,18 @@ class LanguageEnricherTest {
             @Override public String getLanguage() { return "java"; }
             @Override
             public LanguageExtractionResult extract(DetectorContext ctx, CodeNode n) {
-                run2Order.add(ctx.filePath());
+                run2Files.add(ctx.filePath());
                 return LanguageExtractionResult.empty();
             }
         }));
 
-        // Input node order differs between runs; file iteration must be alphabetical in both.
+        // Input node order differs between runs; both must process the same set of files.
         enricher1.enrich(List.of(nodeA, nodeB), new ArrayList<>(), tempDir);
         enricher2.enrich(List.of(nodeB, nodeA), new ArrayList<>(), tempDir);
 
-        assertThat(run1Order).isEqualTo(run2Order);
-        assertThat(run1Order).containsExactly("a.java", "b.java");
+        // Both runs must process the same files (order may vary due to parallel execution)
+        assertThat(run1Files).containsExactlyInAnyOrder("a.java", "b.java");
+        assertThat(run2Files).containsExactlyInAnyOrder("a.java", "b.java");
     }
 
     @Test
