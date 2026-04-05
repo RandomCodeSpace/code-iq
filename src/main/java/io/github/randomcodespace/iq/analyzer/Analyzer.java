@@ -261,6 +261,7 @@ public class Analyzer {
                 final int idx = i;
                 final DiscoveredFile file = files.get(idx);
                 final AnalysisCache cacheRef = cache;
+                try {
                 futures.add(executor.submit(() -> {
                     // Check cache first
                     if (cacheRef != null) {
@@ -292,6 +293,9 @@ public class Analyzer {
                     }
                     return null;
                 }));
+                } catch (java.util.concurrent.RejectedExecutionException e) {
+                    log.warn("Executor rejected task for {}, skipping", file.path());
+                }
             }
 
             // Collect in order -- deterministic regardless of thread completion order
@@ -557,6 +561,7 @@ public class Analyzer {
                     for (int i = 0; i < batch.size(); i++) {
                         final int idx = i;
                         final DiscoveredFile file = batch.get(idx);
+                        try {
                         futures.add(batchExecutorService.submit(() -> {
                             if (incremental) {
                                 try {
@@ -585,6 +590,9 @@ public class Analyzer {
                             }
                             return null;
                         }));
+                        } catch (java.util.concurrent.RejectedExecutionException e) {
+                            log.warn("Executor rejected task for {}, skipping", file.path());
+                        }
                     }
 
                     // Collect in order
@@ -930,6 +938,7 @@ public class Analyzer {
         for (int i = 0; i < batch.size(); i++) {
             final int idx = i;
             final DiscoveredFile file = batch.get(idx);
+            try {
             futures.add(executor.submit(() -> {
                 if (incremental) {
                     try {
@@ -958,6 +967,9 @@ public class Analyzer {
                 }
                 return null;
             }));
+            } catch (java.util.concurrent.RejectedExecutionException e) {
+                log.warn("Executor rejected task for {}, skipping", file.path());
+            }
         }
 
         for (int i = 0; i < futures.size(); i++) {
