@@ -253,7 +253,7 @@ public class Analyzer {
 
         final DetectorRegistry detectorRegistry = effectiveRegistry;
         var executorService = parallelism != null && parallelism > 0
-                ? Executors.newFixedThreadPool(parallelism)
+                ? Executors.newFixedThreadPool(parallelism, Thread.ofPlatform().daemon(true).factory())
                 : Executors.newVirtualThreadPerTaskExecutor();
         try {
             var executor = executorService;
@@ -538,7 +538,7 @@ public class Analyzer {
         }
 
         var batchExecutorService = parallelism != null && parallelism > 0
-                ? Executors.newFixedThreadPool(parallelism)
+                ? Executors.newFixedThreadPool(parallelism, Thread.ofPlatform().daemon(true).factory())
                 : Executors.newVirtualThreadPerTaskExecutor();
         try {
         List<DiscoveredFile> batch = new ArrayList<>(batchSize);
@@ -811,7 +811,7 @@ public class Analyzer {
         Map<String, Integer> frameworkBreakdown = new HashMap<>();
 
         var executorService = parallelism != null && parallelism > 0
-                ? Executors.newFixedThreadPool(parallelism)
+                ? Executors.newFixedThreadPool(parallelism, Thread.ofPlatform().daemon(true).factory())
                 : Executors.newVirtualThreadPerTaskExecutor();
 
         // Process modules in sorted order for determinism
