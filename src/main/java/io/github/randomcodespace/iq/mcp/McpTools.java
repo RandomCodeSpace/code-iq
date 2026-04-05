@@ -273,7 +273,7 @@ public class McpTools {
         List<String> BLOCKED_PATTERNS = List.of(
                 "\\bCREATE\\b", "\\bDELETE\\b", "\\bDETACH\\b", "\\bSET\\b",
                 "\\bREMOVE\\b", "\\bMERGE\\b", "\\bDROP\\b", "\\bFOREACH\\b",
-                "\\bLOAD\\s+CSV\\b", "\\bCALL\\b");
+                "\\bLOAD\\s+CSV\\b", "\\bCALL\\s+(?!db\\.)\\b");
         for (String pattern : BLOCKED_PATTERNS) {
             if (java.util.regex.Pattern.compile(pattern).matcher(upper).find()) {
                 String keyword = pattern.replace("\\b", "").replace("\\s+", " ");

@@ -38,7 +38,7 @@ public class FileDiscovery {
             ".git", ".svn", ".idea", ".vscode", ".eclipse", ".settings",
             // Python
             "__pycache__", "venv", ".venv", ".tox", ".mypy_cache", ".pytest_cache",
-            ".eggs", "*.egg-info",
+            ".eggs",
             // Java / Gradle
             ".gradle", ".mvn",
             // JS / Frontend
@@ -230,7 +230,12 @@ public class FileDiscovery {
 
     private boolean isExcluded(Path relPath) {
         for (Path component : relPath) {
-            if (DEFAULT_EXCLUDES.contains(component.toString())) {
+            String name = component.toString();
+            if (DEFAULT_EXCLUDES.contains(name)) {
+                return true;
+            }
+            // Suffix match for patterns like *.egg-info
+            if (name.endsWith(".egg-info")) {
                 return true;
             }
         }
