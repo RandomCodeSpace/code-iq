@@ -93,6 +93,13 @@ public final class AntlrParserFactory {
             return null;
         }
 
+        // Skip files that are too large for ANTLR — regex fallback handles them.
+        // Files >500KB cause exponential parse times in some grammars (especially TS/JS).
+        if (content.length() > 500_000) {
+            log.debug("Skipping ANTLR parse for {} ({} bytes > 500KB limit)", language, content.length());
+            return null;
+        }
+
         // Check thread-local cache — same content object means same file
         var cached = PARSE_CACHE.get();
         if (cached != null && cached.getKey() == content) {
@@ -114,7 +121,7 @@ public final class AntlrParserFactory {
         };
         long parseMs = java.time.Duration.between(parseStart, java.time.Instant.now()).toMillis();
         if (parseMs > 2000) {
-            log.warn("[SLOW ANTLR] {} parse: {}ms ({} bytes)", language, parseMs, content.length());
+            log.warn("\uD83D\uDC22 SLOW ANTLR: {} parse took {}ms ({} bytes)", language, parseMs, content.length());
         }
 
         // Cache the result for subsequent detectors on the same file

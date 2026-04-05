@@ -853,6 +853,8 @@ public class Analyzer {
                                 filtered.add(file);
                             } else {
                                 filesSkipped++;
+                                log.debug("\u23ED\uFE0F SKIP: {} ({}, {} bytes) — no architecture keywords",
+                                        file.path(), file.language(), raw.length);
                             }
                         } catch (IOException e) {
                             log.debug("Could not read for keyword filter {}", file.path(), e);
@@ -1168,9 +1170,9 @@ public class Analyzer {
 
         long fileMs = Duration.between(fileStart, Instant.now()).toMillis();
         if (fileMs > 5000) {
-            log.warn("[SLOW] {} took {}ms", file.path(), fileMs);
+            log.warn("\uD83D\uDC22 SLOW: {} took {}ms", file.path(), fileMs);
         } else if (fileMs > 500) {
-            log.info("[SLOW] {} took {}ms", file.path(), fileMs);
+            log.info("\uD83D\uDC22 SLOW: {} took {}ms", file.path(), fileMs);
         }
 
         if (moduleName != null) {
@@ -1314,7 +1316,7 @@ public class Analyzer {
                 DetectorResult result = detector.detect(ctx);
                 long detMs = Duration.between(detStart, Instant.now()).toMillis();
                 if (detMs > 2000) {
-                    log.warn("[SLOW DETECTOR] {} on {}: {}ms",
+                    log.warn("\uD83D\uDC22 SLOW DETECTOR: {} on {}: {}ms",
                             detector.getName(), file.path(), detMs);
                 } else if (detMs > 100) {
                     log.debug("Slow detector {} on {} ({} bytes): {}ms",
@@ -1333,9 +1335,9 @@ public class Analyzer {
 
         long fileMs = Duration.between(fileStart, Instant.now()).toMillis();
         if (fileMs > 5000) {
-            log.warn("[SLOW] {} took {}ms", file.path(), fileMs);
+            log.warn("\uD83D\uDC22 SLOW: {} took {}ms", file.path(), fileMs);
         } else if (fileMs > 500) {
-            log.info("[SLOW] {} took {}ms", file.path(), fileMs);
+            log.info("\uD83D\uDC22 SLOW: {} took {}ms", file.path(), fileMs);
         }
 
         // Set module on all nodes that don't have one yet
