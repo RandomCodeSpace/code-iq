@@ -86,6 +86,13 @@ public final class AntlrParserFactory {
             return null;
         }
 
+        // Bail out early if this thread was cancelled (e.g. via Future.cancel(true))
+        // to avoid spending unbounded time in ANTLR's CPU-bound parse loop
+        if (Thread.interrupted()) {
+            Thread.currentThread().interrupt();
+            return null;
+        }
+
         // Check thread-local cache — same content object means same file
         var cached = PARSE_CACHE.get();
         if (cached != null && cached.getKey() == content) {

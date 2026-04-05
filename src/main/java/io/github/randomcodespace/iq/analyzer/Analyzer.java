@@ -255,7 +255,8 @@ public class Analyzer {
         var executorService = parallelism != null && parallelism > 0
                 ? Executors.newFixedThreadPool(parallelism)
                 : Executors.newVirtualThreadPerTaskExecutor();
-        try (var executor = executorService) {
+        try {
+            var executor = executorService;
             List<Future<?>> futures = new ArrayList<>(files.size());
             for (int i = 0; i < files.size(); i++) {
                 final int idx = i;
@@ -308,6 +309,8 @@ public class Analyzer {
                     log.warn("Analysis interrupted for {}", files.get(i).path());
                 }
             }
+        } finally {
+            shutdownExecutor(executorService);
         }
 
         if (cache != null && cacheHitsCounter.get() > 0) {
@@ -537,7 +540,7 @@ public class Analyzer {
         var batchExecutorService = parallelism != null && parallelism > 0
                 ? Executors.newFixedThreadPool(parallelism)
                 : Executors.newVirtualThreadPerTaskExecutor();
-        try (batchExecutorService) {
+        try {
         List<DiscoveredFile> batch = new ArrayList<>(batchSize);
         for (int fileIdx = 0; fileIdx < files.size(); fileIdx++) {
             batch.add(files.get(fileIdx));
@@ -653,6 +656,8 @@ public class Analyzer {
                 batch.clear();
             }
         }
+        } finally {
+            shutdownExecutor(batchExecutorService);
         }
 
         if (cacheHits > 0) {
@@ -813,7 +818,8 @@ public class Analyzer {
         List<String> sortedModuleKeys = new ArrayList<>(modules.keySet());
         sortedModuleKeys.sort(String::compareTo);
 
-        try (var executor = executorService) {
+        try {
+            var executor = executorService;
             List<DiscoveredFile> pendingBatch = new ArrayList<>(batchSize);
             int moduleIndex = 0;
 
@@ -877,6 +883,8 @@ public class Analyzer {
                 cacheHits += batchResult[3];
                 pendingBatch.clear();
             }
+        } finally {
+            shutdownExecutor(executorService);
         }
 
         if (filesSkipped > 0) {
@@ -1124,6 +1132,10 @@ public class Analyzer {
         var allEdges = new ArrayList<io.github.randomcodespace.iq.model.CodeEdge>();
 
         for (Detector detector : detectors) {
+            if (Thread.interrupted()) {
+                Thread.currentThread().interrupt();
+                break;
+            }
             try {
                 DetectorResult result = detector.detect(ctx);
                 allNodes.addAll(result.nodes());
@@ -1163,6 +1175,21 @@ public class Analyzer {
      *       minified files without .min suffix, e.g. webpack output named app.js or vendor.js)</li>
      * </ol>
      */
+    private static void shutdownExecutor(java.util.concurrent.ExecutorService executor) {
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(10, java.util.concurrent.TimeUnit.SECONDS)) {
+                executor.shutdownNow();
+                if (!executor.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                    log.warn("Executor did not terminate cleanly; stuck ANTLR threads will be reclaimed at JVM exit");
+                }
+            }
+        } catch (InterruptedException e) {
+            executor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
+
     private boolean isMinified(DiscoveredFile file, String content) {
         String name = file.path().getFileName().toString();
         boolean nameHint = name.endsWith(".min.js") || name.endsWith(".bundle.js")
