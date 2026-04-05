@@ -90,7 +90,7 @@ public class McpTools {
         return new CacheData(nodes, edges);
     }
 
-    @McpTool(name = "get_stats", description = "Get project graph statistics - node counts, edge counts, backend info.")
+    @McpTool(name = "get_stats", description = "Get graph overview: total nodes, edges, files, languages, and frameworks detected. Use when asked about project size, composition, or what was analyzed. Returns JSON with counts and breakdowns.")
     public String getStats() {
         try {
             return toJson(queryService.getStats());
@@ -99,7 +99,7 @@ public class McpTools {
         }
     }
 
-    @McpTool(name = "get_detailed_stats", description = "Get rich categorized statistics: frameworks, infra, connections, auth, architecture. Category: all, graph, languages, frameworks, infra, connections, auth, architecture.")
+    @McpTool(name = "get_detailed_stats", description = "Get categorized statistics: graph metrics, language distribution, framework usage, infrastructure, API connections, auth patterns, and architecture layers. Use for deep project analysis. Filter by category: graph, languages, frameworks, infra, connections, auth, architecture, or all.")
     public String getDetailedStats(
             @McpToolParam(description = "Category filter (default: all)", required = false) String category) {
         try {
@@ -109,10 +109,10 @@ public class McpTools {
         }
     }
 
-    @McpTool(name = "query_nodes", description = "Query nodes in the code graph. Filter by kind (endpoint, entity, guard, class, method, component, module, etc.).")
+    @McpTool(name = "query_nodes", description = "List nodes in the knowledge graph filtered by kind. Kinds: endpoint, entity, class, method, guard, service, module, topic, queue, config_file, database_connection, component, etc. Use when asked 'show me all endpoints' or 'what entities exist'. Returns paginated node list with IDs, labels, and properties.")
     public String queryNodes(
-            @McpToolParam(description = "Node kind filter", required = false) String kind,
-            @McpToolParam(description = "Max results", required = false) Integer limit) {
+            @McpToolParam(description = "Node kind to filter by: endpoint, entity, class, method, guard, service, module, topic, queue, config_file, database_connection, component, interface, enum, etc.", required = false) String kind,
+            @McpToolParam(description = "Maximum number of results to return (default: 50)", required = false) Integer limit) {
         try {
             return toJson(queryService.listNodes(kind, limit != null ? limit : 50, 0));
         } catch (Exception e) {
@@ -120,10 +120,10 @@ public class McpTools {
         }
     }
 
-    @McpTool(name = "query_edges", description = "Query edges in the code graph. Filter by kind (calls, imports, depends_on, queries, protects, etc.).")
+    @McpTool(name = "query_edges", description = "List edges (relationships) in the graph filtered by kind. Kinds: calls, imports, depends_on, queries, produces, consumes, protects, extends, contains, connects_to, etc. Use when asked 'what calls what' or 'show all dependencies'. Returns paginated edge list.")
     public String queryEdges(
-            @McpToolParam(description = "Edge kind filter", required = false) String kind,
-            @McpToolParam(description = "Max results", required = false) Integer limit) {
+            @McpToolParam(description = "Edge kind to filter by: calls, imports, depends_on, queries, produces, consumes, protects, extends, implements, contains, connects_to, maps_to, etc.", required = false) String kind,
+            @McpToolParam(description = "Maximum number of results to return (default: 50)", required = false) Integer limit) {
         try {
             return toJson(queryService.listEdges(kind, limit != null ? limit : 50, 0));
         } catch (Exception e) {
@@ -131,10 +131,10 @@ public class McpTools {
         }
     }
 
-    @McpTool(name = "get_node_neighbors", description = "Get all nodes connected to a given node. Direction: both, in, out.")
+    @McpTool(name = "get_node_neighbors", description = "Get all nodes directly connected to a given node, with direction control (inbound, outbound, or both). Use when asked 'what connects to this service?' or 'what does this class depend on?'. Returns neighbor nodes grouped by edge kind and direction.")
     public String getNodeNeighbors(
             @McpToolParam(description = "Node ID") String nodeId,
-            @McpToolParam(description = "Direction: both, in, out", required = false) String direction) {
+            @McpToolParam(description = "Relationship direction: 'in' (who points to this node), 'out' (what this node points to), or 'both' (default)", required = false) String direction) {
         try {
             return toJson(queryService.getNeighbors(nodeId, direction != null ? direction : "both"));
         } catch (Exception e) {
@@ -142,10 +142,10 @@ public class McpTools {
         }
     }
 
-    @McpTool(name = "get_ego_graph", description = "Get the subgraph within N hops of a center node. Returns all nodes and edges in the neighborhood.")
+    @McpTool(name = "get_ego_graph", description = "Get the full subgraph within N hops of a center node — all reachable nodes and edges. Use for exploring the neighborhood of a component, understanding local architecture, or visualizing a module's context. Returns nodes and edges as a graph structure.")
     public String getEgoGraph(
             @McpToolParam(description = "Center node ID") String center,
-            @McpToolParam(description = "Radius (max hops)", required = false) Integer radius) {
+            @McpToolParam(description = "Number of hops from center node (default: 2, max: 10)", required = false) Integer radius) {
         try {
             return toJson(queryService.egoGraph(center, radius != null ? radius : 2));
         } catch (Exception e) {
@@ -153,9 +153,9 @@ public class McpTools {
         }
     }
 
-    @McpTool(name = "find_cycles", description = "Find circular dependency cycles in the graph.")
+    @McpTool(name = "find_cycles", description = "Detect circular dependency cycles in the graph. Use when asked about circular dependencies, architecture violations, or import loops. Returns list of cycles as ordered node ID paths.")
     public String findCycles(
-            @McpToolParam(description = "Max cycles to return", required = false) Integer limit) {
+            @McpToolParam(description = "Maximum number of cycles to return (default: 100)", required = false) Integer limit) {
         try {
             return toJson(queryService.findCycles(limit != null ? limit : 100));
         } catch (Exception e) {
@@ -163,7 +163,7 @@ public class McpTools {
         }
     }
 
-    @McpTool(name = "find_shortest_path", description = "Find the shortest path between two nodes.")
+    @McpTool(name = "find_shortest_path", description = "Find the shortest relationship path between two nodes. Use when asked 'how is A connected to B?' or 'what's the dependency chain from X to Y?'. Returns ordered list of nodes and edges along the path.")
     public String findShortestPath(
             @McpToolParam(description = "Source node ID") String source,
             @McpToolParam(description = "Target node ID") String target) {
@@ -178,7 +178,7 @@ public class McpTools {
         }
     }
 
-    @McpTool(name = "find_consumers", description = "Find nodes that consume from a target (CONSUMES/LISTENS edges).")
+    @McpTool(name = "find_consumers", description = "Find all services, handlers, or functions that consume/listen from a given topic, queue, or event source. Use when asked 'what reads from this topic?' or 'who listens to this event?'. Returns consumer nodes with their kind, label, and file location.")
     public String findConsumers(
             @McpToolParam(description = "Target node ID") String targetId) {
         try {
@@ -188,7 +188,7 @@ public class McpTools {
         }
     }
 
-    @McpTool(name = "find_producers", description = "Find nodes that produce to a target (PRODUCES/PUBLISHES edges).")
+    @McpTool(name = "find_producers", description = "Find all services or functions that produce/publish to a given topic, queue, or event target. Use when asked 'what writes to this topic?' or 'who publishes to this queue?'. Returns producer nodes with details.")
     public String findProducers(
             @McpToolParam(description = "Target node ID") String targetId) {
         try {
@@ -198,7 +198,7 @@ public class McpTools {
         }
     }
 
-    @McpTool(name = "find_callers", description = "Find nodes that call a target (CALLS edges).")
+    @McpTool(name = "find_callers", description = "Find all methods or services that call a given target function, method, or service. Use when asked 'who calls this method?' or 'what invokes this service?'. Returns caller nodes with edge details.")
     public String findCallers(
             @McpToolParam(description = "Target node ID") String targetId) {
         try {
@@ -208,7 +208,7 @@ public class McpTools {
         }
     }
 
-    @McpTool(name = "find_dependencies", description = "Find modules that a given module depends on.")
+    @McpTool(name = "find_dependencies", description = "Find all modules, services, or packages that a given module depends on (outbound dependencies). Use when asked 'what does this service depend on?' or 'show me the dependency tree'. Returns dependency nodes.")
     public String findDependencies(
             @McpToolParam(description = "Module node ID") String moduleId) {
         try {
@@ -218,7 +218,7 @@ public class McpTools {
         }
     }
 
-    @McpTool(name = "find_dependents", description = "Find modules that depend on a given module.")
+    @McpTool(name = "find_dependents", description = "Find all modules or services that depend on a given module (inbound — who uses it). Use when asked 'what breaks if I change this?' or 'who depends on this library?'. Returns dependent nodes.")
     public String findDependents(
             @McpToolParam(description = "Module node ID") String moduleId) {
         try {
@@ -228,10 +228,10 @@ public class McpTools {
         }
     }
 
-    @McpTool(name = "find_dead_code", description = "Find potentially dead code - classes, methods, or interfaces with no incoming calls, imports, or references.")
+    @McpTool(name = "find_dead_code", description = "Find potentially unreachable code: classes, methods, or interfaces with no incoming calls, imports, or references. Use when asked about unused code, cleanup candidates, or dead code analysis. Filter by kind (class, method, interface). Returns nodes that appear isolated.")
     public String findDeadCode(
-            @McpToolParam(description = "Filter by node kind (class, method, interface)", required = false) String kind,
-            @McpToolParam(description = "Max results", required = false) Integer limit) {
+            @McpToolParam(description = "Filter by node kind: class, method, interface, or omit for all", required = false) String kind,
+            @McpToolParam(description = "Maximum results (default: 100, max: 1000)", required = false) Integer limit) {
         try {
             int safeLimit = limit != null ? Math.min(limit, 1000) : 100;
             return toJson(queryService.findDeadCode(kind, safeLimit));
@@ -240,10 +240,10 @@ public class McpTools {
         }
     }
 
-    @McpTool(name = "generate_flow", description = "Generate an architecture flow diagram. Views: overview, ci, deploy, runtime, auth. Formats: json, mermaid.")
+    @McpTool(name = "generate_flow", description = "Generate an architecture flow diagram for the codebase. Views: overview (full system), ci (build pipeline), deploy (deployment topology), runtime (service communication), auth (security flow). Output as JSON graph or Mermaid markdown.")
     public String generateFlow(
-            @McpToolParam(description = "View name", required = false) String view,
-            @McpToolParam(description = "Output format", required = false) String format) {
+            @McpToolParam(description = "View name: overview, ci, deploy, runtime, or auth (default: overview)", required = false) String view,
+            @McpToolParam(description = "Output format: json or mermaid (default: json)", required = false) String format) {
         String viewName = view != null ? view : "overview";
         String fmt = format != null ? format : "json";
         try {
@@ -265,9 +265,9 @@ public class McpTools {
     // source code is not available (only the bundled graph). Analysis is
     // done locally via CLI: code-iq analyze / code-iq index
 
-    @McpTool(name = "run_cypher", description = "Execute a read-only Cypher query against the Neo4j graph database.")
+    @McpTool(name = "run_cypher", description = "Execute a custom read-only Cypher query directly against the Neo4j graph. Use for advanced queries not covered by other tools. CALL db.* procedures are allowed (fulltext search, schema inspection). Mutation queries are blocked. Returns rows as JSON array.")
     public String runCypher(
-            @McpToolParam(description = "Cypher query string") String query) {
+            @McpToolParam(description = "Read-only Cypher query. MATCH, RETURN, WITH, WHERE, CALL db.* allowed. CREATE, DELETE, SET, MERGE blocked.") String query) {
         // Block mutation keywords (defense-in-depth). Uses case-insensitive matching
         // so the original query casing is preserved for Neo4j execution.
         // CALL db.* is explicitly allowed (read-only: fulltext search, schema, indexes).
@@ -317,7 +317,7 @@ public class McpTools {
 
     // --- Agentic triage tools ---
 
-    @McpTool(name = "find_component_by_file", description = "Given a file path, find the component/module it belongs to, its layer, and all connected nodes.")
+    @McpTool(name = "find_component_by_file", description = "Given a source file path, find which module/service it belongs to, its architecture layer (frontend/backend/infra), and all nodes defined in that file. Use when asked 'what component is this file part of?' or for file-level triage.")
     public String findComponentByFile(
             @McpToolParam(description = "File path (relative to codebase root)") String filePath) {
         try {
@@ -327,10 +327,10 @@ public class McpTools {
         }
     }
 
-    @McpTool(name = "trace_impact", description = "Trace downstream impact of a node - what depends on it, what breaks if it fails.")
+    @McpTool(name = "trace_impact", description = "Trace the downstream blast radius of a node — everything that depends on it, transitively up to N hops. Use when asked 'what breaks if I change this?' or 'what's the impact of modifying this service?'. Returns affected nodes grouped by depth.")
     public String traceImpact(
             @McpToolParam(description = "Node ID") String nodeId,
-            @McpToolParam(description = "Max depth", required = false) Integer depth) {
+            @McpToolParam(description = "Maximum traversal depth (default: 3, max: 10)", required = false) Integer depth) {
         try {
             return toJson(queryService.traceImpact(nodeId, depth != null ? depth : 3));
         } catch (Exception e) {
@@ -338,7 +338,7 @@ public class McpTools {
         }
     }
 
-    @McpTool(name = "find_related_endpoints", description = "Given a file, class, or entity name, find all API endpoints that interact with it.")
+    @McpTool(name = "find_related_endpoints", description = "Given a file, class, or entity name, find all REST/gRPC/GraphQL endpoints that interact with it. Use when asked 'which APIs use this entity?' or 'what endpoints touch the User table?'. Returns endpoint nodes with HTTP methods and paths.")
     public String findRelatedEndpoints(
             @McpToolParam(description = "File, class, or entity identifier") String identifier) {
         try {
@@ -348,10 +348,10 @@ public class McpTools {
         }
     }
 
-    @McpTool(name = "search_graph", description = "Free-text search across node labels, IDs, and properties.")
+    @McpTool(name = "search_graph", description = "Full-text search across all node labels, IDs, file paths, and properties. Use as the starting point when the user mentions a name but you don't have the exact node ID. Returns matching nodes ranked by relevance.")
     public String searchGraph(
             @McpToolParam(description = "Search query") String query,
-            @McpToolParam(description = "Max results", required = false) Integer limit) {
+            @McpToolParam(description = "Maximum results (default: 20)", required = false) Integer limit) {
         try {
             return toJson(queryService.searchGraph(query, limit != null ? limit : 20));
         } catch (Exception e) {
@@ -359,7 +359,7 @@ public class McpTools {
         }
     }
 
-    @McpTool(name = "get_capabilities", description = "Return the capability matrix declaring per-language analysis fidelity levels (EXACT/PARTIAL/LEXICAL_ONLY/UNSUPPORTED) for each intelligence dimension. Optionally filter by a single language.")
+    @McpTool(name = "get_capabilities", description = "Show the analysis capability matrix: what Code IQ can detect per language (Java, Python, TypeScript, Go, etc.) across dimensions like call graph, type hierarchy, framework detection. Levels: EXACT, PARTIAL, LEXICAL_ONLY, UNSUPPORTED. Use when asked 'what languages do you support?' or 'how accurate is the analysis?'.")
     public String getCapabilities(
             @McpToolParam(description = "Language to filter (e.g. java, python). Omit for the full matrix.", required = false) String language) {
         try {
@@ -379,11 +379,11 @@ public class McpTools {
         }
     }
 
-    @McpTool(name = "read_file", description = "Read a source file from the codebase, optionally a specific line range")
+    @McpTool(name = "read_file", description = "Read source file content from the analyzed codebase. Supports full file or line range. Use when you need to show actual code to the user, verify a detection result, or provide code context. Returns raw file content as text.")
     public String readFile(
-            @McpToolParam(description = "File path relative to codebase root") String filePath,
-            @McpToolParam(description = "Start line (1-based, optional)", required = false) Integer startLine,
-            @McpToolParam(description = "End line (1-based, inclusive, optional)", required = false) Integer endLine) {
+            @McpToolParam(description = "File path relative to the codebase root (e.g., src/main/java/com/example/UserService.java)") String filePath,
+            @McpToolParam(description = "Start line number, 1-based (optional — omit to read entire file)", required = false) Integer startLine,
+            @McpToolParam(description = "End line number, 1-based inclusive (optional — omit to read to end)", required = false) Integer endLine) {
         try {
             Path root = Path.of(config.getRootPath()).toAbsolutePath().normalize();
             Path resolved = root.resolve(filePath).normalize();
@@ -414,7 +414,7 @@ public class McpTools {
 
     // --- Topology tools ---
 
-    @McpTool(name = "get_topology", description = "Get service topology map — services, infrastructure nodes (databases, queues, caches), and connections between them.")
+    @McpTool(name = "get_topology", description = "Get the service topology map: all services, infrastructure nodes (databases, message queues, caches), and runtime connections between them. Use when asked about service architecture, system overview, or 'how do services communicate?'. Returns services with connection counts and infrastructure details.")
     public String getTopology() {
         try {
             return toJson(queryService.getTopology());
@@ -423,7 +423,7 @@ public class McpTools {
         }
     }
 
-    @McpTool(name = "service_detail", description = "Get detailed view of a specific service")
+    @McpTool(name = "service_detail", description = "Get comprehensive details about a specific service: its endpoints, entities, dependencies, dependents, guards, infrastructure connections, and node counts by kind. Use when asked 'tell me about the order-service' or for deep-diving into one service.")
     public String serviceDetail(
             @McpToolParam(description = "Service name") String serviceName) {
         try {
@@ -434,7 +434,7 @@ public class McpTools {
         }
     }
 
-    @McpTool(name = "service_dependencies", description = "Get dependencies of a service (databases, queues, other services)")
+    @McpTool(name = "service_dependencies", description = "List everything a service depends on: databases it queries, queues it produces to, other services it calls, caches it uses. Use when asked 'what does this service need to run?' or 'what are its downstream dependencies?'.")
     public String serviceDependencies(
             @McpToolParam(description = "Service name") String serviceName) {
         try {
@@ -445,7 +445,7 @@ public class McpTools {
         }
     }
 
-    @McpTool(name = "service_dependents", description = "Get services that depend on this service")
+    @McpTool(name = "service_dependents", description = "List all services and components that depend on this service — its upstream consumers. Use when asked 'who calls this service?' or 'what breaks if this service goes down?'.")
     public String serviceDependents(
             @McpToolParam(description = "Service name") String serviceName) {
         try {
@@ -456,7 +456,7 @@ public class McpTools {
         }
     }
 
-    @McpTool(name = "blast_radius", description = "Analyze blast radius — what's affected if this node changes")
+    @McpTool(name = "blast_radius", description = "Analyze the blast radius of a node: all nodes affected if it changes, grouped by hop distance. Use for change impact analysis, incident triage, or understanding coupling. Returns affected nodes with paths showing how they're connected.")
     public String blastRadius(
             @McpToolParam(description = "Node ID") String nodeId) {
         try {
@@ -467,7 +467,7 @@ public class McpTools {
         }
     }
 
-    @McpTool(name = "find_path", description = "Find connection path between two services")
+    @McpTool(name = "find_path", description = "Find the connection path between two services in the topology. Use when asked 'how does service A talk to service B?' or 'what's the chain between frontend and database?'. Returns the ordered path of services and connections.")
     public String findPath(
             @McpToolParam(description = "Source service") String source,
             @McpToolParam(description = "Target service") String target) {
@@ -479,7 +479,7 @@ public class McpTools {
         }
     }
 
-    @McpTool(name = "find_bottlenecks", description = "Find bottleneck services with most connections")
+    @McpTool(name = "find_bottlenecks", description = "Identify bottleneck services with the most inbound and outbound connections — high-traffic hubs that are potential single points of failure. Use when asked about architecture risks, scaling concerns, or 'which services are most critical?'.")
     public String findBottlenecks() {
         try {
             var data = getCachedData();
@@ -489,7 +489,7 @@ public class McpTools {
         }
     }
 
-    @McpTool(name = "find_circular_deps", description = "Find circular service-to-service dependencies")
+    @McpTool(name = "find_circular_deps", description = "Detect circular dependencies between services (A->B->C->A). Use when asked about architecture health, deployment order issues, or 'are there any circular service dependencies?'. Returns cycles as ordered service name lists.")
     public String findCircularDeps() {
         try {
             var data = getCachedData();
@@ -499,7 +499,7 @@ public class McpTools {
         }
     }
 
-    @McpTool(name = "find_dead_services", description = "Find dead services with no incoming connections")
+    @McpTool(name = "find_dead_services", description = "Find services with zero incoming connections — potentially unused or orphaned services. Use when asked about cleanup opportunities or 'are there any services nothing calls?'. Returns isolated service nodes.")
     public String findDeadServices() {
         try {
             var data = getCachedData();
@@ -509,7 +509,7 @@ public class McpTools {
         }
     }
 
-    @McpTool(name = "find_node", description = "Find a node by name — exact match priority, then partial")
+    @McpTool(name = "find_node", description = "Find a node by name with fuzzy matching — exact match priority, then partial/contains match. Use as a quick lookup when you have a name but not the full node ID. Returns best-matching node with its properties and connections.")
     public String findNode(
             @McpToolParam(description = "Search query") String query) {
         try {
@@ -520,7 +520,7 @@ public class McpTools {
         }
     }
 
-    @McpTool(name = "get_evidence_pack", description = "Assemble an evidence pack for a symbol or file. Returns matched nodes, snippets, provenance, and degradation notes. Provide symbol name and/or file path.")
+    @McpTool(name = "get_evidence_pack", description = "Assemble a comprehensive evidence pack for a symbol (class, method, function) or file: matched graph nodes, source code snippets, provenance metadata, analysis confidence level, and any degradation notes. Use when asked to explain or investigate a specific code element in depth.")
     public String getEvidencePack(
             @McpToolParam(description = "Symbol name to look up (e.g. UserService, handleLogin)", required = false) String symbol,
             @McpToolParam(description = "File path relative to repo root", required = false) String filePath,
@@ -539,7 +539,7 @@ public class McpTools {
         }
     }
 
-    @McpTool(name = "get_artifact_metadata", description = "Return artifact metadata: repo identity, commit SHA, build timestamp, extractor versions, capability matrix snapshot, and integrity hash.")
+    @McpTool(name = "get_artifact_metadata", description = "Return provenance metadata about the analyzed codebase: repository identity, commit SHA, build timestamp, analysis tool versions, capability matrix snapshot, and integrity hash. Use when asked about analysis freshness, data provenance, or 'when was this last scanned?'.")
     public String getArtifactMetadata() {
         ArtifactMetadata artifactMetadata = currentArtifactMetadata();
         if (artifactMetadata == null) {
