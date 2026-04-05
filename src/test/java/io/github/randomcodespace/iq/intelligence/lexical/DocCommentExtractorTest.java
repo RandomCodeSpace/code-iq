@@ -58,7 +58,7 @@ class DocCommentExtractorTest {
 
     @Test
     void returnsNullForNullArgs() {
-        assertThat(DocCommentExtractor.extract(null, "java", 1)).isNull();
+        assertThat(DocCommentExtractor.extract((Path) null, "java", 1)).isNull();
         assertThat(DocCommentExtractor.extract(tmp.resolve("x.java"), null, 1)).isNull();
         assertThat(DocCommentExtractor.extract(tmp.resolve("x.java"), "java", 0)).isNull();
     }

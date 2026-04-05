@@ -300,7 +300,21 @@ public class Analyzer {
                     futures.get(i).cancel(true);
                     DiscoveredFile timedOutFile = files.get(i);
                     log.warn("⏱️ ANTLR timed out for {} (30s), running regex fallback", timedOutFile.path());
-                    resultSlots[i] = analyzeFileRegexOnly(timedOutFile, root, detectorRegistry);
+                    DetectorResult regexResult = analyzeFileRegexOnly(timedOutFile, root, detectorRegistry);
+                    resultSlots[i] = regexResult;
+                    // Store regex fallback result to cache with explicit detection_method
+                    if (cache != null && regexResult != null
+                            && (!regexResult.nodes().isEmpty() || !regexResult.edges().isEmpty())) {
+                        try {
+                            Path absPath = root.resolve(timedOutFile.path());
+                            String hash = FileHasher.hash(absPath);
+                            cache.storeResults(hash, timedOutFile.path().toString(),
+                                    timedOutFile.language(), regexResult.nodes(), regexResult.edges(),
+                                    "DETECTED", "regex_fallback");
+                        } catch (IOException ioe) {
+                            log.debug("Could not hash for regex fallback cache: {}", timedOutFile.path(), ioe);
+                        }
+                    }
                 } catch (ExecutionException e) {
                     log.warn("Analysis failed for {}", files.get(i).path(), e.getCause());
                 } catch (InterruptedException e) {
@@ -592,7 +606,21 @@ public class Analyzer {
                             // Zero data loss: run regex-only fallback instead of skipping
                             DiscoveredFile timedOutFile = batch.get(i);
                             log.warn("⏱️ ANTLR timed out for {} (30s), running regex fallback", timedOutFile.path());
-                            resultSlots[i] = analyzeFileRegexOnly(timedOutFile, root, detectorRegistry);
+                            DetectorResult regexResult = analyzeFileRegexOnly(timedOutFile, root, detectorRegistry);
+                            resultSlots[i] = regexResult;
+                            // Store regex fallback result to cache with explicit detection_method
+                            if (incremental && regexResult != null
+                                    && (!regexResult.nodes().isEmpty() || !regexResult.edges().isEmpty())) {
+                                try {
+                                    Path absPath = root.resolve(timedOutFile.path());
+                                    String hash = FileHasher.hash(absPath);
+                                    cache.storeResults(hash, timedOutFile.path().toString(),
+                                            timedOutFile.language(), regexResult.nodes(), regexResult.edges(),
+                                            "DETECTED", "regex_fallback");
+                                } catch (IOException ioe) {
+                                    log.debug("Could not hash for regex fallback cache: {}", timedOutFile.path(), ioe);
+                                }
+                            }
                         } catch (ExecutionException e) {
                             log.warn("Analysis failed for {}", batch.get(i).path(), e.getCause());
                         } catch (InterruptedException e) {
@@ -820,6 +848,8 @@ public class Analyzer {
 
         try (var executor = createExecutor(parallelism)) {
             List<DiscoveredFile> pendingBatch = new ArrayList<>(batchSize);
+            List<CodeNode> filteredNodes = new ArrayList<>();
+            Map<String, String> contentCache = new HashMap<>();
             int moduleIndex = 0;
 
             for (String moduleKey : sortedModuleKeys) {
@@ -828,7 +858,8 @@ public class Analyzer {
                 report.accept("Processing module " + moduleIndex + "/" + sortedModuleKeys.size()
                         + ": " + moduleKey + " (" + moduleFiles.size() + " files)");
 
-                // Pre-filter source files with keyword filter; always pass structured files
+                // Pre-filter source files with keyword filter; always pass structured files.
+                // Cache decoded content from the keyword filter to avoid re-reading in analyzeFile.
                 List<DiscoveredFile> filtered = new ArrayList<>(moduleFiles.size());
                 for (DiscoveredFile file : moduleFiles) {
                     if (STRUCTURED_LANGUAGES.contains(file.language())) {
@@ -841,8 +872,22 @@ public class Analyzer {
                             byte[] raw = Files.readAllBytes(absPath);
                             if (keywordFilter.shouldAnalyze(raw, file.language())) {
                                 filtered.add(file);
+                                // Cache decoded content to avoid duplicate read in analyzeFile
+                                contentCache.put(file.path().toString(),
+                                        DetectorUtils.decodeContent(raw));
                             } else {
                                 filesSkipped++;
+                                // Zero data loss: create minimal inventory node for filtered files
+                                CodeNode fileNode = new CodeNode(
+                                    "file:" + file.path() + ":module:" + file.path().getFileName(),
+                                    NodeKind.MODULE,
+                                    file.path().getFileName().toString());
+                                fileNode.setFilePath(file.path().toString());
+                                fileNode.setModule(DetectorUtils.deriveModuleName(file.path().toString(), file.language()));
+                                fileNode.getProperties().put("status", "filtered");
+                                fileNode.getProperties().put("language", file.language());
+                                fileNode.getProperties().put("detection_method", "none");
+                                filteredNodes.add(fileNode);
                                 log.debug("⏭️ SKIP: {} ({}, {} bytes) — no architecture keywords",
                                         file.path(), file.language(), raw.length);
                             }
@@ -861,29 +906,33 @@ public class Analyzer {
                         var batchResult = processSmartBatch(pendingBatch, root, executor.delegate(),
                                 detectorRegistry, infraRegistry, incremental, cache,
                                 nodeBreakdown, edgeBreakdown, frameworkBreakdown,
-                                batchNumber, report);
+                                batchNumber, report, contentCache, filteredNodes);
                         totalNodesWritten += batchResult[0];
                         totalEdgesWritten += batchResult[1];
                         filesAnalyzed += batchResult[2];
                         cacheHits += batchResult[3];
                         pendingBatch.clear();
+                        filteredNodes.clear();
                     }
                 }
             }
 
-            // Flush remaining files
-            if (!pendingBatch.isEmpty()) {
+            // Flush remaining files (including any accumulated filtered nodes)
+            if (!pendingBatch.isEmpty() || !filteredNodes.isEmpty()) {
                 batchNumber++;
                 var batchResult = processSmartBatch(pendingBatch, root, executor.delegate(),
                         detectorRegistry, infraRegistry, incremental, cache,
                         nodeBreakdown, edgeBreakdown, frameworkBreakdown,
-                        batchNumber, report);
+                        batchNumber, report, contentCache, filteredNodes);
                 totalNodesWritten += batchResult[0];
                 totalEdgesWritten += batchResult[1];
                 filesAnalyzed += batchResult[2];
                 cacheHits += batchResult[3];
                 pendingBatch.clear();
+                filteredNodes.clear();
             }
+            // Clear content cache after all batches in this module to free memory
+            contentCache.clear();
         }
 
         if (filesSkipped > 0) {
@@ -922,7 +971,9 @@ public class Analyzer {
             boolean incremental, AnalysisCache cache,
             Map<String, Integer> nodeBreakdown, Map<String, Integer> edgeBreakdown,
             Map<String, Integer> frameworkBreakdown,
-            int batchNumber, Consumer<String> report) {
+            int batchNumber, Consumer<String> report,
+            Map<String, String> contentCache,
+            List<CodeNode> filteredNodes) {
 
         report.accept("Processing batch " + batchNumber + " (" + batch.size() + " files)...");
         Instant batchStart = Instant.now();
@@ -934,6 +985,7 @@ public class Analyzer {
         for (int i = 0; i < batch.size(); i++) {
             final int idx = i;
             final DiscoveredFile file = batch.get(idx);
+            final String cachedContent = contentCache.remove(file.path().toString());
             futures.add(executor.submit(() -> {
                 if (incremental) {
                     try {
@@ -947,7 +999,7 @@ public class Analyzer {
                                 return null;
                             }
                         }
-                        DetectorResult result = analyzeFileWithRegistry(file, root, detectorRegistry, infraRegistry);
+                        DetectorResult result = analyzeFileWithRegistry(file, root, detectorRegistry, infraRegistry, cachedContent);
                         slots[idx] = result;
                         if (result != null && (!result.nodes().isEmpty() || !result.edges().isEmpty())) {
                             cache.storeResults(hash, file.path().toString(), file.language(),
@@ -955,10 +1007,10 @@ public class Analyzer {
                         }
                     } catch (IOException e) {
                         log.debug("Could not hash {}", file.path(), e);
-                        slots[idx] = analyzeFileWithRegistry(file, root, detectorRegistry, infraRegistry);
+                        slots[idx] = analyzeFileWithRegistry(file, root, detectorRegistry, infraRegistry, cachedContent);
                     }
                 } else {
-                    slots[idx] = analyzeFileWithRegistry(file, root, detectorRegistry, infraRegistry);
+                    slots[idx] = analyzeFileWithRegistry(file, root, detectorRegistry, infraRegistry, cachedContent);
                 }
                 return null;
             }));
@@ -971,7 +1023,21 @@ public class Analyzer {
                 futures.get(i).cancel(true);
                 DiscoveredFile timedOutFile = batch.get(i);
                 log.warn("⏱️ ANTLR timed out for {} (30s), running regex fallback", timedOutFile.path());
-                slots[i] = analyzeFileRegexOnly(timedOutFile, root, detectorRegistry);
+                DetectorResult regexResult = analyzeFileRegexOnly(timedOutFile, root, detectorRegistry);
+                slots[i] = regexResult;
+                // Store regex fallback result to cache with explicit detection_method
+                if (incremental && regexResult != null
+                        && (!regexResult.nodes().isEmpty() || !regexResult.edges().isEmpty())) {
+                    try {
+                        Path absPath = root.resolve(timedOutFile.path());
+                        String hash = FileHasher.hash(absPath);
+                        cache.storeResults(hash, timedOutFile.path().toString(),
+                                timedOutFile.language(), regexResult.nodes(), regexResult.edges(),
+                                "DETECTED", "regex_fallback");
+                    } catch (IOException ioe) {
+                        log.debug("Could not hash for regex fallback cache: {}", timedOutFile.path(), ioe);
+                    }
+                }
             } catch (ExecutionException e) {
                 log.warn("Analysis failed for {}", batch.get(i).path(), e.getCause());
             } catch (InterruptedException e) {
@@ -1018,6 +1084,15 @@ public class Analyzer {
                 nodes += result.nodes().size();
                 edges += result.edges().size();
             }
+        }
+
+        // Add filtered file inventory nodes to batch results
+        if (filteredNodes != null && !filteredNodes.isEmpty()) {
+            batchNodes.addAll(filteredNodes);
+            for (CodeNode fn : filteredNodes) {
+                nodeBreakdown.merge(fn.getKind().getValue(), 1, Integer::sum);
+            }
+            nodes += filteredNodes.size();
         }
 
         if (!incremental && (!batchNodes.isEmpty() || !batchEdges.isEmpty())) {
@@ -1092,16 +1167,34 @@ public class Analyzer {
     DetectorResult analyzeFileWithRegistry(DiscoveredFile file, Path repoPath,
                                             DetectorRegistry detectorRegistry,
                                             InfrastructureRegistry infraRegistry) {
+        return analyzeFileWithRegistry(file, repoPath, detectorRegistry, infraRegistry, null);
+    }
+
+    /**
+     * Analyze a single file using the given registries, optionally with pre-read content.
+     * When {@code preReadContent} is non-null, it is used directly instead of reading from disk,
+     * avoiding a duplicate file read (the content was already read during keyword filtering).
+     *
+     * @param preReadContent decoded file content from the keyword filter, or null to read from disk
+     */
+    DetectorResult analyzeFileWithRegistry(DiscoveredFile file, Path repoPath,
+                                            DetectorRegistry detectorRegistry,
+                                            InfrastructureRegistry infraRegistry,
+                                            String preReadContent) {
         Instant fileStart = Instant.now();
-        Path absPath = repoPath.resolve(file.path());
 
         String content;
-        try {
-            byte[] raw = Files.readAllBytes(absPath);
-            content = DetectorUtils.decodeContent(raw);
-        } catch (IOException e) {
-            log.debug("Could not read file: {}", absPath, e);
-            return DetectorResult.empty();
+        if (preReadContent != null) {
+            content = preReadContent;
+        } else {
+            Path absPath = repoPath.resolve(file.path());
+            try {
+                byte[] raw = Files.readAllBytes(absPath);
+                content = DetectorUtils.decodeContent(raw);
+            } catch (IOException e) {
+                log.debug("Could not read file: {}", absPath, e);
+                return DetectorResult.empty();
+            }
         }
 
         if (isMinified(file, content)) {

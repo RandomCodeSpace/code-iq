@@ -41,7 +41,7 @@ public class AnalysisCache implements Closeable {
     private static final Logger log = LoggerFactory.getLogger(AnalysisCache.class);
 
     /** Bump when hash algorithm or schema changes to force cache invalidation. */
-    private static final int CACHE_VERSION = 2;
+    private static final int CACHE_VERSION = 3;
 
     private static final String SCHEMA_SQL = """
             CREATE TABLE IF NOT EXISTS cache_meta (
@@ -53,7 +53,9 @@ public class AnalysisCache implements Closeable {
                 content_hash VARCHAR PRIMARY KEY,
                 path VARCHAR NOT NULL,
                 language VARCHAR NOT NULL,
-                parsed_at VARCHAR NOT NULL
+                parsed_at VARCHAR NOT NULL,
+                status VARCHAR DEFAULT 'DETECTED',
+                detection_method VARCHAR DEFAULT 'antlr'
             );
 
             CREATE TABLE IF NOT EXISTS nodes (
@@ -230,10 +232,27 @@ public class AnalysisCache implements Closeable {
     // --- Store results ---
 
     /**
-     * Persist analysis results for a single file.
+     * Persist analysis results for a single file with default status and detection method.
      */
     public void storeResults(String contentHash, String filePath, String language,
                              List<CodeNode> nodes, List<CodeEdge> edges) {
+        storeResults(contentHash, filePath, language, nodes, edges, "DETECTED", "antlr");
+    }
+
+    /**
+     * Persist analysis results for a single file with explicit status and detection method.
+     *
+     * @param contentHash     content hash key
+     * @param filePath        file path
+     * @param language        programming language
+     * @param nodes           detected nodes
+     * @param edges           detected edges
+     * @param status          file status (e.g. "DETECTED", "filtered")
+     * @param detectionMethod detection method used (e.g. "antlr", "regex_fallback", "none")
+     */
+    public void storeResults(String contentHash, String filePath, String language,
+                             List<CodeNode> nodes, List<CodeEdge> edges,
+                             String status, String detectionMethod) {
         rwLock.writeLock().lock();
         try {
             conn.setAutoCommit(false);
@@ -241,11 +260,13 @@ public class AnalysisCache implements Closeable {
 
             // Upsert file record (H2 MySQL mode supports INSERT ... ON DUPLICATE KEY UPDATE)
             try (var stmt = conn.prepareStatement(
-                    "MERGE INTO files (content_hash, path, language, parsed_at) KEY (content_hash) VALUES (?, ?, ?, ?)")) {
+                    "MERGE INTO files (content_hash, path, language, parsed_at, status, detection_method) KEY (content_hash) VALUES (?, ?, ?, ?, ?, ?)")) {
                 stmt.setString(1, contentHash);
                 stmt.setString(2, filePath);
                 stmt.setString(3, language);
                 stmt.setString(4, now);
+                stmt.setString(5, status);
+                stmt.setString(6, detectionMethod);
                 stmt.execute();
             }
 
@@ -475,11 +496,13 @@ public class AnalysisCache implements Closeable {
 
             // Insert synthetic file record
             try (var stmt = conn.prepareStatement(
-                    "MERGE INTO files (content_hash, path, language, parsed_at) KEY (content_hash) VALUES (?, ?, ?, ?)")) {
+                    "MERGE INTO files (content_hash, path, language, parsed_at, status, detection_method) KEY (content_hash) VALUES (?, ?, ?, ?, ?, ?)")) {
                 stmt.setString(1, syntheticHash);
                 stmt.setString(2, "__enriched__");
                 stmt.setString(3, "enriched");
                 stmt.setString(4, now);
+                stmt.setString(5, "ENRICHED");
+                stmt.setString(6, "enriched");
                 stmt.execute();
             }
 

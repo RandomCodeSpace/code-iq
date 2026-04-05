@@ -6,8 +6,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * Enriches {@link CodeNode} instances with lexical metadata before Neo4j bulk-load.
@@ -35,34 +40,62 @@ public class LexicalEnricher {
     /**
      * Enrich all nodes with lexical metadata extracted from source files.
      *
+     * <p>Nodes are grouped by {@code filePath} so that each source file is read at most once,
+     * avoiding redundant I/O when many nodes originate from the same file.
+     *
      * @param nodes    All enriched nodes (post-linker, post-classifier).
      * @param rootPath Absolute root path of the analysed repository.
      */
     public void enrich(List<CodeNode> nodes, Path rootPath) {
         int commented = 0;
         int configKeyed = 0;
+
+        // Group doc-comment candidates by filePath (TreeMap for deterministic order).
+        // Nodes without a filePath or lineStart, or non-candidate kinds, are handled inline.
+        Map<String, List<CodeNode>> nodesByFile = new TreeMap<>();
         for (CodeNode node : nodes) {
-            if (enrichDocComment(node, rootPath)) commented++;
             if (enrichConfigKeys(node)) configKeyed++;
+
+            if (node.getFilePath() != null && node.getLineStart() != null
+                    && isDocCommentCandidate(node.getKind())) {
+                nodesByFile.computeIfAbsent(node.getFilePath(), k -> new ArrayList<>()).add(node);
+            }
         }
+
+        // Process each file group: read once, enrich all nodes from that file.
+        for (var entry : nodesByFile.entrySet()) {
+            String filePath = entry.getKey();
+            List<CodeNode> fileNodes = entry.getValue();
+
+            Path absFile = rootPath.resolve(filePath).normalize();
+            if (!absFile.startsWith(rootPath)) continue; // path traversal guard
+
+            List<String> lines;
+            try {
+                lines = Files.readAllLines(absFile, StandardCharsets.UTF_8);
+            } catch (Exception e) {
+                log.debug("Could not read file for doc comment extraction: {}", absFile, e);
+                continue;
+            }
+
+            String language = SnippetStore.inferLanguage(filePath);
+            for (CodeNode node : fileNodes) {
+                if (enrichDocCommentFromLines(node, lines, language)) commented++;
+            }
+            // lines eligible for GC after this iteration
+        }
+
         log.info("Lexical enrichment: {} doc comments, {} config key entries indexed",
                 commented, configKeyed);
     }
 
     /**
-     * Extract and store the doc comment for the given node.
+     * Extract and store the doc comment for the given node using pre-read file lines.
      *
      * @return true if a comment was found and stored.
      */
-    private boolean enrichDocComment(CodeNode node, Path rootPath) {
-        if (node.getFilePath() == null || node.getLineStart() == null) return false;
-        if (!isDocCommentCandidate(node.getKind())) return false;
-
-        String language = SnippetStore.inferLanguage(node.getFilePath());
-        Path file = rootPath.resolve(node.getFilePath()).normalize();
-        if (!file.startsWith(rootPath)) return false; // path traversal guard
-
-        String comment = DocCommentExtractor.extract(file, language, node.getLineStart());
+    private boolean enrichDocCommentFromLines(CodeNode node, List<String> lines, String language) {
+        String comment = DocCommentExtractor.extract(lines, language, node.getLineStart());
         if (comment != null && !comment.isBlank()) {
             node.getProperties().put(KEY_LEX_COMMENT, comment);
             return true;

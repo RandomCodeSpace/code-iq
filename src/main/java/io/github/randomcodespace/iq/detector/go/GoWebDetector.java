@@ -31,7 +31,7 @@ public class GoWebDetector extends AbstractAntlrDetector {
 
     private static final Pattern UPPER_ROUTE_RE = Pattern.compile("\\.(?<method>GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\\s*\\(\\s*\"(?<path>[^\"]*)\"", Pattern.MULTILINE);
     private static final Pattern LOWER_ROUTE_RE = Pattern.compile("\\.(?<method>Get|Post|Put|Delete|Patch|Head|Options)\\s*\\(\\s*\"(?<path>[^\"]*)\"", Pattern.MULTILINE);
-    private static final Pattern HANDLEFUNC_RE = Pattern.compile("\\.HandleFunc\\s*\\(\\s*\"(?<path>[^\"]*)\".*?\\.Methods\\s*\\(\\s*\"(?<method>[A-Z]+)\"", Pattern.DOTALL);
+    private static final Pattern HANDLEFUNC_RE = Pattern.compile("\\.HandleFunc\\s*\\(\\s*\"(?<path>[^\"]*)\"[^\\n]*?\\.Methods\\s*\\(\\s*\"(?<method>[A-Z]+)\"");
     private static final Pattern HANDLEFUNC_NO_METHOD_RE = Pattern.compile("\\.HandleFunc\\s*\\(\\s*\"(?<path>[^\"]*)\"", Pattern.MULTILINE);
     private static final Pattern HTTP_HANDLE_RE = Pattern.compile("http\\.(?:HandleFunc|Handle)\\s*\\(\\s*\"(?<path>[^\"]*)\"", Pattern.MULTILINE);
     private static final Pattern GIN_RE = Pattern.compile("gin\\.(?:Default|New)\\s*\\(");

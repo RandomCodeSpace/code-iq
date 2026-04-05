@@ -34,15 +34,29 @@ public final class DocCommentExtractor {
         if (file == null || language == null || lineStart <= 0) return null;
         try {
             List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
-            if (lineStart > lines.size()) return null;
-            return switch (language) {
-                case "python" -> extractPythonDocstring(lines, lineStart);
-                case "go", "rust" -> extractLineComments(lines, lineStart);
-                default -> extractBlockComment(lines, lineStart);
-            };
+            return extract(lines, language, lineStart);
         } catch (Exception e) {
             return null;
         }
+    }
+
+    /**
+     * Extract the doc comment using pre-read file lines, avoiding redundant file I/O.
+     * Used by {@link LexicalEnricher} when processing multiple nodes from the same file.
+     *
+     * @param lines     All lines of the source file (already read).
+     * @param language  Lowercase language identifier (e.g. "java", "typescript", "python").
+     * @param lineStart 1-based line number of the symbol declaration.
+     * @return Cleaned comment text, or null if none found.
+     */
+    public static String extract(List<String> lines, String language, int lineStart) {
+        if (lines == null || language == null || lineStart <= 0) return null;
+        if (lineStart > lines.size()) return null;
+        return switch (language) {
+            case "python" -> extractPythonDocstring(lines, lineStart);
+            case "go", "rust" -> extractLineComments(lines, lineStart);
+            default -> extractBlockComment(lines, lineStart);
+        };
     }
 
     /**

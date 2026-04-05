@@ -62,6 +62,12 @@ public class TopologyService {
         Map<String, String> nodeToService = buildNodeToServiceMap(nodes);
         List<Map<String, Object>> connections = findCrossServiceConnections(edges, nodeToService);
 
+        // Pre-build degree maps once — O(N+M) instead of O(N×M)
+        Map<Object, Long> outDegree = connections.stream()
+                .collect(Collectors.groupingBy(c -> c.get(PROP_SOURCE), Collectors.counting()));
+        Map<Object, Long> inDegree = connections.stream()
+                .collect(Collectors.groupingBy(c -> c.get(PROP_TARGET), Collectors.counting()));
+
         // Build service summaries
         List<Map<String, Object>> services = new ArrayList<>();
         for (CodeNode svc : sortedValues(serviceNodes)) {
@@ -72,14 +78,8 @@ public class TopologyService {
             svcMap.put(PROP_ENTITY_COUNT, svc.getProperties().getOrDefault(PROP_ENTITY_COUNT, 0));
 
             String name = svc.getLabel();
-            long outCount = connections.stream()
-                    .filter(c -> name.equals(c.get(PROP_SOURCE)))
-                    .count();
-            long inCount = connections.stream()
-                    .filter(c -> name.equals(c.get(PROP_TARGET)))
-                    .count();
-            svcMap.put("connections_out", outCount);
-            svcMap.put("connections_in", inCount);
+            svcMap.put("connections_out", outDegree.getOrDefault(name, 0L));
+            svcMap.put("connections_in", inDegree.getOrDefault(name, 0L));
             services.add(svcMap);
         }
 
@@ -366,6 +366,7 @@ public class TopologyService {
 
         // Find cycles using DFS
         List<List<String>> cycles = new ArrayList<>();
+        Set<String> seenCycles = new HashSet<>();
         Set<String> allServices = new LinkedHashSet<>(adj.keySet());
         for (Map<String, Object> conn : connections) {
             allServices.add((String) conn.get(PROP_TARGET));
@@ -376,7 +377,7 @@ public class TopologyService {
         for (String start : sorted(allServices)) {
             Set<String> inStack = new LinkedHashSet<>();
             List<String> stack = new ArrayList<>();
-            dfsFindCycles(start, adj, inStack, stack, cycles, globalVisited);
+            dfsFindCycles(start, adj, inStack, stack, cycles, seenCycles, globalVisited);
         }
 
         return cycles;
@@ -384,7 +385,8 @@ public class TopologyService {
 
     private void dfsFindCycles(String node, Map<String, Set<String>> adj,
                                Set<String> inStack, List<String> stack,
-                               List<List<String>> cycles, Set<String> globalVisited) {
+                               List<List<String>> cycles, Set<String> seenCycles,
+                               Set<String> globalVisited) {
         if (inStack.contains(node)) {
             // Found a cycle
             int idx = stack.indexOf(node);
@@ -403,7 +405,8 @@ public class TopologyService {
                     normalized.add(cycle.get((minIdx + i) % (cycle.size() - 1)));
                 }
                 normalized.add(normalized.getFirst());
-                if (!cycles.contains(normalized)) {
+                String cycleKey = String.join("->", normalized);
+                if (seenCycles.add(cycleKey)) {
                     cycles.add(normalized);
                 }
             }
@@ -415,7 +418,7 @@ public class TopologyService {
         stack.add(node);
 
         for (String neighbor : sorted(adj.getOrDefault(node, Set.of()))) {
-            dfsFindCycles(neighbor, adj, inStack, stack, cycles, globalVisited);
+            dfsFindCycles(neighbor, adj, inStack, stack, cycles, seenCycles, globalVisited);
         }
 
         inStack.remove(node);
