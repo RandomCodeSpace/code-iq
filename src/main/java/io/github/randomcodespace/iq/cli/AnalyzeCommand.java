@@ -66,28 +66,28 @@ public class AnalyzeCommand implements Callable<Integer> {
         // --no-cache overrides --incremental
         boolean useIncremental = incremental && !noCache;
 
-        CliOutput.step("\uD83D\uDD0D", "Scanning " + root + " ...");
+        CliOutput.step("[*]", "Scanning " + root + " ...");
         if (useIncremental) {
-            CliOutput.info("  (incremental mode — use --no-cache for full re-analysis)");
+            CliOutput.info("  (incremental mode -- use --no-cache for full re-analysis)");
         }
 
         AnalysisResult result = analyzer.run(root, parallelism, useIncremental, msg -> {
             if (msg.startsWith("Discovering")) {
-                CliOutput.step("\uD83D\uDD0D", msg);
+                CliOutput.step("[*]", msg);
             } else if (msg.startsWith("Found")) {
-                CliOutput.step("\uD83D\uDCC1", "@|cyan " + msg + "|@");
+                CliOutput.step("[+]", "@|cyan " + msg + "|@");
             } else if (msg.startsWith("Analyzing")) {
-                CliOutput.step("\u2699\uFE0F", msg.replace("files...", "files using " + cores + " cores..."));
+                CliOutput.step("[~]", msg.replace("files...", "files using " + cores + " cores..."));
             } else if (msg.startsWith("Building")) {
-                CliOutput.step("\uD83C\uDFD7\uFE0F", msg);
+                CliOutput.step("[^]", msg);
             } else if (msg.startsWith("Linking")) {
-                CliOutput.step("\uD83D\uDD17", msg);
+                CliOutput.step("[-]", msg);
             } else if (msg.startsWith("Classifying")) {
-                CliOutput.step("\uD83C\uDFF7\uFE0F", msg);
+                CliOutput.step("[#]", msg);
             } else if (msg.startsWith("Cache hits")) {
-                CliOutput.step("\u26A1", "@|green " + msg + "|@");
+                CliOutput.step("[!]", "@|green " + msg + "|@");
             } else if (msg.startsWith("Incremental")) {
-                CliOutput.step("\u26A1", msg);
+                CliOutput.step("[!]", msg);
             } else if (msg.startsWith("Analysis complete")) {
                 // handled below
             } else {

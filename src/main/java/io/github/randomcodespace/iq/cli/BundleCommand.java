@@ -132,7 +132,7 @@ public class BundleCommand implements Callable<Integer> {
             }
         }
 
-        CliOutput.step("\uD83D\uDCE6", "Creating bundle...");
+        CliOutput.step("[+]", "Creating bundle...");
 
         try (var zos = new ZipOutputStream(Files.newOutputStream(zipPath))) {
 
@@ -202,7 +202,7 @@ public class BundleCommand implements Callable<Integer> {
                     : nf.format(sizeBytes / 1024) + " KB";
 
             System.out.println();
-            CliOutput.success("\u2705 Bundle created: " + zipPath);
+            CliOutput.success("[OK] Bundle created: " + zipPath);
             CliOutput.info("  Tag:    " + bundleTag);
             CliOutput.info("  Nodes:  " + nf.format(nodeCount));
             CliOutput.info("  Edges:  " + nf.format(edgeCount));

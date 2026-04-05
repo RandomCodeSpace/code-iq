@@ -75,7 +75,7 @@ public class ServeCommand implements Callable<Integer> {
             }
         }
 
-        CliOutput.step("\uD83D\uDE80", "@|bold,green Server started|@");
+        CliOutput.step("[OK]", "@|bold,green Server started|@");
         System.out.println();
         if (noUi) {
             CliOutput.info("  Web UI:    disabled (API and MCP active at :" + port + ")");

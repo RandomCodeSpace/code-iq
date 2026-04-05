@@ -58,6 +58,9 @@ public class EnrichCommand implements Callable<Integer> {
     @picocli.CommandLine.Option(names = {"--graph"}, description = "Path to shared graph directory (for multi-repo)")
     private Path graphDir;
 
+    @picocli.CommandLine.Option(names = {"--verbose", "-v"}, description = "Enable verbose per-file logging")
+    private boolean verbose;
+
     private final CodeIqConfig config;
     private final LayerClassifier layerClassifier;
     private final List<Linker> linkers;
@@ -76,6 +79,11 @@ public class EnrichCommand implements Callable<Integer> {
 
     @Override
     public Integer call() {
+        if (verbose) {
+            ((ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger("io.github.randomcodespace.iq"))
+                    .setLevel(ch.qos.logback.classic.Level.DEBUG);
+        }
+
         Instant start = Instant.now();
         Path root = path.toAbsolutePath().normalize();
         NumberFormat nf = NumberFormat.getIntegerInstance(Locale.US);
@@ -94,7 +102,7 @@ public class EnrichCommand implements Callable<Integer> {
             return 1;
         }
 
-        CliOutput.step("\uD83D\uDCE6", "Loading index from H2...");
+        CliOutput.step("[+]", "Loading index from H2...");
         AnalysisCache cache;
         try {
             cache = new AnalysisCache(cachePath);
@@ -124,7 +132,8 @@ public class EnrichCommand implements Callable<Integer> {
                 + nf.format(allEdges.size()) + " edges from H2");
 
         // 2. Run linkers (these work on in-memory node/edge lists)
-        CliOutput.step("\uD83D\uDD17", "Running cross-file linkers...");
+        CliOutput.step("[-]", "Running cross-file linkers...");
+        Instant stepStart = Instant.now();
         RepositoryIdentity repoIdentity = RepositoryIdentity.resolve(root);
         var builder = new GraphBuilder(repoIdentity, VersionCommand.VERSION);
         for (CodeNode node : allNodes) {
@@ -146,21 +155,29 @@ public class EnrichCommand implements Callable<Integer> {
             CliOutput.info("  Linkers added " + nf.format(linkerNodeDelta) + " nodes, "
                     + nf.format(linkerEdgeDelta) + " edges");
         }
+        CliOutput.info("  Done in " + Duration.between(stepStart, Instant.now()).toMillis() + "ms");
 
         // 3. Classify layers
-        CliOutput.step("\uD83C\uDFF7\uFE0F", "Classifying layers...");
+        CliOutput.step("[#]", "Classifying layers...");
+        stepStart = Instant.now();
         layerClassifier.classify(enrichedNodes);
+        CliOutput.info("  Done in " + Duration.between(stepStart, Instant.now()).toMillis() + "ms");
 
         // 3b. Enrich lexical metadata (doc comments, config keys) for fulltext search
-        CliOutput.step("\uD83D\uDD0D", "Enriching lexical metadata...");
+        CliOutput.step("[*]", "Enriching lexical metadata...");
+        stepStart = Instant.now();
         lexicalEnricher.enrich(enrichedNodes, root);
+        CliOutput.info("  Done in " + Duration.between(stepStart, Instant.now()).toMillis() + "ms");
 
         // 3b2. Language-specific enrichment (call graph, type hints, import resolution)
-        CliOutput.step("\uD83D\uDD0D", "Running language-specific enrichment...");
+        CliOutput.step("[*]", "Running language-specific enrichment...");
+        stepStart = Instant.now();
         languageEnricher.enrich(enrichedNodes, enrichedEdges, root);
+        CliOutput.info("  Done in " + Duration.between(stepStart, Instant.now()).toMillis() + "ms");
 
         // 3c. Detect services
-        CliOutput.step("\uD83C\uDFD7\uFE0F", "Detecting service boundaries...");
+        CliOutput.step("[^]", "Detecting service boundaries...");
+        stepStart = Instant.now();
         var serviceDetector = new io.github.randomcodespace.iq.analyzer.ServiceDetector();
         String projectName = root.getFileName().toString();
         var serviceResult = serviceDetector.detect(enrichedNodes, enrichedEdges, projectName, root);
@@ -173,13 +190,15 @@ public class EnrichCommand implements Callable<Integer> {
             enrichedEdges = new ArrayList<>(builder.getEdges());
             CliOutput.info("  Detected " + serviceResult.serviceNodes().size() + " service(s)");
         }
+        CliOutput.info("  Done in " + Duration.between(stepStart, Instant.now()).toMillis() + "ms");
 
         // 4. Start Neo4j Embedded and bulk-load
         Path graphPath = graphDir != null
                 ? graphDir.toAbsolutePath().normalize().resolve("graph.db")
                 : root.resolve(".osscodeiq/graph.db");
 
-        CliOutput.step("\uD83D\uDCBE", "Bulk-loading into Neo4j at " + graphPath + "...");
+        CliOutput.step("[~]", "Bulk-loading into Neo4j at " + graphPath + "...");
+        stepStart = Instant.now();
 
         DatabaseManagementService dbms = null;
         try {
@@ -343,13 +362,14 @@ public class EnrichCommand implements Callable<Integer> {
                 log.debug("Secondary index await returned: {}", e.getMessage());
             }
             CliOutput.info("  Created Neo4j indexes");
+            CliOutput.info("  Done in " + Duration.between(stepStart, Instant.now()).toMillis() + "ms");
 
             Duration elapsed = Duration.between(start, Instant.now());
             long secs = elapsed.toSeconds();
             String timeStr = secs > 0 ? secs + "s" : elapsed.toMillis() + "ms";
 
             System.out.println();
-            CliOutput.success("\u2705 Enrichment complete -- "
+            CliOutput.success("[OK] Enrichment complete -- "
                     + nf.format(nodesLoaded) + " nodes, "
                     + nf.format(edgesLoaded) + " edges in " + timeStr);
             System.out.println();

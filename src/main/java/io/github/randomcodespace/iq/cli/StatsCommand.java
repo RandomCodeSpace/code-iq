@@ -141,7 +141,7 @@ public class StatsCommand implements Callable<Integer> {
         String projectName = path.toAbsolutePath().normalize().getFileName().toString();
 
         out.println();
-        CliOutput.print(out, "@|bold \uD83D\uDCCA Code IQ Stats \u2014 " + projectName + "|@");
+        CliOutput.print(out, "@|bold [=] Code IQ Stats -- " + projectName + "|@");
         out.println();
 
         // Graph

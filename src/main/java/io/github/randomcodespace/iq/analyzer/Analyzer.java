@@ -548,6 +548,7 @@ public class Analyzer {
             if (batch.size() >= batchSize || fileIdx == files.size() - 1) {
                 batchNumber++;
                 report.accept("Processing batch " + batchNumber + " (" + batch.size() + " files)...");
+                Instant batchStart = Instant.now();
 
                 // Analyze batch in parallel
                 DetectorResult[] resultSlots = new DetectorResult[batch.size()];
@@ -601,8 +602,16 @@ public class Analyzer {
                             Thread.currentThread().interrupt();
                             log.warn("Analysis interrupted for {}", batch.get(i).path());
                         }
+                        int done = i + 1;
+                        if (done % 100 == 0 || done == futures.size()) {
+                            report.accept("  " + done + "/" + futures.size() + " files...");
+                        }
                     }
                 }
+
+                long batchMs = Duration.between(batchStart, Instant.now()).toMillis();
+                long avgMs = batch.isEmpty() ? 0 : batchMs / batch.size();
+                report.accept("  Batch " + batchNumber + " done: " + batchMs + "ms (" + avgMs + "ms/file avg)");
 
                 cacheHits += batchCacheHits.get();
 
@@ -926,6 +935,7 @@ public class Analyzer {
             int batchNumber, Consumer<String> report) {
 
         report.accept("Processing batch " + batchNumber + " (" + batch.size() + " files)...");
+        Instant batchStart = Instant.now();
 
         DetectorResult[] slots = new DetectorResult[batch.size()];
         var batchCacheHits = new java.util.concurrent.atomic.AtomicInteger(0);
@@ -976,7 +986,15 @@ public class Analyzer {
                 Thread.currentThread().interrupt();
                 log.warn("Analysis interrupted for {}", batch.get(i).path());
             }
+            int done = i + 1;
+            if (done % 100 == 0 || done == futures.size()) {
+                report.accept("  " + done + "/" + futures.size() + " files...");
+            }
         }
+
+        long batchMs = Duration.between(batchStart, Instant.now()).toMillis();
+        long avgMs = batch.isEmpty() ? 0 : batchMs / batch.size();
+        report.accept("  Batch " + batchNumber + " done: " + batchMs + "ms (" + avgMs + "ms/file avg)");
 
         int nodes = 0, edges = 0, analyzed = 0;
         List<CodeNode> batchNodes = new ArrayList<>();
@@ -1149,8 +1167,10 @@ public class Analyzer {
         AntlrParserFactory.clearCache();
 
         long fileMs = Duration.between(fileStart, Instant.now()).toMillis();
-        if (fileMs > 500) {
-            log.debug("Slow file {} ({}): {}ms", file.path(), file.language(), fileMs);
+        if (fileMs > 5000) {
+            log.warn("[SLOW] {} took {}ms", file.path(), fileMs);
+        } else if (fileMs > 500) {
+            log.info("[SLOW] {} took {}ms", file.path(), fileMs);
         }
 
         if (moduleName != null) {
@@ -1293,7 +1313,10 @@ public class Analyzer {
                 Instant detStart = Instant.now();
                 DetectorResult result = detector.detect(ctx);
                 long detMs = Duration.between(detStart, Instant.now()).toMillis();
-                if (detMs > 100) {
+                if (detMs > 2000) {
+                    log.warn("[SLOW DETECTOR] {} on {}: {}ms",
+                            detector.getName(), file.path(), detMs);
+                } else if (detMs > 100) {
                     log.debug("Slow detector {} on {} ({} bytes): {}ms",
                             detector.getName(), file.path(), content.length(), detMs);
                 }
@@ -1309,8 +1332,10 @@ public class Analyzer {
         AntlrParserFactory.clearCache();
 
         long fileMs = Duration.between(fileStart, Instant.now()).toMillis();
-        if (fileMs > 500) {
-            log.debug("Slow file {} ({}): {}ms", file.path(), file.language(), fileMs);
+        if (fileMs > 5000) {
+            log.warn("[SLOW] {} took {}ms", file.path(), fileMs);
+        } else if (fileMs > 500) {
+            log.info("[SLOW] {} took {}ms", file.path(), fileMs);
         }
 
         // Set module on all nodes that don't have one yet

@@ -79,6 +79,7 @@ public class FileDiscovery {
      */
     public List<DiscoveredFile> discover(Path repoPath) {
         Path root = repoPath.toAbsolutePath().normalize();
+        java.time.Instant discoverStart = java.time.Instant.now();
         List<DiscoveredFile> result;
 
         if (isGitRepo(root)) {
@@ -89,7 +90,8 @@ public class FileDiscovery {
 
         // Sort for deterministic ordering
         result.sort(Comparator.comparing(f -> f.path().toString()));
-        log.debug("Discovered {} files in {}", result.size(), root);
+        long discoverMs = java.time.Duration.between(discoverStart, java.time.Instant.now()).toMillis();
+        log.info("Discovered {} files in {} ({}ms)", result.size(), root, discoverMs);
         return result;
     }
 

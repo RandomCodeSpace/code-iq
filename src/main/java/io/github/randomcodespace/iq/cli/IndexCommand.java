@@ -50,6 +50,9 @@ public class IndexCommand implements Callable<Integer> {
     @Option(names = {"--service-name"}, description = "Service name tag for nodes (for multi-repo)")
     private String serviceName;
 
+    @Option(names = {"--verbose", "-v"}, description = "Enable verbose per-file logging")
+    private boolean verbose;
+
     private final Analyzer analyzer;
     private final CodeIqConfig config;
 
@@ -60,6 +63,11 @@ public class IndexCommand implements Callable<Integer> {
 
     @Override
     public Integer call() {
+        if (verbose) {
+            ((ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger("io.github.randomcodespace.iq"))
+                    .setLevel(ch.qos.logback.classic.Level.DEBUG);
+        }
+
         Path root = path.toAbsolutePath().normalize();
 
         CliOutput.configureFromOptions(config, graphDir, serviceName, root);
@@ -73,7 +81,7 @@ public class IndexCommand implements Callable<Integer> {
         // --no-cache overrides --incremental
         boolean useIncremental = incremental && !noCache;
 
-        CliOutput.step("\uD83D\uDD0D", "Indexing " + root + " ...");
+        CliOutput.step("[*]", "Indexing " + root + " ...");
         CliOutput.info("  (batch size: " + effectiveBatchSize + " files, "
                 + cores + " cores, H2 store, config-first smart pipeline)");
         if (useIncremental) {
@@ -83,17 +91,17 @@ public class IndexCommand implements Callable<Integer> {
         AnalysisResult result = analyzer.runSmartIndex(root, parallelism, effectiveBatchSize,
                 useIncremental, msg -> {
             if (msg.startsWith("Phase 1")) {
-                CliOutput.step("\uD83D\uDD0D", "@|bold " + msg + "|@");
+                CliOutput.step("[*]", "@|bold " + msg + "|@");
             } else if (msg.startsWith("Phase 2")) {
-                CliOutput.step("\uD83D\uDCC1", "@|bold " + msg + "|@");
+                CliOutput.step("[+]", "@|bold " + msg + "|@");
             } else if (msg.startsWith("Processing module")) {
-                CliOutput.step("\uD83E\uDDF1", msg);
+                CliOutput.step("[:]", msg);
             } else if (msg.startsWith("Processing batch")) {
-                CliOutput.step("\u2699\uFE0F", msg);
+                CliOutput.step("[~]", msg);
             } else if (msg.startsWith("Keyword filter")) {
-                CliOutput.step("\u26A1", "@|green " + msg + "|@");
+                CliOutput.step("[!]", "@|green " + msg + "|@");
             } else if (msg.startsWith("Cache hits")) {
-                CliOutput.step("\u26A1", "@|green " + msg + "|@");
+                CliOutput.step("[!]", "@|green " + msg + "|@");
             } else if (msg.startsWith("Service:")) {
                 CliOutput.info("  " + msg);
             } else if (msg.startsWith("Smart index complete")) {

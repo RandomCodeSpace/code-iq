@@ -99,6 +99,7 @@ public final class AntlrParserFactory {
             return cached.getValue();
         }
 
+        java.time.Instant parseStart = java.time.Instant.now();
         ParseTree tree = switch (language.toLowerCase()) {
             case "python" -> parsePython(content);
             case "javascript" -> parseJavaScript(content);
@@ -111,6 +112,10 @@ public final class AntlrParserFactory {
             case "cpp" -> parseCpp(content);
             default -> null;
         };
+        long parseMs = java.time.Duration.between(parseStart, java.time.Instant.now()).toMillis();
+        if (parseMs > 2000) {
+            log.warn("[SLOW ANTLR] {} parse: {}ms ({} bytes)", language, parseMs, content.length());
+        }
 
         // Cache the result for subsequent detectors on the same file
         if (tree != null) {

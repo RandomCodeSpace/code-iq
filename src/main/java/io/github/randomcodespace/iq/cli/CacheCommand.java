@@ -120,7 +120,7 @@ public class CacheCommand implements Runnable {
                                 CliOutput.warn("Could not delete: " + p);
                             }
                         });
-                CliOutput.success("\u2705 Cache cleared: " + cacheDir);
+                CliOutput.success("[OK] Cache cleared: " + cacheDir);
             } catch (IOException e) {
                 CliOutput.error("Failed to clear cache: " + e.getMessage());
                 return 1;

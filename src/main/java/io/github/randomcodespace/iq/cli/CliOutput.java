@@ -107,7 +107,7 @@ final class CliOutput {
         String timeStr = secs > 0 ? secs + "s" : result.elapsed().toMillis() + "ms";
 
         System.out.println();
-        success("\u2705 Complete \u2014 "
+        success("[OK] Complete -- "
                 + nf.format(result.nodeCount()) + " nodes, "
                 + nf.format(result.edgeCount()) + " edges in " + timeStr);
         System.out.println();
