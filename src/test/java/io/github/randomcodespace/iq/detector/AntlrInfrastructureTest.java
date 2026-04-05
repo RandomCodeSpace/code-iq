@@ -35,24 +35,6 @@ class AntlrInfrastructureTest {
                             def greet(self):
                                 pass
                         """),
-                Arguments.of("javascript", """
-                        function hello(name) {
-                            return `Hello, ${name}`;
-                        }
-
-                        class Greeter {
-                            greet() { return "hi"; }
-                        }
-                        """),
-                Arguments.of("typescript", """
-                        function hello(name) {
-                            return `Hello, ${name}`;
-                        }
-
-                        class Greeter {
-                            greet() { return "hi"; }
-                        }
-                        """),
                 Arguments.of("go", """
                         package main
 
@@ -165,6 +147,26 @@ class AntlrInfrastructureTest {
         assertTrue(AntlrParserFactory.isSupported("cpp"));
         assertFalse(AntlrParserFactory.isSupported("brainfuck"));
         assertFalse(AntlrParserFactory.isSupported(null));
+    }
+
+    @Test
+    void typeScriptAndJavaScriptSkippedForPerformance() {
+        // TypeScript/JavaScript ANTLR grammars have exponential ATN prediction on certain
+        // inputs. All TS/JS detectors have comprehensive regex fallback, so ANTLR is skipped.
+        String tsCode = """
+                interface Greeter {
+                    greet(): string;
+                }
+                """;
+        String jsCode = """
+                function hello(name) {
+                    return `Hello, ${name}`;
+                }
+                """;
+        assertNull(AntlrParserFactory.parse("typescript", tsCode),
+                "TypeScript should be skipped (regex fallback)");
+        assertNull(AntlrParserFactory.parse("javascript", jsCode),
+                "JavaScript should be skipped (regex fallback)");
     }
 
     @ParameterizedTest(name = "{0}")

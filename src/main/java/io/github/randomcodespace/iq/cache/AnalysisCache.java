@@ -24,6 +24,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * H2-backed cache for incremental analysis results.
@@ -85,6 +87,15 @@ public class AnalysisCache implements Closeable {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
+    /**
+     * Read-write lock replacing synchronized methods.
+     * Read operations (isCached, loadCachedResults, getHashForPath, etc.) use readLock.
+     * Write operations (storeResults, replaceAll, clear, removeFile) use writeLock.
+     * This prevents ClosedChannelException from concurrent virtual thread writes
+     * to H2's MVStore file channel.
+     */
+    private final ReadWriteLock rwLock = new ReentrantReadWriteLock();
+
     private final Connection conn;
     private final Path dbPath;
 
@@ -106,7 +117,7 @@ public class AnalysisCache implements Closeable {
                 dbFile = dbFile.substring(0, dbFile.length() - 3);
             }
             this.conn = DriverManager.getConnection(
-                    "jdbc:h2:file:" + dbFile + ";AUTO_SERVER=FALSE;MODE=MySQL");
+                    "jdbc:h2:file:" + dbFile + ";AUTO_SERVER=FALSE;MODE=MySQL;DB_CLOSE_ON_EXIT=FALSE;WRITE_DELAY=0");
             initDb();
         } catch (Exception e) {
             throw new RuntimeException("Failed to open analysis cache at " + dbPath, e);
@@ -158,7 +169,8 @@ public class AnalysisCache implements Closeable {
     /**
      * Return the commit SHA from the most recent analysis run, or null.
      */
-    public synchronized String getLastCommit() {
+    public String getLastCommit() {
+        rwLock.readLock().lock();
         try (var stmt = conn.prepareStatement(
                 "SELECT commit_sha FROM analysis_runs ORDER BY timestamp DESC LIMIT 1")) {
             try (ResultSet rs = stmt.executeQuery()) {
@@ -168,6 +180,8 @@ public class AnalysisCache implements Closeable {
             }
         } catch (SQLException e) {
             log.debug("Failed to get last commit", e);
+        } finally {
+            rwLock.readLock().unlock();
         }
         return null;
     }
@@ -177,7 +191,8 @@ public class AnalysisCache implements Closeable {
     /**
      * Check whether results for the given content hash are cached.
      */
-    public synchronized boolean isCached(String contentHash) {
+    public boolean isCached(String contentHash) {
+        rwLock.readLock().lock();
         try (var stmt = conn.prepareStatement(
                 "SELECT 1 FROM files WHERE content_hash = ?")) {
             stmt.setString(1, contentHash);
@@ -187,6 +202,8 @@ public class AnalysisCache implements Closeable {
         } catch (SQLException e) {
             log.debug("Cache lookup failed", e);
             return false;
+        } finally {
+            rwLock.readLock().unlock();
         }
     }
 
@@ -194,7 +211,8 @@ public class AnalysisCache implements Closeable {
      * Look up the content hash stored for a given file path.
      * Returns null if the path has not been cached yet.
      */
-    public synchronized String getHashForPath(String filePath) {
+    public String getHashForPath(String filePath) {
+        rwLock.readLock().lock();
         try (var stmt = conn.prepareStatement(
                 "SELECT content_hash FROM files WHERE path = ? LIMIT 1")) {
             stmt.setString(1, filePath);
@@ -204,6 +222,8 @@ public class AnalysisCache implements Closeable {
         } catch (SQLException e) {
             log.debug("Hash lookup by path failed", e);
             return null;
+        } finally {
+            rwLock.readLock().unlock();
         }
     }
 
@@ -212,8 +232,9 @@ public class AnalysisCache implements Closeable {
     /**
      * Persist analysis results for a single file.
      */
-    public synchronized void storeResults(String contentHash, String filePath, String language,
+    public void storeResults(String contentHash, String filePath, String language,
                              List<CodeNode> nodes, List<CodeEdge> edges) {
+        rwLock.writeLock().lock();
         try {
             conn.setAutoCommit(false);
             String now = Instant.now().toString();
@@ -277,6 +298,7 @@ public class AnalysisCache implements Closeable {
                 conn.setAutoCommit(true);
             } catch (SQLException ignored) {
             }
+            rwLock.writeLock().unlock();
         }
     }
 
@@ -287,7 +309,8 @@ public class AnalysisCache implements Closeable {
      *
      * @return a CachedResult with the nodes and edges, or null if not cached
      */
-    public synchronized CachedResult loadCachedResults(String contentHash) {
+    public CachedResult loadCachedResults(String contentHash) {
+        rwLock.readLock().lock();
         try {
             List<CodeNode> nodes = new ArrayList<>();
             try (var stmt = conn.prepareStatement("SELECT data FROM nodes WHERE content_hash = ?")) {
@@ -318,6 +341,8 @@ public class AnalysisCache implements Closeable {
         } catch (SQLException e) {
             log.debug("Failed to load cached results for hash {}", contentHash, e);
             return null;
+        } finally {
+            rwLock.readLock().unlock();
         }
     }
 
@@ -326,7 +351,8 @@ public class AnalysisCache implements Closeable {
     /**
      * Delete all cached results associated with a content hash.
      */
-    public synchronized void removeFile(String contentHash) {
+    public void removeFile(String contentHash) {
+        rwLock.writeLock().lock();
         try {
             conn.setAutoCommit(false);
             try (var stmt = conn.prepareStatement("DELETE FROM nodes WHERE content_hash = ?")) {
@@ -353,6 +379,7 @@ public class AnalysisCache implements Closeable {
                 conn.setAutoCommit(true);
             } catch (SQLException ignored) {
             }
+            rwLock.writeLock().unlock();
         }
     }
 
@@ -361,7 +388,8 @@ public class AnalysisCache implements Closeable {
     /**
      * Record an analysis run with its commit SHA and file count.
      */
-    public synchronized void recordRun(String commitSha, int fileCount) {
+    public void recordRun(String commitSha, int fileCount) {
+        rwLock.writeLock().lock();
         try (var stmt = conn.prepareStatement(
                 "INSERT INTO analysis_runs (run_id, commit_sha, timestamp, file_count) VALUES (?, ?, ?, ?)")) {
             stmt.setString(1, UUID.randomUUID().toString());
@@ -371,6 +399,8 @@ public class AnalysisCache implements Closeable {
             stmt.execute();
         } catch (SQLException e) {
             log.warn("Failed to record analysis run", e);
+        } finally {
+            rwLock.writeLock().unlock();
         }
     }
 
@@ -379,24 +409,30 @@ public class AnalysisCache implements Closeable {
     /**
      * Return cache statistics.
      */
-    public synchronized Map<String, Object> getStats() {
-        Map<String, Object> stats = new LinkedHashMap<>();
+    public Map<String, Object> getStats() {
+        rwLock.readLock().lock();
         try {
-            stats.put("cached_files", countFiles());
-            stats.put("cached_nodes", getNodeCount());
-            stats.put("cached_edges", countEdges());
-            stats.put("total_runs", countAnalysisRuns());
-            stats.put("db_path", dbPath.toString());
-        } catch (SQLException e) {
-            stats.put("error", e.getMessage());
+            Map<String, Object> stats = new LinkedHashMap<>();
+            try {
+                stats.put("cached_files", countFiles());
+                stats.put("cached_nodes", countNodesInternal());
+                stats.put("cached_edges", countEdges());
+                stats.put("total_runs", countAnalysisRuns());
+                stats.put("db_path", dbPath.toString());
+            } catch (SQLException e) {
+                stats.put("error", e.getMessage());
+            }
+            return stats;
+        } finally {
+            rwLock.readLock().unlock();
         }
-        return stats;
     }
 
     /**
      * Clear all cached data.
      */
-    public synchronized void clear() {
+    public void clear() {
+        rwLock.writeLock().lock();
         try (var stmt = conn.createStatement()) {
             stmt.execute("DELETE FROM edges");
             stmt.execute("DELETE FROM nodes");
@@ -404,6 +440,8 @@ public class AnalysisCache implements Closeable {
             stmt.execute("DELETE FROM analysis_runs");
         } catch (SQLException e) {
             log.warn("Failed to clear cache", e);
+        } finally {
+            rwLock.writeLock().unlock();
         }
     }
 
@@ -420,7 +458,8 @@ public class AnalysisCache implements Closeable {
      * @param nodes enriched nodes (including new SERVICE nodes, layer classifications, etc.)
      * @param edges enriched edges (including linker edges, CONTAINS edges, etc.)
      */
-    public synchronized void replaceAll(List<CodeNode> nodes, List<CodeEdge> edges) {
+    public void replaceAll(List<CodeNode> nodes, List<CodeEdge> edges) {
+        rwLock.writeLock().lock();
         try {
             conn.setAutoCommit(false);
 
@@ -484,6 +523,7 @@ public class AnalysisCache implements Closeable {
                 conn.setAutoCommit(true);
             } catch (SQLException ignored) {
             }
+            rwLock.writeLock().unlock();
         }
     }
 
@@ -633,26 +673,39 @@ public class AnalysisCache implements Closeable {
     /**
      * Return the total number of cached nodes.
      */
-    public synchronized long getNodeCount() {
+    public long getNodeCount() {
+        rwLock.readLock().lock();
+        try {
+            return countNodesInternal();
+        } catch (SQLException e) {
+            log.debug("Failed to count nodes", e);
+            return 0;
+        } finally {
+            rwLock.readLock().unlock();
+        }
+    }
+
+    /** Internal node count -- caller must hold the appropriate lock. */
+    private long countNodesInternal() throws SQLException {
         try (var stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery("SELECT COUNT(DISTINCT id) FROM nodes")) {
             rs.next();
             return rs.getLong(1);
-        } catch (SQLException e) {
-            log.debug("Failed to count nodes", e);
-            return 0;
         }
     }
 
     /**
      * Return the total number of cached edges.
      */
-    public synchronized long getEdgeCount() {
+    public long getEdgeCount() {
+        rwLock.readLock().lock();
         try {
             return countEdges();
         } catch (SQLException e) {
             log.debug("Failed to count edges", e);
             return 0;
+        } finally {
+            rwLock.readLock().unlock();
         }
     }
 
@@ -677,24 +730,29 @@ public class AnalysisCache implements Closeable {
      *
      * @return list of all cached nodes
      */
-    public synchronized List<CodeNode> loadAllNodes() {
-        List<CodeNode> nodes = new ArrayList<>();
-        // Deduplicate by id, keeping the LAST inserted version (most complete data)
-        try (var stmt = conn.prepareStatement("""
-                SELECT n.data FROM nodes n
-                INNER JOIN (SELECT id, MAX(row_id) AS max_id FROM nodes GROUP BY id) m
-                ON n.id = m.id AND n.row_id = m.max_id
-                """)) {
-            try (ResultSet rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    CodeNode node = deserializeNode(rs.getString(1));
-                    if (node != null) nodes.add(node);
+    public List<CodeNode> loadAllNodes() {
+        rwLock.readLock().lock();
+        try {
+            List<CodeNode> nodes = new ArrayList<>();
+            // Deduplicate by id, keeping the LAST inserted version (most complete data)
+            try (var stmt = conn.prepareStatement("""
+                    SELECT n.data FROM nodes n
+                    INNER JOIN (SELECT id, MAX(row_id) AS max_id FROM nodes GROUP BY id) m
+                    ON n.id = m.id AND n.row_id = m.max_id
+                    """)) {
+                try (ResultSet rs = stmt.executeQuery()) {
+                    while (rs.next()) {
+                        CodeNode node = deserializeNode(rs.getString(1));
+                        if (node != null) nodes.add(node);
+                    }
                 }
+            } catch (SQLException e) {
+                log.debug("Failed to load all nodes", e);
             }
-        } catch (SQLException e) {
-            log.debug("Failed to load all nodes", e);
+            return nodes;
+        } finally {
+            rwLock.readLock().unlock();
         }
-        return nodes;
     }
 
     /**
@@ -702,19 +760,24 @@ public class AnalysisCache implements Closeable {
      *
      * @return list of all cached edges
      */
-    public synchronized List<CodeEdge> loadAllEdges() {
-        List<CodeEdge> edges = new ArrayList<>();
-        try (var stmt = conn.prepareStatement("SELECT data FROM edges")) {
-            try (ResultSet rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    CodeEdge edge = deserializeEdge(rs.getString(1));
-                    if (edge != null) edges.add(edge);
+    public List<CodeEdge> loadAllEdges() {
+        rwLock.readLock().lock();
+        try {
+            List<CodeEdge> edges = new ArrayList<>();
+            try (var stmt = conn.prepareStatement("SELECT data FROM edges")) {
+                try (ResultSet rs = stmt.executeQuery()) {
+                    while (rs.next()) {
+                        CodeEdge edge = deserializeEdge(rs.getString(1));
+                        if (edge != null) edges.add(edge);
+                    }
                 }
+            } catch (SQLException e) {
+                log.debug("Failed to load all edges", e);
             }
-        } catch (SQLException e) {
-            log.debug("Failed to load all edges", e);
+            return edges;
+        } finally {
+            rwLock.readLock().unlock();
         }
-        return edges;
     }
 
     /**

@@ -102,6 +102,17 @@ public final class AntlrParserFactory {
             return null;
         }
 
+        // Skip ANTLR for TypeScript/JavaScript entirely — the TS grammar has exponential
+        // ATN prediction on certain inputs regardless of file size (e.g. .d.ts, .mjs, .cjs
+        // files taking 10-40+ seconds even at <1KB). All TS/JS detectors already have
+        // comprehensive regex fallback paths, so ANTLR adds risk without value here.
+        String lang = language.toLowerCase();
+        if ("typescript".equals(lang) || "javascript".equals(lang)) {
+            log.debug("Skipping ANTLR parse for {} — using regex fallback (TS/JS grammar bypass)",
+                    language);
+            return null;
+        }
+
         // Check thread-local cache — same content object means same file
         var cached = PARSE_CACHE.get();
         if (cached != null && cached.getKey() == content) {
