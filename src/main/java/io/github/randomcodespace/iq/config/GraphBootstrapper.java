@@ -45,6 +45,12 @@ public class GraphBootstrapper {
 
     @EventListener(ApplicationReadyEvent.class)
     public void bootstrapNeo4jFromCache() {
+        // Skip bootstrap in read-only mode (no writes allowed)
+        if (config.isReadOnly()) {
+            log.info("Read-only mode -- skipping H2→Neo4j bootstrap");
+            return;
+        }
+
         // Check if Neo4j already has data
         long existingCount = graphStore.count();
         if (existingCount > 0) {

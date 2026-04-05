@@ -46,6 +46,10 @@ public class ServeCommand implements Callable<Integer> {
             description = "Disable the web UI (React SPA). API and MCP endpoints remain active.")
     private boolean noUi;
 
+    @Option(names = {"--read-only"}, defaultValue = "false",
+            description = "Read-only mode: no lock files, no writes. For read-only filesystems (AKS/K8s).")
+    private boolean readOnly;
+
     @Autowired
     private CodeIqConfig config;
 
@@ -56,6 +60,9 @@ public class ServeCommand implements Callable<Integer> {
     public Integer call() {
         Path root = path.toAbsolutePath().normalize();
         config.setRootPath(root.toString());
+        if (readOnly) {
+            config.setReadOnly(true);
+        }
         NumberFormat nf = NumberFormat.getIntegerInstance(Locale.US);
 
         // Report Neo4j graph status

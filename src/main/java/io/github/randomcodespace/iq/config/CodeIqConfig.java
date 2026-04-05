@@ -51,6 +51,9 @@ public class CodeIqConfig {
         public void setPath(String path) { this.path = path; }
     }
 
+    /** Read-only mode for serving — no lock files, no writes. For read-only filesystems (AKS). */
+    private boolean readOnly = false;
+
     /** Service name tag for multi-repo graph mode. */
     private String serviceName;
 
@@ -102,6 +105,14 @@ public class CodeIqConfig {
 
     public void setBatchSize(int batchSize) {
         this.batchSize = Math.max(1, batchSize);
+    }
+
+    public boolean isReadOnly() {
+        return readOnly;
+    }
+
+    public void setReadOnly(boolean readOnly) {
+        this.readOnly = readOnly;
     }
 
     public String getServiceName() {

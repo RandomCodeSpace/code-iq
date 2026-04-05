@@ -1,5 +1,6 @@
 package io.github.randomcodespace.iq.config;
 
+import org.neo4j.configuration.GraphDatabaseSettings;
 import org.neo4j.configuration.connectors.BoltConnector;
 import org.neo4j.configuration.helpers.SocketAddress;
 import org.neo4j.dbms.api.DatabaseManagementService;
@@ -12,9 +13,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.data.neo4j.repository.config.EnableNeo4jRepositories;
 
 import java.nio.file.Path;
+import java.util.Arrays;
 
 /**
  * Neo4j Embedded configuration.
@@ -34,11 +37,19 @@ public class Neo4jConfig {
     private int boltPort;
 
     @Bean(destroyMethod = "shutdown")
-    DatabaseManagementService databaseManagementService(CodeIqConfig config) {
-        return new DatabaseManagementServiceBuilder(Path.of(config.getGraph().getPath()))
+    DatabaseManagementService databaseManagementService(CodeIqConfig config, Environment env) {
+        var builder = new DatabaseManagementServiceBuilder(Path.of(config.getGraph().getPath()))
                 .setConfig(BoltConnector.enabled, true)
-                .setConfig(BoltConnector.listen_address, new SocketAddress("localhost", boltPort))
-                .build();
+                .setConfig(BoltConnector.listen_address, new SocketAddress("localhost", boltPort));
+
+        // Read-only mode for serving profile — no lock files, no transaction logs.
+        // Required for read-only filesystems (e.g., AKS with read-only volumes).
+        boolean isServing = Arrays.asList(env.getActiveProfiles()).contains("serving");
+        if (isServing && config.isReadOnly()) {
+            builder.setConfig(GraphDatabaseSettings.read_only_database_default, true);
+        }
+
+        return builder.build();
     }
 
     @Bean

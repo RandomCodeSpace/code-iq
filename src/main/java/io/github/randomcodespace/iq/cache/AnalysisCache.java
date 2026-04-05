@@ -112,17 +112,37 @@ public class AnalysisCache implements Closeable {
      * @param dbPath path to the H2 database file (without extension)
      */
     public AnalysisCache(Path dbPath) {
+        this(dbPath, false);
+    }
+
+    /**
+     * Open an analysis cache. In read-only mode, no lock files are created
+     * and no writes are allowed — suitable for read-only filesystems (AKS/K8s).
+     *
+     * @param dbPath   path to the H2 database file (without extension)
+     * @param readOnly if true, opens DB in read-only mode (no lock files, no writes)
+     */
+    public AnalysisCache(Path dbPath, boolean readOnly) {
         this.dbPath = dbPath;
         try {
-            Files.createDirectories(dbPath.getParent());
+            if (!readOnly) {
+                Files.createDirectories(dbPath.getParent());
+            }
             // Strip .db extension if present — H2 appends its own .mv.db
             String dbFile = dbPath.toString();
             if (dbFile.endsWith(".db")) {
                 dbFile = dbFile.substring(0, dbFile.length() - 3);
             }
-            this.conn = DriverManager.getConnection(
-                    "jdbc:h2:file:" + dbFile + ";AUTO_SERVER=FALSE;MODE=MySQL;DB_CLOSE_ON_EXIT=FALSE;WRITE_DELAY=0");
-            initDb();
+            String url = "jdbc:h2:file:" + dbFile + ";AUTO_SERVER=FALSE;MODE=MySQL;DB_CLOSE_ON_EXIT=FALSE";
+            if (readOnly) {
+                url += ";ACCESS_MODE_DATA=r;FILE_LOCK=NO";
+            } else {
+                url += ";WRITE_DELAY=0";
+            }
+            this.conn = DriverManager.getConnection(url);
+            if (!readOnly) {
+                initDb();
+            }
         } catch (Exception e) {
             throw new RuntimeException("Failed to open analysis cache at " + dbPath, e);
         }
