@@ -28,21 +28,23 @@ function ThemedApp() {
         wireframe: false,
         // Dark mode refinements
         ...(isDark ? {
-          colorBgContainer: '#1f1f23',
-          colorBgElevated: '#27272b',
-          colorBgLayout: '#18181b',
-          colorBorder: '#3f3f46',
-          colorBorderSecondary: '#34343a',
+          colorBgContainer: '#141414',
+          colorBgElevated: '#1c1c1c',
+          colorBgLayout: '#0a0a0a',
+          colorBorder: '#303030',
+          colorBorderSecondary: '#262626',
+          colorText: '#e8e8e8',
+          colorTextSecondary: '#a0a0a0',
         } : {
           colorBgContainer: '#ffffff',
           colorBgElevated: '#ffffff',
-          colorBgLayout: '#f5f5f9',
+          colorBgLayout: '#f7f7f8',
         }),
       },
       components: {
         Table: {
-          headerBg: isDark ? '#27272b' : '#fafafa',
-          rowHoverBg: isDark ? '#2d2d33' : '#f0f0ff',
+          headerBg: isDark ? '#1c1c1c' : '#fafafa',
+          rowHoverBg: isDark ? '#1f1f1f' : '#f5f5ff',
         },
         Card: {
           paddingLG: 20,

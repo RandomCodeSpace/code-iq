@@ -138,19 +138,23 @@ export default function Dashboard() {
     }
   }
 
-  // Edge kind breakdown from detailed stats
+  // Edge kind breakdown — try multiple sources from stats API
   const edgeKindBreakdown: Record<string, number> = {};
-  if (detailed && typeof detailed === 'object') {
+  if (computed && typeof computed === 'object') {
+    // Check for edges_by_kind in graph section
+    const graph = (computed as unknown as Record<string, unknown>).graph as Record<string, unknown> | undefined;
+    if (graph?.edges_by_kind && typeof graph.edges_by_kind === 'object') {
+      Object.assign(edgeKindBreakdown, flattenToRecord(graph.edges_by_kind));
+    }
+  }
+  if (detailed && typeof detailed === 'object' && Object.keys(edgeKindBreakdown).length === 0) {
     const d = detailed as Record<string, unknown>;
     const graph = d.graph as Record<string, unknown> | undefined;
     if (graph?.edges_by_kind && typeof graph.edges_by_kind === 'object') {
       Object.assign(edgeKindBreakdown, flattenToRecord(graph.edges_by_kind));
     }
-    // Fallback: try connections section
-    if (Object.keys(edgeKindBreakdown).length === 0 && d.connections) {
-      Object.assign(edgeKindBreakdown, flattenToRecord(d.connections));
-    }
   }
+  // If still empty, the API doesn't provide edge breakdown — Edges card won't be clickable
 
   if (loading) {
     return <div style={{ textAlign: 'center', padding: 80 }}><Spin size="large" /></div>;

@@ -4,7 +4,7 @@ import ReactECharts from 'echarts-for-react';
 import { useApi } from '@/hooks/useApi';
 import { api } from '@/lib/api';
 import { useTheme } from '@/context/ThemeContext';
-import type { NodesListResponse } from '@/types/api';
+import type { FileTreeResponse, FileTreeNode } from '@/types/api';
 
 const LANG_COLORS: Record<string, string> = {
   java: '#b07219', python: '#3572A5', typescript: '#3178c6', javascript: '#f1e05a',
@@ -12,7 +12,6 @@ const LANG_COLORS: Record<string, string> = {
   yaml: '#cb171e', json: '#555', ruby: '#701516', scala: '#c22d40',
   cpp: '#f34b7d', shell: '#89e051', markdown: '#083fa1', html: '#e34c26',
   css: '#563d7c', sql: '#e38c00', proto: '#60a0b0', dockerfile: '#384d54',
-  other: '#888',
 };
 
 const EXT_TO_LANG: Record<string, string> = {
@@ -24,104 +23,85 @@ const EXT_TO_LANG: Record<string, string> = {
   css: 'css', sql: 'sql', proto: 'proto',
 };
 
-interface TreeNode {
+interface EChartsTreeNode {
   name: string;
-  path: string;
   value: number;
-  children?: TreeNode[];
+  children?: EChartsTreeNode[];
   itemStyle?: { color: string };
 }
 
-function buildTreemap(
-  nodes: Array<{ file_path?: string; label: string; properties?: Record<string, unknown> }>,
-): TreeNode[] {
-  // Build a nested directory tree
-  const root: Record<string, { count: number; langs: Record<string, number>; children: Record<string, unknown> }> = {};
+function inferLang(name: string): string {
+  const ext = name.split('.').pop()?.toLowerCase() ?? '';
+  return EXT_TO_LANG[ext] ?? 'other';
+}
 
-  for (const node of nodes) {
-    const fp = node.file_path;
-    if (!fp) continue;
+function fileTreeToECharts(nodes: FileTreeNode[]): EChartsTreeNode[] {
+  return nodes
+    .filter(n => n.nodeCount > 0 || (n.children && n.children.length > 0))
+    .map(n => {
+      if (n.type === 'directory' && n.children && n.children.length > 0) {
+        const children = fileTreeToECharts(n.children);
+        // Dominant language from children names
+        const langCounts: Record<string, number> = {};
+        function countLangs(items: FileTreeNode[]) {
+          for (const item of items) {
+            if (item.type === 'file') {
+              const lang = inferLang(item.name);
+              langCounts[lang] = (langCounts[lang] ?? 0) + (item.nodeCount || 1);
+            }
+            if (item.children) countLangs(item.children);
+          }
+        }
+        countLangs(n.children);
+        const dominant = Object.entries(langCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'other';
 
-    const parts = fp.split('/');
-    const ext = fp.split('.').pop()?.toLowerCase() ?? '';
-    const lang = EXT_TO_LANG[ext] ?? 'other';
-
-    // Walk/create directory path
-    let current = root;
-    for (let i = 0; i < parts.length - 1; i++) {
-      const dir = parts[i];
-      if (!current[dir]) {
-        current[dir] = { count: 0, langs: {}, children: {} };
+        return {
+          name: n.name,
+          value: n.nodeCount,
+          children: children.length > 0 ? children : undefined,
+          itemStyle: { color: LANG_COLORS[dominant] ?? '#666' },
+        };
       }
-      current[dir].count++;
-      current[dir].langs[lang] = (current[dir].langs[lang] ?? 0) + 1;
-      current = current[dir].children as typeof root;
+      const lang = inferLang(n.name);
+      return {
+        name: n.name,
+        value: Math.max(n.nodeCount, 1),
+        itemStyle: { color: LANG_COLORS[lang] ?? '#666' },
+      };
+    });
+}
+
+function collectLanguages(nodes: FileTreeNode[]): string[] {
+  const langs = new Set<string>();
+  function walk(items: FileTreeNode[]) {
+    for (const item of items) {
+      if (item.type === 'file') {
+        const lang = inferLang(item.name);
+        if (lang !== 'other') langs.add(lang);
+      }
+      if (item.children) walk(item.children);
     }
   }
-
-  function toTreeNodes(map: typeof root, parentPath: string): TreeNode[] {
-    return Object.entries(map)
-      .sort((a, b) => b[1].count - a[1].count)
-      .map(([name, data]) => {
-        const path = parentPath ? `${parentPath}/${name}` : name;
-        const dominantLang = Object.entries(data.langs).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'other';
-        const children = toTreeNodes(data.children as typeof root, path);
-
-        if (children.length > 0) {
-          return {
-            name,
-            path,
-            value: data.count,
-            children,
-            itemStyle: { color: LANG_COLORS[dominantLang] ?? '#888' },
-          };
-        }
-        return {
-          name,
-          path,
-          value: data.count,
-          itemStyle: { color: LANG_COLORS[dominantLang] ?? '#888' },
-        };
-      });
-  }
-
-  return toTreeNodes(root, '');
+  walk(nodes);
+  return Array.from(langs).sort();
 }
 
 export default function CodebaseMap() {
   const { isDark } = useTheme();
   const [langFilter, setLangFilter] = useState<string | undefined>(undefined);
-  const { data: allNodesData, loading, error } = useApi<NodesListResponse>(
-    () => api.getNodes(undefined, undefined, 10000, 0), []
+
+  const { data: treeData, loading, error } = useApi<FileTreeResponse>(
+    () => api.getFileTree(), []
   );
 
-  const nodes = useMemo(() => {
-    const all = allNodesData?.nodes ?? [];
-    return all.filter(n => n.file_path);
-  }, [allNodesData]);
+  const tree = treeData?.tree ?? [];
+  const totalFiles = treeData?.total_files ?? 0;
+  const uniqueLangs = useMemo(() => collectLanguages(tree), [tree]);
 
-  const uniqueLangs = useMemo(() => {
-    const langs = new Set<string>();
-    for (const n of nodes) {
-      const ext = n.file_path?.split('.').pop()?.toLowerCase() ?? '';
-      const lang = EXT_TO_LANG[ext];
-      if (lang) langs.add(lang);
-    }
-    return Array.from(langs).sort();
-  }, [nodes]);
-
-  const filteredNodes = useMemo(() => {
-    if (!langFilter) return nodes;
-    const matchExts = Object.entries(EXT_TO_LANG)
-      .filter(([, lang]) => lang === langFilter)
-      .map(([ext]) => ext);
-    return nodes.filter(n => {
-      const ext = n.file_path?.split('.').pop()?.toLowerCase() ?? '';
-      return matchExts.includes(ext);
-    });
-  }, [nodes, langFilter]);
-
-  const treemapData = useMemo(() => buildTreemap(filteredNodes), [filteredNodes]);
+  const treemapData = useMemo(() => {
+    // TODO: apply langFilter if needed
+    return fileTreeToECharts(tree);
+  }, [tree, langFilter]);
 
   const chartOption = useMemo(() => ({
     tooltip: {
@@ -138,13 +118,13 @@ export default function CodebaseMap() {
       drillDownIcon: '▶',
       breadcrumb: {
         show: true,
-        top: 0,
-        left: 0,
+        top: 4,
+        left: 4,
         itemStyle: {
-          color: isDark ? '#1f1f38' : '#f5f5f5',
-          borderColor: isDark ? '#2d2d4a' : '#d9d9d9',
-          textStyle: { color: isDark ? '#e0e0e0' : '#333' },
+          color: isDark ? '#2a2a2e' : '#f5f5f5',
+          borderColor: isDark ? '#3f3f46' : '#d9d9d9',
         },
+        textStyle: { color: isDark ? '#e0e0e0' : '#333' },
       },
       levels: [
         {
@@ -167,11 +147,7 @@ export default function CodebaseMap() {
             borderWidth: 1,
             gapWidth: 1,
           },
-          upperLabel: {
-            show: true,
-            height: 22,
-            fontSize: 12,
-          },
+          upperLabel: { show: true, height: 22, fontSize: 12 },
         },
         {
           itemStyle: {
@@ -179,17 +155,10 @@ export default function CodebaseMap() {
             borderWidth: 0.5,
             gapWidth: 0.5,
           },
-          label: {
-            show: true,
-            fontSize: 11,
-          },
+          label: { show: true, fontSize: 11 },
         },
       ],
-      label: {
-        show: true,
-        formatter: '{b}',
-        fontSize: 12,
-      },
+      label: { show: true, formatter: '{b}', fontSize: 12 },
     }],
   }), [treemapData, isDark]);
 
@@ -203,18 +172,17 @@ export default function CodebaseMap() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 96px)', margin: '-16px -24px', padding: '8px 16px 0' }}>
-      {/* Top bar: title + filter */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 8,
+        marginBottom: 4,
         flexShrink: 0,
       }}>
         <Space>
           <Typography.Title level={4} style={{ margin: 0 }}>Codebase Map</Typography.Title>
           <Typography.Text type="secondary">
-            {filteredNodes.length.toLocaleString()} nodes · {uniqueLangs.length} languages
+            {totalFiles.toLocaleString()} files · {uniqueLangs.length} languages
           </Typography.Text>
         </Space>
         <Select
@@ -227,7 +195,6 @@ export default function CodebaseMap() {
         />
       </div>
 
-      {/* Treemap fills remaining space */}
       <div style={{ flex: 1, minHeight: 0 }}>
         {treemapData.length > 0 ? (
           <ReactECharts

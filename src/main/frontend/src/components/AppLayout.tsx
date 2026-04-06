@@ -39,7 +39,7 @@ export default function AppLayout() {
           position: 'sticky',
           top: 0,
           zIndex: 100,
-          borderBottom: isDark ? '1px solid #3f3f46' : '1px solid #f0f0f0',
+          borderBottom: isDark ? '1px solid #303030' : '1px solid #e8e8e8',
         }}
       >
         <Typography.Title
