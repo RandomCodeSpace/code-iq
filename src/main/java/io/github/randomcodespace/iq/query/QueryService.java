@@ -354,9 +354,13 @@ public class QueryService {
      *
      * @param maxDepth limit tree depth; null means unlimited
      */
-    @Cacheable(value = "file-tree", key = "#maxDepth")
     public Map<String, Object> getFileTree(Integer maxDepth) {
-        GraphStore.FilePathResult filePathResult = graphStore.getFilePathsWithCounts(config.getMaxFiles());
+        return getFileTree(maxDepth, config.getMaxFiles());
+    }
+
+    @Cacheable(value = "file-tree", key = "#maxDepth + '-' + #maxFiles")
+    public Map<String, Object> getFileTree(Integer maxDepth, int maxFiles) {
+        GraphStore.FilePathResult filePathResult = graphStore.getFilePathsWithCounts(maxFiles);
         List<Map<String, Object>> rows = filePathResult.rows();
 
         TreeNode root = new TreeNode("", PROP_DIRECTORY);

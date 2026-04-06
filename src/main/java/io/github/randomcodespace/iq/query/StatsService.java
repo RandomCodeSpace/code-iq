@@ -69,10 +69,18 @@ public class StatsService {
                 .distinct()
                 .count();
 
+        // Edge kind breakdown
+        Map<String, Long> edgesByKind = new TreeMap<>();
+        for (CodeEdge edge : edges) {
+            String kind = edge.getKind() != null ? edge.getKind().getValue() : "unknown";
+            edgesByKind.merge(kind, 1L, Long::sum);
+        }
+
         Map<String, Object> graph = new LinkedHashMap<>();
         graph.put("nodes", nodes.size());
         graph.put("edges", edges.size());
         graph.put("files", fileCount);
+        graph.put("edges_by_kind", new LinkedHashMap<>(sortByValueDesc(edgesByKind)));
         return graph;
     }
 

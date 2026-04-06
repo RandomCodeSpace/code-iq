@@ -42,16 +42,34 @@ function ThemedApp() {
         }),
       },
       components: {
+        Layout: {
+          headerBg: isDark ? '#141414' : '#ffffff',
+          bodyBg: isDark ? '#0a0a0a' : '#f7f7f8',
+          siderBg: isDark ? '#141414' : '#ffffff',
+        },
         Table: {
-          headerBg: isDark ? '#1c1c1c' : '#fafafa',
+          headerBg: isDark ? '#1a1a1a' : '#fafafa',
           rowHoverBg: isDark ? '#1f1f1f' : '#f5f5ff',
         },
         Card: {
           paddingLG: 20,
+          colorBgContainer: isDark ? '#141414' : '#ffffff',
         },
         Menu: {
           itemBg: 'transparent',
           darkItemBg: 'transparent',
+          horizontalItemSelectedBg: isDark ? '#1a1a1a' : '#e6f4ff',
+          horizontalItemSelectedColor: isDark ? '#60a5fa' : '#2563eb',
+          itemColor: isDark ? '#a0a0a0' : '#595959',
+          itemHoverColor: isDark ? '#e0e0e0' : '#1d1d1d',
+          itemSelectedColor: isDark ? '#60a5fa' : '#2563eb',
+        },
+        Modal: {
+          contentBg: isDark ? '#1a1a1a' : '#ffffff',
+          headerBg: isDark ? '#1a1a1a' : '#ffffff',
+        },
+        Drawer: {
+          colorBgElevated: isDark ? '#1a1a1a' : '#ffffff',
         },
       },
     }}>

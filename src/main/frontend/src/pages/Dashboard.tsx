@@ -14,6 +14,20 @@ import { useApi } from '@/hooks/useApi';
 import { api } from '@/lib/api';
 import type { StatsResponse } from '@/types/api';
 
+const TAG_COLORS = [
+  'magenta', 'red', 'volcano', 'orange', 'gold',
+  'lime', 'green', 'cyan', 'blue', 'geekblue', 'purple',
+];
+
+function hashCode(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return hash;
+}
+
 /** Flatten a value into a Record<string, number>. Handles nested objects, numbers, arrays. */
 function flattenToRecord(val: unknown): Record<string, number> {
   if (!val || typeof val !== 'object') return {};
@@ -247,7 +261,7 @@ export default function Dashboard() {
             {Object.entries(frameworks)
               .sort((a, b) => b[1] - a[1])
               .map(([name, count]) => (
-                <Tag key={name} color="blue">{name} ({count})</Tag>
+                <Tag key={name} color={TAG_COLORS[Math.abs(hashCode(name)) % TAG_COLORS.length]}>{name} ({count})</Tag>
               ))}
           </div>
         </Card>
