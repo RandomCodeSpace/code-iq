@@ -51,13 +51,42 @@ function dominantLang(nodes: FileTreeNode[]): string {
   return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'other';
 }
 
-function fileTreeToECharts(nodes: FileTreeNode[]): EChartsTreeNode[] {
+/**
+ * Collapse single-child directory chains into one node.
+ * e.g., src → main → java → io → github becomes "src/main/java/io/github"
+ * This avoids 10+ clicks through single-child directories (common in Java packages).
+ */
+function collapseTree(nodes: FileTreeNode[]): FileTreeNode[] {
+  return nodes.map(n => {
+    if (n.type !== 'directory' || !n.children || n.children.length === 0) return n;
+
+    // Collapse: if this directory has exactly 1 child that is also a directory, merge names
+    let current = n;
+    let collapsedName = n.name;
+    while (
+      current.type === 'directory' &&
+      current.children &&
+      current.children.length === 1 &&
+      current.children[0].type === 'directory' &&
+      current.children[0].children &&
+      current.children[0].children.length > 0
+    ) {
+      current = current.children[0];
+      collapsedName += '/' + current.name;
+    }
+
+    const collapsedChildren = collapseTree(current.children ?? []);
+    return { ...current, name: collapsedName, children: collapsedChildren, nodeCount: n.nodeCount };
+  });
+}
+
+function toEChartsNodes(nodes: FileTreeNode[]): EChartsTreeNode[] {
   const result: EChartsTreeNode[] = [];
   for (const n of nodes) {
     if (n.nodeCount <= 0 && (!n.children || n.children.length === 0)) continue;
 
     if (n.type === 'directory' && n.children && n.children.length > 0) {
-      const children = fileTreeToECharts(n.children);
+      const children = toEChartsNodes(n.children);
       if (children.length === 0) continue;
       const lang = dominantLang(n.children);
       // Directory nodes: NO value — ECharts sums from children for correct proportions
@@ -77,6 +106,10 @@ function fileTreeToECharts(nodes: FileTreeNode[]): EChartsTreeNode[] {
     }
   }
   return result;
+}
+
+function fileTreeToECharts(nodes: FileTreeNode[]): EChartsTreeNode[] {
+  return toEChartsNodes(collapseTree(nodes));
 }
 
 function collectLanguages(nodes: FileTreeNode[]): string[] {
@@ -117,7 +150,7 @@ export default function CodebaseMap() {
     series: [{
       type: 'treemap',
       data: treemapData,
-      leafDepth: 1,
+      leafDepth: 2,
       drillDownIcon: '▶ ',
       roam: false,
       nodeClick: 'zoomToNode',
