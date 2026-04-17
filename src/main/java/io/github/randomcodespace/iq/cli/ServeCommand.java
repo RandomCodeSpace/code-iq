@@ -1,6 +1,7 @@
 package io.github.randomcodespace.iq.cli;
 
 import io.github.randomcodespace.iq.config.CodeIqConfig;
+import io.github.randomcodespace.iq.config.GraphBootstrapper;
 import io.github.randomcodespace.iq.graph.GraphStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,6 +64,10 @@ public class ServeCommand implements Callable<Integer> {
     @Autowired
     private ApplicationEventPublisher events;
 
+    // Optional: only present in the "serving" profile (same conditions as the bean).
+    @Autowired(required = false)
+    private GraphBootstrapper graphBootstrapper;
+
     @Override
     public Integer call() {
         Path root = path.toAbsolutePath().normalize();
@@ -71,6 +76,15 @@ public class ServeCommand implements Callable<Integer> {
             config.setReadOnly(true);
         }
         NumberFormat nf = NumberFormat.getIntegerInstance(Locale.US);
+
+        // Bootstrap Neo4j from the H2 analysis cache if Neo4j is empty. This is
+        // a no-op when enrich has already run (guarded internally by a count>0
+        // check) and when the H2 cache file is missing. Must happen before the
+        // status report below so the advertised node/edge counts are truthful.
+        // See GraphBootstrapper javadoc for why this is not an @EventListener.
+        if (graphBootstrapper != null) {
+            graphBootstrapper.bootstrapNeo4jFromCache();
+        }
 
         // Report Neo4j graph status
         if (graphStore != null) {

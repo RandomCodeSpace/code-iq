@@ -7,9 +7,7 @@ import io.github.randomcodespace.iq.model.CodeNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Profile;
-import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 import java.nio.file.Files;
@@ -25,7 +23,13 @@ import java.util.Map;
  * {@code serve} (which needs Neo4j for graph traversal queries like shortest path,
  * cycles, impact trace, ego graph, and neighbors).
  * <p>
- * Runs after the Spring context is fully ready, so Neo4j and GraphStore are available.
+ * Invoked explicitly by {@link io.github.randomcodespace.iq.cli.ServeCommand}
+ * before the server reports "Server started", so the advertised node/edge counts
+ * reflect the bootstrapped state. Previously triggered via
+ * {@code @EventListener(ApplicationReadyEvent.class)}, but that event never fires
+ * because {@code ServeCommand.call()} blocks (as a {@code CommandLineRunner}) and
+ * Spring's ready-event publication waits for runners to return.
+ * <p>
  * Only active in the "serving" profile when GraphStore is present.
  */
 @Component
@@ -43,7 +47,6 @@ public class GraphBootstrapper {
         this.config = config;
     }
 
-    @EventListener(ApplicationReadyEvent.class)
     public void bootstrapNeo4jFromCache() {
         // Skip bootstrap in read-only mode (no writes allowed)
         if (config.isReadOnly()) {
