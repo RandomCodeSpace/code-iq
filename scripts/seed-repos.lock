@@ -1,0 +1,5 @@
+# <name> <url> <commit>
+# Commits chosen to match existing ground-truth files in src/test/resources/e2e/.
+# Update policy: change commit here and regenerate ground truth in same PR.
+spring-petclinic     https://github.com/spring-projects/spring-petclinic.git     edf4db28affcc4741c79850a3d95bc3f177b5ff9
+realworld-express    https://github.com/gothinkster/node-express-realworld-example-app.git 30b68e1e881462b2f4164ea09ab4c4f5699c7b0b

@@ -78,7 +78,8 @@ venv/
 
 # Superpowers plugin
 .superpowers/
-docs/superpowers/
+docs/superpowers/*
+!docs/superpowers/baselines/
 
 # Docker & Helm (bundled separately)
 Dockerfile
@@ -89,3 +90,7 @@ helm/
 neo4j-data/
 graph.db/
 .worktrees/
+
+# Phase A baseline
+.seeds/
+docs/superpowers/baselines/**/raw/**
