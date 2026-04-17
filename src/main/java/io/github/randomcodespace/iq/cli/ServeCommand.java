@@ -5,6 +5,10 @@ import io.github.randomcodespace.iq.graph.GraphStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.availability.AvailabilityChangeEvent;
+import org.springframework.boot.availability.LivenessState;
+import org.springframework.boot.availability.ReadinessState;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -56,6 +60,9 @@ public class ServeCommand implements Callable<Integer> {
     @Autowired(required = false)
     private GraphStore graphStore;
 
+    @Autowired
+    private ApplicationEventPublisher events;
+
     @Override
     public Integer call() {
         Path root = path.toAbsolutePath().normalize();
@@ -96,6 +103,16 @@ public class ServeCommand implements Callable<Integer> {
         System.out.println();
         CliOutput.info("Press Ctrl+C to stop.");
 
+        // Publish availability transitions so /actuator/health reports UP (200).
+        // This Callable is invoked from a CommandLineRunner that blocks forever
+        // (the Thread.join below), so Spring's ApplicationReadyEvent — which
+        // normally drives ReadinessState to ACCEPTING_TRAFFIC — never fires.
+        // Without this, /actuator/health stays OUT_OF_SERVICE (503) even though
+        // the server is accepting and serving traffic. See also: known gap on
+        // GraphBootstrapper's @EventListener(ApplicationReadyEvent.class) which
+        // is dead for the same reason — out of scope for this fix.
+        markReady();
+
         try {
             Thread.currentThread().join();
         } catch (InterruptedException e) {
@@ -103,6 +120,15 @@ public class ServeCommand implements Callable<Integer> {
         }
 
         return 0;
+    }
+
+    /**
+     * Flip availability state to live + accepting traffic. Extracted for
+     * testability — callers can verify the right events are published.
+     */
+    void markReady() {
+        AvailabilityChangeEvent.publish(events, this, LivenessState.CORRECT);
+        AvailabilityChangeEvent.publish(events, this, ReadinessState.ACCEPTING_TRAFFIC);
     }
 
     public Path getPath() { return path; }
