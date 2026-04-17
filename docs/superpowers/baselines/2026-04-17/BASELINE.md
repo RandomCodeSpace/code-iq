@@ -227,6 +227,16 @@ Ordered by severity. Each item cites the raw artifact it was derived from.
 
 - **Pipeline serve-smoke failed on both seed repos** (`health=fail`, `stats=null`). `index` and `enrich` succeeded (petclinic 8+13s, express 5+10s) but the 8-second sleep between starting `serve` and `curl /actuator/health` is at the low end of the documented 8–16s Spring Boot + embedded Neo4j cold-start window (see CLAUDE.md §Gotchas). Fix in Phase F hardening: poll `/actuator/health` with a retry budget instead of a fixed sleep.
   - Raw: `raw/pipeline/spring-petclinic/`, `raw/pipeline/realworld-express/`.
+  - **RESOLVED (2026-04-17, branch `phase-a/fixups-pipeline-smoke`)**: patched `run-pipeline.sh` to poll `/api/stats` (up to 60s at 2s interval) as the readiness probe and to capture `/actuator/health` only as a diagnostic. Root cause was *not* a too-short sleep — the server cold-starts in 10–11s on both seeds and `/api/stats` responds with real data, but `/actuator/health` returns HTTP **503 `OUT_OF_SERVICE`** because the `GraphHealthIndicator` reports OUT_OF_SERVICE even after the graph loads. Captured baseline numbers below.
+
+  | Seed | index | enrich | ready (stats) | nodes | edges | files | languages | frameworks | health HTTP |
+  |---|---:|---:|---:|---:|---:|---:|---|---|---:|
+  | spring-petclinic    | 4s | 11s | 11s | 691 | 1,836 | 67 | java 18 | spring_boot 24 | 503 |
+  | realworld-express   | 5s | 10s | 10s | 224 |   297 | 39 | typescript 6 | express 20, prisma 7 | 503 |
+
+  Follow-up split out below.
+
+- **`GraphHealthIndicator` reports `OUT_OF_SERVICE` (503) even when the graph is loaded.** Discovered during the pipeline smoke-test fix. `/actuator/health` body: `{"groups":["liveness","readiness"],"status":"OUT_OF_SERVICE"}`. The server is fully functional (`/api/stats` returns real data) but the health indicator makes `/actuator/health` unusable as a readiness probe for orchestrators (K8s, Compose, CI). Fix in `src/main/java/io/github/randomcodespace/iq/health/GraphHealthIndicator.java`. Low for baseline use; High when we start Dockerizing or targeting K8s.
 
 - **SpotBugs: 8 HIGH-priority findings (priority=1) + 1,484 at priority=2.** Total 1,492. HIGH findings must be triaged individually (read `raw/spotbugs.xml`). Noise-dominant rules (`NM_METHOD_NAMING_CONVENTION`=730, `SF_SWITCH_NO_DEFAULT`=448) should be filtered via a SpotBugs exclude file so real signal surfaces; real-concern patterns that deserve review now: `NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE` (26), `BC_UNCONFIRMED_CAST` (55), `UL_UNRELEASED_LOCK_EXCEPTION_PATH` (1), `WMI_WRONG_MAP_ITERATOR` (2), `ES_COMPARING_STRINGS_WITH_EQ` (2), `MT_CORRECTNESS` category (1).
   - Raw: `raw/spotbugs.xml`, `raw/spotbugs-summary.json`.
