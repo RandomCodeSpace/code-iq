@@ -222,6 +222,19 @@ Ordered by severity. Each item cites the raw artifact it was derived from.
 
 - **Playwright E2E: 0 passed / 575 failed.** 100% failure rate. Almost certainly environment/config rather than regressions — the audit script runs `npm run test:e2e` without starting the backend (`java -jar ... serve`), so any test that hits `/api/*` will fail. Needs a harness that spins up the server (or mocks it) before running Playwright, or a `webServer` entry in `playwright.config.ts`.
   - Raw: `raw/frontend/playwright.log`, `raw/frontend/playwright-summary.json`.
+  - **RESOLVED — config + system-deps + run (2026-04-17, branch `phase-a/fix-playwright-webserver`)**: added a `webServer` block to `src/main/frontend/playwright.config.ts` that boots `java -jar target/code-iq-*-cli.jar serve .seeds/spring-petclinic --port 8080` and gates readiness on `/api/stats` (HTTP 200). Installed system libs via `sudo npx playwright install-deps chromium`. Ran full chromium suite against the live backend (19.2 min wall time).
+
+  **New chromium baseline**: `33 passed / 94 failed / 4 skipped` out of **131 tests**. Huge improvement from "0 passed / 575 failed" (the 575 was the sum across 7 Playwright projects — chromium/firefox/edge/webkit + 3 responsive breakpoints). The 94 chromium failures are **not environmental** — they're real test ↔ UI divergence. Signature histogram of the 22 detailed failure blocks analyzed:
+
+  | Pattern | Interpretation |
+  |---|---|
+  | `expect(locator).toBeVisible() failed` / `element(s) not found` | Selectors targeting UI elements that no longer render (renamed / removed). |
+  | `strict mode violation: getByText(/0/) resolved to 8 elements` | Tests assumed unique stats values; spring-petclinic's 691-node graph produces many zero-valued stat cards. |
+  | `expect(received).toHaveLength(expected)` | List count mismatches (menu items, nav links, stats rows). |
+  | `Error: Button ... has no aria-label` | Real a11y regressions in `accessibility.spec.ts`. |
+  | `locator.focus: Test timeout 30000ms exceeded` | UI interactions hanging on elements that never appear. |
+
+  Test-suite maintenance / fixture generation is a follow-up (not a Phase A blocker). Candidate approaches: (1) rebuild the Ant-Design selectors to match current UI taxonomy; (2) pin a synthetic fixture with known, deterministic stats counts; (3) relax strict-mode selectors to `.first()` where tests genuinely target "any such element". 22 of the 94 failures have full error blocks captured in `raw/frontend/playwright.log`.
 
 ### High
 
