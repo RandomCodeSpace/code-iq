@@ -70,4 +70,24 @@
         <Bug pattern="MS_FINAL_PKGPROTECT"/>
     </Match>
 
+    <!--
+      RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE in hand-written ANTLR parser
+      support classes (CSharpParserBase, GoParserBase). Defensive null checks
+      carried over verbatim from antlr/grammars-v4 grammar action files. Harmless;
+      divergence risk if we "fix" them because upstream may re-sync.
+    -->
+    <Match>
+        <Class name="~io\.github\.randomcodespace\.iq\.grammar\.(csharp\.CSharpParserBase|golang\.GoParserBase)"/>
+        <Bug pattern="RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE"/>
+    </Match>
+
+    <!--
+      BX_UNBOXING_IMMEDIATELY_REBOXED in CSharpPreprocessorParserBase: grammar
+      action code adapted from upstream. Micro-perf, not a correctness issue.
+    -->
+    <Match>
+        <Class name="io.github.randomcodespace.iq.grammar.csharp.CSharpPreprocessorParserBase"/>
+        <Bug pattern="BX_UNBOXING_IMMEDIATELY_REBOXED"/>
+    </Match>
+
 </FindBugsFilter>
