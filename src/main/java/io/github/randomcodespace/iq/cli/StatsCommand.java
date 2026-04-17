@@ -138,7 +138,8 @@ public class StatsCommand implements Callable<Integer> {
 
     int outputPretty(Map<String, Object> stats) {
         NumberFormat nf = NumberFormat.getIntegerInstance(Locale.US);
-        String projectName = path.toAbsolutePath().normalize().getFileName().toString();
+        String projectName = java.util.Objects.toString(
+                path.toAbsolutePath().normalize().getFileName(), "unknown");
 
         out.println();
         CliOutput.print(out, "@|bold [=] Code IQ Stats -- " + projectName + "|@");

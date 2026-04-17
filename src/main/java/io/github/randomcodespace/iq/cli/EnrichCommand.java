@@ -97,8 +97,12 @@ public class EnrichCommand implements Callable<Integer> {
 
         // 1. Open H2 file
         Path cachePath = root.resolve(config.getCacheDir()).resolve("analysis-cache.db");
-        if (!Files.exists(cachePath.getParent())) {
-            CliOutput.error("No index found at " + cachePath.getParent());
+        // cachePath.getParent() is always non-null here because we resolve off
+        // `root` (a directory), but null-guard explicitly for SpotBugs and to
+        // protect against a future refactor that changes the resolution.
+        Path cacheParent = cachePath.getParent();
+        if (cacheParent == null || !Files.exists(cacheParent)) {
+            CliOutput.error("No index found at " + cacheParent);
             CliOutput.info("  Run 'code-iq index " + root + "' first.");
             return 1;
         }
@@ -180,7 +184,7 @@ public class EnrichCommand implements Callable<Integer> {
         CliOutput.step("[^]", "Detecting service boundaries...");
         stepStart = Instant.now();
         var serviceDetector = new io.github.randomcodespace.iq.analyzer.ServiceDetector();
-        String projectName = root.getFileName().toString();
+        String projectName = java.util.Objects.toString(root.getFileName(), "unknown");
         var serviceResult = serviceDetector.detect(enrichedNodes, enrichedEdges, projectName, root);
         if (!serviceResult.serviceNodes().isEmpty()) {
             serviceResult.serviceNodes().forEach(n -> n.setProvenance(builder.getProvenance()));

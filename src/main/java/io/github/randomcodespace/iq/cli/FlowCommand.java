@@ -76,7 +76,8 @@ public class FlowCommand implements Callable<Integer> {
             String content;
 
             if ("html".equalsIgnoreCase(format)) {
-                String projectName = path.toAbsolutePath().getFileName().toString();
+                String projectName = java.util.Objects.toString(
+                        path.toAbsolutePath().getFileName(), "flow");
                 content = engine.renderInteractive(projectName);
             } else {
                 FlowDiagram diagram = engine.generate(view.toLowerCase());

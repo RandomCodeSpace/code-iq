@@ -185,7 +185,8 @@ public class FileDiscovery {
             Files.walkFileTree(root, new SimpleFileVisitor<>() {
                 @Override
                 public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
-                    String dirName = dir.getFileName() != null ? dir.getFileName().toString() : "";
+                    // Objects.toString yields fallback when getFileName() is null (root paths).
+                    String dirName = java.util.Objects.toString(dir.getFileName(), "");
                     if (DEFAULT_EXCLUDES.contains(dirName)) {
                         return FileVisitResult.SKIP_SUBTREE;
                     }
@@ -243,7 +244,7 @@ public class FileDiscovery {
     }
 
     private static boolean isExcludedFilename(Path relPath) {
-        String filename = relPath.getFileName().toString();
+        String filename = java.util.Objects.toString(relPath.getFileName(), "");
         return EXCLUDED_FILENAMES.contains(filename);
     }
 }

@@ -126,7 +126,12 @@ public class AnalysisCache implements Closeable {
         this.dbPath = dbPath;
         try {
             if (!readOnly) {
-                Files.createDirectories(dbPath.getParent());
+                // dbPath.getParent() is null for a bare filename (no directory
+                // component). Treat "already a directory" as nothing to create.
+                Path parent = dbPath.getParent();
+                if (parent != null) {
+                    Files.createDirectories(parent);
+                }
             }
             // Strip .db extension if present — H2 appends its own .mv.db
             String dbFile = dbPath.toString();

@@ -346,7 +346,7 @@ public class PluginsCommand implements Runnable {
 
                     @Override
                     public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
-                        String name = dir.getFileName() != null ? dir.getFileName().toString() : "";
+                        String name = java.util.Objects.toString(dir.getFileName(), "");
                         if (SKIP_DIRS.contains(name)) {
                             return FileVisitResult.SKIP_SUBTREE;
                         }
@@ -356,7 +356,7 @@ public class PluginsCommand implements Runnable {
                     @Override
                     public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
                         if (!attrs.isRegularFile()) return FileVisitResult.CONTINUE;
-                        String name = file.getFileName().toString();
+                        String name = java.util.Objects.toString(file.getFileName(), "");
                         int dot = name.lastIndexOf('.');
                         if (dot > 0) {
                             String ext = name.substring(dot);

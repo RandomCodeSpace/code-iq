@@ -200,7 +200,7 @@ public class ServiceDetector {
             String filePath = node.getFilePath();
             if (filePath == null) continue;
 
-            String fileName = Path.of(filePath).getFileName().toString();
+            String fileName = java.util.Objects.toString(Path.of(filePath).getFileName(), "");
             String dirPath = parentDir(filePath);
 
             String buildTool = BUILD_FILES.get(fileName);
@@ -343,7 +343,7 @@ public class ServiceDetector {
 
                 @Override
                 public java.nio.file.FileVisitResult preVisitDirectory(Path dir, java.nio.file.attribute.BasicFileAttributes attrs) {
-                    String dirName = dir.getFileName() != null ? dir.getFileName().toString() : "";
+                    String dirName = java.util.Objects.toString(dir.getFileName(), "");
                     if (SKIP_DIRS.contains(dirName)) {
                         return java.nio.file.FileVisitResult.SKIP_SUBTREE;
                     }
@@ -352,7 +352,7 @@ public class ServiceDetector {
 
                 @Override
                 public java.nio.file.FileVisitResult visitFile(Path file, java.nio.file.attribute.BasicFileAttributes attrs) {
-                    String name = file.getFileName().toString();
+                    String name = java.util.Objects.toString(file.getFileName(), "");
                     boolean isBuildFile = BUILD_FILES.containsKey(name)
                             || name.endsWith(CSPROJ_EXTENSION) || name.endsWith(FSPROJ_EXTENSION)
                             || name.endsWith(VBPROJ_EXTENSION) || name.endsWith(GEMSPEC_EXTENSION)

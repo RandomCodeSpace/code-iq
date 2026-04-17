@@ -54,7 +54,7 @@ public final class FileClassifier {
      */
     public static FileType classify(Path relativePath, String language) {
         String pathStr = relativePath.toString().replace('\\', '/');
-        String fileName = relativePath.getFileName().toString();
+        String fileName = java.util.Objects.toString(relativePath.getFileName(), "");
         String ext = getExtension(fileName);
 
         // Binary check first

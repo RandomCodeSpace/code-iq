@@ -79,7 +79,7 @@ public class TopologyCommand implements Callable<Integer> {
         // Check if service nodes exist; if not, run ServiceDetector
         boolean hasServices = nodes.stream().anyMatch(n -> n.getKind() == NodeKind.SERVICE);
         if (!hasServices) {
-            String projectName = root.getFileName().toString();
+            String projectName = java.util.Objects.toString(root.getFileName(), "unknown");
             var detector = new ServiceDetector();
             var result = detector.detect(nodes, edges, projectName);
             nodes.addAll(result.serviceNodes());

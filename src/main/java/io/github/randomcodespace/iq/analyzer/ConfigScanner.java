@@ -96,7 +96,7 @@ public class ConfigScanner {
 
         for (Path candidate : candidates) {
             if (Files.isRegularFile(candidate)) {
-                String name = candidate.getFileName().toString();
+                String name = java.util.Objects.toString(candidate.getFileName(), "");
                 if (name.endsWith(".properties")) {
                     parseSpringProperties(candidate, registry);
                 } else {

@@ -360,7 +360,7 @@ public class Analyzer {
         // 5b. Detect service boundaries and create SERVICE nodes
         report.accept("Detecting service boundaries...");
         var serviceDetector = new ServiceDetector();
-        String projectDirName = root.getFileName() != null ? root.getFileName().toString() : PROP_ROOT;
+        String projectDirName = java.util.Objects.toString(root.getFileName(), PROP_ROOT);
         var serviceResult = serviceDetector.detect(allNodes, builder.getEdges(), projectDirName, root);
         if (!serviceResult.serviceNodes().isEmpty()) {
             serviceResult.serviceNodes().forEach(n -> n.setProvenance(builder.getProvenance()));
@@ -885,10 +885,11 @@ public class Analyzer {
                             } else {
                                 filesSkipped++;
                                 // Zero data loss: create minimal inventory node for filtered files
+                                String filteredFileName = java.util.Objects.toString(file.path().getFileName(), "");
                                 CodeNode fileNode = new CodeNode(
-                                    "file:" + file.path() + ":module:" + file.path().getFileName(),
+                                    "file:" + file.path() + ":module:" + filteredFileName,
                                     NodeKind.MODULE,
-                                    file.path().getFileName().toString());
+                                    filteredFileName);
                                 fileNode.setFilePath(file.path().toString());
                                 fileNode.setModule(DetectorUtils.deriveModuleName(file.path().toString(), file.language()));
                                 fileNode.getProperties().put("status", "filtered");
@@ -1130,7 +1131,7 @@ public class Analyzer {
         // Collect unique module directories from boundary marker files
         Set<String> moduleDirs = new java.util.TreeSet<>();
         for (DiscoveredFile file : files) {
-            if (MODULE_BOUNDARY_MARKERS.contains(file.path().getFileName().toString())) {
+            if (MODULE_BOUNDARY_MARKERS.contains(java.util.Objects.toString(file.path().getFileName(), ""))) {
                 Path parent = file.path().getParent();
                 moduleDirs.add(parent != null ? parent.toString().replace('\\', '/') : "");
             }
@@ -1235,10 +1236,11 @@ public class Analyzer {
         if (isMinified(file, content)) {
             log.debug("Skipping detectors for minified file: {}", file.path());
             String moduleName = DetectorUtils.deriveModuleName(file.path().toString(), file.language());
+            String fileNameStr = java.util.Objects.toString(file.path().getFileName(), "");
             CodeNode node = new CodeNode(
-                    "file:" + file.path() + ":module:" + (moduleName != null ? moduleName : file.path().getFileName().toString()),
+                    "file:" + file.path() + ":module:" + (moduleName != null ? moduleName : fileNameStr),
                     NodeKind.MODULE,
-                    file.path().getFileName().toString());
+                    fileNameStr);
             node.setFilePath(file.path().toString());
             node.setModule(moduleName);
             node.setProperties(new java.util.LinkedHashMap<>(Map.of("minified", true, "file_type", "minified")));
@@ -1351,7 +1353,7 @@ public class Analyzer {
     }
 
     private boolean isMinified(DiscoveredFile file, String content) {
-        String name = file.path().getFileName().toString();
+        String name = java.util.Objects.toString(file.path().getFileName(), "");
         boolean nameHint = name.endsWith(".min.js") || name.endsWith(".bundle.js")
                 || name.endsWith(".min.css") || name.endsWith(".min.mjs");
         boolean jsOrCss = name.endsWith(".js") || name.endsWith(".mjs") || name.endsWith(".cjs")
@@ -1434,10 +1436,11 @@ public class Analyzer {
         if (isMinified(file, content)) {
             log.debug("Skipping detectors for minified file: {}", file.path());
             String moduleName = DetectorUtils.deriveModuleName(file.path().toString(), file.language());
+            String fileNameStr = java.util.Objects.toString(file.path().getFileName(), "");
             CodeNode node = new CodeNode(
-                    "file:" + file.path() + ":module:" + (moduleName != null ? moduleName : file.path().getFileName().toString()),
+                    "file:" + file.path() + ":module:" + (moduleName != null ? moduleName : fileNameStr),
                     NodeKind.MODULE,
-                    file.path().getFileName().toString());
+                    fileNameStr);
             node.setFilePath(file.path().toString());
             node.setModule(moduleName);
             node.setProperties(new java.util.LinkedHashMap<>(Map.of("minified", true, "file_type", "minified")));
@@ -1520,10 +1523,11 @@ public class Analyzer {
      */
     private static DetectorResult createInventoryNode(DiscoveredFile file, String fileType) {
         String moduleName = DetectorUtils.deriveModuleName(file.path().toString(), file.language());
+        String fileNameStr = java.util.Objects.toString(file.path().getFileName(), "");
         CodeNode node = new CodeNode(
-                "file:" + file.path() + ":module:" + (moduleName != null ? moduleName : file.path().getFileName().toString()),
+                "file:" + file.path() + ":module:" + (moduleName != null ? moduleName : fileNameStr),
                 NodeKind.MODULE,
-                file.path().getFileName().toString());
+                fileNameStr);
         node.setFilePath(file.path().toString());
         node.setModule(moduleName);
         node.setProperties(new java.util.LinkedHashMap<>(Map.of(

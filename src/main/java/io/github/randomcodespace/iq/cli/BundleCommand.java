@@ -115,7 +115,7 @@ public class BundleCommand implements Callable<Integer> {
             return 1;
         }
 
-        String projectName = root.getFileName().toString();
+        String projectName = java.util.Objects.toString(root.getFileName(), "bundle");
         String bundleTag = tag != null ? tag : "latest";
 
         Path zipPath = output != null ? output
