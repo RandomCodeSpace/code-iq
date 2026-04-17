@@ -179,14 +179,14 @@ abstract class CSharpPreprocessorParserBase extends Parser
     {
         ParserRuleContext c = this._ctx;
         CSharpPreprocessorParser.Preprocessor_expressionContext d = (CSharpPreprocessorParser.Preprocessor_expressionContext)c;
-        d.value = (d.expr1.value == d.expr2.value ? "true" : "false");
+        d.value = (java.util.Objects.equals(d.expr1.value, d.expr2.value) ? "true" : "false");
     }
 
     protected void OnPreprocessorExpressionConditionalNe()
     {
         ParserRuleContext c = this._ctx;
         CSharpPreprocessorParser.Preprocessor_expressionContext d = (CSharpPreprocessorParser.Preprocessor_expressionContext)c;
-        d.value = (d.expr1.value != d.expr2.value ? "true" : "false");
+        d.value = (!java.util.Objects.equals(d.expr1.value, d.expr2.value) ? "true" : "false");
     }
 
     protected void OnPreprocessorExpressionConditionalAnd()

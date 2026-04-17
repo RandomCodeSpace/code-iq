@@ -38,8 +38,8 @@ public class VersionCommand implements Callable<Integer> {
                 String v = props.getProperty("build.version");
                 if (v != null && !v.isBlank()) return v;
             }
-        } catch (Exception ignored) {
-            // intentionally empty
+        } catch (java.io.IOException ignored) {
+            // build-info.properties is optional; fall through to manifest lookup.
         }
         // Fallback: Implementation-Version from JAR manifest
         String v = VersionCommand.class.getPackage().getImplementationVersion();

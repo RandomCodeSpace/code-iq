@@ -404,8 +404,9 @@ public class PluginsCommand implements Runnable {
             yaml.append("# Optimized for this project's detected languages\n\n");
 
             yaml.append("languages:\n");
-            for (String lang : languageCounts.keySet()) {
-                yaml.append("  - ").append(lang).append("  # ").append(languageCounts.get(lang)).append(" files\n");
+            for (Map.Entry<String, Integer> entry : languageCounts.entrySet()) {
+                yaml.append("  - ").append(entry.getKey())
+                        .append("  # ").append(entry.getValue()).append(" files\n");
             }
 
             yaml.append("\ndetectors:\n");

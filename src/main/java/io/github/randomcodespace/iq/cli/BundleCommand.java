@@ -464,9 +464,4 @@ public class BundleCommand implements Callable<Integer> {
         zos.closeEntry();
     }
 
-    private void writeEntry(ZipOutputStream zos, String name, String content, String lineEnding)
-            throws IOException {
-        writeEntry(zos, name, content);
-    }
-
 }

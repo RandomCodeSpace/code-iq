@@ -453,10 +453,16 @@ public class AnalysisCache implements Closeable {
             log.warn("Failed to remove cached file {}", contentHash, e);
         } finally {
             try {
-                conn.setAutoCommit(true);
-            } catch (SQLException ignored) {
+                try {
+                    conn.setAutoCommit(true);
+                } catch (SQLException ignored) {
+                    // best-effort restore; the DELETEs have already been committed or rolled back.
+                }
+            } finally {
+                // Guarantee unlock even if conn.setAutoCommit throws a non-SQLException
+                // (RuntimeException / Error). Fixes SpotBugs UL_UNRELEASED_LOCK_EXCEPTION_PATH.
+                rwLock.writeLock().unlock();
             }
-            rwLock.writeLock().unlock();
         }
     }
 

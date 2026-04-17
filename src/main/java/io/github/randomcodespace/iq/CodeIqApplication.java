@@ -96,17 +96,12 @@ public class CodeIqApplication implements CommandLineRunner, ExitCodeGenerator {
             // Point Neo4j config to the graph path (enriched or new empty db).
             // GraphBootstrapper will auto-load from H2 cache if no enriched graph exists.
             System.setProperty("codeiq.graph.path", graphDbPath.toString());
-        } else if (isIndex) {
-            app.setAdditionalProfiles("indexing");
-            // Index command: no web server, no Neo4j
-            app.setWebApplicationType(org.springframework.boot.WebApplicationType.NONE);
-        } else if (isEnrich) {
-            // Enrich command: no web server, Neo4j started programmatically
-            app.setAdditionalProfiles("indexing");
-            app.setWebApplicationType(org.springframework.boot.WebApplicationType.NONE);
         } else {
+            // All non-serve commands (index, enrich, analyze, stats, ...) share the same
+            // Spring setup: "indexing" profile, no web server. index/enrich open Neo4j
+            // programmatically when needed. Previously split into three identical
+            // branches — SpotBugs DB_DUPLICATE_BRANCHES.
             app.setAdditionalProfiles("indexing");
-            // Disable web server for non-serve commands
             app.setWebApplicationType(org.springframework.boot.WebApplicationType.NONE);
         }
 

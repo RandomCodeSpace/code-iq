@@ -135,9 +135,10 @@ public class GitLabCiDetector extends AbstractStructuredDetector {
 
         // Collect job names
         List<String> jobNames = new ArrayList<>();
-        for (String key : data.keySet()) {
+        for (Map.Entry<String, Object> entry : data.entrySet()) {
+            String key = entry.getKey();
             if (GITLAB_CI_KEYWORDS.contains(key)) continue;
-            if (data.get(key) instanceof Map<?, ?>) {
+            if (entry.getValue() instanceof Map<?, ?>) {
                 jobNames.add(key);
             }
         }
