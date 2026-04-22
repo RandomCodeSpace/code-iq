@@ -11,7 +11,6 @@ import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.Map;
 import java.util.concurrent.Callable;
-import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -64,11 +63,11 @@ public class ConfigExplainSubcommand implements Callable<Integer> {
 
     // Nullable on purpose: a Spring-singleton bean must not freeze the env at construction time,
     // so we resolve System.getenv() lazily inside call(). Tests inject a fixed map via setEnv.
-    @Nullable private Map<String, String> envMap;
+    private Map<String, String> envMap;
 
     // Nullable: tests may inject a CLI overlay to exercise CLI-wins-over-ENV precedence. Runtime
     // callers pass the real CLI overlay through this same seam once wired end-to-end.
-    @Nullable private CodeIqUnifiedConfig cliOverlay;
+    private CodeIqUnifiedConfig cliOverlay;
 
     public ConfigExplainSubcommand() {
         this(System.out, System.err);
@@ -88,7 +87,7 @@ public class ConfigExplainSubcommand implements Callable<Integer> {
      * environment" -- {@link #call()} falls back to {@link System#getenv()} at invocation time, so
      * a Spring singleton bean sees fresh env each call instead of a frozen snapshot.
      */
-    void setEnv(@Nullable Map<String, String> e) {
+    void setEnv(Map<String, String> e) {
         this.envMap = e;
     }
 
@@ -97,7 +96,7 @@ public class ConfigExplainSubcommand implements Callable<Integer> {
      * as a package-private hook so tests can assert CLI-wins-over-ENV precedence without booting a
      * full picocli parse.
      */
-    void setCliOverlay(@Nullable CodeIqUnifiedConfig overlay) {
+    void setCliOverlay(CodeIqUnifiedConfig overlay) {
         this.cliOverlay = overlay;
     }
 
