@@ -53,4 +53,38 @@ class EnvVarOverlayTest {
                 () -> EnvVarOverlay.from(Map.of("CODEIQ_SERVING_PORT", "not-a-port")));
         assertTrue(e.getMessage().contains("CODEIQ_SERVING_PORT"));
     }
+
+    // ---- Phase-B extensions: detectors + parsers + Integer parallelism ------------
+
+    @Test
+    void readsDetectorsCategoriesAndInclude() {
+        CodeIqUnifiedConfig cfg = EnvVarOverlay.from(Map.of(
+                "CODEIQ_DETECTORS_CATEGORIES", "endpoints,entities",
+                "CODEIQ_DETECTORS_INCLUDE", "spring-rest-detector,jpa-entity-detector"));
+        assertEquals(java.util.List.of("endpoints", "entities"), cfg.detectors().categories());
+        assertEquals(java.util.List.of("spring-rest-detector", "jpa-entity-detector"),
+                cfg.detectors().include());
+    }
+
+    @Test
+    void readsIndexingParsersList() {
+        CodeIqUnifiedConfig cfg = EnvVarOverlay.from(Map.of(
+                "CODEIQ_INDEXING_PARSERS", "javaparser, antlr ,regex"));
+        assertEquals(java.util.List.of("javaparser", "antlr", "regex"),
+                cfg.indexing().parsers());
+    }
+
+    @Test
+    void readsIndexingParallelismAsInteger() {
+        CodeIqUnifiedConfig cfg = EnvVarOverlay.from(Map.of(
+                "CODEIQ_INDEXING_PARALLELISM", "16"));
+        assertEquals(16, cfg.indexing().parallelism());
+    }
+
+    @Test
+    void malformedIndexingParallelismThrows() {
+        ConfigLoadException e = assertThrows(ConfigLoadException.class,
+                () -> EnvVarOverlay.from(Map.of("CODEIQ_INDEXING_PARALLELISM", "many")));
+        assertTrue(e.getMessage().contains("CODEIQ_INDEXING_PARALLELISM"));
+    }
 }

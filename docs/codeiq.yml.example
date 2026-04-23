@@ -39,12 +39,13 @@ indexing:
     - '**/generated/**'
   incremental: true             # reuse H2 cache when file hashes match
   cache_dir: .code-iq/cache     # H2 analysis cache directory
-  parallelism: auto             # "auto" or a positive integer
+  parallelism: null             # null = auto-detect (Runtime.availableProcessors()); positive int to pin
   batch_size: 500               # files per H2 flush batch (default: 500)
   max_depth: 10                 # max impact-trace depth
   max_radius: 10                # max ego-graph radius
   max_files: null               # null = no cap; positive int to bound discovery
   max_snippet_lines: null       # null = use CodeIqConfig default
+  parsers: []                   # parser-preference names (e.g. ["javaparser","antlr"]); empty = defaults
 
 # ---------------------------------------------------------------------------
 # serving
@@ -92,6 +93,8 @@ observability:
 # ---------------------------------------------------------------------------
 detectors:
   profiles: [default]           # named detector bundles to activate
+  categories: []                # allow-list of detector categories (e.g. ["endpoints","entities"]); empty = all
+  include: []                   # allow-list of detector names (by Detector#getName()); empty = no name filter
   overrides:                    # per-detector feature flags, keyed by SimpleClassName
     SpringRestDetector:    { enabled: true }
     QuarkusRestDetector:   { enabled: true }

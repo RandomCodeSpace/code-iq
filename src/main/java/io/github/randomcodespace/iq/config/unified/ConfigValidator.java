@@ -41,6 +41,12 @@ public final class ConfigValidator {
         if (c.indexing().batchSize() != null && c.indexing().batchSize() <= 0)
             errs.add(new ConfigError("indexing.batch_size", "must be > 0", "validator"));
 
+        // indexing.parallelism — null means "auto-detect"; any non-null value must be a positive int.
+        if (c.indexing().parallelism() != null && c.indexing().parallelism() <= 0)
+            errs.add(new ConfigError("indexing.parallelism",
+                    "must be > 0 (or unset for auto-detect); got " + c.indexing().parallelism(),
+                    "validator"));
+
         // mcp.transport
         if (c.mcp().transport() != null && !MCP_TRANSPORTS.contains(c.mcp().transport()))
             errs.add(new ConfigError("mcp.transport",

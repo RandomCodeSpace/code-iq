@@ -18,12 +18,13 @@ public final class ConfigDefaults {
                         List.of(), List.of(), List.of(),
                         true,
                         ".code-iq/cache",
-                        "auto",
+                        null, // parallelism — null = auto-detect (Runtime.availableProcessors())
                         500,
                         10,   // maxDepth — matches application.yml codeiq.max-depth
                         10,   // maxRadius — matches application.yml codeiq.max-radius
                         null, // maxFiles — not set in application.yml; CodeIqConfig default wins
-                        null  // maxSnippetLines — not set in application.yml; CodeIqConfig default wins
+                        null, // maxSnippetLines — not set in application.yml; CodeIqConfig default wins
+                        List.of() // parsers — empty = no parser-preference override
                 ),
                 new ServingConfig(
                         8080,
@@ -43,7 +44,7 @@ public final class ConfigDefaults {
                         new McpToolsConfig(List.of("*"), List.of())
                 ),
                 new ObservabilityConfig(true, false, "json", "info"),
-                new DetectorsConfig(List.of("default"), Map.of())
+                new DetectorsConfig(List.of("default"), List.of(), List.of(), Map.of())
         );
     }
 }

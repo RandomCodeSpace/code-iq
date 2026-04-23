@@ -187,6 +187,83 @@ class UnifiedConfigLoaderTest {
         }
     }
 
+    // ---- Phase-B extensions: detectors.categories/include + indexing.parsers ------
+
+    @Test
+    void loadsDetectorsCategoriesAndInclude(@TempDir Path tmp) throws Exception {
+        Path yml = tmp.resolve("codeiq.yml");
+        Files.writeString(yml,
+                "detectors:\n"
+              + "  categories: [endpoints, entities]\n"
+              + "  include: [spring-rest-detector]\n");
+        CodeIqUnifiedConfig cfg = UnifiedConfigLoader.load(yml);
+        assertEquals(List.of("endpoints", "entities"), cfg.detectors().categories());
+        assertEquals(List.of("spring-rest-detector"), cfg.detectors().include());
+    }
+
+    @Test
+    void loadsIndexingParsersList(@TempDir Path tmp) throws Exception {
+        Path yml = tmp.resolve("codeiq.yml");
+        Files.writeString(yml, "indexing:\n  parsers: [javaparser, antlr]\n");
+        CodeIqUnifiedConfig cfg = UnifiedConfigLoader.load(yml);
+        assertEquals(List.of("javaparser", "antlr"), cfg.indexing().parsers());
+    }
+
+    @Test
+    void loadsIndexingParallelismAsInteger(@TempDir Path tmp) throws Exception {
+        Path yml = tmp.resolve("codeiq.yml");
+        Files.writeString(yml, "indexing:\n  parallelism: 12\n");
+        CodeIqUnifiedConfig cfg = UnifiedConfigLoader.load(yml);
+        assertEquals(12, cfg.indexing().parallelism());
+    }
+
+    @Test
+    void indexingParallelismNonIntegerThrows(@TempDir Path tmp) throws Exception {
+        Path yml = tmp.resolve("codeiq.yml");
+        Files.writeString(yml, "indexing:\n  parallelism: not-a-number\n");
+        ConfigLoadException e = assertThrows(ConfigLoadException.class,
+                () -> UnifiedConfigLoader.load(yml));
+        assertTrue(e.getMessage().contains("indexing.parallelism"),
+                "error must name the field; got: " + e.getMessage());
+    }
+
+    @Test
+    void detectorsCamelCaseAliasesAcceptedWithWarn(@TempDir Path tmp) throws Exception {
+        // Back-compat: existing configs that spelled the filter keys in camelCase
+        // should still load, but emit a deprecation WARN naming the canonical snake_case form.
+        Path yml = tmp.resolve("codeiq.yml");
+        Files.writeString(yml,
+                "detectors:\n"
+              + "  detectorCategories: [endpoints]\n"
+              + "  detectorInclude: [spring-rest-detector]\n");
+
+        ListAppender<ILoggingEvent> appender = attachAppender();
+        try {
+            CodeIqUnifiedConfig cfg = UnifiedConfigLoader.load(yml);
+            assertEquals(List.of("endpoints"), cfg.detectors().categories());
+            assertEquals(List.of("spring-rest-detector"), cfg.detectors().include());
+            assertWarnsExactlyFor(appender,
+                    "detectors.detectorCategories", "detectors.detectorInclude");
+        } finally {
+            detachAppender(appender);
+        }
+    }
+
+    @Test
+    void missingDetectorsSectionMeansEmptyLists(@TempDir Path tmp) throws Exception {
+        // Loading an empty codeiq.yml must leave detectors at empty defaults — no
+        // surprise null/NPE when Analyzer reads categories()/include().
+        Path yml = tmp.resolve("codeiq.yml");
+        Files.writeString(yml, "serving:\n  port: 8080\n");
+        CodeIqUnifiedConfig cfg = UnifiedConfigLoader.load(yml);
+        assertNotNull(cfg.detectors().categories());
+        assertTrue(cfg.detectors().categories().isEmpty());
+        assertNotNull(cfg.detectors().include());
+        assertTrue(cfg.detectors().include().isEmpty());
+        assertNotNull(cfg.indexing().parsers());
+        assertTrue(cfg.indexing().parsers().isEmpty());
+    }
+
     @Test
     void aliasWarnIsDedupedPerFile(@TempDir Path tmp) throws Exception {
         // A single load() call must emit at most ONE WARN per alias even if the

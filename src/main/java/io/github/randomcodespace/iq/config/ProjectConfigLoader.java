@@ -210,7 +210,7 @@ public class ProjectConfigLoader {
                 new io.github.randomcodespace.iq.config.unified.ProjectConfig(null, root, serviceName, List.of());
 
         // --- indexing layer (flat keys) ---
-        // Reuse parseProjectConfig to pull languages / exclude / pipeline.batch-size.
+        // Reuse parseProjectConfig to pull languages / detectors / exclude / parsers / pipeline.*.
         ProjectConfig legacy = parseProjectConfig(raw);
         List<String> languages = legacy.getLanguages();
         List<String> exclude = legacy.getExclude();
@@ -227,8 +227,13 @@ public class ProjectConfigLoader {
         if (batchSize == null && raw.containsKey("batch_size")) {
             batchSize = toInteger(raw.get("batch_size"));
         }
-        String parallelism = legacy.getPipelineParallelism() == null
-                ? null : String.valueOf(legacy.getPipelineParallelism());
+        Integer parallelism = legacy.getPipelineParallelism();
+
+        // parsers: legacy shape is a map {lang: parserName}; unified carries a List<String> of
+        // parser names (Analyzer never consumed the map at runtime — list is sufficient).
+        List<String> parsers = legacy.getParsers() == null
+                ? List.of()
+                : List.copyOf(legacy.getParsers().values());
 
         IndexingConfig indexingU = new IndexingConfig(
                 languages == null ? List.of() : languages,
@@ -241,7 +246,28 @@ public class ProjectConfigLoader {
                 maxDepth,
                 maxRadius,
                 maxFiles,
-                maxSnippetLines);
+                maxSnippetLines,
+                parsers);
+
+        // --- detectors layer ---
+        // detectors.categories / detectors.include come from the nested
+        // `detectors: { categories, include }` shape that parseProjectConfig already reads.
+        // In addition, Phase B accepts flat top-level aliases `detector_categories` /
+        // `detector_include` so legacy `.osscodeiq.yml` files that put the filters at the
+        // root (rather than under `detectors:`) continue to work.
+        List<String> detectorCategories = legacy.getDetectorCategories();
+        if (detectorCategories == null && raw.get("detector_categories") instanceof List<?> lc) {
+            detectorCategories = lc.stream().map(String::valueOf).toList();
+        }
+        List<String> detectorInclude = legacy.getDetectorInclude();
+        if (detectorInclude == null && raw.get("detector_include") instanceof List<?> li) {
+            detectorInclude = li.stream().map(String::valueOf).toList();
+        }
+        DetectorsConfig detectorsU = new DetectorsConfig(
+                List.of(),
+                detectorCategories == null ? List.of() : detectorCategories,
+                detectorInclude == null ? List.of() : detectorInclude,
+                Map.of());
 
         return new CodeIqUnifiedConfig(
                 projectU,
@@ -249,7 +275,7 @@ public class ProjectConfigLoader {
                 ServingConfig.empty(),
                 McpConfig.empty(),
                 ObservabilityConfig.empty(),
-                DetectorsConfig.empty());
+                detectorsU);
     }
 
     // ---------------------------------------------------------------

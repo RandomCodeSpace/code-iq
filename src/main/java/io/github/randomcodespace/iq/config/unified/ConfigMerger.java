@@ -60,7 +60,8 @@ public final class ConfigMerger {
                 take("indexing.max_depth",         lo.maxDepth(),        hi.maxDepth(),        l, p),
                 take("indexing.max_radius",        lo.maxRadius(),       hi.maxRadius(),       l, p),
                 take("indexing.max_files",         lo.maxFiles(),        hi.maxFiles(),        l, p),
-                take("indexing.max_snippet_lines", lo.maxSnippetLines(), hi.maxSnippetLines(), l, p));
+                take("indexing.max_snippet_lines", lo.maxSnippetLines(), hi.maxSnippetLines(), l, p),
+                takeList("indexing.parsers",       lo.parsers(),         hi.parsers(),         l, p));
     }
 
     private ServingConfig mergeServing(ServingConfig lo, ServingConfig hi, Input l, Map<String,ConfigProvenance> p) {
@@ -103,8 +104,10 @@ public final class ConfigMerger {
 
     private DetectorsConfig mergeDetectors(DetectorsConfig lo, DetectorsConfig hi, Input l, Map<String,ConfigProvenance> p) {
         return new DetectorsConfig(
-                takeList("detectors.profiles", lo.profiles(), hi.profiles(), l, p),
-                takeMap("detectors.overrides", lo.overrides(), hi.overrides(), l, p));
+                takeList("detectors.profiles",   lo.profiles(),   hi.profiles(),   l, p),
+                takeList("detectors.categories", lo.categories(), hi.categories(), l, p),
+                takeList("detectors.include",    lo.include(),    hi.include(),    l, p),
+                takeMap("detectors.overrides",   lo.overrides(),  hi.overrides(),  l, p));
     }
 
     private <T> T take(String path, T lo, T hi, Input l, Map<String, ConfigProvenance> p) {
