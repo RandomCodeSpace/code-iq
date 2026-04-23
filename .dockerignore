@@ -6,4 +6,4 @@ docs/
 tests/
 .github/
 helm/
-src/osscodeiq/
+src/codeiq/

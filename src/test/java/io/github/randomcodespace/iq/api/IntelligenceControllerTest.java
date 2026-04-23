@@ -36,7 +36,7 @@ class IntelligenceControllerTest {
         assembler = Mockito.mock(EvidencePackAssembler.class);
         metadata = new ArtifactMetadata(
                 "https://github.com/example/repo", "abc123", Instant.now(),
-                "1", "2", Map.of("code-iq", "1.0"),
+                "1", "2", Map.of("codeiq", "1.0"),
                 Map.of(), "deadbeef");
         metadataProvider = Mockito.mock(ArtifactMetadataProvider.class);
         when(metadataProvider.current()).thenReturn(metadata);

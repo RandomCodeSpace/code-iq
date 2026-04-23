@@ -1,6 +1,6 @@
 spring:
   application:
-    name: code-iq
+    name: codeiq
   main:
     banner-mode: off
     allow-bean-definition-overriding: false
@@ -35,7 +35,7 @@ codeiq:
     enabled: true
 
 spring.ai.mcp.server:
-  name: code-iq
+  name: codeiq
   version: 0.1.0
   protocol: STREAMABLE
   streamable-http:

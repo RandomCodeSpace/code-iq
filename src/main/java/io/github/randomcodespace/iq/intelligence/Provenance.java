@@ -6,7 +6,7 @@ package io.github.randomcodespace.iq.intelligence;
  *
  * @param repositoryUrl    Remote URL of the repository (may be null for local-only analysis).
  * @param commitSha        Full SHA-1 of the HEAD commit at analysis time (may be null).
- * @param extractorVersion Version of the code-iq extractor that produced this node.
+ * @param extractorVersion Version of the codeiq extractor that produced this node.
  * @param schemaVersion    Graph schema version (integer, incremented on breaking changes).
  * @param confidence       Capability level for the language/feature that produced this node.
  */

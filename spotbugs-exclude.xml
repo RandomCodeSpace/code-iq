@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  SpotBugs exclude filter for code-iq.
+  SpotBugs exclude filter for codeiq.
 
   Philosophy: fail CI on real bugs, not on stylistic or generated-code noise.
   Each entry MUST have a rationale comment. If a rule here ever catches a

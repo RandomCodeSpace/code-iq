@@ -133,10 +133,10 @@ public class IndexCommand implements Callable<Integer> {
         });
 
         CliOutput.printResultSummary(result, nf);
-        CliOutput.info("  Store:   H2 (.code-iq/cache/analysis-cache)");
+        CliOutput.info("  Store:   H2 (.codeiq/cache/analysis-cache)");
 
         System.out.println();
-        CliOutput.info("  Next step: code-iq enrich " + root);
+        CliOutput.info("  Next step: codeiq enrich " + root);
 
         return 0;
     }

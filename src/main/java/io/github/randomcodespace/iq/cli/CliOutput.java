@@ -84,7 +84,7 @@ final class CliOutput {
      * Used by both {@code analyze} and {@code index} commands.
      *
      * <p>Project-level overrides ({@code cache_dir}, {@code max_depth},
-     * {@code max_radius} from {@code codeiq.yml} / legacy {@code .osscodeiq.yml})
+     * {@code max_radius} from {@code codeiq.yml})
      * are already resolved at Spring startup by
      * {@link io.github.randomcodespace.iq.config.UnifiedConfigBeans#codeIqConfig}
      * via {@code ConfigResolver} + {@code UnifiedConfigAdapter}. The {@code config}

@@ -293,6 +293,6 @@ public class GraphController {
     }
 
     // POST /api/analyze removed — API/MCP server is read-only.
-    // Analysis is done locally via CLI: code-iq analyze / code-iq index
+    // Analysis is done locally via CLI: codeiq analyze / codeiq index
     // Data is loaded into Neo4j on serve startup (auto-enrich).
 }

@@ -9,7 +9,7 @@ import java.util.Map;
  * @param bundleFormat       Always {@code 2} for this record.
  * @param tag                User-supplied bundle tag (may be null).
  * @param project            Project name.
- * @param extractorVersion   Version of the code-iq extractor that built this bundle.
+ * @param extractorVersion   Version of the codeiq extractor that built this bundle.
  * @param schemaVersion      Graph schema version at bundle time.
  * @param createdAt          ISO-8601 timestamp.
  * @param repositoryIdentity Git/VCS identity of the analysed repo.

@@ -151,7 +151,7 @@ public class PluginsCommand implements Runnable {
             List<Detector> matches = registry.findByQuery(query);
             if (matches.isEmpty()) {
                 CliOutput.error("No detectors found for: " + query);
-                CliOutput.info("Use 'code-iq plugins list' to see available categories.");
+                CliOutput.info("Use 'codeiq plugins list' to see available categories.");
                 return 1;
             }
 
@@ -313,7 +313,7 @@ public class PluginsCommand implements Runnable {
 
     @Component
     @Command(name = "suggest", mixinStandardHelpOptions = true,
-            description = "Suggest an optimized .osscodeiq.yml for a project")
+            description = "Suggest an optimized codeiq.yml for a project")
     static class SuggestSubcommand implements Callable<Integer> {
 
         @Parameters(index = "0", defaultValue = ".",
@@ -341,7 +341,7 @@ public class PluginsCommand implements Runnable {
                     private static final Set<String> SKIP_DIRS = Set.of(
                             "node_modules", ".git", "build", "target", "dist",
                             "__pycache__", "venv", ".venv", ".gradle",
-                            ".idea", ".vscode", ".code-iq", ".code-intelligence");
+                            ".idea", ".vscode", ".codeiq");
 
                     @Override
                     public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {

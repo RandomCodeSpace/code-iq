@@ -17,7 +17,7 @@ fi
 [[ -d "$SEED" ]] || { echo "Seed $SEED missing. Run scripts/seed-repos.sh first."; exit 1; }
 
 # Clean any prior state in the seed repo.
-rm -rf "$SEED/.code-intelligence" "$SEED/.osscodeiq"
+rm -rf "$SEED/.codeiq"
 # Truncate timings file so re-runs don't append stale entries.
 : > "$OUT/timings.txt"
 

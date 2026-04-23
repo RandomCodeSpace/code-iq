@@ -146,7 +146,7 @@ public class Analyzer {
      * Backward-compatible constructor for tests that don't need smart indexing.
      *
      * <p>Defaults the unified-config overlay to {@link CodeIqUnifiedConfig#empty()} —
-     * equivalent to the pre-Phase-B "no {@code .osscodeiq.yml} present" path
+     * equivalent to the "no {@code codeiq.yml} present" path
      * (no detector filters, no language filter, auto parallelism). Tests that
      * need to exercise filters should use the primary constructor with a
      * hand-rolled {@link CodeIqUnifiedConfig}.

@@ -85,7 +85,7 @@ public class McpTools {
                 .flatMap(n -> n.getEdges().stream())
                 .toList();
         if (nodes.isEmpty()) {
-            throw new RuntimeException("No analysis data available. Run 'code-iq analyze' first.");
+            throw new RuntimeException("No analysis data available. Run 'codeiq analyze' first.");
         }
         return new CacheData(nodes, edges);
     }
@@ -249,7 +249,7 @@ public class McpTools {
         try {
             FlowEngine engine = resolveFlowEngine();
             if (engine == null) {
-                return toJson(Map.of(PROP_ERROR, "No analysis data available. Run 'code-iq analyze' first."));
+                return toJson(Map.of(PROP_ERROR, "No analysis data available. Run 'codeiq analyze' first."));
             }
             FlowDiagram diagram = engine.generate(viewName);
             String rendered = engine.render(diagram, fmt);
@@ -263,7 +263,7 @@ public class McpTools {
 
     // analyze_codebase removed — MCP server runs on remote hosts where
     // source code is not available (only the bundled graph). Analysis is
-    // done locally via CLI: code-iq analyze / code-iq index
+    // done locally via CLI: codeiq analyze / codeiq index
 
     @McpTool(name = "run_cypher", description = "Execute a custom read-only Cypher query directly against the Neo4j graph. Use for advanced queries not covered by other tools. CALL db.* procedures are allowed (fulltext search, schema inspection). Mutation queries are blocked. Returns rows as JSON array.")
     public String runCypher(

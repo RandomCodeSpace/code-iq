@@ -93,11 +93,11 @@ public class ServeCommand implements Callable<Integer> {
                     CliOutput.success("Neo4j graph: " + nf.format(nodeCount) + " nodes, "
                             + nf.format(edgeCount) + " edges");
                 } else {
-                    CliOutput.warn("Neo4j graph is empty. Run 'code-iq enrich " + root + "' to populate.");
+                    CliOutput.warn("Neo4j graph is empty. Run 'codeiq enrich " + root + "' to populate.");
                 }
             } catch (Exception e) {
                 log.debug("Could not check Neo4j state", e);
-                CliOutput.warn("Could not read Neo4j graph. Run 'code-iq enrich' first.");
+                CliOutput.warn("Could not read Neo4j graph. Run 'codeiq enrich' first.");
             }
         }
 

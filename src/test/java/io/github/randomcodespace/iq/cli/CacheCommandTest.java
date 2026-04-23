@@ -37,7 +37,7 @@ class CacheCommandTest {
     @Test
     void statsShowsNoCacheWhenMissing(@TempDir Path tempDir) {
         var config = new CodeIqConfig();
-        CodeIqConfigTestSupport.override(config).cacheDir(".code-iq/cache").done();
+        CodeIqConfigTestSupport.override(config).cacheDir(".codeiq/cache").done();
         var cmd = new CacheCommand.StatsSubcommand(config);
 
         var cmdLine = new picocli.CommandLine(cmd);
@@ -51,13 +51,13 @@ class CacheCommandTest {
     @Test
     void statsShowsCacheInfo(@TempDir Path tempDir) throws IOException {
         // Create a fake cache directory with a file
-        Path cacheDir = tempDir.resolve(".code-iq/cache");
+        Path cacheDir = tempDir.resolve(".codeiq/cache");
         Files.createDirectories(cacheDir);
         Files.writeString(cacheDir.resolve("test.txt"), "hello world",
                 StandardCharsets.UTF_8);
 
         var config = new CodeIqConfig();
-        CodeIqConfigTestSupport.override(config).cacheDir(".code-iq/cache").done();
+        CodeIqConfigTestSupport.override(config).cacheDir(".codeiq/cache").done();
         var cmd = new CacheCommand.StatsSubcommand(config);
 
         var cmdLine = new picocli.CommandLine(cmd);
@@ -71,13 +71,13 @@ class CacheCommandTest {
 
     @Test
     void clearRemovesCache(@TempDir Path tempDir) throws IOException {
-        Path cacheDir = tempDir.resolve(".code-iq/cache");
+        Path cacheDir = tempDir.resolve(".codeiq/cache");
         Files.createDirectories(cacheDir);
         Files.writeString(cacheDir.resolve("data.bin"), "data",
                 StandardCharsets.UTF_8);
 
         var config = new CodeIqConfig();
-        CodeIqConfigTestSupport.override(config).cacheDir(".code-iq/cache").done();
+        CodeIqConfigTestSupport.override(config).cacheDir(".codeiq/cache").done();
         var cmd = new CacheCommand.ClearSubcommand(config);
 
         var cmdLine = new picocli.CommandLine(cmd);
@@ -90,7 +90,7 @@ class CacheCommandTest {
     @Test
     void clearHandlesNoCacheGracefully(@TempDir Path tempDir) {
         var config = new CodeIqConfig();
-        CodeIqConfigTestSupport.override(config).cacheDir(".code-iq/cache").done();
+        CodeIqConfigTestSupport.override(config).cacheDir(".codeiq/cache").done();
         var cmd = new CacheCommand.ClearSubcommand(config);
 
         var cmdLine = new picocli.CommandLine(cmd);

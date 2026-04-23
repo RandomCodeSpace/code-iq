@@ -55,7 +55,7 @@ public class FindCommand implements Callable<Integer> {
     @Override
     public Integer call() {
         if (graphStore == null) {
-            CliOutput.error("Find queries require the serve profile (Neo4j). Use 'code-iq serve' to start the server, or 'code-iq stats' for cache-based queries.");
+            CliOutput.error("Find queries require the serve profile (Neo4j). Use 'codeiq serve' to start the server, or 'codeiq stats' for cache-based queries.");
             return 1;
         }
         NodeKind kind = resolveKind(what);
@@ -75,7 +75,7 @@ public class FindCommand implements Callable<Integer> {
         }
 
         if (nodes.isEmpty()) {
-            CliOutput.warn("No " + what + " found. Run 'code-iq analyze' first.");
+            CliOutput.warn("No " + what + " found. Run 'codeiq analyze' first.");
             return 1;
         }
 

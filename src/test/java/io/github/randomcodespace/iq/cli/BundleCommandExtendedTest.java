@@ -57,7 +57,7 @@ class BundleCommandExtendedTest {
     }
 
     private Path createFakeGraphDb(Path tempDir) throws IOException {
-        Path graphDb = tempDir.resolve(".code-iq/graph/graph.db");
+        Path graphDb = tempDir.resolve(".codeiq/graph/graph.db");
         Files.createDirectories(graphDb);
         Files.writeString(graphDb.resolve("neostore"), "neo4j-data", StandardCharsets.UTF_8);
         return graphDb;
@@ -157,7 +157,7 @@ class BundleCommandExtendedTest {
 
     @Test
     void bundleSkipsPidFilesFromGraphDb(@TempDir Path tempDir) throws IOException {
-        Path graphDb = tempDir.resolve(".code-iq/graph/graph.db");
+        Path graphDb = tempDir.resolve(".codeiq/graph/graph.db");
         Files.createDirectories(graphDb);
         Files.writeString(graphDb.resolve("neostore"), "data", StandardCharsets.UTF_8);
         Files.writeString(graphDb.resolve("neo4j.pid"), "12345", StandardCharsets.UTF_8);
@@ -244,11 +244,11 @@ class BundleCommandExtendedTest {
         createFakeGraphDb(tempDir);
 
         // Create a minimal H2 cache directory (no .mv.db file – no stats but no error)
-        Path cacheDir = tempDir.resolve(".code-iq/cache");
+        Path cacheDir = tempDir.resolve(".codeiq/cache");
         Files.createDirectories(cacheDir);
 
         var config = new CodeIqConfig();
-        CodeIqConfigTestSupport.override(config).cacheDir(".code-iq/cache").done();
+        CodeIqConfigTestSupport.override(config).cacheDir(".codeiq/cache").done();
         Path zipPath = tempDir.resolve("out.zip");
         var cmd = new BundleCommand(config, java.util.Optional.empty(), java.util.Optional.empty());
         var cmdLine = new picocli.CommandLine(cmd);

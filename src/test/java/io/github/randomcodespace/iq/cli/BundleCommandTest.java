@@ -48,7 +48,7 @@ class BundleCommandTest {
     }
 
     private void createFakeGraphDb(Path tempDir) throws IOException {
-        Path graphDb = tempDir.resolve(".code-iq/graph/graph.db");
+        Path graphDb = tempDir.resolve(".codeiq/graph/graph.db");
         Files.createDirectories(graphDb);
         Files.writeString(graphDb.resolve("neostore"), "neo4j-data", StandardCharsets.UTF_8);
     }
@@ -71,7 +71,7 @@ class BundleCommandTest {
         Files.writeString(tempDir.resolve("App.java"), "class App {}", StandardCharsets.UTF_8);
 
         var config = new CodeIqConfig();
-        CodeIqConfigTestSupport.override(config).cacheDir(".code-iq/cache").done();
+        CodeIqConfigTestSupport.override(config).cacheDir(".codeiq/cache").done();
 
         when(flowEngine.renderInteractive(anyString())).thenReturn("<html>flow</html>");
 
@@ -159,7 +159,7 @@ class BundleCommandTest {
 
     @Test
     void bundleSkipsNeo4jLockFiles(@TempDir Path tempDir) throws IOException {
-        Path graphDb = tempDir.resolve(".code-iq/graph/graph.db");
+        Path graphDb = tempDir.resolve(".codeiq/graph/graph.db");
         Files.createDirectories(graphDb);
         Files.writeString(graphDb.resolve("neostore"), "data", StandardCharsets.UTF_8);
         Files.writeString(graphDb.resolve("store_lock"), "locked", StandardCharsets.UTF_8);
@@ -182,12 +182,12 @@ class BundleCommandTest {
     void bundleIncludesH2Cache(@TempDir Path tempDir) throws IOException {
         createFakeGraphDb(tempDir);
 
-        Path cacheDir = tempDir.resolve(".code-iq/cache");
+        Path cacheDir = tempDir.resolve(".codeiq/cache");
         Files.createDirectories(cacheDir);
         Files.writeString(cacheDir.resolve("analysis-cache.db"), "h2-data", StandardCharsets.UTF_8);
 
         var config = new CodeIqConfig();
-        CodeIqConfigTestSupport.override(config).cacheDir(".code-iq/cache").done();
+        CodeIqConfigTestSupport.override(config).cacheDir(".codeiq/cache").done();
 
         Path zipPath = tempDir.resolve("test-bundle.zip");
         var cmd = new BundleCommand(config, (GraphStore) null, (FlowEngine) null);

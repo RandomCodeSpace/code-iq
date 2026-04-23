@@ -12,7 +12,7 @@ import java.util.Comparator;
 import java.util.concurrent.Callable;
 
 /**
- * Manage the analysis cache (.code-intelligence directory).
+ * Manage the analysis cache (.codeiq/cache directory).
  */
 @Component
 @Command(name = "cache", mixinStandardHelpOptions = true,

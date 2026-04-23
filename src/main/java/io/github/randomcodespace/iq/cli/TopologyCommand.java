@@ -62,7 +62,7 @@ public class TopologyCommand implements Callable<Integer> {
 
         if (!Files.exists(h2File)) {
             CliOutput.error("No analysis cache found at " + h2File.getParent());
-            CliOutput.info("  Run 'code-iq index " + root + "' and 'code-iq enrich " + root + "' first.");
+            CliOutput.info("  Run 'codeiq index " + root + "' and 'codeiq enrich " + root + "' first.");
             return 1;
         }
 

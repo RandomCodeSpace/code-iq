@@ -25,8 +25,8 @@ class UnifiedConfigAdapterTest {
         CodeIqConfig legacy = UnifiedConfigAdapter.toCodeIqConfig(u);
 
         assertEquals(".", legacy.getRootPath());
-        assertEquals(".code-iq/cache", legacy.getCacheDir());
-        assertEquals(".code-iq/graph/graph.db", legacy.getGraph().getPath());
+        assertEquals(".codeiq/cache", legacy.getCacheDir());
+        assertEquals(".codeiq/graph/graph.db", legacy.getGraph().getPath());
         assertEquals(500, legacy.getBatchSize());
         assertFalse(legacy.isReadOnly());
         // maxDepth and maxRadius flow through builtIn() matching application.yml

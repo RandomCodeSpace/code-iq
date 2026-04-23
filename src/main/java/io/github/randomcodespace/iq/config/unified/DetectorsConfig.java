@@ -8,9 +8,8 @@ import java.util.Map;
  * <ul>
  *   <li>{@code profiles} -- named detector bundles to activate.</li>
  *   <li>{@code categories} -- allow-list of detector categories (e.g. {@code ["endpoints",
- *       "entities"]}); empty means "all categories". Introduced in Phase B cleanup to
- *       give the Analyzer pipeline a unified home for filters that previously lived
- *       only on the legacy {@code .osscodeiq.yml} {@code ProjectConfig} POJO.</li>
+ *       "entities"]}); empty means "all categories". Gives the Analyzer pipeline a
+ *       unified home for filters.</li>
  *   <li>{@code include} -- allow-list of detector names (by {@code Detector#getName()});
  *       empty means "no name-level filter".</li>
  *   <li>{@code overrides} -- per-detector feature flags keyed by {@code SimpleClassName}.</li>
