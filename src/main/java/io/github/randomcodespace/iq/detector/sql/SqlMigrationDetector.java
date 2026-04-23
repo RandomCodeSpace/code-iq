@@ -142,12 +142,20 @@ public class SqlMigrationDetector extends AbstractRegexDetector {
                     + "[^>]*?\\breferencedTableName\\s*+=\\s*+\"(\\w++)\"");
 
     // -- Liquibase YAML patterns (regex-based; avoids pulling in SnakeYAML here) --
+    // Intermediate lines use a negative-lookahead + possessive `*+` instead of reluctant `*?`:
+    // no backtracking (prevents SonarCloud S5998 stack-overflow / S5852 ReDoS), same
+    // semantics — lines that *would* match the target key are excluded from the skip group,
+    // so the outer match terminates exactly where the reluctant version would have.
     private static final Pattern LQ_CREATE_TABLE_YAML = Pattern.compile(
-            "createTable\\s*+:[^\\n]*+\\n(?:\\s++[^\\n]*+\\n)*?\\s++tableName\\s*+:\\s*+([\\w\"']++)");
+            "createTable\\s*+:[^\\n]*+\\n"
+                    + "(?:(?!\\s++tableName\\s*+:)\\s++[^\\n]*+\\n)*+"
+                    + "\\s++tableName\\s*+:\\s*+([\\w\"']++)");
     private static final Pattern LQ_ADD_FK_YAML = Pattern.compile(
             "addForeignKeyConstraint\\s*+:[^\\n]*+\\n"
-                    + "(?:\\s++[^\\n]*+\\n)*?\\s++baseTableName\\s*+:\\s*+([\\w\"']++)[^\\n]*+\\n"
-                    + "(?:\\s++[^\\n]*+\\n)*?\\s++referencedTableName\\s*+:\\s*+([\\w\"']++)");
+                    + "(?:(?!\\s++baseTableName\\s*+:)\\s++[^\\n]*+\\n)*+"
+                    + "\\s++baseTableName\\s*+:\\s*+([\\w\"']++)[^\\n]*+\\n"
+                    + "(?:(?!\\s++referencedTableName\\s*+:)\\s++[^\\n]*+\\n)*+"
+                    + "\\s++referencedTableName\\s*+:\\s*+([\\w\"']++)");
 
     // -- Flyway version parsing --
     private static final Pattern FLYWAY_VERSION = Pattern.compile(
