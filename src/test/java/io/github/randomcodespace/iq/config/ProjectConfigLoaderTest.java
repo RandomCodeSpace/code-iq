@@ -11,6 +11,7 @@ import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ProjectConfigLoaderTest {
@@ -40,6 +41,64 @@ class ProjectConfigLoaderTest {
         ProjectConfigLoader.LoadResult r = new ProjectConfigLoader().loadFrom(repo);
         assertEquals(CodeIqUnifiedConfig.empty(), r.config());
         assertFalse(r.deprecationWarningEmitted());
+    }
+
+    @Test
+    void fallbackOsscodeiqWithFlatKeysTranslatesToUnifiedOverlay(@TempDir Path repo) throws Exception {
+        String yaml = """
+                max_depth: 25
+                max_radius: 8
+                cache_dir: .custom-cache
+                root_path: /repo
+                """;
+        Files.writeString(repo.resolve(".osscodeiq.yml"), yaml);
+
+        ProjectConfigLoader.LoadResult r = new ProjectConfigLoader().loadFrom(repo);
+
+        assertEquals(25, r.config().indexing().maxDepth());
+        assertEquals(8, r.config().indexing().maxRadius());
+        assertEquals(".custom-cache", r.config().indexing().cacheDir());
+        assertEquals("/repo", r.config().project().root());
+        assertTrue(r.deprecationWarningEmitted(),
+                "must emit a migration warning when falling back to .osscodeiq.yml");
+    }
+
+    @Test
+    void fallbackOsscodeiqWithNewShapeStillWorks(@TempDir Path repo) throws Exception {
+        // A .osscodeiq.yml that has already been rewritten in the new nested schema
+        // (e.g., a user renamed codeiq.yml back, or copy-pasted the new sample) must
+        // continue to work — delegate to UnifiedConfigLoader, still warn.
+        Files.writeString(repo.resolve(".osscodeiq.yml"), "serving:\n  port: 9999\n");
+
+        ProjectConfigLoader.LoadResult r = new ProjectConfigLoader().loadFrom(repo);
+
+        assertEquals(9999, r.config().serving().port());
+        assertTrue(r.deprecationWarningEmitted());
+    }
+
+    @Test
+    void mixedLegacyFlatAndNestedKeysPrefersLegacyPath(@TempDir Path repo) throws Exception {
+        // Documented behavior (see javadoc on ProjectConfigLoader#readAndTranslateLegacy):
+        // presence of ANY legacy flat key at the root triggers the legacy translator,
+        // so flat values are honored. Nested sections that lack a flat equivalent
+        // (serving / mcp / observability / detectors) are intentionally NOT read in the
+        // legacy-mixed case — a pure new-shape file should drop the flat keys first.
+        String yaml = """
+                max_depth: 25
+                indexing:
+                  batch_size: 100
+                """;
+        Files.writeString(repo.resolve(".osscodeiq.yml"), yaml);
+
+        ProjectConfigLoader.LoadResult r = new ProjectConfigLoader().loadFrom(repo);
+
+        assertEquals(25, r.config().indexing().maxDepth(),
+                "flat max_depth must translate even when a nested indexing block is present");
+        // In legacy-mixed mode, pipeline.batch-size (legacy schema) is the batch-size
+        // source; a bare `indexing.batch_size` nested block is intentionally ignored.
+        assertNull(r.config().indexing().batchSize(),
+                "nested indexing.batch_size is not honored in legacy-mixed mode (documented)");
+        assertTrue(r.deprecationWarningEmitted());
     }
 
     // ---- Legacy static API retained for back-compat call sites (Analyzer, CliOutput) ----
