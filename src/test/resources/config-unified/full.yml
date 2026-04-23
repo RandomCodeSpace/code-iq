@@ -13,37 +13,37 @@ indexing:
   languages: [java, typescript]
   exclude: ['**/generated/**']
   incremental: true
-  cacheDir: .code-iq/cache
+  cache_dir: .code-iq/cache
   parallelism: auto
-  batchSize: 500
+  batch_size: 500
 serving:
   port: 9090
-  bindAddress: 127.0.0.1
-  readOnly: true
+  bind_address: 127.0.0.1
+  read_only: true
   neo4j:
     dir: .code-iq/graph/graph.db
-    pageCacheMb: 512
-    heapInitialMb: 256
-    heapMaxMb: 2048
+    page_cache_mb: 512
+    heap_initial_mb: 256
+    heap_max_mb: 2048
 mcp:
   enabled: true
   transport: http
-  basePath: /mcp
+  base_path: /mcp
   auth:
     mode: none
   limits:
-    perToolTimeoutMs: 10000
-    maxResults: 200
-    maxPayloadBytes: 1000000
-    ratePerMinute: 120
+    per_tool_timeout_ms: 10000
+    max_results: 200
+    max_payload_bytes: 1000000
+    rate_per_minute: 120
   tools:
     enabled: ['*']
     disabled: [run_cypher]
 observability:
   metrics: true
   tracing: false
-  logFormat: json
-  logLevel: info
+  log_format: json
+  log_level: info
 detectors:
   profiles: [default]
   overrides:

@@ -15,14 +15,14 @@ class ConfigResolverTest {
         Path userGlobal = tmp.resolve("user.yml");
         Files.writeString(userGlobal, "serving:\n  port: 7000\n");
 
-        // project: port=8500  AND  indexing.batchSize=1234
+        // project: port=8500  AND  indexing.batch_size=1234
         Path project = tmp.resolve("codeiq.yml");
-        Files.writeString(project, "serving:\n  port: 8500\nindexing:\n  batchSize: 1234\n");
+        Files.writeString(project, "serving:\n  port: 8500\nindexing:\n  batch_size: 1234\n");
 
-        // env: port=9100 (should win over project)  AND NO batchSize (project wins there)
+        // env: port=9100 (should win over project)  AND NO batch_size (project wins there)
         Map<String, String> env = Map.of("CODEIQ_SERVING_PORT", "9100");
 
-        // cli: readOnly=true (only CLI sets it)
+        // cli: read_only=true (only CLI sets it)
         CodeIqUnifiedConfig cli = new CodeIqUnifiedConfig(
                 ProjectConfig.empty(), IndexingConfig.empty(),
                 new ServingConfig(null, null, true, Neo4jConfig.empty()),
@@ -38,9 +38,9 @@ class ConfigResolverTest {
         assertEquals(9100, merged.effective().serving().port());
         assertEquals(ConfigLayer.ENV, merged.provenance().get("serving.port").layer());
         assertEquals(1234, merged.effective().indexing().batchSize());
-        assertEquals(ConfigLayer.PROJECT, merged.provenance().get("indexing.batchSize").layer());
+        assertEquals(ConfigLayer.PROJECT, merged.provenance().get("indexing.batch_size").layer());
         assertEquals(Boolean.TRUE, merged.effective().serving().readOnly());
-        assertEquals(ConfigLayer.CLI, merged.provenance().get("serving.readOnly").layer());
+        assertEquals(ConfigLayer.CLI, merged.provenance().get("serving.read_only").layer());
         // indexing.incremental is not set in project/env/cli, so it must
         // fall through to BUILT_IN defaults (which set it to true).
         assertEquals(Boolean.TRUE, merged.effective().indexing().incremental());

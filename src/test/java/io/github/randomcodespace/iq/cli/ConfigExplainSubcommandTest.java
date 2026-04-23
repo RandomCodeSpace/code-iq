@@ -53,7 +53,7 @@ class ConfigExplainSubcommandTest {
         assertTrue(s.contains("9000"), "must show effective value 9000, got: " + s);
         assertTrue(s.contains("PROJECT"), "must show source layer PROJECT, got: " + s);
         assertTrue(
-                s.contains("mcp.limits.perToolTimeoutMs"),
+                s.contains("mcp.limits.per_tool_timeout_ms"),
                 "must list mcp timeout field, got: " + s);
         assertTrue(s.contains("30000"), "must show env-overridden 30000, got: " + s);
         assertTrue(s.contains("ENV"), "must show source layer ENV, got: " + s);

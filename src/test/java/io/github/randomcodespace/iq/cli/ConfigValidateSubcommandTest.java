@@ -115,7 +115,7 @@ class ConfigValidateSubcommandTest {
     void validationErrorsPrintedInSortedOrder(@TempDir Path tmp) throws Exception {
         // Craft a YAML that trips three distinct validator field paths. After the
         // Comparator applied in call(), the expected alphabetical-by-fieldPath
-        // order is: indexing.batchSize, mcp.transport, serving.port.
+        // order is: indexing.batch_size, mcp.transport, serving.port.
         Path cfg = tmp.resolve("codeiq.yml");
         Files.writeString(
                 cfg,
@@ -123,7 +123,7 @@ class ConfigValidateSubcommandTest {
                 serving:
                   port: 99999
                 indexing:
-                  batchSize: 0
+                  batch_size: 0
                 mcp:
                   transport: carrier-pigeon
                 """);
@@ -133,10 +133,10 @@ class ConfigValidateSubcommandTest {
 
         assertEquals(1, rc);
         String stderr = h.stderr();
-        int idxBatch = stderr.indexOf("indexing.batchSize");
+        int idxBatch = stderr.indexOf("indexing.batch_size");
         int idxTransport = stderr.indexOf("mcp.transport");
         int idxPort = stderr.indexOf("serving.port");
-        assertTrue(idxBatch >= 0, "missing indexing.batchSize in: " + stderr);
+        assertTrue(idxBatch >= 0, "missing indexing.batch_size in: " + stderr);
         assertTrue(idxTransport >= 0, "missing mcp.transport in: " + stderr);
         assertTrue(idxPort >= 0, "missing serving.port in: " + stderr);
         assertTrue(

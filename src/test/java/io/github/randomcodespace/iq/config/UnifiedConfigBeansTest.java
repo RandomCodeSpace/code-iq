@@ -94,8 +94,9 @@ class UnifiedConfigBeansTest {
     @Test
     void codeiqYmlOverlayFlowsIntoLegacyBean(@TempDir Path tempDir) throws Exception {
         Path yml = tempDir.resolve("codeiq.yml");
-        // Key casing matches UnifiedConfigLoader: batchSize (camel), max_depth (snake).
-        Files.writeString(yml, "indexing:\n  batchSize: 1234\n  max_depth: 42\n");
+        // Canonical snake_case keys -- camelCase is still accepted as a deprecated
+        // alias (see UnifiedConfigLoaderTest) but this test pins the primary form.
+        Files.writeString(yml, "indexing:\n  batch_size: 1234\n  max_depth: 42\n");
 
         // Point user-global at the same temp dir so the test doesn't pick up the
         // running user's real ~/.codeiq/config.yml.

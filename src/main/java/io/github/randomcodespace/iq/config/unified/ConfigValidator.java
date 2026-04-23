@@ -26,20 +26,20 @@ public final class ConfigValidator {
                     "port must be 1-65535; got " + c.serving().port(), "validator"));
         }
 
-        // serving.neo4j.*Mb
+        // serving.neo4j.*_mb
         Integer pc = c.serving().neo4j().pageCacheMb();
         Integer hi = c.serving().neo4j().heapInitialMb();
         Integer hm = c.serving().neo4j().heapMaxMb();
-        if (pc != null && pc < 0) errs.add(new ConfigError("serving.neo4j.pageCacheMb", "must be >= 0", "validator"));
-        if (hi != null && hi < 0) errs.add(new ConfigError("serving.neo4j.heapInitialMb", "must be >= 0", "validator"));
-        if (hm != null && hm < 0) errs.add(new ConfigError("serving.neo4j.heapMaxMb", "must be >= 0", "validator"));
+        if (pc != null && pc < 0) errs.add(new ConfigError("serving.neo4j.page_cache_mb", "must be >= 0", "validator"));
+        if (hi != null && hi < 0) errs.add(new ConfigError("serving.neo4j.heap_initial_mb", "must be >= 0", "validator"));
+        if (hm != null && hm < 0) errs.add(new ConfigError("serving.neo4j.heap_max_mb", "must be >= 0", "validator"));
         if (hi != null && hm != null && hi > hm)
-            errs.add(new ConfigError("serving.neo4j.heapInitialMb",
-                    "heapInitialMb (" + hi + ") must be <= heapMaxMb (" + hm + ")", "validator"));
+            errs.add(new ConfigError("serving.neo4j.heap_initial_mb",
+                    "heap_initial_mb (" + hi + ") must be <= heap_max_mb (" + hm + ")", "validator"));
 
-        // indexing.batchSize
+        // indexing.batch_size
         if (c.indexing().batchSize() != null && c.indexing().batchSize() <= 0)
-            errs.add(new ConfigError("indexing.batchSize", "must be > 0", "validator"));
+            errs.add(new ConfigError("indexing.batch_size", "must be > 0", "validator"));
 
         // mcp.transport
         if (c.mcp().transport() != null && !MCP_TRANSPORTS.contains(c.mcp().transport()))
@@ -54,18 +54,18 @@ public final class ConfigValidator {
         // mcp.limits.*
         Integer perTool = c.mcp().limits().perToolTimeoutMs();
         if (perTool != null && perTool <= 0)
-            errs.add(new ConfigError("mcp.limits.perToolTimeoutMs", "must be > 0", "validator"));
+            errs.add(new ConfigError("mcp.limits.per_tool_timeout_ms", "must be > 0", "validator"));
         Integer maxRes = c.mcp().limits().maxResults();
         if (maxRes != null && maxRes <= 0)
-            errs.add(new ConfigError("mcp.limits.maxResults", "must be > 0", "validator"));
+            errs.add(new ConfigError("mcp.limits.max_results", "must be > 0", "validator"));
 
-        // observability.logFormat / logLevel
+        // observability.log_format / log_level
         if (c.observability().logFormat() != null && !LOG_FORMATS.contains(c.observability().logFormat()))
-            errs.add(new ConfigError("observability.logFormat",
+            errs.add(new ConfigError("observability.log_format",
                     "must be one of " + LOG_FORMATS + "; got " + c.observability().logFormat(), "validator"));
         if (c.observability().logLevel() != null
                 && !LOG_LEVELS.contains(c.observability().logLevel().toLowerCase()))
-            errs.add(new ConfigError("observability.logLevel",
+            errs.add(new ConfigError("observability.log_level",
                     "must be one of " + LOG_LEVELS + "; got " + c.observability().logLevel(), "validator"));
 
         return errs;
