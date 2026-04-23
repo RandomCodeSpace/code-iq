@@ -1,5 +1,6 @@
 package io.github.randomcodespace.iq.config;
 
+import io.github.randomcodespace.iq.config.unified.CodeIqUnifiedConfig;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -13,6 +14,35 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ProjectConfigLoaderTest {
+
+    // ---- New LoadResult-based API (Task 12: .osscodeiq.yml deprecation shim) ----
+
+    @Test
+    void preferCodeiqYmlWhenBothPresent(@TempDir Path repo) throws Exception {
+        Files.writeString(repo.resolve("codeiq.yml"), "serving:\n  port: 9000\n");
+        Files.writeString(repo.resolve(".osscodeiq.yml"), "serving:\n  port: 9999\n");
+        ProjectConfigLoader.LoadResult r = new ProjectConfigLoader().loadFrom(repo);
+        assertEquals(9000, r.config().serving().port());
+        assertFalse(r.deprecationWarningEmitted());
+    }
+
+    @Test
+    void fallsBackToOsscodeIqWithWarn(@TempDir Path repo) throws Exception {
+        Files.writeString(repo.resolve(".osscodeiq.yml"), "serving:\n  port: 8888\n");
+        ProjectConfigLoader.LoadResult r = new ProjectConfigLoader().loadFrom(repo);
+        assertEquals(8888, r.config().serving().port());
+        assertTrue(r.deprecationWarningEmitted(),
+                "must emit a migration warning when falling back to .osscodeiq.yml");
+    }
+
+    @Test
+    void neitherFilePresentReturnsEmptyConfig(@TempDir Path repo) {
+        ProjectConfigLoader.LoadResult r = new ProjectConfigLoader().loadFrom(repo);
+        assertEquals(CodeIqUnifiedConfig.empty(), r.config());
+        assertFalse(r.deprecationWarningEmitted());
+    }
+
+    // ---- Legacy static API retained for back-compat call sites (Analyzer, CliOutput) ----
 
     @Test
     void loadFromYmlFile(@TempDir Path tempDir) throws IOException {

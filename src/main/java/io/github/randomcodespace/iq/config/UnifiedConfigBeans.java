@@ -1,7 +1,12 @@
 package io.github.randomcodespace.iq.config;
 
 import io.github.randomcodespace.iq.config.unified.CodeIqUnifiedConfig;
-import io.github.randomcodespace.iq.config.unified.ConfigResolver;
+import io.github.randomcodespace.iq.config.unified.ConfigDefaults;
+import io.github.randomcodespace.iq.config.unified.ConfigLayer;
+import io.github.randomcodespace.iq.config.unified.ConfigMerger;
+import io.github.randomcodespace.iq.config.unified.EnvVarOverlay;
+import io.github.randomcodespace.iq.config.unified.MergedConfig;
+import io.github.randomcodespace.iq.config.unified.UnifiedConfigLoader;
 import io.github.randomcodespace.iq.graph.GraphStore;
 import io.github.randomcodespace.iq.intelligence.provenance.ArtifactMetadataProvider;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,6 +16,7 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 
 import java.nio.file.Path;
+import java.util.List;
 
 /**
  * Produces the unified config tree and the legacy {@link CodeIqConfig} POJO for downstream consumers.
@@ -48,20 +54,31 @@ import java.nio.file.Path;
 public class UnifiedConfigBeans {
 
     /**
-     * Resolves codeiq.yml + env vars once at startup; the resulting
-     * {@link CodeIqUnifiedConfig} is the single source of truth for
-     * configuration.
+     * Resolves {@code codeiq.yml} (or, via {@link ProjectConfigLoader}, the
+     * deprecated {@code .osscodeiq.yml}) + env vars once at startup; the
+     * resulting {@link CodeIqUnifiedConfig} is the single source of truth
+     * for configuration.
+     *
+     * <p>The project layer is sourced through {@link ProjectConfigLoader} so
+     * users with a pre-Phase-B {@code .osscodeiq.yml} keep working for one
+     * release with a one-time {@code WARN} pointing them at {@code codeiq.yml}.
      */
     @Bean
-    public CodeIqUnifiedConfig codeIqUnifiedConfig() {
+    public CodeIqUnifiedConfig codeIqUnifiedConfig(ProjectConfigLoader loader) {
         Path userGlobal = Path.of(System.getProperty("user.home"), ".codeiq", "config.yml");
-        Path project = Path.of("codeiq.yml");
-        return new ConfigResolver()
-                .userGlobalPath(userGlobal)
-                .projectPath(project)
-                .env(System.getenv())
-                .resolve()
-                .effective();
+        ProjectConfigLoader.LoadResult pr = loader.loadFrom(Path.of("."));
+        // Compose defaults + user-global + project (from loader) + env. The CLI
+        // overlay is injected per-command elsewhere.
+        MergedConfig merged = new ConfigMerger().merge(List.of(
+                new ConfigMerger.Input(ConfigLayer.BUILT_IN, "(defaults)", ConfigDefaults.builtIn()),
+                new ConfigMerger.Input(ConfigLayer.USER_GLOBAL, userGlobal.toString(),
+                        UnifiedConfigLoader.load(userGlobal)),
+                new ConfigMerger.Input(ConfigLayer.PROJECT,
+                        pr.deprecationWarningEmitted() ? "./.osscodeiq.yml (deprecated)" : "./codeiq.yml",
+                        pr.config()),
+                new ConfigMerger.Input(ConfigLayer.ENV, "(env)", EnvVarOverlay.from(System.getenv()))
+        ));
+        return merged.effective();
     }
 
     /**
