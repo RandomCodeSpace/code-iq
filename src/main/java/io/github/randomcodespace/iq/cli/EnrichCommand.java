@@ -4,6 +4,7 @@ import io.github.randomcodespace.iq.analyzer.GraphBuilder;
 import io.github.randomcodespace.iq.analyzer.LayerClassifier;
 import io.github.randomcodespace.iq.analyzer.linker.Linker;
 import io.github.randomcodespace.iq.cache.AnalysisCache;
+import io.github.randomcodespace.iq.config.CliStartupConfigOverrides;
 import io.github.randomcodespace.iq.config.CodeIqConfig;
 import io.github.randomcodespace.iq.intelligence.RepositoryIdentity;
 import io.github.randomcodespace.iq.intelligence.extractor.LanguageEnricher;
@@ -91,8 +92,9 @@ public class EnrichCommand implements Callable<Integer> {
 
         // If --graph is set, override cache directory to shared location
         if (graphDir != null) {
-            config.setCacheDir(graphDir.toAbsolutePath().normalize().toString());
-            CliOutput.info("  Graph dir: " + graphDir.toAbsolutePath().normalize() + " (shared multi-repo)");
+            Path sharedDir = graphDir.toAbsolutePath().normalize();
+            CliStartupConfigOverrides.applyCacheDir(config, sharedDir.toString());
+            CliOutput.info("  Graph dir: " + sharedDir + " (shared multi-repo)");
         }
 
         // 1. Open H2 file
