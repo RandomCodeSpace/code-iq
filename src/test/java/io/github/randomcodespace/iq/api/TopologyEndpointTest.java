@@ -6,8 +6,6 @@ import io.github.randomcodespace.iq.analyzer.Analyzer;
 import io.github.randomcodespace.iq.config.CodeIqConfig;
 import io.github.randomcodespace.iq.graph.GraphStore;
 import io.github.randomcodespace.iq.mcp.McpTools;
-import io.github.randomcodespace.iq.model.CodeEdge;
-import io.github.randomcodespace.iq.model.CodeNode;
 import io.github.randomcodespace.iq.query.QueryService;
 import io.github.randomcodespace.iq.query.StatsService;
 import io.github.randomcodespace.iq.query.TopologyService;

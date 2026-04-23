@@ -1,7 +1,6 @@
 package io.github.randomcodespace.iq.analyzer;
 
 import io.github.randomcodespace.iq.analyzer.linker.Linker;
-import io.github.randomcodespace.iq.analyzer.linker.LinkResult;
 import io.github.randomcodespace.iq.config.CodeIqConfig;
 import io.github.randomcodespace.iq.detector.Detector;
 import io.github.randomcodespace.iq.detector.DetectorContext;

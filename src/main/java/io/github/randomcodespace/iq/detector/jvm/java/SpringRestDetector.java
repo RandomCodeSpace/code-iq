@@ -34,7 +34,6 @@ import io.github.randomcodespace.iq.detector.ParserType;
 )
 @Component
 public class SpringRestDetector extends AbstractJavaParserDetector {
-    private static final String PROP_REQUESTMAPPING = "RequestMapping";
     private static final String PROP_CONSUMES = "consumes";
     private static final String PROP_PATH = "path";
     private static final String PROP_PRODUCES = "produces";

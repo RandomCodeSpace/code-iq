@@ -70,18 +70,6 @@ class GraphStoreExtendedTest {
         return tx;
     }
 
-    /**
-     * Sets up graphDb to return an empty result (no rows).
-     */
-    private void mockEmptyResult(String column) {
-        var tx = mock(Transaction.class);
-        when(graphDb.beginTx()).thenReturn(tx);
-        var result = mock(Result.class);
-        when(result.hasNext()).thenReturn(false);
-        when(result.columns()).thenReturn(List.of(column));
-        when(tx.execute(anyString(), anyMap())).thenReturn(result);
-    }
-
     // --- Write operations (still use repository) ---
 
     @Test

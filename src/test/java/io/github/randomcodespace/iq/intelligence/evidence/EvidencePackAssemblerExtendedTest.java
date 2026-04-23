@@ -3,7 +3,6 @@ package io.github.randomcodespace.iq.intelligence.evidence;
 import io.github.randomcodespace.iq.config.CodeIqConfig;
 import io.github.randomcodespace.iq.graph.GraphStore;
 import io.github.randomcodespace.iq.intelligence.CapabilityLevel;
-import io.github.randomcodespace.iq.intelligence.Provenance;
 import io.github.randomcodespace.iq.intelligence.lexical.CodeSnippet;
 import io.github.randomcodespace.iq.intelligence.lexical.LexicalQueryService;
 import io.github.randomcodespace.iq.intelligence.lexical.LexicalResult;
@@ -19,7 +18,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;

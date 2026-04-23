@@ -63,7 +63,6 @@ public class StructuredParser {
     // Individual parsers
     // ------------------------------------------------------------------
 
-    @SuppressWarnings("unchecked")
     private Object parseYaml(String content) {
         var yaml = new Yaml(new org.yaml.snakeyaml.constructor.SafeConstructor(new org.yaml.snakeyaml.LoaderOptions()));
         var docs = new java.util.ArrayList<>();
@@ -82,7 +81,6 @@ public class StructuredParser {
         return result;
     }
 
-    @SuppressWarnings("unchecked")
     private Object parseJson(String content) throws Exception {
         Object data = objectMapper.readValue(content, Object.class);
         Map<String, Object> result = new LinkedHashMap<>();

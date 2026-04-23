@@ -5,8 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.randomcodespace.iq.config.CodeIqConfig;
 import io.github.randomcodespace.iq.flow.FlowEngine;
 import io.github.randomcodespace.iq.flow.FlowModels.FlowDiagram;
-import io.github.randomcodespace.iq.flow.FlowModels.FlowEdge;
-import io.github.randomcodespace.iq.flow.FlowModels.FlowNode;
 import io.github.randomcodespace.iq.flow.FlowModels.FlowSubgraph;
 import io.github.randomcodespace.iq.query.QueryService;
 import io.github.randomcodespace.iq.query.StatsService;
@@ -23,14 +21,11 @@ import org.neo4j.graphdb.Transaction;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 import io.github.randomcodespace.iq.config.CodeIqConfigTestSupport;
@@ -66,10 +61,6 @@ class McpToolsTest {
     }
 
     private Map<String, Object> parseJson(String json) throws IOException {
-        return objectMapper.readValue(json, new TypeReference<>() {});
-    }
-
-    private List<Object> parseJsonArray(String json) throws IOException {
         return objectMapper.readValue(json, new TypeReference<>() {});
     }
 

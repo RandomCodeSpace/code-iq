@@ -2,7 +2,6 @@ package io.github.randomcodespace.iq.cli;
 
 import io.github.randomcodespace.iq.config.CodeIqConfig;
 import io.github.randomcodespace.iq.flow.FlowEngine;
-import io.github.randomcodespace.iq.graph.GraphStore;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,7 +19,6 @@ import java.nio.file.Path;
 import java.util.zip.ZipFile;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import io.github.randomcodespace.iq.config.CodeIqConfigTestSupport;
 

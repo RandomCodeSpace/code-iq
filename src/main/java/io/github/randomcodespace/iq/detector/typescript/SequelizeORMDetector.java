@@ -38,10 +38,6 @@ public class SequelizeORMDetector extends AbstractTypeScriptDetector {
             "class\\s+(\\w+)\\s+extends\\s+Model\\s*\\{"
     );
 
-    private static final Pattern MODEL_INIT_RE = Pattern.compile(
-            "(\\w+)\\.init\\s*\\(\\s*\\{"
-    );
-
     private static final Pattern CONNECTION_RE = Pattern.compile(
             "new\\s+Sequelize(?:\\.Sequelize)?\\s*\\("
     );

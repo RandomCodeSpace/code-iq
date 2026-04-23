@@ -488,14 +488,8 @@ class QueryServiceTest {
 
     @Test
     void findDeadCodeShouldNotFlagMessageDrivenComponents() {
-        var guard = makeNode("guard:AuthGuard", NodeKind.GUARD, "AuthGuard");
-        var middleware = makeNode("mid:LoggingMiddleware", NodeKind.MIDDLEWARE, "LoggingMiddleware");
-        var topic = makeNode("topic:UserEvents", NodeKind.TOPIC, "UserEvents");
-        var queue = makeNode("queue:EmailQueue", NodeKind.QUEUE, "EmailQueue");
-        var event = makeNode("event:OrderPlaced", NodeKind.EVENT, "OrderPlaced");
-        var messageQueue = makeNode("mq:NotificationQueue", NodeKind.MESSAGE_QUEUE, "NotificationQueue");
-
-        // These are excluded via ENTRY_POINT_KINDS so graphStore won't return them
+        // These kinds (GUARD, MIDDLEWARE, TOPIC, QUEUE, EVENT, MESSAGE_QUEUE) are excluded via
+        // ENTRY_POINT_KINDS so graphStore won't return them when querying for dead code.
         when(graphStore.findNodesWithoutIncomingSemantic(anyList(), anyList(), anyList(), eq(0), eq(100)))
                 .thenReturn(List.of());
 

@@ -180,7 +180,6 @@ class E2EQualityTest {
 
     // ── Setup ─────────────────────────────────────────────────────────────
 
-    @SuppressWarnings("unchecked")
     private static List<Detector> allDetectors() {
         Detector[] detectors = {
                 // Auth

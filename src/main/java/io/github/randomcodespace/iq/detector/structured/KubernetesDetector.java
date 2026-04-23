@@ -263,7 +263,6 @@ public class KubernetesDetector extends AbstractStructuredDetector {
         return List.of();
     }
 
-    @SuppressWarnings("unchecked")
     private List<Map<String, Object>> extractContainers(Map<String, Object> spec, String kind) {
         List<Map<String, Object>> containers = new ArrayList<>();
 

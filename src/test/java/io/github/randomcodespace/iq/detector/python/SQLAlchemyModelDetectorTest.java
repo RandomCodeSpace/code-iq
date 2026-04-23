@@ -276,7 +276,6 @@ class SQLAlchemyModelDetectorTest {
         DetectorResult result = detector.detect(ctx);
 
         var entity = result.nodes().stream().filter(n -> n.getKind() == NodeKind.ENTITY).findFirst().orElseThrow();
-        @SuppressWarnings("unchecked")
         var columns = (List<?>) entity.getProperties().get("columns");
         assertNotNull(columns);
         assertFalse(columns.isEmpty(), "regex fallback should extract columns");

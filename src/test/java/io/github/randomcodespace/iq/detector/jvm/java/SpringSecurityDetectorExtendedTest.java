@@ -1,7 +1,6 @@
 package io.github.randomcodespace.iq.detector.jvm.java;
 
 import io.github.randomcodespace.iq.detector.DetectorContext;
-import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.detector.DetectorTestUtils;
 import io.github.randomcodespace.iq.model.NodeKind;
 import org.junit.jupiter.api.Test;
@@ -40,7 +39,6 @@ class SpringSecurityDetectorExtendedTest {
         var node = result.nodes().get(0);
         assertEquals(NodeKind.GUARD, node.getKind());
         assertEquals("spring_security", node.getProperties().get("auth_type"));
-        @SuppressWarnings("unchecked")
         var roles = (List<?>) node.getProperties().get("roles");
         assertNotNull(roles);
         assertFalse(roles.isEmpty(), "SpEL with hasRole/hasAnyRole should extract roles");
@@ -58,7 +56,6 @@ class SpringSecurityDetectorExtendedTest {
                 """;
         var result = detector.detect(ctx(code));
         assertFalse(result.nodes().isEmpty());
-        @SuppressWarnings("unchecked")
         var roles = (List<?>) result.nodes().get(0).getProperties().get("roles");
         assertNotNull(roles);
         assertEquals(3, roles.size(), "All roles in hasAnyRole should be extracted");
@@ -124,7 +121,6 @@ class SpringSecurityDetectorExtendedTest {
         assertFalse(result.nodes().isEmpty());
         var node = result.nodes().get(0);
         assertEquals("@Secured", node.getLabel());
-        @SuppressWarnings("unchecked")
         var roles = (List<?>) node.getProperties().get("roles");
         assertNotNull(roles);
         assertTrue(roles.contains("ROLE_ADMIN"));
@@ -142,7 +138,6 @@ class SpringSecurityDetectorExtendedTest {
                 """;
         var result = detector.detect(ctx(code));
         assertFalse(result.nodes().isEmpty());
-        @SuppressWarnings("unchecked")
         var roles = (List<?>) result.nodes().get(0).getProperties().get("roles");
         assertNotNull(roles);
         assertEquals(3, roles.size(), "All roles in @Secured array should be extracted");
@@ -166,7 +161,6 @@ class SpringSecurityDetectorExtendedTest {
         var result = detector.detect(ctx(code));
         assertFalse(result.nodes().isEmpty());
         assertEquals("@RolesAllowed", result.nodes().get(0).getLabel());
-        @SuppressWarnings("unchecked")
         var roles = (List<?>) result.nodes().get(0).getProperties().get("roles");
         assertNotNull(roles);
     }
@@ -183,7 +177,6 @@ class SpringSecurityDetectorExtendedTest {
                 """;
         var result = detector.detect(ctx(code));
         assertFalse(result.nodes().isEmpty());
-        @SuppressWarnings("unchecked")
         var roles = (List<?>) result.nodes().get(0).getProperties().get("roles");
         assertNotNull(roles);
         assertFalse(roles.isEmpty());
@@ -402,7 +395,6 @@ class SpringSecurityDetectorExtendedTest {
                 + "}";
         var result = detector.detect(ctx(code));
         assertFalse(result.nodes().isEmpty(), "regex fallback should detect @Secured single role");
-        @SuppressWarnings("unchecked")
         var roles = (List<?>) result.nodes().get(0).getProperties().get("roles");
         assertNotNull(roles);
         assertTrue(roles.contains("ROLE_ADMIN"));
@@ -416,7 +408,6 @@ class SpringSecurityDetectorExtendedTest {
                 + "}";
         var result = detector.detect(ctx(code));
         assertFalse(result.nodes().isEmpty(), "regex fallback should detect @Secured with multiple roles");
-        @SuppressWarnings("unchecked")
         var roles = (List<?>) result.nodes().get(0).getProperties().get("roles");
         assertNotNull(roles);
         assertEquals(2, roles.size());
@@ -430,7 +421,6 @@ class SpringSecurityDetectorExtendedTest {
                 + "}";
         var result = detector.detect(ctx(code));
         assertFalse(result.nodes().isEmpty(), "regex fallback should detect @PreAuthorize");
-        @SuppressWarnings("unchecked")
         var roles = (List<?>) result.nodes().get(0).getProperties().get("roles");
         assertNotNull(roles);
         assertTrue(roles.contains("ANALYST"));
@@ -444,7 +434,6 @@ class SpringSecurityDetectorExtendedTest {
                 + "}";
         var result = detector.detect(ctx(code));
         assertFalse(result.nodes().isEmpty(), "regex fallback should detect @PreAuthorize with hasAnyRole");
-        @SuppressWarnings("unchecked")
         var roles = (List<?>) result.nodes().get(0).getProperties().get("roles");
         assertNotNull(roles);
         assertFalse(roles.isEmpty());
