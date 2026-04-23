@@ -2,7 +2,6 @@ package io.github.randomcodespace.iq.detector.typescript;
 
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
-import io.github.randomcodespace.iq.grammar.AntlrParserFactory;
 import io.github.randomcodespace.iq.grammar.javascript.JavaScriptParser;
 import io.github.randomcodespace.iq.grammar.javascript.JavaScriptParserBaseListener;
 import io.github.randomcodespace.iq.model.CodeNode;

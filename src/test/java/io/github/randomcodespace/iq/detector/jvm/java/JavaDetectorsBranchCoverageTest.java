@@ -1,7 +1,6 @@
 package io.github.randomcodespace.iq.detector.jvm.java;
 
 import io.github.randomcodespace.iq.detector.DetectorContext;
-import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.detector.DetectorTestUtils;
 import io.github.randomcodespace.iq.model.EdgeKind;
 import io.github.randomcodespace.iq.model.NodeKind;
@@ -10,7 +9,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -456,7 +454,6 @@ class JavaDetectorsBranchCoverageTest {
                     """;
             var r = d.detect(ctx("java", code));
             assertFalse(r.nodes().isEmpty());
-            @SuppressWarnings("unchecked")
             var params = (List<?>) r.nodes().get(0).getProperties().get("parameters");
             assertNotNull(params);
             assertFalse(params.isEmpty());
@@ -687,7 +684,6 @@ class JavaDetectorsBranchCoverageTest {
                     """;
             var r = d.detect(ctx("java", code));
             assertFalse(r.nodes().isEmpty());
-            @SuppressWarnings("unchecked")
             var roles = (List<?>) r.nodes().get(0).getProperties().get("roles");
             assertNotNull(roles);
             assertTrue(roles.contains("ADMIN"));
@@ -704,7 +700,6 @@ class JavaDetectorsBranchCoverageTest {
                     """;
             var r = d.detect(ctx("java", code));
             assertFalse(r.nodes().isEmpty());
-            @SuppressWarnings("unchecked")
             var roles = (List<?>) r.nodes().get(0).getProperties().get("roles");
             assertNotNull(roles);
             assertFalse(roles.isEmpty());
@@ -721,7 +716,6 @@ class JavaDetectorsBranchCoverageTest {
                     """;
             var r = d.detect(ctx("java", code));
             assertFalse(r.nodes().isEmpty());
-            @SuppressWarnings("unchecked")
             var roles = (List<?>) r.nodes().get(0).getProperties().get("roles");
             assertNotNull(roles);
         }
@@ -879,7 +873,6 @@ class JavaDetectorsBranchCoverageTest {
                     """;
             var r = d.detect(ctx("java", code));
             assertFalse(r.nodes().isEmpty());
-            @SuppressWarnings("unchecked")
             var columns = (List<?>) r.nodes().get(0).getProperties().get("columns");
             assertNotNull(columns);
         }
@@ -1135,7 +1128,6 @@ class JavaDetectorsBranchCoverageTest {
                     """;
             var r = d.detect(ctx("java", code));
             assertFalse(r.nodes().isEmpty());
-            @SuppressWarnings("unchecked")
             var params = (List<?>) r.nodes().get(0).getProperties().get("parameters");
             assertEquals(3, params.size());
         }

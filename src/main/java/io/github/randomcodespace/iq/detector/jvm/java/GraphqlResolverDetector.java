@@ -34,7 +34,6 @@ public class GraphqlResolverDetector extends AbstractRegexDetector {
     private static final Pattern MUTATION_MAPPING_RE = Pattern.compile("@MutationMapping(?:\\s*\\(\\s*(?:name\\s*=\\s*)?\"([^\"]*)\"\\s*\\))?");
     private static final Pattern SUBSCRIPTION_MAPPING_RE = Pattern.compile("@SubscriptionMapping(?:\\s*\\(\\s*(?:name\\s*=\\s*)?\"([^\"]*)\"\\s*\\))?");
     private static final Pattern SCHEMA_MAPPING_RE = Pattern.compile("@SchemaMapping\\s*\\(\\s*(?:typeName\\s*=\\s*\"([^\"]*)\")?");
-    private static final Pattern BATCH_MAPPING_RE = Pattern.compile("@BatchMapping(?:\\s*\\(\\s*(?:field\\s*=\\s*)?\"([^\"]*)\"\\s*\\))?");
     private static final Pattern DGS_QUERY_RE = Pattern.compile("@DgsQuery(?:\\s*\\(\\s*field\\s*=\\s*\"([^\"]*)\"\\s*\\))?");
     private static final Pattern DGS_MUTATION_RE = Pattern.compile("@DgsMutation(?:\\s*\\(\\s*field\\s*=\\s*\"([^\"]*)\"\\s*\\))?");
     private static final Pattern DGS_SUBSCRIPTION_RE = Pattern.compile("@DgsSubscription(?:\\s*\\(\\s*field\\s*=\\s*\"([^\"]*)\"\\s*\\))?");

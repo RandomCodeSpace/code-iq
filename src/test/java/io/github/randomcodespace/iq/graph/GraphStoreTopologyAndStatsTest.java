@@ -634,11 +634,8 @@ class GraphStoreTopologyAndStatsTest {
 
         Map<String, Object> topology = store.getTopology();
 
-        @SuppressWarnings("unchecked")
         List<?> services = (List<?>) topology.get("services");
-        @SuppressWarnings("unchecked")
         List<?> infrastructure = (List<?>) topology.get("infrastructure");
-        @SuppressWarnings("unchecked")
         List<?> connections = (List<?>) topology.get("connections");
 
         assertTrue(services.isEmpty());

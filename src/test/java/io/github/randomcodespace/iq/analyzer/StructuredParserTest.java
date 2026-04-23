@@ -25,12 +25,6 @@ class StructuredParserTest {
         return (Map<String, Object>) result;
     }
 
-    @SuppressWarnings("unchecked")
-    private <T> T getData(Object result) {
-        Map<String, Object> wrapper = asWrapper(result);
-        return (T) wrapper.get("data");
-    }
-
     // ---- YAML ----
 
     @Test

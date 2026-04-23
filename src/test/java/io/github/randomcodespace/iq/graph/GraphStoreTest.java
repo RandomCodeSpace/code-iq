@@ -15,7 +15,6 @@ import org.neo4j.graphdb.Transaction;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -70,18 +69,6 @@ class GraphStoreTest {
         when(result.columns()).thenReturn(List.of(column));
         when(tx.execute(anyString(), anyMap())).thenReturn(result);
         return tx;
-    }
-
-    /**
-     * Sets up graphDb to return an empty result.
-     */
-    private void mockEmptyResult() {
-        var tx = mock(Transaction.class);
-        when(graphDb.beginTx()).thenReturn(tx);
-        var result = mock(Result.class);
-        when(result.hasNext()).thenReturn(false);
-        when(result.columns()).thenReturn(List.of("n"));
-        when(tx.execute(anyString(), anyMap())).thenReturn(result);
     }
 
     // --- Write operations (still use repository) ---

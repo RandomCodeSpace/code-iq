@@ -107,14 +107,10 @@ import io.github.randomcodespace.iq.detector.typescript.TypeScriptStructuresDete
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
-import io.github.randomcodespace.iq.model.CodeEdge;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -135,7 +131,6 @@ class FullAnalysisIntegrationTest {
     /**
      * Build all detectors manually — no Spring context needed.
      */
-    @SuppressWarnings("unchecked")
     private static List<Detector> allDetectors() {
         // Use explicit Detector[] to avoid List.of() varargs inference issue with 90+ subtypes
         Detector[] detectors = {

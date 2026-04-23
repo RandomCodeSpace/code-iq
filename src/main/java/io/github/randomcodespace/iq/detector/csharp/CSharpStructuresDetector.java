@@ -1,7 +1,6 @@
 package io.github.randomcodespace.iq.detector.csharp;
 
 import io.github.randomcodespace.iq.detector.AbstractAntlrDetector;
-import io.github.randomcodespace.iq.grammar.AntlrParserFactory;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.model.CodeEdge;
@@ -36,7 +35,6 @@ public class CSharpStructuresDetector extends AbstractAntlrDetector {
     private static final Pattern USING_RE = Pattern.compile("^\\s*using\\s+([\\w.]+)\\s*;", Pattern.MULTILINE);
     private static final Pattern HTTP_ATTR_RE = Pattern.compile("\\[(Http(?:Get|Post|Put|Delete|Patch))\\s*(?:\\(\"([^\"]*)\"\\))?\\]");
     private static final Pattern ROUTE_RE = Pattern.compile("\\[Route\\(\"([^\"]*)\"\\)\\]");
-    private static final Pattern API_CONTROLLER_RE = Pattern.compile("\\[ApiController\\]");
     private static final Pattern METHOD_RE = Pattern.compile("(?:public|protected|private|internal)\\s+(?:static\\s+|virtual\\s+|override\\s+|async\\s+|abstract\\s+)*(?:[\\w<>\\[\\]?,\\s]+)\\s+(\\w+)\\s*\\(");
 
     @Override

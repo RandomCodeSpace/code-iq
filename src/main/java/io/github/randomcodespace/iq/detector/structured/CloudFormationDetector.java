@@ -187,7 +187,6 @@ public class CloudFormationDetector extends AbstractStructuredDetector {
         return false;
     }
 
-    @SuppressWarnings("unchecked")
     private void collectRefs(Object value, Set<String> refs) {
         if (value instanceof Map<?, ?> map) {
             Object ref = map.get("Ref");

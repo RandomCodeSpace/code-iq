@@ -1,7 +1,6 @@
 package io.github.randomcodespace.iq.detector.jvm.java;
 
 import io.github.randomcodespace.iq.detector.DetectorContext;
-import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.detector.DetectorTestUtils;
 import io.github.randomcodespace.iq.model.EdgeKind;
 import io.github.randomcodespace.iq.model.NodeKind;
@@ -270,7 +269,6 @@ class PublicApiDetectorTest {
                 """;
         var result = detector.detect(ctx(code));
         assertFalse(result.nodes().isEmpty());
-        @SuppressWarnings("unchecked")
         var params = (List<?>) result.nodes().get(0).getProperties().get("parameters");
         assertNotNull(params);
         assertTrue(params.isEmpty(), "Method with no parameters should have empty params list");
@@ -492,7 +490,6 @@ class PublicApiDetectorTest {
                 + "}";
         var result = detector.detect(ctx(code));
         assertFalse(result.nodes().isEmpty(), "regex fallback should detect method with multiple params");
-        @SuppressWarnings("unchecked")
         var params = (List<?>) result.nodes().get(0).getProperties().get("parameters");
         assertNotNull(params);
         assertFalse(params.isEmpty(), "Parameters should be extracted in regex fallback");

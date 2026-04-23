@@ -3,7 +3,6 @@ package io.github.randomcodespace.iq.detector.typescript;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.detector.DetectorTestUtils;
-import io.github.randomcodespace.iq.model.NodeKind;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;

@@ -52,7 +52,6 @@ public class JpaEntityDetector extends AbstractJavaParserDetector {
             "ManyToMany", "many_to_many");
 
     // ---- Regex fallback patterns ----
-    private static final Pattern ENTITY_RE = Pattern.compile("@Entity");
     private static final Pattern TABLE_RE = Pattern.compile("@Table\\s*\\(\\s*(?:name\\s*=\\s*)?\"(\\w+)\"");
     private static final Pattern CLASS_RE = Pattern.compile("(?:public\\s+)?class\\s+(\\w+)");
     private static final Pattern COLUMN_RE = Pattern.compile("@Column\\s*\\(([^)]*)\\)");

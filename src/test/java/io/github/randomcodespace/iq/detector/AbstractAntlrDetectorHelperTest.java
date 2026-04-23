@@ -31,10 +31,6 @@ class AbstractAntlrDetectorHelperTest {
         int exposedLineOf(ParserRuleContext ctx) { return lineOf(ctx); }
 
         String exposedTextOf(ParserRuleContext ctx) { return textOf(ctx); }
-
-        String exposedOriginalTextOf(ParserRuleContext ctx, CommonTokenStream tokens) {
-            return originalTextOf(ctx, tokens);
-        }
     }
 
     private final TestAntlrDetector detector = new TestAntlrDetector();

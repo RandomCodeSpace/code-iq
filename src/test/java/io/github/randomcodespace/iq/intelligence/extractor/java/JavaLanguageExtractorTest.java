@@ -3,7 +3,6 @@ package io.github.randomcodespace.iq.intelligence.extractor.java;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.intelligence.CapabilityLevel;
 import io.github.randomcodespace.iq.intelligence.extractor.LanguageExtractionResult;
-import io.github.randomcodespace.iq.model.CodeEdge;
 import io.github.randomcodespace.iq.model.CodeNode;
 import io.github.randomcodespace.iq.model.EdgeKind;
 import io.github.randomcodespace.iq.model.NodeKind;

@@ -1,6 +1,5 @@
 package io.github.randomcodespace.iq.detector.generic;
 
-import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorTestUtils;
 import org.junit.jupiter.api.Test;
 

@@ -1,8 +1,6 @@
 package io.github.randomcodespace.iq.grammar.golang;
 
-import java.util.List;
 import org.antlr.v4.runtime.*;
-import java.io.PrintStream;
 import java.util.HashSet;
 import java.util.Set;
 

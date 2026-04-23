@@ -1,8 +1,6 @@
 package io.github.randomcodespace.iq.detector.structured;
 
 import io.github.randomcodespace.iq.detector.DetectorContext;
-import io.github.randomcodespace.iq.detector.DetectorTestUtils;
-import io.github.randomcodespace.iq.model.NodeKind;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 

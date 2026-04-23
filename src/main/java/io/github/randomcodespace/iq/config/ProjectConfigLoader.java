@@ -126,7 +126,6 @@ public class ProjectConfigLoader {
      * (which have no legacy flat equivalent) are still read via the unified
      * loader path and composed into the overlay.
      */
-    @SuppressWarnings("unchecked")
     private static LegacyParse readAndTranslateLegacy(Path oldFile) {
         Map<String, Object> raw;
         try {
@@ -196,7 +195,6 @@ public class ProjectConfigLoader {
      * {@code null} so {@link io.github.randomcodespace.iq.config.unified.ConfigMerger}
      * correctly falls through to lower layers.
      */
-    @SuppressWarnings("unchecked")
     static CodeIqUnifiedConfig translateLegacyToUnified(Map<String, Object> raw) {
         // --- project layer ---
         String root = raw.containsKey("root_path") ? String.valueOf(raw.get("root_path")) : null;

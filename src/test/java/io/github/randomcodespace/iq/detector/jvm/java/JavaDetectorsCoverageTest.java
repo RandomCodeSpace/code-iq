@@ -1,7 +1,6 @@
 package io.github.randomcodespace.iq.detector.jvm.java;
 
 import io.github.randomcodespace.iq.detector.DetectorContext;
-import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.detector.DetectorTestUtils;
 import io.github.randomcodespace.iq.model.EdgeKind;
 import io.github.randomcodespace.iq.model.NodeKind;
@@ -933,7 +932,6 @@ class JavaDetectorsCoverageTest {
                     """;
             var r = d.detect(ctx("java", code));
             assertFalse(r.nodes().isEmpty());
-            @SuppressWarnings("unchecked")
             var queries = (java.util.List<?>) r.nodes().get(0).getProperties().get("custom_queries");
             assertNotNull(queries);
             assertEquals(2, queries.size());

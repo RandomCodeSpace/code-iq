@@ -1,7 +1,6 @@
 package io.github.randomcodespace.iq.detector.jvm.java;
 
 import io.github.randomcodespace.iq.detector.DetectorContext;
-import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.detector.DetectorTestUtils;
 import io.github.randomcodespace.iq.model.EdgeKind;
 import io.github.randomcodespace.iq.model.NodeKind;
@@ -146,7 +145,6 @@ class JpaEntityDetectorExtendedTest {
         assertFalse(result.nodes().isEmpty());
         var entity = result.nodes().stream()
                 .filter(n -> n.getKind() == NodeKind.ENTITY).findFirst().orElseThrow();
-        @SuppressWarnings("unchecked")
         var columns = (List<?>) entity.getProperties().get("columns");
         assertNotNull(columns, "Entity with @Id and @Column should have columns property");
         assertFalse(columns.isEmpty());
@@ -260,7 +258,6 @@ class JpaEntityDetectorExtendedTest {
                 """;
         var result = detector.detect(ctx(code));
         assertFalse(result.nodes().isEmpty());
-        @SuppressWarnings("unchecked")
         var columns = (List<?>) result.nodes().stream()
                 .filter(n -> n.getKind() == NodeKind.ENTITY).findFirst().orElseThrow()
                 .getProperties().get("columns");
@@ -487,7 +484,6 @@ class JpaEntityDetectorExtendedTest {
         assertFalse(result.nodes().isEmpty());
         var entity = result.nodes().stream()
                 .filter(n -> n.getKind() == NodeKind.ENTITY).findFirst().orElseThrow();
-        @SuppressWarnings("unchecked")
         var columns = (List<?>) entity.getProperties().get("columns");
         assertNotNull(columns, "regex fallback should extract @Column annotations");
         assertFalse(columns.isEmpty());

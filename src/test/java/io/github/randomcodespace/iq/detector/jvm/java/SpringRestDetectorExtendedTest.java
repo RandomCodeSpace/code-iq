@@ -1,7 +1,6 @@
 package io.github.randomcodespace.iq.detector.jvm.java;
 
 import io.github.randomcodespace.iq.detector.DetectorContext;
-import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.detector.DetectorTestUtils;
 import io.github.randomcodespace.iq.model.EdgeKind;
 import io.github.randomcodespace.iq.model.NodeKind;
@@ -125,7 +124,6 @@ class SpringRestDetectorExtendedTest {
         var endpoints = result.nodes().stream()
                 .filter(n -> n.getKind() == NodeKind.ENDPOINT).toList();
         assertEquals(1, endpoints.size());
-        @SuppressWarnings("unchecked")
         var params = (List<?>) endpoints.get(0).getProperties().get("parameters");
         assertNotNull(params);
         assertEquals(3, params.size());
@@ -148,7 +146,6 @@ class SpringRestDetectorExtendedTest {
         var endpoints = result.nodes().stream()
                 .filter(n -> n.getKind() == NodeKind.ENDPOINT).toList();
         assertFalse(endpoints.isEmpty());
-        @SuppressWarnings("unchecked")
         var params = (List<?>) endpoints.get(0).getProperties().get("parameters");
         assertNotNull(params);
     }
