@@ -209,6 +209,42 @@ class SqlMigrationDetectorTest {
                         && e.getTarget().getId().endsWith(":invoices")));
     }
 
+    @Test
+    void liquibaseYamlChangeSet_largeIntermediateContent_completesQuickly() {
+        // Regression guard for SonarCloud S5998 / S5852 on LQ_*_YAML: the reluctant-outer
+        // `(?:\s++[^\n]*+\n)*?` patterns were rewritten with a negative-lookahead +
+        // possessive outer so stack/runtime cannot blow up on many indented lines.
+        // Pathological input: a createTable with 500 indented column lines preceding
+        // tableName — the pre-fix reluctant walk would scale quadratically.
+        StringBuilder columns = new StringBuilder();
+        for (int i = 0; i < 500; i++) {
+            columns.append("                                  - column_").append(i).append(": stub_value\n");
+        }
+        String yaml = """
+                databaseChangeLog:
+                  - changeSet:
+                      id: 1
+                      author: bob
+                      changes:
+                        - createTable:
+                """
+                + columns
+                + "                            tableName: wide_table\n";
+        DetectorContext ctx = new DetectorContext(
+                "src/main/resources/db/db.changelog-wide.yml", "yaml", yaml);
+
+        long start = System.nanoTime();
+        DetectorResult result = detector.detect(ctx);
+        long elapsedMs = (System.nanoTime() - start) / 1_000_000;
+
+        assertTrue(hasEntity(sqlEntitiesOf(result), "wide_table", "table"),
+                "wide_table must still be detected after the anti-backtracking rewrite");
+        // 2s is 100x the observed fast-path time; we only care that it doesn't blow up
+        // exponentially — the exact threshold isn't load-bearing.
+        assertTrue(elapsedMs < 2000,
+                "detection of wide_table should complete in under 2s, was " + elapsedMs + "ms");
+    }
+
     // -- Positive: Rails --
 
     @Test
