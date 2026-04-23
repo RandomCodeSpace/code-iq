@@ -7,8 +7,9 @@ import static org.junit.jupiter.api.Assertions.*;
 class EdgeKindTest {
 
     @Test
-    void shouldHave27Values() {
-        assertEquals(27, EdgeKind.values().length, "EdgeKind must have exactly 27 types");
+    void shouldHave28Values() {
+        assertEquals(28, EdgeKind.values().length,
+                "EdgeKind must have exactly 28 types (includes REFERENCES_TABLE)");
     }
 
     @Test

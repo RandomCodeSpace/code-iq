@@ -32,7 +32,8 @@ public enum EdgeKind {
     SENDS_TO("sends_to"),
     RECEIVES_FROM("receives_from"),
     PROTECTS("protects"),
-    RENDERS("renders");
+    RENDERS("renders"),
+    REFERENCES_TABLE("references_table");
 
     private final String value;
 

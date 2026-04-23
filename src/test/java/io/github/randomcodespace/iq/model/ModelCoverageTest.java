@@ -74,8 +74,8 @@ class ModelCoverageTest {
         }
 
         @Test
-        void has32Values() {
-            assertEquals(33, NodeKind.values().length);
+        void has34Values() {
+            assertEquals(34, NodeKind.values().length);
         }
 
         @Test
@@ -164,8 +164,8 @@ class ModelCoverageTest {
         }
 
         @Test
-        void has27Values() {
-            assertEquals(27, EdgeKind.values().length);
+        void has28Values() {
+            assertEquals(28, EdgeKind.values().length);
         }
     }
 
@@ -451,6 +451,7 @@ class ModelCoverageTest {
             assertNotNull(NodeKind.MIDDLEWARE);
             assertNotNull(NodeKind.HOOK);
             assertNotNull(NodeKind.SERVICE);
+            assertNotNull(NodeKind.SQL_ENTITY);
         }
 
         @Test
@@ -482,6 +483,7 @@ class ModelCoverageTest {
             assertNotNull(EdgeKind.RECEIVES_FROM);
             assertNotNull(EdgeKind.PROTECTS);
             assertNotNull(EdgeKind.RENDERS);
+            assertNotNull(EdgeKind.REFERENCES_TABLE);
         }
     }
 
