@@ -122,8 +122,10 @@ public class LanguageEnricher {
         var edgesAdded = new java.util.concurrent.atomic.AtomicInteger(0);
         var typeHintsAdded = new java.util.concurrent.atomic.AtomicInteger(0);
 
-        var executor = Executors.newVirtualThreadPerTaskExecutor();
-        try {
+        // try-with-resources: ExecutorService#close() handles shutdown + awaitTermination.
+        // Each future.get() below has its own 5-minute timeout + cancel, so by the time
+        // close() runs, all tasks are terminal and close() returns promptly.
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             List<Future<?>> futures = new ArrayList<>(tasks.size());
             for (FileTask task : tasks) {
                 futures.add(executor.submit(() -> {
@@ -182,19 +184,6 @@ public class LanguageEnricher {
                     Thread.currentThread().interrupt();
                     break;
                 }
-            }
-        } finally {
-            executor.shutdown();
-            try {
-                if (!executor.awaitTermination(10, TimeUnit.SECONDS)) {
-                    executor.shutdownNow();
-                    if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
-                        log.warn("Language enrichment executor did not terminate cleanly");
-                    }
-                }
-            } catch (InterruptedException e) {
-                executor.shutdownNow();
-                Thread.currentThread().interrupt();
             }
         }
 
