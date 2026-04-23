@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
+import io.github.randomcodespace.iq.config.CodeIqConfigTestSupport;
 
 /**
  * Extended tests for TopologyCommand covering branches not hit by TopologyCommandTest:
@@ -111,7 +112,7 @@ class TopologyCommandExtendedTest {
         createRealCache(tempDir);
 
         var config = new CodeIqConfig();
-        config.setCacheDir(".code-iq/cache");
+        CodeIqConfigTestSupport.override(config).cacheDir(".code-iq/cache").done();
         var svc = new TopologyService();
         var cmd = new TopologyCommand(config, svc);
         var cmdLine = new picocli.CommandLine(cmd);
@@ -131,7 +132,7 @@ class TopologyCommandExtendedTest {
         createRealCache(tempDir);
 
         var config = new CodeIqConfig();
-        config.setCacheDir(".code-iq/cache");
+        CodeIqConfigTestSupport.override(config).cacheDir(".code-iq/cache").done();
         var svc = new TopologyService();
         var cmd = new TopologyCommand(config, svc);
         var cmdLine = new picocli.CommandLine(cmd);
@@ -150,7 +151,7 @@ class TopologyCommandExtendedTest {
         createRealCache(tempDir);
 
         var config = new CodeIqConfig();
-        config.setCacheDir(".code-iq/cache");
+        CodeIqConfigTestSupport.override(config).cacheDir(".code-iq/cache").done();
         var svc = new TopologyService();
         var cmd = new TopologyCommand(config, svc);
         var cmdLine = new picocli.CommandLine(cmd);
@@ -168,7 +169,7 @@ class TopologyCommandExtendedTest {
         createRealCache(tempDir);
 
         var config = new CodeIqConfig();
-        config.setCacheDir(".code-iq/cache");
+        CodeIqConfigTestSupport.override(config).cacheDir(".code-iq/cache").done();
         var svc = new TopologyService();
         var cmd = new TopologyCommand(config, svc);
         var cmdLine = new picocli.CommandLine(cmd);
@@ -184,7 +185,7 @@ class TopologyCommandExtendedTest {
         createRealCache(tempDir);
 
         var config = new CodeIqConfig();
-        config.setCacheDir(".code-iq/cache");
+        CodeIqConfigTestSupport.override(config).cacheDir(".code-iq/cache").done();
         var svc = new TopologyService();
         var cmd = new TopologyCommand(config, svc);
         var cmdLine = new picocli.CommandLine(cmd);
@@ -203,7 +204,7 @@ class TopologyCommandExtendedTest {
         createRealCache(tempDir);
 
         var config = new CodeIqConfig();
-        config.setCacheDir(".code-iq/cache");
+        CodeIqConfigTestSupport.override(config).cacheDir(".code-iq/cache").done();
         var svc = new TopologyService();
         var cmd = new TopologyCommand(config, svc);
         var cmdLine = new picocli.CommandLine(cmd);
@@ -221,7 +222,7 @@ class TopologyCommandExtendedTest {
         createRealCache(tempDir);
 
         var config = new CodeIqConfig();
-        config.setCacheDir(".code-iq/cache");
+        CodeIqConfigTestSupport.override(config).cacheDir(".code-iq/cache").done();
         var svc = mock(TopologyService.class);
         when(svc.getTopology(anyList(), anyList()))
                 .thenThrow(new RuntimeException("topology failed"));
@@ -256,7 +257,7 @@ class TopologyCommandExtendedTest {
         }
 
         var config = new CodeIqConfig();
-        config.setCacheDir(".code-iq/cache");
+        CodeIqConfigTestSupport.override(config).cacheDir(".code-iq/cache").done();
         var svc = new TopologyService();
         var cmd = new TopologyCommand(config, svc);
         var cmdLine = new picocli.CommandLine(cmd);

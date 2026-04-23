@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import io.github.randomcodespace.iq.config.CodeIqConfigTestSupport;
 
 class StatsCommandTest {
 
@@ -40,7 +41,7 @@ class StatsCommandTest {
         System.setErr(new PrintStream(captureErr, true, StandardCharsets.UTF_8));
         statsService = new StatsService();
         config = new CodeIqConfig();
-        config.setCacheDir(".code-iq/cache");
+        CodeIqConfigTestSupport.override(config).cacheDir(".code-iq/cache").done();
     }
 
     @AfterEach

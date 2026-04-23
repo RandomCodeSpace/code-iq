@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import io.github.randomcodespace.iq.config.CodeIqConfigTestSupport;
 
 class CacheCommandTest {
 
@@ -36,7 +37,7 @@ class CacheCommandTest {
     @Test
     void statsShowsNoCacheWhenMissing(@TempDir Path tempDir) {
         var config = new CodeIqConfig();
-        config.setCacheDir(".code-iq/cache");
+        CodeIqConfigTestSupport.override(config).cacheDir(".code-iq/cache").done();
         var cmd = new CacheCommand.StatsSubcommand(config);
 
         var cmdLine = new picocli.CommandLine(cmd);
@@ -56,7 +57,7 @@ class CacheCommandTest {
                 StandardCharsets.UTF_8);
 
         var config = new CodeIqConfig();
-        config.setCacheDir(".code-iq/cache");
+        CodeIqConfigTestSupport.override(config).cacheDir(".code-iq/cache").done();
         var cmd = new CacheCommand.StatsSubcommand(config);
 
         var cmdLine = new picocli.CommandLine(cmd);
@@ -76,7 +77,7 @@ class CacheCommandTest {
                 StandardCharsets.UTF_8);
 
         var config = new CodeIqConfig();
-        config.setCacheDir(".code-iq/cache");
+        CodeIqConfigTestSupport.override(config).cacheDir(".code-iq/cache").done();
         var cmd = new CacheCommand.ClearSubcommand(config);
 
         var cmdLine = new picocli.CommandLine(cmd);
@@ -89,7 +90,7 @@ class CacheCommandTest {
     @Test
     void clearHandlesNoCacheGracefully(@TempDir Path tempDir) {
         var config = new CodeIqConfig();
-        config.setCacheDir(".code-iq/cache");
+        CodeIqConfigTestSupport.override(config).cacheDir(".code-iq/cache").done();
         var cmd = new CacheCommand.ClearSubcommand(config);
 
         var cmdLine = new picocli.CommandLine(cmd);

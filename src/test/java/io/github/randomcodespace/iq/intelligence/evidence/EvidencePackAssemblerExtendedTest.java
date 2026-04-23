@@ -28,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
+import io.github.randomcodespace.iq.config.CodeIqConfigTestSupport;
 
 /**
  * Extended tests for EvidencePackAssembler covering uncovered branches:
@@ -65,8 +66,8 @@ class EvidencePackAssemblerExtendedTest {
     void setUp() {
         queryPlanner = new QueryPlanner();
         config = new CodeIqConfig();
-        config.setRootPath(System.getProperty("java.io.tmpdir"));
-        config.setMaxSnippetLines(50);
+        CodeIqConfigTestSupport.override(config).rootPath(System.getProperty("java.io.tmpdir")).done();
+        CodeIqConfigTestSupport.override(config).maxSnippetLines(50).done();
         assembler = new EvidencePackAssembler(lexicalQueryService, snippetStore, queryPlanner, config, graphStore);
         metadata = new ArtifactMetadata(
                 "https://github.com/example/repo", "abc123", Instant.now(),
@@ -121,7 +122,7 @@ class EvidencePackAssemblerExtendedTest {
 
     @Test
     void snippetsAreTruncatedToMaxSnippetLines() {
-        config.setMaxSnippetLines(3);
+        CodeIqConfigTestSupport.override(config).maxSnippetLines(3).done();
 
         CodeNode node = new CodeNode("java:Big.java:class:Big", NodeKind.CLASS, "Big");
         node.setFilePath("src/Big.java");
@@ -148,7 +149,7 @@ class EvidencePackAssemblerExtendedTest {
 
     @Test
     void snippetsNotTruncatedWhenWithinMaxLines() {
-        config.setMaxSnippetLines(50);
+        CodeIqConfigTestSupport.override(config).maxSnippetLines(50).done();
 
         CodeNode node = new CodeNode("java:Small.java:class:Small", NodeKind.CLASS, "Small");
         node.setFilePath("src/Small.java");
@@ -290,7 +291,7 @@ class EvidencePackAssemblerExtendedTest {
 
     @Test
     void maxSnippetLinesCappedToConfiguredMax() {
-        config.setMaxSnippetLines(20);
+        CodeIqConfigTestSupport.override(config).maxSnippetLines(20).done();
 
         CodeNode node = new CodeNode("java:X.java:class:X", NodeKind.CLASS, "X");
         node.setFilePath("src/X.java");

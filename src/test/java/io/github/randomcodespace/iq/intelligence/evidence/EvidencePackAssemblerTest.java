@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
+import io.github.randomcodespace.iq.config.CodeIqConfigTestSupport;
 
 @ExtendWith(MockitoExtension.class)
 class EvidencePackAssemblerTest {
@@ -44,8 +45,8 @@ class EvidencePackAssemblerTest {
     void setUp() {
         queryPlanner = new QueryPlanner();
         config = new CodeIqConfig();
-        config.setRootPath(System.getProperty("java.io.tmpdir"));
-        config.setMaxSnippetLines(50);
+        CodeIqConfigTestSupport.override(config).rootPath(System.getProperty("java.io.tmpdir")).done();
+        CodeIqConfigTestSupport.override(config).maxSnippetLines(50).done();
         assembler = new EvidencePackAssembler(lexicalQueryService, snippetStore, queryPlanner, config, graphStore);
         metadata = new ArtifactMetadata(
                 "https://github.com/example/repo", "abc123", Instant.now(),
@@ -120,7 +121,7 @@ class EvidencePackAssemblerTest {
 
     @Test
     void respectsMaxSnippetLinesFromConfig() {
-        config.setMaxSnippetLines(10);
+        CodeIqConfigTestSupport.override(config).maxSnippetLines(10).done();
         assertThat(config.getMaxSnippetLines()).isEqualTo(10);
     }
 }

@@ -27,6 +27,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import io.github.randomcodespace.iq.config.CodeIqConfigTestSupport;
 
 /**
  * Expanded McpTools tests targeting coverage gaps:
@@ -61,7 +62,7 @@ class McpToolsExpandedTest {
     @BeforeEach
     void setUp() {
         config = new CodeIqConfig();
-        config.setRootPath(".");
+        CodeIqConfigTestSupport.override(config).rootPath(".").done();
         objectMapper = new ObjectMapper();
         mcpTools = new McpTools(
                 queryService, config, objectMapper,

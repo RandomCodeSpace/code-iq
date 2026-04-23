@@ -33,6 +33,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
+import io.github.randomcodespace.iq.config.CodeIqConfigTestSupport;
 
 @ExtendWith(MockitoExtension.class)
 class McpToolsTest {
@@ -59,7 +60,7 @@ class McpToolsTest {
     @BeforeEach
     void setUp() {
         config = new CodeIqConfig();
-        config.setRootPath(".");
+        CodeIqConfigTestSupport.override(config).rootPath(".").done();
         objectMapper = new ObjectMapper();
         mcpTools = new McpTools(queryService, config, objectMapper, java.util.Optional.ofNullable(flowEngine), graphDb, statsService, new io.github.randomcodespace.iq.query.TopologyService(), graphStore, java.util.Optional.empty(), java.util.Optional.empty());
     }
@@ -459,7 +460,7 @@ class McpToolsTest {
 
     @Test
     void readFileShouldReadContent(@TempDir Path tempDir) throws IOException {
-        config.setRootPath(tempDir.toString());
+        CodeIqConfigTestSupport.override(config).rootPath(tempDir.toString()).done();
         Path file = tempDir.resolve("test.txt");
         Files.writeString(file, "Hello, World!");
 
@@ -470,7 +471,7 @@ class McpToolsTest {
 
     @Test
     void readFileShouldRejectPathTraversal(@TempDir Path tempDir) throws IOException {
-        config.setRootPath(tempDir.toString());
+        CodeIqConfigTestSupport.override(config).rootPath(tempDir.toString()).done();
 
         String result = mcpTools.readFile("../../etc/passwd", null, null);
         Map<String, Object> parsed = parseJson(result);
@@ -480,7 +481,7 @@ class McpToolsTest {
 
     @Test
     void readFileShouldHandleMissingFile(@TempDir Path tempDir) throws IOException {
-        config.setRootPath(tempDir.toString());
+        CodeIqConfigTestSupport.override(config).rootPath(tempDir.toString()).done();
 
         String result = mcpTools.readFile("nonexistent.txt", null, null);
         Map<String, Object> parsed = parseJson(result);
@@ -491,7 +492,7 @@ class McpToolsTest {
 
     @Test
     void readFileShouldReturnLineRange(@TempDir Path tempDir) throws IOException {
-        config.setRootPath(tempDir.toString());
+        CodeIqConfigTestSupport.override(config).rootPath(tempDir.toString()).done();
         Path file = tempDir.resolve("lines.txt");
         Files.writeString(file, "line1\nline2\nline3\nline4\nline5");
 
@@ -502,7 +503,7 @@ class McpToolsTest {
 
     @Test
     void readFileShouldReturnFromStartLineToEnd(@TempDir Path tempDir) throws IOException {
-        config.setRootPath(tempDir.toString());
+        CodeIqConfigTestSupport.override(config).rootPath(tempDir.toString()).done();
         Path file = tempDir.resolve("lines.txt");
         Files.writeString(file, "line1\nline2\nline3\nline4\nline5");
 
@@ -513,7 +514,7 @@ class McpToolsTest {
 
     @Test
     void readFileShouldReturnFromStartToEndLine(@TempDir Path tempDir) throws IOException {
-        config.setRootPath(tempDir.toString());
+        CodeIqConfigTestSupport.override(config).rootPath(tempDir.toString()).done();
         Path file = tempDir.resolve("lines.txt");
         Files.writeString(file, "line1\nline2\nline3\nline4\nline5");
 
@@ -524,7 +525,7 @@ class McpToolsTest {
 
     @Test
     void readFileShouldClampOutOfBoundsLineRange(@TempDir Path tempDir) throws IOException {
-        config.setRootPath(tempDir.toString());
+        CodeIqConfigTestSupport.override(config).rootPath(tempDir.toString()).done();
         Path file = tempDir.resolve("lines.txt");
         Files.writeString(file, "line1\nline2\nline3");
 

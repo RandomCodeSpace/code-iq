@@ -22,6 +22,7 @@ import java.util.zip.ZipFile;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
+import io.github.randomcodespace.iq.config.CodeIqConfigTestSupport;
 
 /**
  * Extended tests for BundleCommand covering additional branches:
@@ -249,7 +250,7 @@ class BundleCommandExtendedTest {
         Files.createDirectories(cacheDir);
 
         var config = new CodeIqConfig();
-        config.setCacheDir(".code-iq/cache");
+        CodeIqConfigTestSupport.override(config).cacheDir(".code-iq/cache").done();
         Path zipPath = tempDir.resolve("out.zip");
         var cmd = new BundleCommand(config, java.util.Optional.empty(), java.util.Optional.empty());
         var cmdLine = new picocli.CommandLine(cmd);

@@ -7,13 +7,19 @@ package io.github.randomcodespace.iq.config;
  * Task 11 moved bean production to {@link UnifiedConfigBeans#codeIqConfig}, which
  * adapts a {@link io.github.randomcodespace.iq.config.unified.CodeIqUnifiedConfig}
  * (single source of truth) via {@link UnifiedConfigAdapter#toCodeIqConfig}. The
- * getter/setter surface is preserved unchanged so the ~100 call sites that still
- * depend on this bean continue to work.
+ * getter surface is preserved unchanged so the ~100 call sites that read this
+ * bean continue to work.
  *
  * <p>This class is intentionally a plain POJO (no {@code @Configuration},
  * no {@code @ConfigurationProperties}); Spring Boot no longer instantiates it
- * from {@code application.yml}. Instantiable directly in tests via the public
- * no-arg constructor and setters.
+ * from {@code application.yml}.
+ *
+ * <p><b>Setters are package-private.</b> Only {@link UnifiedConfigAdapter}
+ * (at Spring startup) and {@link CliStartupConfigOverrides} (once per JVM at
+ * CLI entry) mutate instances of this class. External-package callers go
+ * through {@link CliStartupConfigOverrides}. External-package tests that need
+ * a populated instance construct one via
+ * {@link UnifiedConfigAdapter#toCodeIqConfig(io.github.randomcodespace.iq.config.unified.CodeIqUnifiedConfig)}.
  */
 public class CodeIqConfig {
 
@@ -48,7 +54,7 @@ public class CodeIqConfig {
         private String path = ".code-iq/graph/graph.db";
 
         public String getPath() { return path; }
-        public void setPath(String path) { this.path = path; }
+        void setPath(String path) { this.path = path; }
     }
 
     /** Read-only mode for serving — no lock files, no writes. For read-only filesystems (AKS). */
@@ -57,13 +63,13 @@ public class CodeIqConfig {
     /** Service name tag for multi-repo graph mode. */
     private String serviceName;
 
-    // --- Getters and Setters ---
+    // --- Getters (public) and Setters (package-private) ---
 
     public String getRootPath() {
         return rootPath;
     }
 
-    public void setRootPath(String rootPath) {
+    void setRootPath(String rootPath) {
         this.rootPath = rootPath;
     }
 
@@ -71,7 +77,7 @@ public class CodeIqConfig {
         return cacheDir;
     }
 
-    public void setCacheDir(String cacheDir) {
+    void setCacheDir(String cacheDir) {
         this.cacheDir = cacheDir;
     }
 
@@ -79,7 +85,7 @@ public class CodeIqConfig {
         return maxDepth;
     }
 
-    public void setMaxDepth(int maxDepth) {
+    void setMaxDepth(int maxDepth) {
         this.maxDepth = maxDepth;
     }
 
@@ -87,7 +93,7 @@ public class CodeIqConfig {
         return maxFiles;
     }
 
-    public void setMaxFiles(int maxFiles) {
+    void setMaxFiles(int maxFiles) {
         this.maxFiles = Math.max(1, maxFiles);
     }
 
@@ -95,7 +101,7 @@ public class CodeIqConfig {
         return maxRadius;
     }
 
-    public void setMaxRadius(int maxRadius) {
+    void setMaxRadius(int maxRadius) {
         this.maxRadius = maxRadius;
     }
 
@@ -103,7 +109,7 @@ public class CodeIqConfig {
         return batchSize;
     }
 
-    public void setBatchSize(int batchSize) {
+    void setBatchSize(int batchSize) {
         this.batchSize = Math.max(1, batchSize);
     }
 
@@ -111,7 +117,7 @@ public class CodeIqConfig {
         return readOnly;
     }
 
-    public void setReadOnly(boolean readOnly) {
+    void setReadOnly(boolean readOnly) {
         this.readOnly = readOnly;
     }
 
@@ -119,7 +125,7 @@ public class CodeIqConfig {
         return serviceName;
     }
 
-    public void setServiceName(String serviceName) {
+    void setServiceName(String serviceName) {
         this.serviceName = serviceName;
     }
 
@@ -127,7 +133,7 @@ public class CodeIqConfig {
         return graph;
     }
 
-    public void setGraph(Graph graph) {
+    void setGraph(Graph graph) {
         this.graph = graph;
     }
 
@@ -135,7 +141,7 @@ public class CodeIqConfig {
         return uiEnabled;
     }
 
-    public void setUiEnabled(boolean uiEnabled) {
+    void setUiEnabled(boolean uiEnabled) {
         this.uiEnabled = uiEnabled;
     }
 
@@ -143,7 +149,7 @@ public class CodeIqConfig {
         return maxSnippetLines;
     }
 
-    public void setMaxSnippetLines(int maxSnippetLines) {
+    void setMaxSnippetLines(int maxSnippetLines) {
         this.maxSnippetLines = Math.max(1, maxSnippetLines);
     }
 }

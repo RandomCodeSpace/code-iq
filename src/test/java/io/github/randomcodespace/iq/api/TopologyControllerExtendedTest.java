@@ -31,6 +31,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import io.github.randomcodespace.iq.config.CodeIqConfigTestSupport;
 
 /**
  * Extended tests for TopologyController that exercise the actual REST endpoints
@@ -60,7 +61,7 @@ class TopologyControllerExtendedTest {
     void setUp() {
         var config = new CodeIqConfig();
         // Use the temp dir as rootPath so H2 fallback finds no cache file
-        config.setRootPath(tempDir.toString());
+        CodeIqConfigTestSupport.override(config).rootPath(tempDir.toString()).done();
         controller = new TopologyController(topologyService, graphStore, config);
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }

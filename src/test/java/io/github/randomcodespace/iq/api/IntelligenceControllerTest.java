@@ -22,6 +22,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import io.github.randomcodespace.iq.config.CodeIqConfigTestSupport;
 
 class IntelligenceControllerTest {
 
@@ -41,7 +42,7 @@ class IntelligenceControllerTest {
         when(metadataProvider.current()).thenReturn(metadata);
 
         CodeIqConfig config = new CodeIqConfig();
-        config.setRootPath(System.getProperty("java.io.tmpdir"));
+        CodeIqConfigTestSupport.override(config).rootPath(System.getProperty("java.io.tmpdir")).done();
 
         IntelligenceController controller = new IntelligenceController(assembler, metadataProvider, config);
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();

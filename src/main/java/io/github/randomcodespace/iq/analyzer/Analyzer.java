@@ -5,6 +5,7 @@ import io.github.randomcodespace.iq.analyzer.linker.Linker;
 import io.github.randomcodespace.iq.cache.AnalysisCache;
 import io.github.randomcodespace.iq.cache.FileHasher;
 import io.github.randomcodespace.iq.cli.VersionCommand;
+import io.github.randomcodespace.iq.config.CliStartupConfigOverrides;
 import io.github.randomcodespace.iq.config.CodeIqConfig;
 import io.github.randomcodespace.iq.config.unified.CodeIqUnifiedConfig;
 import io.github.randomcodespace.iq.detector.AbstractAntlrDetector;
@@ -814,7 +815,7 @@ public class Analyzer {
             report.accept("Service: " + infraRegistry.getServiceName());
             // Propagate to config if not already set
             if (config.getServiceName() == null || config.getServiceName().isBlank()) {
-                config.setServiceName(infraRegistry.getServiceName());
+                CliStartupConfigOverrides.applyServiceName(config, infraRegistry.getServiceName());
             }
         }
 

@@ -95,11 +95,13 @@ final class CliOutput {
                                      java.nio.file.Path graphDir, String serviceName) {
         if (graphDir != null) {
             java.nio.file.Path sharedDir = graphDir.toAbsolutePath().normalize();
-            config.setCacheDir(sharedDir.toString());
+            io.github.randomcodespace.iq.config.CliStartupConfigOverrides.applyCacheDir(
+                    config, sharedDir.toString());
             info("  Graph dir: " + sharedDir + " (shared multi-repo)");
         }
         if (serviceName != null && !serviceName.isBlank()) {
-            config.setServiceName(serviceName);
+            io.github.randomcodespace.iq.config.CliStartupConfigOverrides.applyServiceName(
+                    config, serviceName);
             info("  Service name: " + serviceName);
         }
     }

@@ -20,6 +20,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import io.github.randomcodespace.iq.config.CodeIqConfigTestSupport;
 
 @ExtendWith(MockitoExtension.class)
 class QueryServiceTest {
@@ -34,8 +35,8 @@ class QueryServiceTest {
     @BeforeEach
     void setUp() {
         config = new CodeIqConfig();
-        config.setMaxDepth(10);
-        config.setMaxRadius(10);
+        CodeIqConfigTestSupport.override(config).maxDepth(10).done();
+        CodeIqConfigTestSupport.override(config).maxRadius(10).done();
         service = new QueryService(graphStore, config);
     }
 
@@ -290,7 +291,7 @@ class QueryServiceTest {
 
     @Test
     void traceImpactShouldCapDepth() {
-        config.setMaxDepth(5);
+        CodeIqConfigTestSupport.override(config).maxDepth(5).done();
         var impacted = makeNode("n2", NodeKind.CLASS, "Service");
         when(graphStore.traceImpact("n1", 5)).thenReturn(List.of(impacted));
 
@@ -304,7 +305,7 @@ class QueryServiceTest {
 
     @Test
     void egoGraphShouldCapRadius() {
-        config.setMaxRadius(5);
+        CodeIqConfigTestSupport.override(config).maxRadius(5).done();
         when(graphStore.findEgoGraph("center", 5)).thenReturn(new ArrayList<>());
         var centerNode = makeNode("center", NodeKind.MODULE, "app");
         when(graphStore.findById("center")).thenReturn(Optional.of(centerNode));

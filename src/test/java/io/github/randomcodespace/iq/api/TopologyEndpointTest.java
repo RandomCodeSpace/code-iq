@@ -31,6 +31,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import io.github.randomcodespace.iq.config.CodeIqConfigTestSupport;
 
 /**
  * Tests for the /api/topology endpoint and related components.
@@ -61,9 +62,9 @@ class TopologyEndpointTest {
     @BeforeEach
     void setUp() {
         config = new CodeIqConfig();
-        config.setMaxDepth(10);
-        config.setMaxRadius(10);
-        config.setRootPath(".");
+        CodeIqConfigTestSupport.override(config).maxDepth(10).done();
+        CodeIqConfigTestSupport.override(config).maxRadius(10).done();
+        CodeIqConfigTestSupport.override(config).rootPath(".").done();
 
         objectMapper = new ObjectMapper();
 

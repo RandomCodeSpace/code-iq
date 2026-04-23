@@ -15,6 +15,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import io.github.randomcodespace.iq.config.CodeIqConfigTestSupport;
 
 /**
  * Unit tests for {@link LexicalQueryService}.
@@ -35,7 +36,7 @@ class LexicalQueryServiceTest {
         graphStore = mock(GraphStore.class);
         snippetStore = mock(SnippetStore.class);
         config = new CodeIqConfig();
-        config.setRootPath(tempRoot.toString());
+        CodeIqConfigTestSupport.override(config).rootPath(tempRoot.toString()).done();
         service = new LexicalQueryService(graphStore, snippetStore, config);
     }
 

@@ -1,5 +1,6 @@
 package io.github.randomcodespace.iq.cli;
 
+import io.github.randomcodespace.iq.config.CliStartupConfigOverrides;
 import io.github.randomcodespace.iq.config.CodeIqConfig;
 import io.github.randomcodespace.iq.config.GraphBootstrapper;
 import io.github.randomcodespace.iq.graph.GraphStore;
@@ -71,10 +72,7 @@ public class ServeCommand implements Callable<Integer> {
     @Override
     public Integer call() {
         Path root = path.toAbsolutePath().normalize();
-        config.setRootPath(root.toString());
-        if (readOnly) {
-            config.setReadOnly(true);
-        }
+        CliStartupConfigOverrides.applyServeOverrides(config, root, readOnly);
         NumberFormat nf = NumberFormat.getIntegerInstance(Locale.US);
 
         // Bootstrap Neo4j from the H2 analysis cache if Neo4j is empty. This is

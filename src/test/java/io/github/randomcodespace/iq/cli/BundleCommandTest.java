@@ -22,6 +22,7 @@ import java.util.zip.ZipFile;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
+import io.github.randomcodespace.iq.config.CodeIqConfigTestSupport;
 
 @ExtendWith(MockitoExtension.class)
 class BundleCommandTest {
@@ -70,7 +71,7 @@ class BundleCommandTest {
         Files.writeString(tempDir.resolve("App.java"), "class App {}", StandardCharsets.UTF_8);
 
         var config = new CodeIqConfig();
-        config.setCacheDir(".code-iq/cache");
+        CodeIqConfigTestSupport.override(config).cacheDir(".code-iq/cache").done();
 
         when(flowEngine.renderInteractive(anyString())).thenReturn("<html>flow</html>");
 
@@ -186,7 +187,7 @@ class BundleCommandTest {
         Files.writeString(cacheDir.resolve("analysis-cache.db"), "h2-data", StandardCharsets.UTF_8);
 
         var config = new CodeIqConfig();
-        config.setCacheDir(".code-iq/cache");
+        CodeIqConfigTestSupport.override(config).cacheDir(".code-iq/cache").done();
 
         Path zipPath = tempDir.resolve("test-bundle.zip");
         var cmd = new BundleCommand(config, (GraphStore) null, (FlowEngine) null);
