@@ -157,31 +157,100 @@ java -jar code-iq-*-cli.jar serve /shared
 
 ## Configuration
 
-Create `.osscodeiq.yml` in your repo root to customize the pipeline:
+code-iq is configured by a single YAML file at the repo root: **`codeiq.yml`**.
+Every field is optional; omitted fields fall back to the in-code defaults
+(`ConfigDefaults.builtIn()`). See
+[`docs/codeiq.yml.example`](docs/codeiq.yml.example) for the full reference
+with inline documentation. All keys are **snake_case**; camelCase spellings
+are accepted as deprecated aliases for one release and log a WARN on load.
+
+### Resolution order (last wins)
+
+1. Built-in defaults
+2. `~/.codeiq/config.yml` (user-global)
+3. `./codeiq.yml` (project)
+4. Environment variables: `CODEIQ_<SECTION>_<KEY>` (e.g. `CODEIQ_SERVING_PORT=9090`,
+   `CODEIQ_MCP_AUTH_MODE=bearer`, `CODEIQ_INDEXING_BATCH_SIZE=1000`). Nested
+   keys are flattened with underscores; values parse as YAML scalars.
+5. CLI flags on `code-iq <command>`
+
+### Commands
+
+```bash
+code-iq config validate              # Validate ./codeiq.yml, exit 1 on error
+code-iq config validate -p custom.yml
+code-iq config explain               # Print each effective value + its source layer
+```
+
+### Minimal example
 
 ```yaml
+project:
+  name: my-service
+  root: .
+
+indexing:
+  exclude: ['**/node_modules/**', '**/build/**', '**/dist/**']
+  cache_dir: .code-iq/cache
+  batch_size: 500
+
+serving:
+  port: 8080
+  bind_address: 0.0.0.0
+
+mcp:
+  enabled: true
+  transport: http
+```
+
+### Spring-owned keys (stay in `application.yml`)
+
+A handful of keys drive Spring's `@ConditionalOnProperty` / `@Value` wiring
+and have not been migrated into `codeiq.yml`. Keep them in
+`src/main/resources/application.yml`:
+
+- `codeiq.neo4j.enabled` -- profile-conditional Neo4j toggle (`false` under
+  the `indexing` profile, `true` under `serving`).
+- `codeiq.neo4j.bolt.port` -- embedded Neo4j Bolt listener port.
+- `codeiq.cors.allowed-origin-patterns` -- CORS allow-list for the REST API.
+- `codeiq.ui.enabled` -- toggles the React SPA static resource handler.
+
+Everything else belongs in `codeiq.yml`. `UnifiedConfigBeans` bridges the
+two worlds for values that exist in both.
+
+### Migration from `.osscodeiq.yml`
+
+`.osscodeiq.yml` is deprecated. code-iq still loads it for one release via
+`ProjectConfigLoader`, translates its legacy flat keys into the unified
+shape, and logs a one-time WARN per path. Rename the file to `codeiq.yml`
+and restructure flat keys into the nested sections.
+
+**Before** (`.osscodeiq.yml`, legacy flat schema):
+
+```yaml
+languages: [java, typescript, yaml]
+exclude:
+  - '**/node_modules/**'
+  - '**/build/**'
 pipeline:
   parallelism: 4
   batch-size: 500
-
-languages:
-  - java
-  - typescript
-  - yaml
-
-detectors:
-  categories:
-    - endpoints
-    - entities
-    - auth
-    - config
-
-exclude:
-  - "**/node_modules/**"
-  - "**/build/**"
+batch_size: 500
 ```
 
-Or auto-generate a config: `code-iq plugins suggest /path/to/repo`
+**After** (`codeiq.yml`, unified snake_case schema):
+
+```yaml
+indexing:
+  languages: [java, typescript, yaml]
+  exclude:
+    - '**/node_modules/**'
+    - '**/build/**'
+  parallelism: 4
+  batch_size: 500
+```
+
+See `docs/codeiq.yml.example` for the full schema.
 
 ## Graph Model
 

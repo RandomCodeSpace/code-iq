@@ -367,18 +367,46 @@ mvn dependency-check:check
 
 ## Configuration
 
-### Application properties (`application.yml`)
-- `codeiq.root-path` -- codebase root (default: `.`)
-- `codeiq.cache-dir` -- cache directory name (default: `.code-intelligence`)
-- `codeiq.graph.path` -- Neo4j graph path (default: `.osscodeiq/graph.db`)
-- `codeiq.max-radius` -- max ego graph radius (default: 10)
-- `codeiq.max-depth` -- max impact trace depth (default: 10)
-- `codeiq.batch-size` -- files per H2 flush batch (default: 500)
-- `codeiq.neo4j.enabled` -- Neo4j conditional toggle (default: `true`, overridden to `false` in `indexing` profile)
-- `spring.ai.mcp.server.protocol` -- MCP protocol (STREAMABLE)
+Single source of truth: **`codeiq.yml`** at the repo root. See
+`docs/codeiq.yml.example` for the full schema (snake_case throughout;
+camelCase accepted as a deprecated alias for one release). Resolution order
+(last wins):
 
-### Project-level overrides (`.osscodeiq.yml`)
-Placed in the codebase root, loaded by `ProjectConfigLoader` before analysis.
+1. Built-in defaults (`ConfigDefaults.builtIn()`)
+2. `~/.codeiq/config.yml` (user-global)
+3. `./codeiq.yml` (project)
+4. `CODEIQ_<SECTION>_<KEY>` env vars (e.g. `CODEIQ_SERVING_PORT=9090`)
+5. CLI flags on `code-iq <command>`
+
+Validate and introspect with:
+
+```bash
+code-iq config validate
+code-iq config explain
+```
+
+### Spring-owned keys (stay in `application.yml`)
+
+A small set of keys still lives in `src/main/resources/application.yml`
+because they drive Spring's `@ConditionalOnProperty` / `@Value` wiring and
+have not been migrated into `codeiq.yml`:
+
+- `codeiq.neo4j.enabled` -- profile-conditional toggle (`false` in the
+  `indexing` profile, `true` in `serving`).
+- `codeiq.neo4j.bolt.port` -- embedded Neo4j Bolt listener port.
+- `codeiq.cors.allowed-origin-patterns` -- CORS allow-list for the REST API.
+- `codeiq.ui.enabled` -- toggles the React SPA static resource handler.
+
+`UnifiedConfigBeans` bridges the unified config to the legacy `CodeIqConfig`
+bean for code paths that haven't been ported yet.
+
+### `.osscodeiq.yml` deprecation
+
+`.osscodeiq.yml` is deprecated. `ProjectConfigLoader` still loads it for one
+release, translates its legacy flat keys into the unified nested shape, and
+logs a one-time WARN per canonical path. Rename to `codeiq.yml` and migrate
+flat keys into the `project:` / `indexing:` / `serving:` / `mcp:` /
+`observability:` / `detectors:` sections.
 
 ## Gotchas & Lessons Learned
 

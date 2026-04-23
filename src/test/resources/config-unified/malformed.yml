@@ -1,0 +1,4 @@
+project:
+  name: oops
+indexing:
+  batch_size: not-a-number      # type mismatch

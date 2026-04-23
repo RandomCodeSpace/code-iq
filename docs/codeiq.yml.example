@@ -1,0 +1,98 @@
+# docs/codeiq.yml.example
+#
+# Authoritative reference for `codeiq.yml` (Phase B unified config).
+#
+# - Place this file as `codeiq.yml` at the repo root.
+# - Every field is optional; omitted fields fall back to the built-in defaults
+#   (see `ConfigDefaults.builtIn()`).
+# - All keys are snake_case. camelCase spellings (e.g. `cacheDir`, `batchSize`,
+#   `bindAddress`, `pageCacheMb`, `perToolTimeoutMs`, `logFormat`) are accepted
+#   as deprecated aliases for one release and emit a WARN on load. Do not use
+#   camelCase in new config.
+# - Run `code-iq config validate` to type-check your file, and
+#   `code-iq config explain` to print every effective value and the layer it
+#   was resolved from.
+
+# ---------------------------------------------------------------------------
+# project
+# ---------------------------------------------------------------------------
+project:
+  name: my-service              # human-readable identifier; defaults to null
+  root: .                       # codebase root, relative to this file (default: ".")
+  service_name: my-service      # override for the emitted SERVICE node name
+  modules: []                   # optional list of sub-modules (Phase C). Example:
+  #   - path: services/api
+  #     type: maven             # maven | gradle | npm | pnpm | pip | go | cargo | ...
+  #     name: api
+  #     kind: service           # service | library | tool | infra
+
+# ---------------------------------------------------------------------------
+# indexing
+# ---------------------------------------------------------------------------
+indexing:
+  languages: []                 # allow-list; empty = detect all supported languages
+  include: []                   # glob allow-list; empty = include everything discovered
+  exclude:                      # glob deny-list; applied after `include`
+    - '**/node_modules/**'
+    - '**/build/**'
+    - '**/dist/**'
+    - '**/generated/**'
+  incremental: true             # reuse H2 cache when file hashes match
+  cache_dir: .code-iq/cache     # H2 analysis cache directory
+  parallelism: auto             # "auto" or a positive integer
+  batch_size: 500               # files per H2 flush batch (default: 500)
+  max_depth: 10                 # max impact-trace depth
+  max_radius: 10                # max ego-graph radius
+  max_files: null               # null = no cap; positive int to bound discovery
+  max_snippet_lines: null       # null = use CodeIqConfig default
+
+# ---------------------------------------------------------------------------
+# serving
+# ---------------------------------------------------------------------------
+serving:
+  port: 8080                    # HTTP port for REST + MCP + UI
+  bind_address: 0.0.0.0         # interface to bind; 127.0.0.1 for localhost-only
+  read_only: false              # must be false in non-prod; CI gate enforces this
+  neo4j:
+    dir: .code-iq/graph/graph.db   # embedded Neo4j data directory
+    page_cache_mb: 256             # Neo4j page cache (MB)
+    heap_initial_mb: 256           # JVM -Xms for Neo4j (MB)
+    heap_max_mb: 1024              # JVM -Xmx for Neo4j (MB)
+
+# ---------------------------------------------------------------------------
+# mcp (Model Context Protocol server)
+# ---------------------------------------------------------------------------
+mcp:
+  enabled: true                 # expose MCP tools via the serving layer
+  transport: http               # http | stdio
+  base_path: /mcp               # HTTP path prefix when transport=http
+  auth:
+    mode: none                  # none (default) | bearer | mtls
+    token_env: CODEIQ_MCP_TOKEN # env var read when mode=bearer
+  limits:
+    per_tool_timeout_ms: 15000  # hard cap per tool invocation
+    max_results: 500            # cap on result rows returned per tool
+    max_payload_bytes: 2000000  # cap on single response body (bytes)
+    rate_per_minute: 300        # per-client rate limit
+  tools:
+    enabled: ['*']              # allow-list of tool names; '*' = all
+    disabled: []                # deny-list wins over `enabled`
+
+# ---------------------------------------------------------------------------
+# observability
+# ---------------------------------------------------------------------------
+observability:
+  metrics: true                 # expose Micrometer/Prometheus metrics
+  tracing: false                # emit OTLP spans (off by default)
+  log_format: json              # json | text
+  log_level: info               # trace | debug | info | warn | error
+
+# ---------------------------------------------------------------------------
+# detectors
+# ---------------------------------------------------------------------------
+detectors:
+  profiles: [default]           # named detector bundles to activate
+  overrides:                    # per-detector feature flags, keyed by SimpleClassName
+    SpringRestDetector:    { enabled: true }
+    QuarkusRestDetector:   { enabled: true }
+    # MicronautRestDetector: { enabled: false }

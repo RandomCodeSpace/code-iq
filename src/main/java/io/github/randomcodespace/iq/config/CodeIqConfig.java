@@ -1,20 +1,20 @@
 package io.github.randomcodespace.iq.config;
 
-import io.github.randomcodespace.iq.graph.GraphStore;
-import io.github.randomcodespace.iq.intelligence.provenance.ArtifactMetadataProvider;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Profile;
-
-import java.nio.file.Path;
-
 /**
- * Configuration properties for Code IQ, bound to the "codeiq" prefix.
+ * Legacy flat configuration bean for Code IQ.
+ *
+ * <p>Historically bound to Spring Boot {@code @ConfigurationProperties("codeiq")}.
+ * Task 11 moved bean production to {@link UnifiedConfigBeans#codeIqConfig}, which
+ * adapts a {@link io.github.randomcodespace.iq.config.unified.CodeIqUnifiedConfig}
+ * (single source of truth) via {@link UnifiedConfigAdapter#toCodeIqConfig}. The
+ * getter/setter surface is preserved unchanged so the ~100 call sites that still
+ * depend on this bean continue to work.
+ *
+ * <p>This class is intentionally a plain POJO (no {@code @Configuration},
+ * no {@code @ConfigurationProperties}); Spring Boot no longer instantiates it
+ * from {@code application.yml}. Instantiable directly in tests via the public
+ * no-arg constructor and setters.
  */
-@Configuration
-@ConfigurationProperties(prefix = "codeiq")
 public class CodeIqConfig {
 
     /** Root path of the codebase to analyze. */
@@ -145,19 +145,5 @@ public class CodeIqConfig {
 
     public void setMaxSnippetLines(int maxSnippetLines) {
         this.maxSnippetLines = Math.max(1, maxSnippetLines);
-    }
-
-    /**
-     * Provides on-demand artifact metadata in the {@code serving} profile.
-     *
-     * <p>Graph-derived fields are resolved lazily so H2-to-Neo4j bootstrap can complete
-     * before clients fetch manifest data.
-     */
-    @Bean
-    @Profile("serving")
-    public ArtifactMetadataProvider artifactMetadataProvider(
-            @Autowired(required = false) GraphStore graphStore) {
-        Path root = Path.of(rootPath).toAbsolutePath().normalize();
-        return new ArtifactMetadataProvider(root, graphStore);
     }
 }

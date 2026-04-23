@@ -22,14 +22,15 @@ management:
       exposure:
         include: health,info,metrics
 
+# Runtime codeiq.* values (cache dir, limits, pipeline tuning, MCP auth, etc.)
+# are sourced from codeiq.yml / env / CLI via CodeIqUnifiedConfig (see
+# UnifiedConfigBeans.java). The keys kept here are ONLY those consumed
+# directly by Spring's Environment for @ConditionalOnProperty / @Value:
+#   codeiq.ui.enabled                    -> SpaController @ConditionalOnProperty
+#   codeiq.neo4j.enabled                 -> Neo4jConfig @ConditionalOnProperty (profile-conditional, below)
+#   codeiq.neo4j.bolt.port               -> Neo4jConfig @Value (default 7688)
+#   codeiq.cors.allowed-origin-patterns  -> CorsConfig @Value (default patterns)
 codeiq:
-  root-path: "."
-  cache-dir: ".code-iq/cache"
-  graph:
-    path: ".code-iq/graph/graph.db"
-  max-depth: 10
-  max-radius: 10
-  batch-size: 500
   ui:
     enabled: true
 
