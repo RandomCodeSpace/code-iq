@@ -36,7 +36,8 @@ public class LayerClassifier {
     );
 
     private static final Set<NodeKind> INFRA_NODE_KINDS = Set.of(
-            NodeKind.INFRA_RESOURCE, NodeKind.AZURE_RESOURCE, NodeKind.AZURE_FUNCTION
+            NodeKind.INFRA_RESOURCE, NodeKind.AZURE_RESOURCE, NodeKind.AZURE_FUNCTION,
+            NodeKind.SQL_ENTITY
     );
 
     private static final Set<String> INFRA_LANGUAGES = Set.of(

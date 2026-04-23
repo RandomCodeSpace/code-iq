@@ -7,8 +7,9 @@ import static org.junit.jupiter.api.Assertions.*;
 class NodeKindTest {
 
     @Test
-    void shouldHave31Values() {
-        assertEquals(33, NodeKind.values().length, "NodeKind must have exactly 33 types (includes EXTERNAL)");
+    void shouldHave34Values() {
+        assertEquals(34, NodeKind.values().length,
+                "NodeKind must have exactly 34 types (includes EXTERNAL, SQL_ENTITY)");
     }
 
     @Test

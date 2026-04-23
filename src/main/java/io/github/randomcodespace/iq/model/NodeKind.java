@@ -38,7 +38,8 @@ public enum NodeKind {
     MIDDLEWARE("middleware"),
     HOOK("hook"),
     SERVICE("service"),
-    EXTERNAL("external");
+    EXTERNAL("external"),
+    SQL_ENTITY("sql_entity");
 
     private final String value;
 
