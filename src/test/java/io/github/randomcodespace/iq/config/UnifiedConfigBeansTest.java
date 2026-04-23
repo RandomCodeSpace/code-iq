@@ -54,8 +54,8 @@ class UnifiedConfigBeansTest {
             CodeIqConfig legacy = ctx.getBean(CodeIqConfig.class);
             // These values came from application.yml pre-Task-11; they must still
             // be what CodeIqConfig exposes now that wiring goes through ConfigDefaults.
-            assertEquals(".code-iq/cache", legacy.getCacheDir());
-            assertEquals(".code-iq/graph/graph.db", legacy.getGraph().getPath());
+            assertEquals(".codeiq/cache", legacy.getCacheDir());
+            assertEquals(".codeiq/graph/graph.db", legacy.getGraph().getPath());
             assertEquals(10, legacy.getMaxDepth());
             assertEquals(10, legacy.getMaxRadius());
             assertEquals(500, legacy.getBatchSize());

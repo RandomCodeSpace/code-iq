@@ -13,7 +13,7 @@ class CodeIqCliTest {
     void cliHasCorrectName() {
         var cli = new CodeIqCli();
         var cmdLine = new CommandLine(cli);
-        assertEquals("code-iq", cmdLine.getCommandName());
+        assertEquals("codeiq", cmdLine.getCommandName());
     }
 
     @Test

@@ -1,5 +1,5 @@
 <p align="center">
-  <h1 align="center">Code IQ</h1>
+  <h1 align="center">codeiq</h1>
   <p align="center">
     <strong>Deterministic code knowledge graph -- scans codebases to map services, endpoints, entities, infrastructure, auth patterns, and framework usage. No AI, pure static analysis.</strong>
   </p>
@@ -7,13 +7,13 @@
 
 <p align="center">
   <a href="https://central.sonatype.com/artifact/io.github.randomcodespace.iq/code-iq"><img src="https://img.shields.io/maven-central/v/io.github.randomcodespace.iq/code-iq?style=flat-square&logo=apachemaven&label=Maven%20Central" alt="Maven Central"></a>
-  <a href="https://github.com/RandomCodeSpace/code-iq/actions/workflows/ci-java.yml"><img src="https://img.shields.io/github/actions/workflow/status/RandomCodeSpace/code-iq/ci-java.yml?branch=main&style=flat-square&logo=github&label=CI" alt="CI"></a>
+  <a href="https://github.com/RandomCodeSpace/codeiq/actions/workflows/ci-java.yml"><img src="https://img.shields.io/github/actions/workflow/status/RandomCodeSpace/codeiq/ci-java.yml?branch=main&style=flat-square&logo=github&label=CI" alt="CI"></a>
   <a href="https://www.oracle.com/java/technologies/downloads/"><img src="https://img.shields.io/badge/Java-25-orange?style=flat-square&logo=openjdk&logoColor=white" alt="Java 25"></a>
-  <a href="https://github.com/RandomCodeSpace/code-iq/blob/main/LICENSE"><img src="https://img.shields.io/github/license/RandomCodeSpace/code-iq?style=flat-square&label=License" alt="MIT License"></a>
-  <a href="https://sonarcloud.io/summary/overall?id=RandomCodeSpace_code-iq"><img src="https://sonarcloud.io/api/project_badges/measure?project=RandomCodeSpace_code-iq&metric=security_rating" alt="Security"></a>
-  <a href="https://sonarcloud.io/summary/overall?id=RandomCodeSpace_code-iq"><img src="https://sonarcloud.io/api/project_badges/measure?project=RandomCodeSpace_code-iq&metric=reliability_rating" alt="Reliability"></a>
-  <a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/detectors-97-brightgreen?style=flat-square&logo=codefactor&logoColor=white" alt="97 Detectors"></a>
-  <a href="https://github.com/RandomCodeSpace/code-iq"><img src="https://img.shields.io/badge/languages-35%2B-blue?style=flat-square&logo=stackblitz&logoColor=white" alt="35+ Languages"></a>
+  <a href="https://github.com/RandomCodeSpace/codeiq/blob/main/LICENSE"><img src="https://img.shields.io/github/license/RandomCodeSpace/codeiq?style=flat-square&label=License" alt="MIT License"></a>
+  <a href="https://sonarcloud.io/summary/overall?id=RandomCodeSpace_codeiq"><img src="https://sonarcloud.io/api/project_badges/measure?project=RandomCodeSpace_codeiq&metric=security_rating" alt="Security"></a>
+  <a href="https://sonarcloud.io/summary/overall?id=RandomCodeSpace_codeiq"><img src="https://sonarcloud.io/api/project_badges/measure?project=RandomCodeSpace_codeiq&metric=reliability_rating" alt="Reliability"></a>
+  <a href="https://github.com/RandomCodeSpace/codeiq"><img src="https://img.shields.io/badge/detectors-97-brightgreen?style=flat-square&logo=codefactor&logoColor=white" alt="97 Detectors"></a>
+  <a href="https://github.com/RandomCodeSpace/codeiq"><img src="https://img.shields.io/badge/languages-35%2B-blue?style=flat-square&logo=stackblitz&logoColor=white" alt="35+ Languages"></a>
 </p>
 
 ---
@@ -22,8 +22,8 @@
 
 ```bash
 # Build from source (requires Java 25+, Maven 3.9+)
-git clone https://github.com/RandomCodeSpace/code-iq.git
-cd code-iq
+git clone https://github.com/RandomCodeSpace/codeiq.git
+cd codeiq
 mvn clean package -DskipTests
 
 # Analyze a codebase
@@ -36,7 +36,7 @@ java -jar target/code-iq-*-cli.jar serve /path/to/repo
 
 ## How It Works
 
-Code IQ scans source files using 97 detectors across 35+ languages, builds a knowledge graph of code relationships, and serves it via REST API, MCP server, and React UI.
+codeiq scans source files using 97 detectors across 35+ languages, builds a knowledge graph of code relationships, and serves it via REST API, MCP server, and React UI.
 
 ```mermaid
 graph TD
@@ -157,7 +157,7 @@ java -jar code-iq-*-cli.jar serve /shared
 
 ## Configuration
 
-code-iq is configured by a single YAML file at the repo root: **`codeiq.yml`**.
+codeiq is configured by a single YAML file at the repo root: **`codeiq.yml`**.
 Every field is optional; omitted fields fall back to the in-code defaults
 (`ConfigDefaults.builtIn()`). See
 [`docs/codeiq.yml.example`](docs/codeiq.yml.example) for the full reference
@@ -172,14 +172,14 @@ are accepted as deprecated aliases for one release and log a WARN on load.
 4. Environment variables: `CODEIQ_<SECTION>_<KEY>` (e.g. `CODEIQ_SERVING_PORT=9090`,
    `CODEIQ_MCP_AUTH_MODE=bearer`, `CODEIQ_INDEXING_BATCH_SIZE=1000`). Nested
    keys are flattened with underscores; values parse as YAML scalars.
-5. CLI flags on `code-iq <command>`
+5. CLI flags on `codeiq <command>`
 
 ### Commands
 
 ```bash
-code-iq config validate              # Validate ./codeiq.yml, exit 1 on error
-code-iq config validate -p custom.yml
-code-iq config explain               # Print each effective value + its source layer
+codeiq config validate              # Validate ./codeiq.yml, exit 1 on error
+codeiq config validate -p custom.yml
+codeiq config explain                # Print each effective value + its source layer
 ```
 
 ### Minimal example
@@ -191,7 +191,7 @@ project:
 
 indexing:
   exclude: ['**/node_modules/**', '**/build/**', '**/dist/**']
-  cache_dir: .code-iq/cache
+  cache_dir: .codeiq/cache
   batch_size: 500
 
 serving:
@@ -217,38 +217,6 @@ and have not been migrated into `codeiq.yml`. Keep them in
 
 Everything else belongs in `codeiq.yml`. `UnifiedConfigBeans` bridges the
 two worlds for values that exist in both.
-
-### Migration from `.osscodeiq.yml`
-
-`.osscodeiq.yml` is deprecated. code-iq still loads it for one release via
-`ProjectConfigLoader`, translates its legacy flat keys into the unified
-shape, and logs a one-time WARN per path. Rename the file to `codeiq.yml`
-and restructure flat keys into the nested sections.
-
-**Before** (`.osscodeiq.yml`, legacy flat schema):
-
-```yaml
-languages: [java, typescript, yaml]
-exclude:
-  - '**/node_modules/**'
-  - '**/build/**'
-pipeline:
-  parallelism: 4
-  batch-size: 500
-batch_size: 500
-```
-
-**After** (`codeiq.yml`, unified snake_case schema):
-
-```yaml
-indexing:
-  languages: [java, typescript, yaml]
-  exclude:
-    - '**/node_modules/**'
-    - '**/build/**'
-  parallelism: 4
-  batch_size: 500
-```
 
 See `docs/codeiq.yml.example` for the full schema.
 
@@ -294,8 +262,8 @@ All results are 100% deterministic across runs.
 ## Development
 
 ```bash
-git clone https://github.com/RandomCodeSpace/code-iq.git
-cd code-iq
+git clone https://github.com/RandomCodeSpace/codeiq.git
+cd codeiq
 mvn clean package    # Build + test (3,219 tests)
 mvn test             # Tests only
 ```

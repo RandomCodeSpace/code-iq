@@ -51,7 +51,7 @@ class UnifiedConfigLoaderTest {
         assertEquals(9090, cfg.serving().port());
         assertEquals("127.0.0.1", cfg.serving().bindAddress());
         assertEquals(true, cfg.serving().readOnly());
-        assertEquals(".code-iq/graph/graph.db", cfg.serving().neo4j().dir());
+        assertEquals(".codeiq/graph/graph.db", cfg.serving().neo4j().dir());
         assertEquals(2048, cfg.serving().neo4j().heapMaxMb());
         assertEquals(10000, cfg.mcp().limits().perToolTimeoutMs());
         assertEquals(List.of("run_cypher"), cfg.mcp().tools().disabled());

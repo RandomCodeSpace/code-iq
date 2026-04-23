@@ -1,16 +1,16 @@
-# Code IQ (Java) -- Project Instructions
+# codeiq (Java) -- Project Instructions
 
 ## What This Project Is
 
-**Code IQ** -- a CLI tool + server that scans codebases to build a deterministic code knowledge graph. No AI, no external APIs -- pure static analysis. 97 detectors, 35+ languages, Neo4j Embedded graph database, Spring AI MCP server, REST API, web UI.
+**codeiq** -- a CLI tool + server that scans codebases to build a deterministic code knowledge graph. No AI, no external APIs -- pure static analysis. 97 detectors, 35+ languages, Neo4j Embedded graph database, Spring AI MCP server, REST API, web UI.
 
-- **Maven coordinates:** `io.github.randomcodespace.iq:code-iq`
-- **CLI command:** `code-iq` (via `java -jar`)
+- **Maven coordinates:** `io.github.randomcodespace.iq:code-iq` (artifactId intentionally unchanged)
+- **CLI command:** `codeiq` (via `java -jar`; JAR filename remains `code-iq-*-cli.jar`)
 - **Java package:** `io.github.randomcodespace.iq` (under `src/main/java/`)
-- **GitHub repo:** `RandomCodeSpace/code-iq` (branch: `main`)
-- **Cache directory on disk:** `.code-intelligence` (H2 analysis cache)
-- **Neo4j directory on disk:** `.osscodeiq/graph.db` (enriched graph)
-- **Config file:** `.osscodeiq.yml` (project-level overrides)
+- **GitHub repo:** `RandomCodeSpace/codeiq` (branch: `main`)
+- **Cache directory on disk:** `.codeiq/cache` (H2 analysis cache)
+- **Neo4j directory on disk:** `.codeiq/graph/graph.db` (enriched graph)
+- **Config file:** `codeiq.yml` (project-level overrides)
 
 ## Tech Stack
 
@@ -30,12 +30,12 @@
 
 ```
 Developer machine:
-  code-iq index  /repo  →  H2 cache (.code-intelligence/)
-  code-iq enrich /repo  →  Neo4j (.osscodeiq/graph.db)
-  code-iq bundle /repo  →  bundle.zip (graph + source snapshot)
+  codeiq index  /repo  →  H2 cache (.codeiq/cache/)
+  codeiq enrich /repo  →  Neo4j (.codeiq/graph/graph.db)
+  codeiq bundle /repo  →  bundle.zip (graph + source snapshot)
 
 Remote server (or local):
-  code-iq serve /repo   →  read-only API + MCP + UI (from Neo4j)
+  codeiq serve /repo   →  read-only API + MCP + UI (from Neo4j)
 ```
 
 **Key principle:** MCP and API are strictly **read-only**. No data manipulation from the serving layer. Analysis happens only via CLI (`index`/`enrich`). The remote server may not have source code access (bundle deployment model).
@@ -164,13 +164,13 @@ io.github.randomcodespace.iq
 
 ```bash
 # For large codebases (44K+ files):
-code-iq index /path/to/repo          # ~220s for 44K files, writes to H2
-code-iq enrich /path/to/repo         # loads H2 → Neo4j with linkers/layers/services
-code-iq serve /path/to/repo          # read-only server
+codeiq index /path/to/repo           # ~220s for 44K files, writes to H2
+codeiq enrich /path/to/repo          # loads H2 → Neo4j with linkers/layers/services
+codeiq serve /path/to/repo           # read-only server
 
 # For small codebases:
-code-iq analyze /path/to/repo        # in-memory, all-in-one
-code-iq serve /path/to/repo          # needs enrich if using index
+codeiq analyze /path/to/repo         # in-memory, all-in-one
+codeiq serve /path/to/repo           # needs enrich if using index
 ```
 
 ## Server Endpoints (all read-only)
@@ -380,13 +380,13 @@ camelCase accepted as a deprecated alias for one release). Resolution order
 2. `~/.codeiq/config.yml` (user-global)
 3. `./codeiq.yml` (project)
 4. `CODEIQ_<SECTION>_<KEY>` env vars (e.g. `CODEIQ_SERVING_PORT=9090`)
-5. CLI flags on `code-iq <command>`
+5. CLI flags on `codeiq <command>`
 
 Validate and introspect with:
 
 ```bash
-code-iq config validate
-code-iq config explain
+codeiq config validate
+codeiq config explain
 ```
 
 ### Spring-owned keys (stay in `application.yml`)
@@ -403,14 +403,6 @@ have not been migrated into `codeiq.yml`:
 
 `UnifiedConfigBeans` bridges the unified config to the legacy `CodeIqConfig`
 bean for code paths that haven't been ported yet.
-
-### `.osscodeiq.yml` deprecation
-
-`.osscodeiq.yml` is deprecated. `ProjectConfigLoader` still loads it for one
-release, translates its legacy flat keys into the unified nested shape, and
-logs a one-time WARN per canonical path. Rename to `codeiq.yml` and migrate
-flat keys into the `project:` / `indexing:` / `serving:` / `mcp:` /
-`observability:` / `detectors:` sections.
 
 ## Gotchas & Lessons Learned
 
@@ -434,7 +426,7 @@ flat keys into the `project:` / `indexing:` / `serving:` / `mcp:` /
 - **SnakeYAML parses `on` as Boolean.TRUE**: In YAML files, bare `on` key becomes `Boolean.TRUE`. Use `String.valueOf(key)` comparisons, not `Boolean.TRUE.equals(key)` (SonarCloud S2159).
 - **Regex possessive quantifiers**: Use `*+` instead of `*` for nested quantifiers like `([^"\\]*(?:\\.[^"\\]*)*)` → `([^"\\]*+(?:\\.[^"\\]*+)*+)` to prevent stack overflow (SonarCloud S5998).
 - **Parallel agent conflicts**: Don't dispatch multiple agents editing the same files concurrently. Use worktree isolation or sequential execution.
-- **SonarCloud project key**: `RandomCodeSpace_code-iq`, org: `randomcodespace`
+- **SonarCloud project key**: `RandomCodeSpace_codeiq`, org: `randomcodespace`
 - **CI workflow**: Single `ci-java.yml` runs build + SonarCloud analysis. No cross-platform builds needed (JVM).
 
 ## Updating This File

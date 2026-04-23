@@ -1,7 +1,7 @@
 package io.github.randomcodespace.iq.config.unified;
 
 /**
- * Root of the unified configuration tree for code-iq. All sections are
+ * Root of the unified configuration tree for codeiq. All sections are
  * non-null; absent sections in a YAML source become their in-code defaults
  * (see ConfigDefaults). Records are immutable — apply overlays by building
  * a new instance via ConfigMerger.

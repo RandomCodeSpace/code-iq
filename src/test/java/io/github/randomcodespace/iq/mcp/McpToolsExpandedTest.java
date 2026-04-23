@@ -273,7 +273,7 @@ class McpToolsExpandedTest {
 
     @Test
     void serviceDetailShouldReturnErrorWhenNoData() throws IOException {
-        when(graphStore.findAll()).thenThrow(new RuntimeException("No analysis data available. Run 'code-iq analyze' first."));
+        when(graphStore.findAll()).thenThrow(new RuntimeException("No analysis data available. Run 'codeiq analyze' first."));
         String result = mcpTools.serviceDetail("my-service");
         Map<String, Object> parsed = parseJson(result);
         assertNotNull(parsed.get("error"));
@@ -281,7 +281,7 @@ class McpToolsExpandedTest {
 
     @Test
     void serviceDependenciesShouldReturnErrorWhenNoData() throws IOException {
-        when(graphStore.findAll()).thenThrow(new RuntimeException("No analysis data available. Run 'code-iq analyze' first."));
+        when(graphStore.findAll()).thenThrow(new RuntimeException("No analysis data available. Run 'codeiq analyze' first."));
         String result = mcpTools.serviceDependencies("my-service");
         Map<String, Object> parsed = parseJson(result);
         assertNotNull(parsed.get("error"));
@@ -289,7 +289,7 @@ class McpToolsExpandedTest {
 
     @Test
     void serviceDependentsShouldReturnErrorWhenNoData() throws IOException {
-        when(graphStore.findAll()).thenThrow(new RuntimeException("No analysis data available. Run 'code-iq analyze' first."));
+        when(graphStore.findAll()).thenThrow(new RuntimeException("No analysis data available. Run 'codeiq analyze' first."));
         String result = mcpTools.serviceDependents("my-service");
         Map<String, Object> parsed = parseJson(result);
         assertNotNull(parsed.get("error"));
@@ -297,7 +297,7 @@ class McpToolsExpandedTest {
 
     @Test
     void blastRadiusShouldReturnErrorWhenNoData() throws IOException {
-        when(graphStore.findAll()).thenThrow(new RuntimeException("No analysis data available. Run 'code-iq analyze' first."));
+        when(graphStore.findAll()).thenThrow(new RuntimeException("No analysis data available. Run 'codeiq analyze' first."));
         String result = mcpTools.blastRadius("node-1");
         Map<String, Object> parsed = parseJson(result);
         assertNotNull(parsed.get("error"));
@@ -305,7 +305,7 @@ class McpToolsExpandedTest {
 
     @Test
     void findPathShouldReturnErrorWhenNoData() throws IOException {
-        when(graphStore.findAll()).thenThrow(new RuntimeException("No analysis data available. Run 'code-iq analyze' first."));
+        when(graphStore.findAll()).thenThrow(new RuntimeException("No analysis data available. Run 'codeiq analyze' first."));
         String result = mcpTools.findPath("service-a", "service-b");
         Map<String, Object> parsed = parseJson(result);
         assertNotNull(parsed.get("error"));
@@ -313,7 +313,7 @@ class McpToolsExpandedTest {
 
     @Test
     void findBottlenecksShouldReturnErrorWhenNoData() throws IOException {
-        when(graphStore.findAll()).thenThrow(new RuntimeException("No analysis data available. Run 'code-iq analyze' first."));
+        when(graphStore.findAll()).thenThrow(new RuntimeException("No analysis data available. Run 'codeiq analyze' first."));
         String result = mcpTools.findBottlenecks();
         Map<String, Object> parsed = parseJson(result);
         assertNotNull(parsed.get("error"));
@@ -321,7 +321,7 @@ class McpToolsExpandedTest {
 
     @Test
     void findCircularDepsShouldReturnErrorWhenNoData() throws IOException {
-        when(graphStore.findAll()).thenThrow(new RuntimeException("No analysis data available. Run 'code-iq analyze' first."));
+        when(graphStore.findAll()).thenThrow(new RuntimeException("No analysis data available. Run 'codeiq analyze' first."));
         String result = mcpTools.findCircularDeps();
         Map<String, Object> parsed = parseJson(result);
         assertNotNull(parsed.get("error"));
@@ -329,7 +329,7 @@ class McpToolsExpandedTest {
 
     @Test
     void findDeadServicesShouldReturnErrorWhenNoData() throws IOException {
-        when(graphStore.findAll()).thenThrow(new RuntimeException("No analysis data available. Run 'code-iq analyze' first."));
+        when(graphStore.findAll()).thenThrow(new RuntimeException("No analysis data available. Run 'codeiq analyze' first."));
         String result = mcpTools.findDeadServices();
         Map<String, Object> parsed = parseJson(result);
         assertNotNull(parsed.get("error"));
@@ -337,7 +337,7 @@ class McpToolsExpandedTest {
 
     @Test
     void findNodeShouldReturnErrorWhenNoData() throws IOException {
-        when(graphStore.findAll()).thenThrow(new RuntimeException("No analysis data available. Run 'code-iq analyze' first."));
+        when(graphStore.findAll()).thenThrow(new RuntimeException("No analysis data available. Run 'codeiq analyze' first."));
         String result = mcpTools.findNode("UserService");
         Map<String, Object> parsed = parseJson(result);
         assertNotNull(parsed.get("error"));

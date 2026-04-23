@@ -16,9 +16,9 @@
     <version>0.1.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
-    <name>OSSCodeIQ</name>
+    <name>codeiq</name>
     <description>CLI tool and server that scans codebases to build a deterministic code knowledge graph</description>
-    <url>https://github.com/RandomCodeSpace/code-iq</url>
+    <url>https://github.com/RandomCodeSpace/codeiq</url>
 
     <properties>
         <java.version>25</java.version>
@@ -220,9 +220,9 @@
     </developers>
 
     <scm>
-        <connection>scm:git:git://github.com/RandomCodeSpace/code-iq.git</connection>
-        <developerConnection>scm:git:ssh://github.com:RandomCodeSpace/code-iq.git</developerConnection>
-        <url>https://github.com/RandomCodeSpace/code-iq/tree/main</url>
+        <connection>scm:git:git://github.com/RandomCodeSpace/codeiq.git</connection>
+        <developerConnection>scm:git:ssh://github.com:RandomCodeSpace/codeiq.git</developerConnection>
+        <url>https://github.com/RandomCodeSpace/codeiq/tree/main</url>
     </scm>
 
     <build>

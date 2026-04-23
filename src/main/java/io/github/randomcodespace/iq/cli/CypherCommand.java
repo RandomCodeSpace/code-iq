@@ -36,7 +36,7 @@ public class CypherCommand implements Callable<Integer> {
         CliOutput.info("    -H 'Content-Type: application/json' \\");
         CliOutput.info("    -d '{\"query\": \"" + query + "\", \"limit\": " + limit + "}'");
         CliOutput.info("");
-        CliOutput.info("Or start the server with: code-iq serve");
+        CliOutput.info("Or start the server with: codeiq serve");
         return 0;
     }
 }

@@ -69,7 +69,7 @@ class EvidencePackAssemblerExtendedTest {
         assembler = new EvidencePackAssembler(lexicalQueryService, snippetStore, queryPlanner, config, graphStore);
         metadata = new ArtifactMetadata(
                 "https://github.com/example/repo", "abc123", Instant.now(),
-                "1", "2", Map.of("code-iq", "1.0"), Map.of(), "deadbeef");
+                "1", "2", Map.of("codeiq", "1.0"), Map.of(), "deadbeef");
     }
 
     // ---- filePath as subject when symbol is null or blank ----------

@@ -68,7 +68,7 @@ public class FlowCommand implements Callable<Integer> {
     public Integer call() {
         FlowEngine engine = resolveEngine();
         if (engine == null) {
-            CliOutput.error("No analysis cache found. Run 'code-iq analyze' or 'code-iq index' first.");
+            CliOutput.error("No analysis cache found. Run 'codeiq analyze' or 'codeiq index' first.");
             return 1;
         }
 

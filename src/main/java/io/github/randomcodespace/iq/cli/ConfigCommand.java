@@ -11,7 +11,7 @@ import java.util.concurrent.Callable;
 /**
  * Parent command for configuration-related subcommands.
  *
- * <p>Running {@code code-iq config} with no subcommand prints usage to stderr
+ * <p>Running {@code codeiq config} with no subcommand prints usage to stderr
  * and exits with picocli's conventional {@code USAGE} (2) exit code so that
  * scripts can distinguish "I invoked the tool wrong" from a successful or
  * failed operation.
@@ -20,7 +20,7 @@ import java.util.concurrent.Callable;
 @Command(
         name = "config",
         mixinStandardHelpOptions = true,
-        description = "Inspect and validate code-iq configuration",
+        description = "Inspect and validate codeiq configuration",
         subcommands = {ConfigValidateSubcommand.class, ConfigExplainSubcommand.class})
 public class ConfigCommand implements Callable<Integer> {
 

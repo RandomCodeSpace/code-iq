@@ -97,7 +97,7 @@ public class StatsCommand implements Callable<Integer> {
 
         if (!Files.exists(h2File)) {
             CliOutput.warn("No analysis cache found at " + cachePath);
-            CliOutput.info("Run 'code-iq analyze' first to scan the codebase.");
+            CliOutput.info("Run 'codeiq analyze' first to scan the codebase.");
             return 1;
         }
 
@@ -109,7 +109,7 @@ public class StatsCommand implements Callable<Integer> {
         }
 
         if (nodes.isEmpty()) {
-            CliOutput.warn("Analysis cache is empty. Run 'code-iq analyze' first.");
+            CliOutput.warn("Analysis cache is empty. Run 'codeiq analyze' first.");
             return 1;
         }
 

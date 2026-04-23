@@ -103,13 +103,13 @@ public class BundleCommand implements Callable<Integer> {
         // Resolve paths
         Path neo4jDir = graphDirOption != null
                 ? graphDirOption.toAbsolutePath().normalize()
-                : root.resolve(".code-iq/graph/graph.db");
+                : root.resolve(".codeiq/graph/graph.db");
         Path h2Dir = root.resolve(config.getCacheDir());
 
         // Validate Neo4j graph exists
         if (!Files.isDirectory(neo4jDir)) {
             CliOutput.error("No Neo4j graph found at " + neo4jDir);
-            CliOutput.info("  Run 'code-iq index " + root + "' then 'code-iq enrich " + root + "' first.");
+            CliOutput.info("  Run 'codeiq index " + root + "' then 'codeiq enrich " + root + "' first.");
             return 1;
         }
 
@@ -254,7 +254,7 @@ public class BundleCommand implements Callable<Integer> {
                 cd "$SCRIPT_DIR"
 
                 # Read version from manifest
-                VERSION=$(grep -o '"osscodeiq_version" *: *"[^"]*"' manifest.json | grep -o '"[^"]*"$' | tr -d '"')
+                VERSION=$(grep -o '"extractor_version" *: *"[^"]*"' manifest.json | grep -o '"[^"]*"$' | tr -d '"')
                 JAR="code-iq-${VERSION}-cli.jar"
 
                 # Download CLI JAR if not present
@@ -264,7 +264,7 @@ public class BundleCommand implements Callable<Integer> {
                     echo "  Re-bundle with --include-jar or place $JAR in this directory."
                     exit 1
                   fi
-                  echo "Downloading code-iq CLI v${VERSION}..."
+                  echo "Downloading codeiq CLI v${VERSION}..."
                   curl -fL -o "$JAR" \\
                     "https://repo1.maven.org/maven2/io/github/randomcodespace/iq/code-iq/${VERSION}/code-iq-${VERSION}-cli.jar"
                 fi
@@ -284,7 +284,7 @@ public class BundleCommand implements Callable<Integer> {
                 setlocal enabledelayedexpansion\r
                 cd /d "%~dp0"\r
                 \r
-                for /f "tokens=2 delims=:" %%a in ('findstr "osscodeiq_version" manifest.json') do (\r
+                for /f "tokens=2 delims=:" %%a in ('findstr "extractor_version" manifest.json') do (\r
                     set "VERSION=%%~a"\r
                     set "VERSION=!VERSION: =!"\r
                     set "VERSION=!VERSION:"=!"\r
@@ -300,7 +300,7 @@ public class BundleCommand implements Callable<Integer> {
                         echo   Re-bundle with --include-jar or place !JAR! in this directory.\r
                         exit /b 1\r
                     )\r
-                    echo Downloading code-iq CLI v!VERSION!...\r
+                    echo Downloading codeiq CLI v!VERSION!...\r
                     curl -fL -o "!JAR!" "https://repo1.maven.org/maven2/io/github/randomcodespace/iq/code-iq/!VERSION!/code-iq-!VERSION!-cli.jar"\r
                 )\r
                 \r
@@ -391,7 +391,7 @@ public class BundleCommand implements Callable<Integer> {
         try (Stream<Path> walk = Files.walk(root)) {
             walk.filter(Files::isRegularFile)
                     .filter(p -> !p.startsWith(root.resolve(config.getCacheDir())))
-                    .filter(p -> !p.startsWith(root.resolve(".osscodeiq")))
+                    .filter(p -> !p.startsWith(root.resolve(".codeiq")))
                     .filter(p -> !p.startsWith(root.resolve(".git")))
                     .sorted()
                     .forEach(file -> {

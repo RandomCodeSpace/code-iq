@@ -70,7 +70,7 @@ public class GraphCommand implements Callable<Integer> {
     @Override
     public Integer call() {
         if (graphStore == null) {
-            CliOutput.error("Graph export requires the serve profile (Neo4j). Use 'code-iq serve' to start the server, or 'code-iq stats' for cache-based queries.");
+            CliOutput.error("Graph export requires the serve profile (Neo4j). Use 'codeiq serve' to start the server, or 'codeiq stats' for cache-based queries.");
             return 1;
         }
         List<CodeNode> nodes;
@@ -81,7 +81,7 @@ public class GraphCommand implements Callable<Integer> {
         }
 
         if (nodes.isEmpty()) {
-            CliOutput.warn("No graph data found. Run 'code-iq analyze' first.");
+            CliOutput.warn("No graph data found. Run 'codeiq analyze' first.");
             return 1;
         }
 

@@ -124,14 +124,14 @@ public class FlowController {
 
         if (!Files.exists(h2File)) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
-                    "No analysis data available. Run 'code-iq analyze' first.");
+                    "No analysis data available. Run 'codeiq analyze' first.");
         }
 
         try (AnalysisCache cache = new AnalysisCache(cachePath)) {
             List<CodeNode> nodes = cache.loadAllNodes();
             if (nodes.isEmpty()) {
                 throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
-                        "Analysis cache is empty. Run 'code-iq analyze' first.");
+                        "Analysis cache is empty. Run 'codeiq analyze' first.");
             }
             return FlowEngine.fromCache(nodes);
         }

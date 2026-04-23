@@ -45,7 +45,7 @@ class McpToolsEvidenceTest {
         CodeIqConfig config = new CodeIqConfig();
         metadata = new ArtifactMetadata(
                 "https://github.com/example/repo", "sha456", Instant.now(),
-                "1", "2", Map.of("code-iq", "1.0"),
+                "1", "2", Map.of("codeiq", "1.0"),
                 Map.of(), "cafebabe");
         org.mockito.Mockito.lenient().when(metadataProvider.current()).thenReturn(metadata);
 

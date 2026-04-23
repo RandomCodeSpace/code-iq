@@ -41,7 +41,7 @@ class StatsCommandTest {
         System.setErr(new PrintStream(captureErr, true, StandardCharsets.UTF_8));
         statsService = new StatsService();
         config = new CodeIqConfig();
-        CodeIqConfigTestSupport.override(config).cacheDir(".code-iq/cache").done();
+        CodeIqConfigTestSupport.override(config).cacheDir(".codeiq/cache").done();
     }
 
     @AfterEach
@@ -57,7 +57,7 @@ class StatsCommandTest {
     }
 
     private void populateCache(Path root) {
-        Path cachePath = root.resolve(".code-iq/cache").resolve("analysis-cache.db");
+        Path cachePath = root.resolve(".codeiq/cache").resolve("analysis-cache.db");
         try (AnalysisCache cache = new AnalysisCache(cachePath)) {
             // Create some sample nodes
             var n1 = new CodeNode("n1", NodeKind.CLASS, "UserService");

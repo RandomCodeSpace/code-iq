@@ -21,9 +21,7 @@ target/
 Thumbs.db
 
 # Project runtime data
-.osscodeiq/
-.code-intelligence/
-.code_intelligence_cache*/
+.codeiq/
 *.db
 *.db-wal
 *.db-shm

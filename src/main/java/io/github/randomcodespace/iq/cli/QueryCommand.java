@@ -68,7 +68,7 @@ public class QueryCommand implements Callable<Integer> {
     @Override
     public Integer call() {
         if (queryService == null) {
-            CliOutput.error("Graph queries require the serve profile (Neo4j). Use 'code-iq serve' to start the server, or 'code-iq stats' for cache-based queries.");
+            CliOutput.error("Graph queries require the serve profile (Neo4j). Use 'codeiq serve' to start the server, or 'codeiq stats' for cache-based queries.");
             return 1;
         }
         if (consumersOf != null) {

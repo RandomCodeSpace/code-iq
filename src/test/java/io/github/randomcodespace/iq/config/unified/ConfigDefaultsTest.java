@@ -9,7 +9,7 @@ class ConfigDefaultsTest {
         CodeIqUnifiedConfig d = ConfigDefaults.builtIn();
         // These reflect values from application.yml + CLI flag defaults today.
         assertEquals(".", d.project().root());
-        assertEquals(".code-iq/cache", d.indexing().cacheDir());
+        assertEquals(".codeiq/cache", d.indexing().cacheDir());
         assertEquals(500, d.indexing().batchSize());
         assertEquals(true, d.indexing().incremental());
         // Phase-B extension: parallelism defaults to null (= auto-detect at runtime);
@@ -21,7 +21,7 @@ class ConfigDefaultsTest {
         assertEquals(8080, d.serving().port());
         assertEquals("0.0.0.0", d.serving().bindAddress());
         assertEquals(false, d.serving().readOnly());
-        assertEquals(".code-iq/graph/graph.db", d.serving().neo4j().dir());
+        assertEquals(".codeiq/graph/graph.db", d.serving().neo4j().dir());
         assertEquals(true, d.mcp().enabled());
         assertEquals("http", d.mcp().transport());
         assertEquals("/mcp", d.mcp().basePath());

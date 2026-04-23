@@ -116,7 +116,7 @@ public class GraphBootstrapper {
                     nodes.size(), edges.size());
         } catch (Exception e) {
             log.warn("Failed to bootstrap Neo4j from H2 cache -- graph traversal queries " +
-                    "may not work. Run 'code-iq enrich' to populate Neo4j.", e);
+                    "may not work. Run 'codeiq enrich' to populate Neo4j.", e);
         }
     }
 }

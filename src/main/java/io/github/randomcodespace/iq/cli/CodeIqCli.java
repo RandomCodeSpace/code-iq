@@ -5,12 +5,12 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
 /**
- * Top-level CLI entry point for Code IQ.
+ * Top-level CLI entry point for codeiq.
  * Delegates to subcommands for actual work.
  */
 @Component
 @Command(
-        name = "code-iq",
+        name = "codeiq",
         mixinStandardHelpOptions = true,
         version = "0.1.0-SNAPSHOT",
         description = "Intelligent code graph discovery and analysis CLI",

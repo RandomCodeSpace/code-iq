@@ -2,15 +2,15 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * Playwright E2E test configuration for Code IQ UI Redesign (Phase 7).
+ * Playwright E2E test configuration for codeiq UI Redesign (Phase 7).
  *
  * Prerequisites:
  *   - A pre-built CLI jar under ../../../target/code-iq-*-cli.jar
  *     (run `mvn -DskipTests package` from the repo root if missing).
  *   - A pre-populated fixture at <repo-root>/.seeds/spring-petclinic
- *     with .code-iq/cache + .code-iq/graph populated by
+ *     with .codeiq/cache + .codeiq/graph populated by
  *     `./scripts/baseline/run-pipeline.sh spring-petclinic`. The webServer
- *     block below boots `code-iq serve` against this fixture automatically.
+ *     block below boots `codeiq serve` against this fixture automatically.
  *   - Set `BASE_URL` / `E2E_FIXTURE` to override defaults when running against
  *     a different backend or fixture.
  *
@@ -28,7 +28,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: [['html', { outputFolder: 'playwright-report' }], ['line']],
 
-  // Boot the real code-iq backend against a pre-enriched fixture before any
+  // Boot the real codeiq backend against a pre-enriched fixture before any
   // spec runs. Skipped if BASE_URL points elsewhere (developer has their own
   // backend) or if a server is already listening on the target port locally.
   webServer: process.env.BASE_URL ? undefined : {

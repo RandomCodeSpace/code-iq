@@ -54,14 +54,9 @@ import java.util.List;
 public class UnifiedConfigBeans {
 
     /**
-     * Resolves {@code codeiq.yml} (or, via {@link ProjectConfigLoader}, the
-     * deprecated {@code .osscodeiq.yml}) + env vars once at startup; the
-     * resulting {@link CodeIqUnifiedConfig} is the single source of truth
-     * for configuration.
-     *
-     * <p>The project layer is sourced through {@link ProjectConfigLoader} so
-     * users with a pre-Phase-B {@code .osscodeiq.yml} keep working for one
-     * release with a one-time {@code WARN} pointing them at {@code codeiq.yml}.
+     * Resolves {@code codeiq.yml} + env vars once at startup; the resulting
+     * {@link CodeIqUnifiedConfig} is the single source of truth for
+     * configuration.
      */
     @Bean
     public CodeIqUnifiedConfig codeIqUnifiedConfig(ProjectConfigLoader loader) {
@@ -73,9 +68,7 @@ public class UnifiedConfigBeans {
                 new ConfigMerger.Input(ConfigLayer.BUILT_IN, "(defaults)", ConfigDefaults.builtIn()),
                 new ConfigMerger.Input(ConfigLayer.USER_GLOBAL, userGlobal.toString(),
                         UnifiedConfigLoader.load(userGlobal)),
-                new ConfigMerger.Input(ConfigLayer.PROJECT,
-                        pr.deprecationWarningEmitted() ? "./.osscodeiq.yml (deprecated)" : "./codeiq.yml",
-                        pr.config()),
+                new ConfigMerger.Input(ConfigLayer.PROJECT, "./codeiq.yml", pr.config()),
                 new ConfigMerger.Input(ConfigLayer.ENV, "(env)", EnvVarOverlay.from(System.getenv()))
         ));
         return merged.effective();

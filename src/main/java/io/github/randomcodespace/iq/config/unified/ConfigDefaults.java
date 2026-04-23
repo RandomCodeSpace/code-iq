@@ -17,7 +17,7 @@ public final class ConfigDefaults {
                 new IndexingConfig(
                         List.of(), List.of(), List.of(),
                         true,
-                        ".code-iq/cache",
+                        ".codeiq/cache",
                         null, // parallelism — null = auto-detect (Runtime.availableProcessors())
                         500,
                         10,   // maxDepth — matches application.yml codeiq.max-depth
@@ -31,7 +31,7 @@ public final class ConfigDefaults {
                         "0.0.0.0",
                         false,
                         new Neo4jConfig(
-                                ".code-iq/graph/graph.db",
+                                ".codeiq/graph/graph.db",
                                 256, 256, 1024
                         )
                 ),

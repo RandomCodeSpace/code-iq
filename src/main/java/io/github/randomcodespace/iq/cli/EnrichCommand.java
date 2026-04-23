@@ -105,7 +105,7 @@ public class EnrichCommand implements Callable<Integer> {
         Path cacheParent = cachePath.getParent();
         if (cacheParent == null || !Files.exists(cacheParent)) {
             CliOutput.error("No index found at " + cacheParent);
-            CliOutput.info("  Run 'code-iq index " + root + "' first.");
+            CliOutput.info("  Run 'codeiq index " + root + "' first.");
             return 1;
         }
 
@@ -131,7 +131,7 @@ public class EnrichCommand implements Callable<Integer> {
         List<CodeEdge> allEdges = cache.loadAllEdges();
 
         if (allNodes.isEmpty()) {
-            CliOutput.error("No indexed data found in H2. Run 'code-iq index' first.");
+            CliOutput.error("No indexed data found in H2. Run 'codeiq index' first.");
             return 1;
         }
 
@@ -418,7 +418,7 @@ public class EnrichCommand implements Callable<Integer> {
             CliOutput.info("  Graph:   " + graphPath);
             CliOutput.info("  Time:    " + timeStr);
             System.out.println();
-            CliOutput.info("  Next step: code-iq serve " + path);
+            CliOutput.info("  Next step: codeiq serve " + path);
 
             return 0;
 

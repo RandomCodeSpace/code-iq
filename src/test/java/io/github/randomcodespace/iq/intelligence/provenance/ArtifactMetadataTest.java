@@ -60,7 +60,7 @@ class ArtifactMetadataTest {
     @Test
     void recordConstructorAndAccessors() {
         Instant now = Instant.now();
-        Map<String, String> extractors = Map.of("code-iq", "phase-4");
+        Map<String, String> extractors = Map.of("codeiq", "phase-4");
         Map<String, Map<String, CapabilityLevel>> caps = Map.of();
 
         ArtifactMetadata meta = new ArtifactMetadata(

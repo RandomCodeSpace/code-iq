@@ -1,7 +1,7 @@
 package io.github.randomcodespace.iq.config;
 
 /**
- * Legacy flat configuration bean for Code IQ.
+ * Legacy flat configuration bean for codeiq.
  *
  * <p>Historically bound to Spring Boot {@code @ConfigurationProperties("codeiq")}.
  * Task 11 moved bean production to {@link UnifiedConfigBeans#codeIqConfig}, which
@@ -27,7 +27,7 @@ public class CodeIqConfig {
     private String rootPath = ".";
 
     /** Cache directory relative to repo root. */
-    private String cacheDir = ".code-iq/cache";
+    private String cacheDir = ".codeiq/cache";
 
     /** Maximum traversal depth for graph queries. */
     private int maxDepth = 10;
@@ -51,7 +51,7 @@ public class CodeIqConfig {
     private int maxSnippetLines = 50;
 
     public static class Graph {
-        private String path = ".code-iq/graph/graph.db";
+        private String path = ".codeiq/graph/graph.db";
 
         public String getPath() { return path; }
         void setPath(String path) { this.path = path; }

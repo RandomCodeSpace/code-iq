@@ -9,8 +9,8 @@
 #   `bindAddress`, `pageCacheMb`, `perToolTimeoutMs`, `logFormat`) are accepted
 #   as deprecated aliases for one release and emit a WARN on load. Do not use
 #   camelCase in new config.
-# - Run `code-iq config validate` to type-check your file, and
-#   `code-iq config explain` to print every effective value and the layer it
+# - Run `codeiq config validate` to type-check your file, and
+#   `codeiq config explain` to print every effective value and the layer it
 #   was resolved from.
 
 # ---------------------------------------------------------------------------
@@ -38,7 +38,7 @@ indexing:
     - '**/dist/**'
     - '**/generated/**'
   incremental: true             # reuse H2 cache when file hashes match
-  cache_dir: .code-iq/cache     # H2 analysis cache directory
+  cache_dir: .codeiq/cache      # H2 analysis cache directory
   parallelism: null             # null = auto-detect (Runtime.availableProcessors()); positive int to pin
   batch_size: 500               # files per H2 flush batch (default: 500)
   max_depth: 10                 # max impact-trace depth
@@ -55,7 +55,7 @@ serving:
   bind_address: 0.0.0.0         # interface to bind; 127.0.0.1 for localhost-only
   read_only: false              # must be false in non-prod; CI gate enforces this
   neo4j:
-    dir: .code-iq/graph/graph.db   # embedded Neo4j data directory
+    dir: .codeiq/graph/graph.db    # embedded Neo4j data directory
     page_cache_mb: 256             # Neo4j page cache (MB)
     heap_initial_mb: 256           # JVM -Xms for Neo4j (MB)
     heap_max_mb: 1024              # JVM -Xmx for Neo4j (MB)

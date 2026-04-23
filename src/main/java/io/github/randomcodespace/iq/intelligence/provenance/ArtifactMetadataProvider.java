@@ -30,7 +30,7 @@ public class ArtifactMetadataProvider {
         this.repositoryIdentity = identity.repoUrl() != null ? identity.repoUrl() : root.toAbsolutePath().normalize().toString();
         this.commitSha = identity.commitSha();
         this.buildTimestamp = identity.buildTimestamp();
-        this.extractorVersions = Map.of("code-iq", "phase-4");
+        this.extractorVersions = Map.of("codeiq", "phase-4");
         this.languageCapabilities = buildLanguageCapabilities();
         this.graphStore = graphStore;
     }

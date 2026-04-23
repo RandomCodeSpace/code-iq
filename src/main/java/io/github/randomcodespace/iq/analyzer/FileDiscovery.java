@@ -46,8 +46,8 @@ public class FileDiscovery {
             ".parcel-cache", ".turbo", ".cache",
             // Go / Rust
             "vendor",
-            // Code-IQ own dirs
-            ".code-iq", ".code-intelligence", ".osscodeiq"
+            // codeiq own dirs
+            ".codeiq"
     );
 
     /** Files to always skip (lock files, generated). */
