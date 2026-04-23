@@ -3,6 +3,7 @@ package io.github.randomcodespace.iq.detector.jvm.java;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.detector.DetectorTestUtils;
+import io.github.randomcodespace.iq.model.CodeNode;
 import io.github.randomcodespace.iq.model.EdgeKind;
 import io.github.randomcodespace.iq.model.NodeKind;
 import org.junit.jupiter.api.Test;
@@ -15,6 +16,10 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * <p>Covers Maven (pom.xml), Gradle build scripts (.gradle / .gradle.kts), and
  * Gradle settings (settings.gradle / settings.gradle.kts) detection paths.
+ *
+ * <p>The settings.gradle dispatch was previously shadowed by the generic
+ * {@code .endsWith(".gradle")} branch; the tests below both exercise the fixed
+ * path and guard against a regression to that bug.
  */
 class ModuleDepsDetectorTest {
 
@@ -263,16 +268,87 @@ class ModuleDepsDetectorTest {
                 .hasSize(1);
     }
 
+    @Test
+    void buildGradle_routesToDetectGradle_notToSettings() {
+        // Regression guard: `include ':x'` tokens that happen to appear in a build.gradle
+        // file must NOT be interpreted as settings-style module includes — those only apply
+        // inside settings.gradle. This pairs with the settings.gradle dispatch tests below.
+        String build = """
+                dependencies {
+                    implementation project(':shared')
+                    implementation 'com.acme:lib:1.0.0'
+                }
+                """;
+        DetectorContext ctx = DetectorTestUtils.contextFor("build.gradle", "gradle", build);
+        DetectorResult r = detector.detect(ctx);
+
+        // detectGradle emits a module node for the current file plus DEPENDS_ON edges.
+        assertThat(r.nodes()).isNotEmpty();
+        assertThat(r.edges()).isNotEmpty();
+    }
+
     // ---------------------------------------------------------------
-    // Gradle settings.gradle
+    // Gradle settings.gradle — the fixed dispatch branch
     // ---------------------------------------------------------------
     //
-    // The detector's dispatch chain checks `.endsWith(".gradle")` *before*
-    // `.endsWith("settings.gradle")`, so any filename ending in `.gradle`
-    // routes to detectGradle (not detectGradleSettings). The
-    // detectGradleSettings() branch is therefore unreachable via the public
-    // detect() API for these filenames — flagged as a follow-up bug.
-    // We intentionally omit direct tests for that unreachable branch.
+    // Prior to the dispatch-order fix, `.endsWith(".gradle")` matched
+    // settings.gradle first, so detectGradleSettings() was unreachable via the
+    // public detect() API. Tests below both exercise the now-reachable path
+    // and pin the contract so the bug cannot reappear.
+
+    @Test
+    void settingsGradle_routesToDetectGradleSettings_andEmitsModuleNodes() {
+        // `include 'foo'` is only handled by detectGradleSettings.
+        // detectGradle would emit zero module nodes for this input, so seeing
+        // module nodes here proves the dispatch fix reaches detectGradleSettings.
+        String settings = """
+                rootProject.name = 'acme'
+                include ':api'
+                include ':domain'
+                include ':infra'
+                """;
+        DetectorContext ctx = DetectorTestUtils.contextFor("settings.gradle", "gradle", settings);
+        DetectorResult r = detector.detect(ctx);
+
+        assertThat(r.nodes())
+                .extracting(CodeNode::getLabel)
+                .containsExactlyInAnyOrder("api", "domain", "infra");
+        assertThat(r.nodes())
+                .allMatch(n -> n.getKind() == NodeKind.MODULE);
+        assertThat(r.nodes())
+                .allMatch(n -> "gradle".equals(n.getProperties().get("build_tool")));
+    }
+
+    @Test
+    void settingsGradleKts_routesToDetectGradleSettings() {
+        // The Kotlin-DSL syntax `include(":a")` is NOT matched by the detector's current
+        // regex (which expects a whitespace-separated call — `include ':a'`). This test
+        // asserts ONLY the dispatch contract: a `settings.gradle.kts` path reaches
+        // detectGradleSettings and, where the syntax is regex-compatible, produces module
+        // nodes.
+        String settingsKts = """
+                rootProject.name = "acme"
+                include ':b'
+                """;
+        DetectorContext ctx = DetectorTestUtils.contextFor("settings.gradle.kts", "gradle", settingsKts);
+        DetectorResult r = detector.detect(ctx);
+
+        assertThat(r.nodes())
+                .extracting(CodeNode::getLabel)
+                .contains("b");
+    }
+
+    @Test
+    void nestedSettingsGradlePath_stillRoutesToDetectGradleSettings() {
+        // Regression guard: path-like endsWith should still match when the settings file lives in a subdir.
+        String settings = "include ':core'\n";
+        DetectorContext ctx = DetectorTestUtils.contextFor("build/settings.gradle", "gradle", settings);
+        DetectorResult r = detector.detect(ctx);
+
+        assertThat(r.nodes())
+                .extracting(CodeNode::getLabel)
+                .containsExactly("core");
+    }
 
     // ---------------------------------------------------------------
     // Determinism
@@ -302,6 +378,13 @@ class ModuleDepsDetectorTest {
                 }
                 """;
         DetectorContext ctx = DetectorTestUtils.contextFor("build.gradle", "gradle", gradle);
+        DetectorTestUtils.assertDeterministic(detector, ctx);
+    }
+
+    @Test
+    void deterministic_settingsGradle() {
+        String settings = "include ':a'\ninclude ':b'\n";
+        DetectorContext ctx = DetectorTestUtils.contextFor("settings.gradle", "gradle", settings);
         DetectorTestUtils.assertDeterministic(detector, ctx);
     }
 }

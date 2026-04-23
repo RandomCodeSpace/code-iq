@@ -61,10 +61,15 @@ public class ModuleDepsDetector extends AbstractRegexDetector {
         String filePath = ctx.filePath();
         if (filePath.endsWith("pom.xml")) {
             return detectMaven(ctx);
-        } else if (filePath.endsWith(".gradle") || filePath.endsWith(".gradle.kts")) {
-            return detectGradle(ctx);
-        } else if (filePath.endsWith("settings.gradle") || filePath.endsWith("settings.gradle.kts")) {
+        }
+        // Order matters: `settings.gradle[.kts]` must be matched before the generic
+        // `.gradle[.kts]` branch, otherwise Gradle multi-module settings files are
+        // misrouted to detectGradle() and never reach detectGradleSettings().
+        if (filePath.endsWith("settings.gradle") || filePath.endsWith("settings.gradle.kts")) {
             return detectGradleSettings(ctx);
+        }
+        if (filePath.endsWith(".gradle") || filePath.endsWith(".gradle.kts")) {
+            return detectGradle(ctx);
         }
         return DetectorResult.empty();
     }
