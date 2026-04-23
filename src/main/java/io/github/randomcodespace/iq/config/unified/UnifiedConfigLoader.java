@@ -77,7 +77,7 @@ public final class UnifiedConfigLoader {
                 servingFrom((Map<String, Object>) m.get("serving"), path, warnedAliases),
                 mcpFrom((Map<String, Object>) m.get("mcp"), path, warnedAliases),
                 observabilityFrom((Map<String, Object>) m.get("observability"), path, warnedAliases),
-                detectorsFrom((Map<String, Object>) m.get("detectors"))
+                detectorsFrom((Map<String, Object>) m.get("detectors"), path, warnedAliases)
         );
     }
 
@@ -108,13 +108,14 @@ public final class UnifiedConfigLoader {
                 asStringList(m.get("exclude")),
                 (Boolean) m.get("incremental"),
                 (String) pick(m, "indexing", "cache_dir", "cacheDir", path, warned),
-                m.get("parallelism") == null ? null : String.valueOf(m.get("parallelism")),
+                requireIntOrNull(m.get("parallelism"), path, "indexing.parallelism"),
                 requireIntOrNull(pick(m, "indexing", "batch_size", "batchSize", path, warned),
                         path, "indexing.batch_size"),
                 requireIntOrNull(m.get("max_depth"), path, "indexing.max_depth"),
                 requireIntOrNull(m.get("max_radius"), path, "indexing.max_radius"),
                 requireIntOrNull(m.get("max_files"), path, "indexing.max_files"),
-                requireIntOrNull(m.get("max_snippet_lines"), path, "indexing.max_snippet_lines"));
+                requireIntOrNull(m.get("max_snippet_lines"), path, "indexing.max_snippet_lines"),
+                asStringList(m.get("parsers")));
     }
 
     @SuppressWarnings("unchecked")
@@ -177,7 +178,7 @@ public final class UnifiedConfigLoader {
     }
 
     @SuppressWarnings("unchecked")
-    private static DetectorsConfig detectorsFrom(Map<String, Object> m) {
+    private static DetectorsConfig detectorsFrom(Map<String, Object> m, Path path, Set<String> warned) {
         if (m == null) return DetectorsConfig.empty();
         Map<String, DetectorOverride> overrides = new LinkedHashMap<>();
         Map<String, Object> raw = (Map<String, Object>) m.getOrDefault("overrides", Map.of());
@@ -185,7 +186,17 @@ public final class UnifiedConfigLoader {
             Map<String, Object> v = (Map<String, Object>) e.getValue();
             overrides.put(e.getKey(), new DetectorOverride(v == null ? null : (Boolean) v.get("enabled")));
         }
-        return new DetectorsConfig(asStringList(m.get("profiles")), overrides);
+        // detectors.categories (canonical) / detectorCategories (deprecated alias)
+        // detectors.include    (canonical) / detectorInclude   (deprecated alias)
+        List<String> categories = asStringList(
+                pick(m, "detectors", "categories", "detectorCategories", path, warned));
+        List<String> include = asStringList(
+                pick(m, "detectors", "include", "detectorInclude", path, warned));
+        return new DetectorsConfig(
+                asStringList(m.get("profiles")),
+                categories,
+                include,
+                overrides);
     }
 
     /**

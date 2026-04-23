@@ -19,15 +19,18 @@ public final class EnvVarOverlay {
     public static CodeIqUnifiedConfig from(Map<String, String> env) {
         Integer port = null, batch = null, perToolMs = null, maxResults = null, ratePerMin = null,
                 pageMb = null, heapInit = null, heapMax = null,
-                maxDepth = null, maxRadius = null, maxFiles = null, maxSnippetLines = null;
+                maxDepth = null, maxRadius = null, maxFiles = null, maxSnippetLines = null,
+                parallelism = null;
         Long maxPayload = null;
         Boolean readOnly = null, incremental = null, metrics = null, tracing = null, mcpEnabled = null;
         String cacheDir = null, bindAddr = null, projectName = null, projectRoot = null,
                 projectServiceName = null,
                 neo4jDir = null, mcpTransport = null, mcpBasePath = null, mcpMode = null,
-                mcpTokenEnv = null, logFormat = null, logLevel = null, parallelism = null;
+                mcpTokenEnv = null, logFormat = null, logLevel = null;
         List<String> languages = List.of(), include = List.of(), exclude = List.of(),
-                     toolsEnabled = List.of(), toolsDisabled = List.of(), profiles = List.of();
+                     toolsEnabled = List.of(), toolsDisabled = List.of(), profiles = List.of(),
+                     detectorCategories = List.of(), detectorInclude = List.of(),
+                     parsers = List.of();
 
         for (var e : env.entrySet()) {
             String k = e.getKey(), v = e.getValue();
@@ -43,7 +46,8 @@ public final class EnvVarOverlay {
                     case "INDEXING_EXCLUDE" -> exclude = splitCsv(v);
                     case "INDEXING_INCREMENTAL" -> incremental = Boolean.parseBoolean(v);
                     case "INDEXING_CACHEDIR" -> cacheDir = v;
-                    case "INDEXING_PARALLELISM" -> parallelism = v;
+                    case "INDEXING_PARALLELISM" -> parallelism = Integer.parseInt(v);
+                    case "INDEXING_PARSERS" -> parsers = splitCsv(v);
                     case "INDEXING_BATCHSIZE" -> batch = Integer.parseInt(v);
                     case "INDEXING_MAX_DEPTH" -> maxDepth = Integer.parseInt(v);
                     case "INDEXING_MAX_RADIUS" -> maxRadius = Integer.parseInt(v);
@@ -72,6 +76,8 @@ public final class EnvVarOverlay {
                     case "OBSERVABILITY_LOGFORMAT" -> logFormat = v;
                     case "OBSERVABILITY_LOGLEVEL" -> logLevel = v;
                     case "DETECTORS_PROFILES" -> profiles = splitCsv(v);
+                    case "DETECTORS_CATEGORIES" -> detectorCategories = splitCsv(v);
+                    case "DETECTORS_INCLUDE" -> detectorInclude = splitCsv(v);
                     default -> { /* unknown key — ignore, forward-compatible */ }
                 }
             } catch (NumberFormatException nfe) {
@@ -83,7 +89,7 @@ public final class EnvVarOverlay {
         return new CodeIqUnifiedConfig(
                 new ProjectConfig(projectName, projectRoot, projectServiceName, List.of()),
                 new IndexingConfig(languages, include, exclude, incremental, cacheDir, parallelism, batch,
-                        maxDepth, maxRadius, maxFiles, maxSnippetLines),
+                        maxDepth, maxRadius, maxFiles, maxSnippetLines, parsers),
                 new ServingConfig(port, bindAddr, readOnly,
                         new Neo4jConfig(neo4jDir, pageMb, heapInit, heapMax)),
                 new McpConfig(mcpEnabled, mcpTransport, mcpBasePath,
@@ -91,7 +97,7 @@ public final class EnvVarOverlay {
                         new McpLimitsConfig(perToolMs, maxResults, maxPayload, ratePerMin),
                         new McpToolsConfig(toolsEnabled, toolsDisabled)),
                 new ObservabilityConfig(metrics, tracing, logFormat, logLevel),
-                new DetectorsConfig(profiles, Map.of())
+                new DetectorsConfig(profiles, detectorCategories, detectorInclude, Map.of())
         );
     }
 

@@ -12,6 +12,12 @@ class ConfigDefaultsTest {
         assertEquals(".code-iq/cache", d.indexing().cacheDir());
         assertEquals(500, d.indexing().batchSize());
         assertEquals(true, d.indexing().incremental());
+        // Phase-B extension: parallelism defaults to null (= auto-detect at runtime);
+        // parsers/categories/include default to empty list (= no filter).
+        assertNull(d.indexing().parallelism());
+        assertTrue(d.indexing().parsers().isEmpty());
+        assertTrue(d.detectors().categories().isEmpty());
+        assertTrue(d.detectors().include().isEmpty());
         assertEquals(8080, d.serving().port());
         assertEquals("0.0.0.0", d.serving().bindAddress());
         assertEquals(false, d.serving().readOnly());

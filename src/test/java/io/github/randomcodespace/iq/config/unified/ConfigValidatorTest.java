@@ -34,4 +34,35 @@ class ConfigValidatorTest {
         List<ConfigError> errs = new ConfigValidator().validate(bad);
         assertTrue(errs.stream().anyMatch(e -> e.fieldPath().equals("mcp.transport")));
     }
+
+    // ---- Phase-B extension: indexing.parallelism positivity -------------------
+
+    @Test
+    void parallelismZeroOrNegativeIsRejected() {
+        CodeIqUnifiedConfig bad = new CodeIqUnifiedConfig(
+                ProjectConfig.empty(),
+                new IndexingConfig(
+                        List.of(), List.of(), List.of(),
+                        null, null, 0, null,
+                        null, null, null, null,
+                        List.of()),
+                ServingConfig.empty(),
+                McpConfig.empty(), ObservabilityConfig.empty(), DetectorsConfig.empty());
+        List<ConfigError> errs = new ConfigValidator().validate(bad);
+        assertTrue(errs.stream().anyMatch(e -> e.fieldPath().equals("indexing.parallelism")),
+                "expected indexing.parallelism error; got " + errs);
+    }
+
+    @Test
+    void parallelismNullIsValidAutoDetect() {
+        // null means "auto-detect" — must NOT be flagged as an error.
+        CodeIqUnifiedConfig ok = new CodeIqUnifiedConfig(
+                ProjectConfig.empty(),
+                IndexingConfig.empty(),
+                ServingConfig.empty(),
+                McpConfig.empty(), ObservabilityConfig.empty(), DetectorsConfig.empty());
+        List<ConfigError> errs = new ConfigValidator().validate(ok);
+        assertTrue(errs.stream().noneMatch(e -> e.fieldPath().equals("indexing.parallelism")),
+                "null parallelism must be valid (auto-detect); got " + errs);
+    }
 }

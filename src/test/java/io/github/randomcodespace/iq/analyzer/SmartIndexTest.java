@@ -2,6 +2,7 @@ package io.github.randomcodespace.iq.analyzer;
 
 import io.github.randomcodespace.iq.analyzer.linker.Linker;
 import io.github.randomcodespace.iq.config.CodeIqConfig;
+import io.github.randomcodespace.iq.config.unified.CodeIqUnifiedConfig;
 import io.github.randomcodespace.iq.detector.Detector;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorRegistry;
@@ -64,7 +65,8 @@ class SmartIndexTest {
         List<Linker> linkers = List.of();
 
         analyzer = new Analyzer(registry, parser, fileDiscovery, layerClassifier, linkers,
-                new CodeIqConfig(), new ConfigScanner(), new ArchitectureKeywordFilter());
+                new CodeIqConfig(), CodeIqUnifiedConfig.empty(),
+                new ConfigScanner(), new ArchitectureKeywordFilter());
     }
 
     // -------------------------------------------------------------------------

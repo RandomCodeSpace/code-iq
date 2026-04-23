@@ -80,12 +80,19 @@ final class CliOutput {
     }
 
     /**
-     * Configure shared CLI options: graph directory, service name, and project-level overrides.
+     * Configure shared CLI options: graph directory + service name.
      * Used by both {@code analyze} and {@code index} commands.
+     *
+     * <p>Project-level overrides ({@code cache_dir}, {@code max_depth},
+     * {@code max_radius} from {@code codeiq.yml} / legacy {@code .osscodeiq.yml})
+     * are already resolved at Spring startup by
+     * {@link io.github.randomcodespace.iq.config.UnifiedConfigBeans#codeIqConfig}
+     * via {@code ConfigResolver} + {@code UnifiedConfigAdapter}. The {@code config}
+     * bean passed in already carries those values, so re-reading the file here
+     * would be pure redundancy.
      */
     static void configureFromOptions(io.github.randomcodespace.iq.config.CodeIqConfig config,
-                                     java.nio.file.Path graphDir, String serviceName,
-                                     java.nio.file.Path root) {
+                                     java.nio.file.Path graphDir, String serviceName) {
         if (graphDir != null) {
             java.nio.file.Path sharedDir = graphDir.toAbsolutePath().normalize();
             config.setCacheDir(sharedDir.toString());
@@ -95,7 +102,6 @@ final class CliOutput {
             config.setServiceName(serviceName);
             info("  Service name: " + serviceName);
         }
-        io.github.randomcodespace.iq.config.ProjectConfigLoader.loadIfPresent(root, config);
     }
 
     /**

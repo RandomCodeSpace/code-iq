@@ -58,7 +58,7 @@ public class AnalyzeCommand implements Callable<Integer> {
     public Integer call() {
         Path root = path.toAbsolutePath().normalize();
 
-        CliOutput.configureFromOptions(config, graphDir, serviceName, root);
+        CliOutput.configureFromOptions(config, graphDir, serviceName);
 
         NumberFormat nf = NumberFormat.getIntegerInstance(Locale.US);
         int cores = parallelism != null ? parallelism : Runtime.getRuntime().availableProcessors();

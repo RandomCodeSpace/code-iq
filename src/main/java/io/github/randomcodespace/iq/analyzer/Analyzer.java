@@ -6,8 +6,7 @@ import io.github.randomcodespace.iq.cache.AnalysisCache;
 import io.github.randomcodespace.iq.cache.FileHasher;
 import io.github.randomcodespace.iq.cli.VersionCommand;
 import io.github.randomcodespace.iq.config.CodeIqConfig;
-import io.github.randomcodespace.iq.config.ProjectConfig;
-import io.github.randomcodespace.iq.config.ProjectConfigLoader;
+import io.github.randomcodespace.iq.config.unified.CodeIqUnifiedConfig;
 import io.github.randomcodespace.iq.detector.AbstractAntlrDetector;
 import io.github.randomcodespace.iq.detector.Detector;
 import io.github.randomcodespace.iq.detector.DetectorContext;
@@ -88,8 +87,35 @@ public class Analyzer {
     private final LayerClassifier layerClassifier;
     private final List<Linker> linkers;
     private final CodeIqConfig config;
+    private final CodeIqUnifiedConfig unifiedConfig;
     private final ConfigScanner configScanner;
     private final ArchitectureKeywordFilter keywordFilter;
+
+    /**
+     * Projection of the injected {@link CodeIqUnifiedConfig} tree into the flat
+     * shape the pipeline consumes: detector category/include filters, language +
+     * exclude filters, and a parallelism override ({@code null} = auto-detect).
+     *
+     * <p>Lists are always non-null; an empty list means "no filter" (same
+     * semantics as the pre-Phase-B legacy {@code ProjectConfig.empty()} path).
+     */
+    private record PipelineFilters(
+            List<String> categories,
+            List<String> include,
+            List<String> languages,
+            List<String> exclude,
+            Integer parallelism) {}
+
+    private PipelineFilters pipelineFilters() {
+        var indexing = unifiedConfig.indexing();
+        var detectors = unifiedConfig.detectors();
+        return new PipelineFilters(
+                detectors.categories() == null ? List.of() : detectors.categories(),
+                detectors.include()    == null ? List.of() : detectors.include(),
+                indexing.languages()   == null ? List.of() : indexing.languages(),
+                indexing.exclude()     == null ? List.of() : indexing.exclude(),
+                indexing.parallelism());
+    }
 
     /** Primary constructor — used by Spring Boot dependency injection. */
     @Autowired
@@ -100,6 +126,7 @@ public class Analyzer {
             LayerClassifier layerClassifier,
             List<Linker> linkers,
             CodeIqConfig config,
+            CodeIqUnifiedConfig unifiedConfig,
             ConfigScanner configScanner,
             ArchitectureKeywordFilter keywordFilter
     ) {
@@ -109,11 +136,20 @@ public class Analyzer {
         this.layerClassifier = layerClassifier;
         this.linkers = linkers;
         this.config = config;
+        this.unifiedConfig = unifiedConfig;
         this.configScanner = configScanner;
         this.keywordFilter = keywordFilter;
     }
 
-    /** Backward-compatible constructor for tests that don't need smart indexing. */
+    /**
+     * Backward-compatible constructor for tests that don't need smart indexing.
+     *
+     * <p>Defaults the unified-config overlay to {@link CodeIqUnifiedConfig#empty()} —
+     * equivalent to the pre-Phase-B "no {@code .osscodeiq.yml} present" path
+     * (no detector filters, no language filter, auto parallelism). Tests that
+     * need to exercise filters should use the primary constructor with a
+     * hand-rolled {@link CodeIqUnifiedConfig}.
+     */
     public Analyzer(
             DetectorRegistry registry,
             StructuredParser parser,
@@ -123,6 +159,7 @@ public class Analyzer {
             CodeIqConfig config
     ) {
         this(registry, parser, fileDiscovery, layerClassifier, linkers, config,
+                CodeIqUnifiedConfig.empty(),
                 new ConfigScanner(), new ArchitectureKeywordFilter());
     }
 
@@ -188,27 +225,26 @@ public class Analyzer {
 
     private AnalysisResult runWithCache(Path root, Integer parallelism, AnalysisCache cache,
                                          Consumer<String> report, Instant start) {
-        // 0. Load project config for pipeline filtering
-        ProjectConfig projectConfig = ProjectConfigLoader.loadProjectConfig(root);
+        // 0. Read pipeline filters from the injected unified config (single source of truth
+        // resolved at startup by UnifiedConfigBeans — no per-call file I/O).
+        PipelineFilters filters = pipelineFilters();
         DetectorRegistry effectiveRegistry = registry;
 
-        // Apply detector category filter from project config
-        if (projectConfig.hasDetectorCategoryFilter()) {
-            effectiveRegistry = effectiveRegistry.filterByCategories(
-                    projectConfig.getDetectorCategories());
-            report.accept("Detector categories: " + projectConfig.getDetectorCategories());
+        // Apply detector category filter from unified config
+        if (!filters.categories().isEmpty()) {
+            effectiveRegistry = effectiveRegistry.filterByCategories(filters.categories());
+            report.accept("Detector categories: " + filters.categories());
         }
 
-        // Apply detector include filter from project config
-        if (projectConfig.hasDetectorIncludeFilter()) {
-            effectiveRegistry = effectiveRegistry.filterByNames(
-                    projectConfig.getDetectorInclude());
-            report.accept("Detector include: " + projectConfig.getDetectorInclude());
+        // Apply detector include filter from unified config
+        if (!filters.include().isEmpty()) {
+            effectiveRegistry = effectiveRegistry.filterByNames(filters.include());
+            report.accept("Detector include: " + filters.include());
         }
 
-        // Apply parallelism override from project config
-        if (parallelism == null && projectConfig.getPipelineParallelism() != null) {
-            parallelism = projectConfig.getPipelineParallelism();
+        // Apply parallelism override from unified config (null = auto-detect)
+        if (parallelism == null && filters.parallelism() != null) {
+            parallelism = filters.parallelism();
             report.accept("Pipeline parallelism: " + parallelism + " (from config)");
         }
 
@@ -216,23 +252,22 @@ public class Analyzer {
         report.accept("Discovering files...");
         List<DiscoveredFile> files = fileDiscovery.discover(root);
 
-        // Apply language filter from project config
-        if (projectConfig.hasLanguageFilter()) {
-            Set<String> allowedLanguages = new HashSet<>(projectConfig.getLanguages());
+        // Apply language filter from unified config
+        if (!filters.languages().isEmpty()) {
+            Set<String> allowedLanguages = new HashSet<>(filters.languages());
             files = files.stream()
                     .filter(f -> allowedLanguages.contains(f.language()))
                     .toList();
-            report.accept("Language filter active: " + projectConfig.getLanguages());
+            report.accept("Language filter active: " + filters.languages());
         }
 
-        // Apply exclude patterns from project config
-        if (projectConfig.hasExcludePatterns()) {
-            List<String> excludes = projectConfig.getExclude();
-            List<java.util.regex.Pattern> compiledExcludes = compileExcludePatterns(excludes);
+        // Apply exclude patterns from unified config
+        if (!filters.exclude().isEmpty()) {
+            List<java.util.regex.Pattern> compiledExcludes = compileExcludePatterns(filters.exclude());
             files = files.stream()
                     .filter(f -> !matchesAnyCompiledExclude(f.path().toString(), compiledExcludes))
                     .toList();
-            report.accept("Exclude patterns: " + excludes);
+            report.accept("Exclude patterns: " + filters.exclude());
         }
 
         int totalFiles = files.size();
@@ -486,22 +521,20 @@ public class Analyzer {
     private AnalysisResult runBatchedWithCache(Path root, Integer parallelism, int batchSize,
                                                 boolean incremental, AnalysisCache cache,
                                                 Consumer<String> report, Instant start) {
-        // 0. Load project config for pipeline filtering
-        ProjectConfig projectConfig = ProjectConfigLoader.loadProjectConfig(root);
+        // 0. Read pipeline filters from the injected unified config.
+        PipelineFilters filters = pipelineFilters();
         DetectorRegistry effectiveRegistry = registry;
 
-        if (projectConfig.hasDetectorCategoryFilter()) {
-            effectiveRegistry = effectiveRegistry.filterByCategories(
-                    projectConfig.getDetectorCategories());
-            report.accept("Detector categories: " + projectConfig.getDetectorCategories());
+        if (!filters.categories().isEmpty()) {
+            effectiveRegistry = effectiveRegistry.filterByCategories(filters.categories());
+            report.accept("Detector categories: " + filters.categories());
         }
-        if (projectConfig.hasDetectorIncludeFilter()) {
-            effectiveRegistry = effectiveRegistry.filterByNames(
-                    projectConfig.getDetectorInclude());
-            report.accept("Detector include: " + projectConfig.getDetectorInclude());
+        if (!filters.include().isEmpty()) {
+            effectiveRegistry = effectiveRegistry.filterByNames(filters.include());
+            report.accept("Detector include: " + filters.include());
         }
-        if (parallelism == null && projectConfig.getPipelineParallelism() != null) {
-            parallelism = projectConfig.getPipelineParallelism();
+        if (parallelism == null && filters.parallelism() != null) {
+            parallelism = filters.parallelism();
             report.accept("Pipeline parallelism: " + parallelism + " (from config)");
         }
 
@@ -509,20 +542,19 @@ public class Analyzer {
         report.accept("Discovering files...");
         List<DiscoveredFile> files = fileDiscovery.discover(root);
 
-        if (projectConfig.hasLanguageFilter()) {
-            Set<String> allowedLanguages = new HashSet<>(projectConfig.getLanguages());
+        if (!filters.languages().isEmpty()) {
+            Set<String> allowedLanguages = new HashSet<>(filters.languages());
             files = files.stream()
                     .filter(f -> allowedLanguages.contains(f.language()))
                     .toList();
-            report.accept("Language filter active: " + projectConfig.getLanguages());
+            report.accept("Language filter active: " + filters.languages());
         }
-        if (projectConfig.hasExcludePatterns()) {
-            List<String> excludes = projectConfig.getExclude();
-            List<java.util.regex.Pattern> compiledExcludes = compileExcludePatterns(excludes);
+        if (!filters.exclude().isEmpty()) {
+            List<java.util.regex.Pattern> compiledExcludes = compileExcludePatterns(filters.exclude());
             files = files.stream()
                     .filter(f -> !matchesAnyCompiledExclude(f.path().toString(), compiledExcludes))
                     .toList();
-            report.accept("Exclude patterns: " + excludes);
+            report.accept("Exclude patterns: " + filters.exclude());
         }
 
         int totalFiles = files.size();
@@ -790,30 +822,28 @@ public class Analyzer {
         Instant phase2Start = Instant.now();
         report.accept("Phase 2: Discovering files...");
 
-        ProjectConfig projectConfig = ProjectConfigLoader.loadProjectConfig(root);
+        PipelineFilters filters = pipelineFilters();
         DetectorRegistry effectiveRegistry = registry;
 
-        if (projectConfig.hasDetectorCategoryFilter()) {
-            effectiveRegistry = effectiveRegistry.filterByCategories(
-                    projectConfig.getDetectorCategories());
+        if (!filters.categories().isEmpty()) {
+            effectiveRegistry = effectiveRegistry.filterByCategories(filters.categories());
         }
-        if (projectConfig.hasDetectorIncludeFilter()) {
-            effectiveRegistry = effectiveRegistry.filterByNames(
-                    projectConfig.getDetectorInclude());
+        if (!filters.include().isEmpty()) {
+            effectiveRegistry = effectiveRegistry.filterByNames(filters.include());
         }
-        if (parallelism == null && projectConfig.getPipelineParallelism() != null) {
-            parallelism = projectConfig.getPipelineParallelism();
+        if (parallelism == null && filters.parallelism() != null) {
+            parallelism = filters.parallelism();
         }
 
         List<DiscoveredFile> allFiles = fileDiscovery.discover(root);
 
-        if (projectConfig.hasLanguageFilter()) {
-            Set<String> allowed = new HashSet<>(projectConfig.getLanguages());
+        if (!filters.languages().isEmpty()) {
+            Set<String> allowed = new HashSet<>(filters.languages());
             allFiles = allFiles.stream().filter(f -> allowed.contains(f.language())).toList();
         }
-        if (projectConfig.hasExcludePatterns()) {
+        if (!filters.exclude().isEmpty()) {
             List<java.util.regex.Pattern> compiledExcludes =
-                    compileExcludePatterns(projectConfig.getExclude());
+                    compileExcludePatterns(filters.exclude());
             allFiles = allFiles.stream()
                     .filter(f -> !matchesAnyCompiledExclude(f.path().toString(), compiledExcludes))
                     .toList();

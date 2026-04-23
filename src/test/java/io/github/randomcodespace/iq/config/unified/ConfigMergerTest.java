@@ -37,6 +37,61 @@ class ConfigMergerTest {
         assertEquals(ConfigLayer.BUILT_IN, merged.provenance().get("serving.port").layer());
     }
 
+    // ---- Phase-B extensions: detectors.categories/include + indexing.parsers -------
+
+    @Test
+    void detectorsCategoriesFollowLayerReplacement() {
+        CodeIqUnifiedConfig project = EnvVarOverlay.from(Map.of(
+                "CODEIQ_DETECTORS_CATEGORIES", "endpoints"));
+        CodeIqUnifiedConfig cli = EnvVarOverlay.from(Map.of(
+                "CODEIQ_DETECTORS_CATEGORIES", "entities,topics"));
+        MergedConfig merged = new ConfigMerger().merge(List.of(
+                new ConfigMerger.Input(ConfigLayer.BUILT_IN, "defaults", ConfigDefaults.builtIn()),
+                new ConfigMerger.Input(ConfigLayer.PROJECT, "./codeiq.yml", project),
+                new ConfigMerger.Input(ConfigLayer.CLI, "--categories=...", cli)));
+        assertEquals(List.of("entities", "topics"), merged.effective().detectors().categories());
+        assertEquals(ConfigLayer.CLI, merged.provenance().get("detectors.categories").layer());
+    }
+
+    @Test
+    void detectorsIncludeFallsThroughWhenAbsent() {
+        CodeIqUnifiedConfig project = EnvVarOverlay.from(Map.of(
+                "CODEIQ_DETECTORS_INCLUDE", "spring-rest-detector"));
+        MergedConfig merged = new ConfigMerger().merge(List.of(
+                new ConfigMerger.Input(ConfigLayer.BUILT_IN, "defaults", ConfigDefaults.builtIn()),
+                new ConfigMerger.Input(ConfigLayer.PROJECT, "./codeiq.yml", project)));
+        assertEquals(List.of("spring-rest-detector"), merged.effective().detectors().include());
+        assertEquals(ConfigLayer.PROJECT, merged.provenance().get("detectors.include").layer());
+    }
+
+    @Test
+    void indexingParsersMergeWholeLayer() {
+        CodeIqUnifiedConfig project = EnvVarOverlay.from(Map.of(
+                "CODEIQ_INDEXING_PARSERS", "javaparser"));
+        CodeIqUnifiedConfig cli = EnvVarOverlay.from(Map.of(
+                "CODEIQ_INDEXING_PARSERS", "antlr,regex"));
+        MergedConfig merged = new ConfigMerger().merge(List.of(
+                new ConfigMerger.Input(ConfigLayer.BUILT_IN, "defaults", ConfigDefaults.builtIn()),
+                new ConfigMerger.Input(ConfigLayer.PROJECT, "./codeiq.yml", project),
+                new ConfigMerger.Input(ConfigLayer.CLI, "--parsers=...", cli)));
+        assertEquals(List.of("antlr", "regex"), merged.effective().indexing().parsers());
+        assertEquals(ConfigLayer.CLI, merged.provenance().get("indexing.parsers").layer());
+    }
+
+    @Test
+    void indexingParallelismIntegerLayerReplacement() {
+        CodeIqUnifiedConfig project = EnvVarOverlay.from(Map.of(
+                "CODEIQ_INDEXING_PARALLELISM", "4"));
+        CodeIqUnifiedConfig cli = EnvVarOverlay.from(Map.of(
+                "CODEIQ_INDEXING_PARALLELISM", "16"));
+        MergedConfig merged = new ConfigMerger().merge(List.of(
+                new ConfigMerger.Input(ConfigLayer.BUILT_IN, "defaults", ConfigDefaults.builtIn()),
+                new ConfigMerger.Input(ConfigLayer.PROJECT, "./codeiq.yml", project),
+                new ConfigMerger.Input(ConfigLayer.CLI, "--parallelism=16", cli)));
+        assertEquals(16, merged.effective().indexing().parallelism());
+        assertEquals(ConfigLayer.CLI, merged.provenance().get("indexing.parallelism").layer());
+    }
+
     @Test
     void listsFollowWholeLayerReplacementNotMerge() {
         // Non-merge semantics: if a higher layer declares `languages`,

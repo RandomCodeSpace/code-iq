@@ -130,7 +130,8 @@ class UnifiedConfigAdapterTest {
                         25,   // maxDepth
                         17,   // maxRadius
                         500,  // maxFiles
-                        12    // maxSnippetLines
+                        12,   // maxSnippetLines
+                        List.of() // parsers
                 ),
                 ServingConfig.empty(),
                 new McpConfig(null, null, null,

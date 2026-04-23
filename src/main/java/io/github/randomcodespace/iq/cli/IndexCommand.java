@@ -70,7 +70,7 @@ public class IndexCommand implements Callable<Integer> {
 
         Path root = path.toAbsolutePath().normalize();
 
-        CliOutput.configureFromOptions(config, graphDir, serviceName, root);
+        CliOutput.configureFromOptions(config, graphDir, serviceName);
 
         // Use configured batch size if not overridden on command line
         int effectiveBatchSize = batchSize > 0 ? batchSize : config.getBatchSize();
