@@ -5,9 +5,7 @@ import io.github.randomcodespace.iq.config.unified.ConfigLoadException;
 import io.github.randomcodespace.iq.config.unified.ConfigResolver;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -23,37 +21,45 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * bean that is the single source of truth, and the legacy {@link CodeIqConfig} bean
  * is produced by adapting the unified bean.
  *
+ * <p>Uses {@link ApplicationContextRunner} to spin up a minimal context containing
+ * only {@link UnifiedConfigBeans} + {@link ProjectConfigLoader}, rather than booting
+ * the full application via {@code @SpringBootTest}. Sub-second per test vs.
+ * multi-second full-context startup, same correctness guarantee for this surface.
+ *
  * <p>The "defaults path" assertions here run with no {@code codeiq.yml} in cwd,
  * so values must match {@link io.github.randomcodespace.iq.config.unified.ConfigDefaults}
  * — which in turn matches the values that were historically in {@code application.yml}.
  */
-@SpringBootTest
-@ActiveProfiles("test")
 class UnifiedConfigBeansTest {
 
-    @Autowired
-    CodeIqUnifiedConfig unified;
-
-    @Autowired
-    CodeIqConfig legacy;
+    private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+            .withBean(ProjectConfigLoader.class)
+            .withUserConfiguration(UnifiedConfigBeans.class);
 
     @Test
     void contextExposesUnifiedAndLegacyBeansBothBackedBySameSource() {
-        assertNotNull(unified, "unified config bean must be present");
-        assertNotNull(legacy, "legacy config bean must be present");
-        // Same cacheDir — proves the legacy bean is adapted from unified.
-        assertEquals(unified.indexing().cacheDir(), legacy.getCacheDir());
+        contextRunner.run(ctx -> {
+            CodeIqUnifiedConfig unified = ctx.getBean(CodeIqUnifiedConfig.class);
+            CodeIqConfig legacy = ctx.getBean(CodeIqConfig.class);
+            assertNotNull(unified, "unified config bean must be present");
+            assertNotNull(legacy, "legacy config bean must be present");
+            // Same cacheDir — proves the legacy bean is adapted from unified.
+            assertEquals(unified.indexing().cacheDir(), legacy.getCacheDir());
+        });
     }
 
     @Test
     void defaultsMatchHistoricalApplicationYmlValues() {
-        // These values came from application.yml pre-Task-11; they must still
-        // be what CodeIqConfig exposes now that wiring goes through ConfigDefaults.
-        assertEquals(".code-iq/cache", legacy.getCacheDir());
-        assertEquals(".code-iq/graph/graph.db", legacy.getGraph().getPath());
-        assertEquals(10, legacy.getMaxDepth());
-        assertEquals(10, legacy.getMaxRadius());
-        assertEquals(500, legacy.getBatchSize());
+        contextRunner.run(ctx -> {
+            CodeIqConfig legacy = ctx.getBean(CodeIqConfig.class);
+            // These values came from application.yml pre-Task-11; they must still
+            // be what CodeIqConfig exposes now that wiring goes through ConfigDefaults.
+            assertEquals(".code-iq/cache", legacy.getCacheDir());
+            assertEquals(".code-iq/graph/graph.db", legacy.getGraph().getPath());
+            assertEquals(10, legacy.getMaxDepth());
+            assertEquals(10, legacy.getMaxRadius());
+            assertEquals(500, legacy.getBatchSize());
+        });
     }
 
     /**
@@ -62,9 +68,9 @@ class UnifiedConfigBeansTest {
      * names the offending file path, so a user can find and fix the broken yml.
      *
      * <p>Tested at the {@link ConfigResolver} level (not via Spring context restart)
-     * because relocating CWD inside a single {@code @SpringBootTest} run is fragile.
-     * The Spring wiring in {@link UnifiedConfigBeans#codeIqUnifiedConfig()} calls
-     * exactly this resolver, so the guarantee propagates: Spring wraps the
+     * because relocating CWD inside a single context run is fragile. The Spring
+     * wiring in {@link UnifiedConfigBeans#codeIqUnifiedConfig} calls exactly this
+     * resolver, so the guarantee propagates: Spring wraps the
      * {@code ConfigLoadException} in a {@code BeanCreationException} at startup.
      */
     @Test
