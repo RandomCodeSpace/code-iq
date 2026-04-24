@@ -31,6 +31,14 @@
         <checkstyle-plugin.version>3.6.0</checkstyle-plugin.version>
 
         <!--
+          Toggle for the OWASP dependency-check execution bound to `verify`.
+          Default: false (gate runs in CI). Override locally with
+          `-Ddependency-check.skip=true` since the first run downloads the
+          NVD database (~1GB).
+        -->
+        <dependency-check.skip>false</dependency-check.skip>
+
+        <!--
           Security override: Spring Boot 4.0.5 pulls tomcat-embed-core 11.0.20
           and jackson (tools.jackson.core) 3.1.0; both have CVEs fixed in the
           next patch release. Bumping these via the Spring-Boot-managed
@@ -402,12 +410,33 @@
                 <configuration>
                     <excludeFilterFile>spotbugs-exclude.xml</excludeFilterFile>
                 </configuration>
+                <executions>
+                    <execution>
+                        <id>spotbugs-verify</id>
+                        <phase>verify</phase>
+                        <goals><goal>check</goal></goals>
+                    </execution>
+                </executions>
             </plugin>
 
             <plugin>
                 <groupId>org.owasp</groupId>
                 <artifactId>dependency-check-maven</artifactId>
                 <version>${owasp.dependency-check.version}</version>
+                <configuration>
+                    <skip>${dependency-check.skip}</skip>
+                    <failBuildOnCVSS>7</failBuildOnCVSS>
+                    <suppressionFiles>
+                        <suppressionFile>dependency-check-suppressions.xml</suppressionFile>
+                    </suppressionFiles>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>dependency-check-verify</id>
+                        <phase>verify</phase>
+                        <goals><goal>check</goal></goals>
+                    </execution>
+                </executions>
             </plugin>
 
             <plugin>

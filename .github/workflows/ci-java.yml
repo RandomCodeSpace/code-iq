@@ -18,6 +18,9 @@ jobs:
           distribution: 'temurin'
           java-version: '25'
           cache: 'maven'
+      # `verify` is the enforced quality gate: it runs unit + integration tests
+      # AND the spotbugs:check + dependency-check:check executions bound in pom.xml.
+      # Any of those failing breaks the build.
       - run: mvn clean verify -B
       - uses: actions/upload-artifact@v4
         if: always()
