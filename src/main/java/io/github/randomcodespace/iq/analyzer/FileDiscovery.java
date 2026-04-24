@@ -165,6 +165,7 @@ public class FileDiscovery {
         try {
             size = Files.size(absPath);
         } catch (IOException e) {
+            log.debug("Skipping {} -- could not read size", absPath, e);
             return;
         }
         long maxSize = CONFIG_LANGUAGES.contains(language)

@@ -195,14 +195,12 @@ public class TopologyService {
     public Map<String, Object> blastRadius(String nodeId, List<CodeNode> nodes, List<CodeEdge> edges) {
         // Build adjacency for BFS
         Map<String, List<String>> adjacency = new HashMap<>();
-        Map<String, EdgeKind> edgeKinds = new HashMap<>();
         for (CodeEdge edge : edges) {
             if (!RUNTIME_EDGES.contains(edge.getKind())) continue;
             String src = edge.getSourceId();
             String tgt = edge.getTarget() != null ? edge.getTarget().getId() : null;
             if (src == null || tgt == null) continue;
             adjacency.computeIfAbsent(src, k -> new ArrayList<>()).add(tgt);
-            edgeKinds.put(src + "->" + tgt, edge.getKind());
         }
 
         // BFS from nodeId, max depth 5

@@ -15,9 +15,6 @@ import io.github.randomcodespace.iq.detector.DetectorRegistry;
 import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.detector.DetectorUtils;
 import io.github.randomcodespace.iq.grammar.AntlrParserFactory;
-import io.github.randomcodespace.iq.intelligence.FileClassification;
-import io.github.randomcodespace.iq.intelligence.FileEntry;
-import io.github.randomcodespace.iq.intelligence.FileInventory;
 import io.github.randomcodespace.iq.intelligence.RepositoryIdentity;
 import io.github.randomcodespace.iq.model.CodeEdge;
 import io.github.randomcodespace.iq.model.CodeNode;
@@ -274,9 +271,8 @@ public class Analyzer {
         int totalFiles = files.size();
         report.accept("Found " + totalFiles + " files");
 
-        // 1b. Resolve repository identity and build file inventory
+        // 1b. Resolve repository identity
         RepositoryIdentity repoIdentity = RepositoryIdentity.resolve(root);
-        FileInventory fileInventory = buildFileInventory(files, cache);
 
         // Compute language breakdown
         Map<String, Integer> languageBreakdown = new HashMap<>();
@@ -384,9 +380,12 @@ public class Analyzer {
         report.accept("Linking cross-file relationships...");
         builder.runLinkers(linkers);
 
-        // Flush and collect deferred edges
-        GraphBuilder.FlushResult flushed = builder.flush();
-        List<io.github.randomcodespace.iq.model.CodeEdge> recoveredEdges = builder.flushDeferred();
+        // Flush buffered graph state and retry any deferred edges so the
+        // side effects (provenance stamping, edge validation, dropped-edge
+        // counters) still run even though we read the results straight off
+        // the builder below.
+        builder.flush();
+        builder.flushDeferred();
 
         // 5. Classify layers
         report.accept("Classifying layers...");
@@ -1617,22 +1616,6 @@ public class Analyzer {
 
         AntlrParserFactory.clearCache();
         return DetectorResult.of(allNodes, allEdges);
-    }
-
-    /**
-     * Build a deterministic FileInventory from the list of discovered files.
-     * Content hashes are reused from {@code cache} when available (no re-read of files).
-     * Hashes remain null for files not yet present in the cache.
-     */
-    private static FileInventory buildFileInventory(List<DiscoveredFile> files, AnalysisCache cache) {
-        List<FileEntry> entries = new ArrayList<>(files.size());
-        for (DiscoveredFile f : files) {
-            String relPath = f.path().toString().replace('\\', '/');
-            FileClassification cls = FileEntry.classify(relPath, f.language());
-            String contentHash = cache != null ? cache.getHashForPath(relPath) : null;
-            entries.add(new FileEntry(relPath, f.language(), f.sizeBytes(), contentHash, cls));
-        }
-        return new FileInventory(entries);
     }
 
     /**

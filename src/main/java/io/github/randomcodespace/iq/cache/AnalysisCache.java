@@ -35,7 +35,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * Uses H2 in embedded mode — pure Java, no JNI, MVCC concurrency,
  * fully compatible with virtual threads.
  */
-public class AnalysisCache implements Closeable {
+public final class AnalysisCache implements Closeable {
 
     private static final Logger log = LoggerFactory.getLogger(AnalysisCache.class);
 

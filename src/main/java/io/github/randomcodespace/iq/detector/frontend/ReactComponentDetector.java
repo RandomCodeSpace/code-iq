@@ -110,9 +110,6 @@ public class ReactComponentDetector extends AbstractRegexDetector {
 
         // RENDERS edges: scope JSX tag search to each component's body section.
         // A component's body is from its match position to the next component's position.
-        Set<String> allDetected = new HashSet<>(componentNames);
-        allDetected.addAll(hookNames);
-
         componentEntries.sort(Comparator.comparingInt(ComponentEntry::matchStart));
 
         for (int i = 0; i < componentEntries.size(); i++) {

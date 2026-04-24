@@ -22,6 +22,7 @@ import org.springframework.stereotype.Component;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.text.NumberFormat;
@@ -149,9 +150,12 @@ public class EnrichCommand implements Callable<Integer> {
         builder.addEdges(allEdges);
         builder.runLinkers(linkers);
 
-        // Flush and collect valid edges
-        GraphBuilder.FlushResult flushed = builder.flush();
-        List<CodeEdge> recoveredEdges = builder.flushDeferred();
+        // Flush buffered graph state and retry any deferred edges so the
+        // side effects (provenance stamping, edge validation, dropped-edge
+        // counters) still run even though we read enriched nodes/edges
+        // straight off the builder below.
+        builder.flush();
+        builder.flushDeferred();
 
         List<CodeNode> enrichedNodes = new ArrayList<>(builder.getNodes());
         List<CodeEdge> enrichedEdges = new ArrayList<>(builder.getEdges());
@@ -422,7 +426,7 @@ public class EnrichCommand implements Callable<Integer> {
 
             return 0;
 
-        } catch (Exception e) {
+        } catch (IOException | RuntimeException e) {
             log.error("Enrichment failed", e);
             CliOutput.error("Enrichment failed: " + e.getMessage());
             return 1;

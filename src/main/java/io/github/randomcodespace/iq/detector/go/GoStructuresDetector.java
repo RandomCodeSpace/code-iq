@@ -139,9 +139,7 @@ public class GoStructuresDetector extends AbstractAntlrDetector {
 
         // Methods
         Matcher mm = METHOD_RE.matcher(text);
-        Set<Integer> methodPositions = new HashSet<>();
         while (mm.find()) {
-            methodPositions.add(mm.start());
             String receiver = mm.group(1);
             String methodName = mm.group(2);
             boolean exported = Character.isUpperCase(methodName.charAt(0));

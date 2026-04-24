@@ -54,8 +54,6 @@ public class CodeIqApplication implements CommandLineRunner, ExitCodeGenerator {
                 .findFirst()
                 .orElse("");
         boolean isServe = "serve".equalsIgnoreCase(command);
-        boolean isIndex = "index".equalsIgnoreCase(command);
-        boolean isEnrich = "enrich".equalsIgnoreCase(command);
 
         if (isServe) {
             app.setAdditionalProfiles("serving");
