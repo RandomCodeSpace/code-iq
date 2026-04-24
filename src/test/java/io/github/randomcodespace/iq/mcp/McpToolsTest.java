@@ -524,4 +524,47 @@ class McpToolsTest {
 
         assertEquals("line2\nline3", result);
     }
+
+    @Test
+    void readFileShouldRejectSymlinkEscapingRoot(@TempDir Path tempDir) throws IOException {
+        CodeIqConfigTestSupport.override(config).rootPath(tempDir.toString()).done();
+
+        Path target = Files.createTempFile("codeiq-escape-", ".txt");
+        try {
+            Files.writeString(target, "TOP SECRET");
+            Path link = tempDir.resolve("leak.txt");
+            try {
+                Files.createSymbolicLink(link, target.toAbsolutePath());
+            } catch (UnsupportedOperationException | IOException unsupported) {
+                // Filesystem does not support symlinks (e.g. Windows without privilege) — skip.
+                return;
+            }
+
+            String result = mcpTools.readFile("leak.txt", null, null);
+
+            assertFalse(result.contains("TOP SECRET"),
+                    "Symlink target contents must not leak through read_file");
+            Map<String, Object> parsed = parseJson(result);
+            assertEquals("Path traversal detected", parsed.get("error"));
+        } finally {
+            Files.deleteIfExists(target);
+        }
+    }
+
+    @Test
+    void readFileShouldAllowInRepoSymlink(@TempDir Path tempDir) throws IOException {
+        CodeIqConfigTestSupport.override(config).rootPath(tempDir.toString()).done();
+        Path real = tempDir.resolve("real.txt");
+        Files.writeString(real, "in-repo");
+        Path link = tempDir.resolve("alias.txt");
+        try {
+            Files.createSymbolicLink(link, real);
+        } catch (UnsupportedOperationException | IOException unsupported) {
+            return;
+        }
+
+        String result = mcpTools.readFile("alias.txt", null, null);
+
+        assertEquals("in-repo", result);
+    }
 }

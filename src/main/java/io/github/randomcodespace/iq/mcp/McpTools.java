@@ -385,9 +385,15 @@ public class McpTools {
             @McpToolParam(description = "Start line number, 1-based (optional — omit to read entire file)", required = false) Integer startLine,
             @McpToolParam(description = "End line number, 1-based inclusive (optional — omit to read to end)", required = false) Integer endLine) {
         try {
-            Path root = Path.of(config.getRootPath()).toAbsolutePath().normalize();
-            Path resolved = root.resolve(filePath).normalize();
-            // Path traversal protection
+            Path root = Path.of(config.getRootPath()).toRealPath();
+            Path candidate = root.resolve(filePath).normalize();
+            // Lexical traversal guard (rejects ../ before any filesystem touch)
+            if (!candidate.startsWith(root)) {
+                return toJson(Map.of(PROP_ERROR, "Path traversal detected"));
+            }
+            // Follow symlinks and re-check so an in-repo symlink pointing outside the
+            // codebase (e.g. link -> /etc/passwd) cannot be used to exfiltrate files.
+            Path resolved = candidate.toRealPath();
             if (!resolved.startsWith(root)) {
                 return toJson(Map.of(PROP_ERROR, "Path traversal detected"));
             }

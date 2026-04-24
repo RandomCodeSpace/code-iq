@@ -557,6 +557,49 @@ class GraphControllerTest {
                 .andExpect(content().string("aaa\nbbb\nccc"));
     }
 
+    @Test
+    void readFileShouldRejectSymlinkEscapingRoot(@TempDir Path tempDir) throws Exception {
+        Path target = Files.createTempFile("codeiq-escape-", ".txt");
+        try {
+            Files.writeString(target, "TOP SECRET", StandardCharsets.UTF_8);
+            Path link = tempDir.resolve("leak.txt");
+            try {
+                Files.createSymbolicLink(link, target.toAbsolutePath());
+            } catch (UnsupportedOperationException | java.io.IOException unsupported) {
+                // Filesystem does not support symlinks (e.g. Windows without privilege) — skip.
+                return;
+            }
+            CodeIqConfigTestSupport.override(config).rootPath(tempDir.toAbsolutePath().toString()).done();
+            var controller = new GraphController(queryService, config);
+            var fileMvc = MockMvcBuilders.standaloneSetup(controller).build();
+
+            fileMvc.perform(get("/api/file").param("path", "leak.txt"))
+                    .andExpect(status().isForbidden())
+                    .andExpect(content().string("Path traversal blocked"));
+        } finally {
+            Files.deleteIfExists(target);
+        }
+    }
+
+    @Test
+    void readFileShouldAllowInRepoSymlink(@TempDir Path tempDir) throws Exception {
+        Path real = tempDir.resolve("real.txt");
+        Files.writeString(real, "in-repo", StandardCharsets.UTF_8);
+        Path link = tempDir.resolve("alias.txt");
+        try {
+            Files.createSymbolicLink(link, real);
+        } catch (UnsupportedOperationException | java.io.IOException unsupported) {
+            return;
+        }
+        CodeIqConfigTestSupport.override(config).rootPath(tempDir.toAbsolutePath().toString()).done();
+        var controller = new GraphController(queryService, config);
+        var fileMvc = MockMvcBuilders.standaloneSetup(controller).build();
+
+        fileMvc.perform(get("/api/file").param("path", "alias.txt"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("in-repo"));
+    }
+
     // POST /api/analyze removed — API is read-only
 
     // --- /api/file-tree ---

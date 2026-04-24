@@ -19,6 +19,7 @@ import io.github.randomcodespace.iq.model.NodeKind;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
@@ -257,18 +258,40 @@ public class GraphController {
             @RequestParam String path,
             @RequestParam(required = false) Integer startLine,
             @RequestParam(required = false) Integer endLine) {
-        Path codebasePath = Path.of(config.getRootPath()).toAbsolutePath().normalize();
-        Path resolved = codebasePath.resolve(path).normalize();
-        if (!resolved.startsWith(codebasePath)) {
+        Path codebaseReal;
+        try {
+            codebaseReal = Path.of(config.getRootPath()).toRealPath();
+        } catch (IOException e) {
+            return ResponseEntity.status(500)
+                    .contentType(MediaType.TEXT_PLAIN)
+                    .body("Failed to resolve codebase root: " + e.getMessage());
+        }
+        Path candidate = codebaseReal.resolve(path).normalize();
+        if (!candidate.startsWith(codebaseReal)) {
             return ResponseEntity.status(403)
                     .contentType(MediaType.TEXT_PLAIN)
                     .body("Path traversal blocked");
         }
-        if (!Files.isRegularFile(resolved)) {
+        Path resolvedReal;
+        try {
+            resolvedReal = candidate.toRealPath();
+        } catch (NoSuchFileException e) {
+            return ResponseEntity.notFound().build();
+        } catch (IOException e) {
+            return ResponseEntity.status(500)
+                    .contentType(MediaType.TEXT_PLAIN)
+                    .body("Failed to resolve file: " + e.getMessage());
+        }
+        if (!resolvedReal.startsWith(codebaseReal)) {
+            return ResponseEntity.status(403)
+                    .contentType(MediaType.TEXT_PLAIN)
+                    .body("Path traversal blocked");
+        }
+        if (!Files.isRegularFile(resolvedReal)) {
             return ResponseEntity.notFound().build();
         }
         try {
-            String content = Files.readString(resolved, StandardCharsets.UTF_8);
+            String content = Files.readString(resolvedReal, StandardCharsets.UTF_8);
             if (startLine != null || endLine != null) {
                 String[] lines = content.split("\n", -1);
                 int start = (startLine != null ? startLine : 1);
