@@ -74,6 +74,7 @@ public class SpringRestDetector extends AbstractJavaParserDetector {
     // ---- HTTP client patterns (for CALLS edge emission) ----
     private static final Pattern REST_TEMPLATE_RE = Pattern.compile("RestTemplate");
     private static final Pattern WEB_CLIENT_RE    = Pattern.compile("WebClient");
+    private static final Pattern BARE_QUOTED_RE = Pattern.compile("\"([^\"]*)\"");
     private static final Pattern FEIGN_CLIENT_RE  = Pattern.compile(
             "@FeignClient\\s*\\(\\s*(?:name\\s*=\\s*)?[\"']([^\"']+)[\"']");
 
@@ -342,7 +343,7 @@ public class SpringRestDetector extends AbstractJavaParserDetector {
 
             String path = extractAttr(attrStr, VALUE_RE);
             if (path == null && attrStr != null) {
-                Matcher bare = Pattern.compile("\"([^\"]*)\"").matcher(attrStr);
+                Matcher bare = BARE_QUOTED_RE.matcher(attrStr);
                 if (bare.find()) path = bare.group(1);
             }
             if (path == null) path = "";
