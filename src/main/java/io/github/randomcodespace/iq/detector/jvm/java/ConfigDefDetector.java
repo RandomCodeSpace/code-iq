@@ -44,6 +44,8 @@ public class ConfigDefDetector extends AbstractJavaParserDetector {
     private static final Pattern DEFINE_RE = Pattern.compile("\\.define\\s*\\(\\s*\"([^\"]+)\"");
     private static final Pattern VALUE_RE = Pattern.compile("@Value\\s*\\(\\s*\"\\$\\{([^}]+)\\}\"");
     private static final Pattern CONFIG_PROPS_RE = Pattern.compile("@ConfigurationProperties\\s*\\(\\s*(?:prefix\\s*=\\s*)?\"([^\"]+)\"");
+    private static final Pattern VALUE_KEY_RE = Pattern.compile("\"\\$\\{([^}]+)\\}\"");
+    private static final Pattern QUOTED_STRING_RE = Pattern.compile("\"([^\"]+)\"");
 
     private static final String VALUE_ANNOTATION = "Value";
     private static final String CONFIG_PROPS_ANNOTATION = "ConfigurationProperties";
@@ -157,7 +159,7 @@ public class ConfigDefDetector extends AbstractJavaParserDetector {
     private Optional<String> extractValueKey(AnnotationExpr ann) {
         // @Value("${some.key}") or @Value(value = "${some.key}")
         String raw = ann.toString();
-        Matcher m = Pattern.compile("\"\\$\\{([^}]+)\\}\"").matcher(raw);
+        Matcher m = VALUE_KEY_RE.matcher(raw);
         if (m.find()) return Optional.of(m.group(1));
         return Optional.empty();
     }
@@ -165,7 +167,7 @@ public class ConfigDefDetector extends AbstractJavaParserDetector {
     private Optional<String> extractAnnotationStringValue(AnnotationExpr ann) {
         // @ConfigurationProperties("prefix") or @ConfigurationProperties(prefix = "prefix")
         String raw = ann.toString();
-        Matcher m = Pattern.compile("\"([^\"]+)\"").matcher(raw);
+        Matcher m = QUOTED_STRING_RE.matcher(raw);
         if (m.find()) return Optional.of(m.group(1));
         return Optional.empty();
     }

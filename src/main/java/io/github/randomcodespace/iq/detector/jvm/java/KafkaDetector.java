@@ -39,6 +39,7 @@ public class KafkaDetector extends AbstractRegexDetector {
     private static final Pattern KAFKA_SEND_RE = Pattern.compile(
             "(?:kafkaTemplate|KafkaTemplate)\\s*\\.send\\s*\\(\\s*\"([^\"]+)\"");
     private static final Pattern GROUP_ID_RE = Pattern.compile("groupId\\s*=\\s*\"([^\"]+)\"");
+    private static final Pattern QUOTED_TOPIC_RE = Pattern.compile("\"([^\"]+)\"");
 
     @Override
     public String getName() {
@@ -84,7 +85,7 @@ public class KafkaDetector extends AbstractRegexDetector {
             Matcher m = KAFKA_LISTENER_RE.matcher(lines[i]);
             if (!m.find()) {
                 if (i > 0 && lines[i - 1].contains("@KafkaListener")) {
-                    Matcher fallback = Pattern.compile("\"([^\"]+)\"").matcher(lines[i]);
+                    Matcher fallback = QUOTED_TOPIC_RE.matcher(lines[i]);
                     if (fallback.find()) {
                         String topic = fallback.group(1);
                         String topicId = ensureTopicNode(topic, seenTopics, nodes, registry);
