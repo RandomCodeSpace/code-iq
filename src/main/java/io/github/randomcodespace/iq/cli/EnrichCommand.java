@@ -1,7 +1,10 @@
 package io.github.randomcodespace.iq.cli;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.randomcodespace.iq.analyzer.GraphBuilder;
 import io.github.randomcodespace.iq.analyzer.LayerClassifier;
+import io.github.randomcodespace.iq.analyzer.ServiceDetector;
 import io.github.randomcodespace.iq.analyzer.linker.Linker;
 import io.github.randomcodespace.iq.cache.AnalysisCache;
 import io.github.randomcodespace.iq.config.CliStartupConfigOverrides;
@@ -15,6 +18,7 @@ import io.github.randomcodespace.iq.model.EdgeKind;
 import org.neo4j.dbms.api.DatabaseManagementService;
 import org.neo4j.dbms.api.DatabaseManagementServiceBuilder;
 import org.neo4j.graphdb.GraphDatabaseService;
+import org.neo4j.graphdb.Result;
 import org.neo4j.graphdb.Transaction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,9 +34,12 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Callable;
 
@@ -54,6 +61,16 @@ import java.util.concurrent.Callable;
 public class EnrichCommand implements Callable<Integer> {
 
     private static final Logger log = LoggerFactory.getLogger(EnrichCommand.class);
+
+    private static final int NODE_BATCH_SIZE = 500;
+    private static final int EDGE_BATCH_SIZE = 500;
+    private static final int STUB_BATCH_SIZE = 500;
+    private static final int CLEAR_BATCH_SIZE = 5000;
+    private static final int PROGRESS_REPORT_INTERVAL = 10000;
+    private static final int INDEX_AWAIT_SECONDS = 300;
+    private static final String UNWIND_STUB_MERGE =
+            "UNWIND $batch AS n MERGE (node:CodeNode {id: n.id}) "
+                    + "ON CREATE SET node.kind = n.kind, node.label = n.label";
 
     @Parameters(index = "0", defaultValue = ".", description = "Path to indexed codebase")
     private Path path;
@@ -91,14 +108,8 @@ public class EnrichCommand implements Callable<Integer> {
         Path root = path.toAbsolutePath().normalize();
         NumberFormat nf = NumberFormat.getIntegerInstance(Locale.US);
 
-        // If --graph is set, override cache directory to shared location
-        if (graphDir != null) {
-            Path sharedDir = graphDir.toAbsolutePath().normalize();
-            CliStartupConfigOverrides.applyCacheDir(config, sharedDir.toString());
-            CliOutput.info("  Graph dir: " + sharedDir + " (shared multi-repo)");
-        }
+        applyGraphDirOverride();
 
-        // 1. Open H2 file
         Path cachePath = root.resolve(config.getCacheDir()).resolve("analysis-cache.db");
         // cachePath.getParent() is always non-null here because we resolve off
         // `root` (a directory), but null-guard explicitly for SpotBugs and to
@@ -126,8 +137,16 @@ public class EnrichCommand implements Callable<Integer> {
         }
     }
 
+    private void applyGraphDirOverride() {
+        if (graphDir == null) {
+            return;
+        }
+        Path sharedDir = graphDir.toAbsolutePath().normalize();
+        CliStartupConfigOverrides.applyCacheDir(config, sharedDir.toString());
+        CliOutput.info("  Graph dir: " + sharedDir + " (shared multi-repo)");
+    }
+
     private int enrichFromCache(AnalysisCache cache, Path root, NumberFormat nf, Instant start) {
-        // Load all nodes and edges from H2
         List<CodeNode> allNodes = cache.loadAllNodes();
         List<CodeEdge> allEdges = cache.loadAllEdges();
 
@@ -139,7 +158,20 @@ public class EnrichCommand implements Callable<Integer> {
         CliOutput.info("  Loaded " + nf.format(allNodes.size()) + " nodes, "
                 + nf.format(allEdges.size()) + " edges from H2");
 
-        // 2. Run linkers (these work on in-memory node/edge lists)
+        GraphBuilder builder = runLinkerPhase(allNodes, allEdges, root, nf);
+        List<CodeNode> enrichedNodes = new ArrayList<>(builder.getNodes());
+        List<CodeEdge> enrichedEdges = new ArrayList<>(builder.getEdges());
+
+        runClassifierAndEnrichers(enrichedNodes, enrichedEdges, root);
+
+        EnrichedGraph withServices = runServiceDetection(builder, enrichedNodes, enrichedEdges, root);
+
+        Path graphPath = resolveGraphPath(root);
+        return bulkLoadIntoNeo4j(graphPath, withServices, nf, start);
+    }
+
+    private GraphBuilder runLinkerPhase(List<CodeNode> allNodes, List<CodeEdge> allEdges,
+                                        Path root, NumberFormat nf) {
         CliOutput.step("[-]", "Running cross-file linkers...");
         Instant stepStart = Instant.now();
         RepositoryIdentity repoIdentity = RepositoryIdentity.resolve(root);
@@ -157,59 +189,66 @@ public class EnrichCommand implements Callable<Integer> {
         builder.flush();
         builder.flushDeferred();
 
-        List<CodeNode> enrichedNodes = new ArrayList<>(builder.getNodes());
-        List<CodeEdge> enrichedEdges = new ArrayList<>(builder.getEdges());
-
-        int linkerNodeDelta = enrichedNodes.size() - allNodes.size();
-        int linkerEdgeDelta = enrichedEdges.size() - allEdges.size();
+        int linkerNodeDelta = builder.getNodes().size() - allNodes.size();
+        int linkerEdgeDelta = builder.getEdges().size() - allEdges.size();
         if (linkerNodeDelta > 0 || linkerEdgeDelta > 0) {
             CliOutput.info("  Linkers added " + nf.format(linkerNodeDelta) + " nodes, "
                     + nf.format(linkerEdgeDelta) + " edges");
         }
-        CliOutput.info("  Done in " + Duration.between(stepStart, Instant.now()).toMillis() + "ms");
+        logStepDone(stepStart);
+        return builder;
+    }
 
-        // 3. Classify layers
+    private void runClassifierAndEnrichers(List<CodeNode> enrichedNodes,
+                                           List<CodeEdge> enrichedEdges, Path root) {
         CliOutput.step("[#]", "Classifying layers...");
-        stepStart = Instant.now();
+        Instant stepStart = Instant.now();
         layerClassifier.classify(enrichedNodes);
-        CliOutput.info("  Done in " + Duration.between(stepStart, Instant.now()).toMillis() + "ms");
+        logStepDone(stepStart);
 
-        // 3b. Enrich lexical metadata (doc comments, config keys) for fulltext search
         CliOutput.step("[*]", "Enriching lexical metadata...");
         stepStart = Instant.now();
         lexicalEnricher.enrich(enrichedNodes, root);
-        CliOutput.info("  Done in " + Duration.between(stepStart, Instant.now()).toMillis() + "ms");
+        logStepDone(stepStart);
 
-        // 3b2. Language-specific enrichment (call graph, type hints, import resolution)
         CliOutput.step("[*]", "Running language-specific enrichment...");
         stepStart = Instant.now();
         languageEnricher.enrich(enrichedNodes, enrichedEdges, root);
-        CliOutput.info("  Done in " + Duration.between(stepStart, Instant.now()).toMillis() + "ms");
+        logStepDone(stepStart);
+    }
 
-        // 3c. Detect services
+    private EnrichedGraph runServiceDetection(GraphBuilder builder, List<CodeNode> enrichedNodes,
+                                              List<CodeEdge> enrichedEdges, Path root) {
         CliOutput.step("[^]", "Detecting service boundaries...");
-        stepStart = Instant.now();
-        var serviceDetector = new io.github.randomcodespace.iq.analyzer.ServiceDetector();
-        String projectName = java.util.Objects.toString(root.getFileName(), "unknown");
+        Instant stepStart = Instant.now();
+        var serviceDetector = new ServiceDetector();
+        String projectName = Objects.toString(root.getFileName(), "unknown");
         var serviceResult = serviceDetector.detect(enrichedNodes, enrichedEdges, projectName, root);
+
+        List<CodeNode> nodesOut = enrichedNodes;
+        List<CodeEdge> edgesOut = enrichedEdges;
         if (!serviceResult.serviceNodes().isEmpty()) {
             serviceResult.serviceNodes().forEach(n -> n.setProvenance(builder.getProvenance()));
-            // Add service nodes and edges to the builder
             builder.addNodes(serviceResult.serviceNodes());
             builder.addEdges(serviceResult.serviceEdges());
-            enrichedNodes = new ArrayList<>(builder.getNodes());
-            enrichedEdges = new ArrayList<>(builder.getEdges());
+            nodesOut = new ArrayList<>(builder.getNodes());
+            edgesOut = new ArrayList<>(builder.getEdges());
             CliOutput.info("  Detected " + serviceResult.serviceNodes().size() + " service(s)");
         }
-        CliOutput.info("  Done in " + Duration.between(stepStart, Instant.now()).toMillis() + "ms");
+        logStepDone(stepStart);
+        return new EnrichedGraph(nodesOut, edgesOut);
+    }
 
-        // 4. Start Neo4j Embedded and bulk-load
-        Path graphPath = graphDir != null
+    private Path resolveGraphPath(Path root) {
+        return graphDir != null
                 ? graphDir.toAbsolutePath().normalize().resolve("graph.db")
                 : root.resolve(config.getGraph().getPath());
+    }
 
+    private int bulkLoadIntoNeo4j(Path graphPath, EnrichedGraph graph,
+                                  NumberFormat nf, Instant start) {
         CliOutput.step("[~]", "Bulk-loading into Neo4j at " + graphPath + "...");
-        stepStart = Instant.now();
+        Instant stepStart = Instant.now();
 
         DatabaseManagementService dbms = null;
         try {
@@ -217,213 +256,21 @@ public class EnrichCommand implements Callable<Integer> {
             dbms = new DatabaseManagementServiceBuilder(graphPath).build();
             GraphDatabaseService db = dbms.database("neo4j");
 
-            // Clear existing data in batches to avoid memory pool limit on large graphs
-            CliOutput.info("  Clearing existing graph...");
-            int deleted;
-            do {
-                try (Transaction tx = db.beginTx()) {
-                    var result = tx.execute(
-                            "MATCH (n) WITH n LIMIT 5000 DETACH DELETE n RETURN count(*) AS cnt");
-                    deleted = result.hasNext() ? ((Number) result.next().get("cnt")).intValue() : 0;
-                    tx.commit();
-                }
-            } while (deleted > 0);
+            clearGraph(db);
+            int nodesLoaded = bulkLoadNodes(db, graph.nodes(), nf);
+            createPrimaryIndex(db);
 
-            // Bulk-load nodes in batches using UNWIND
-            // Smaller batches to avoid Neo4j memory pool limit (nodes carry prop_* properties)
-            int nodeBatchSize = 500;
-            int nodesLoaded = 0;
-            int totalNodes = enrichedNodes.size();
-            for (int i = 0; i < totalNodes; i += nodeBatchSize) {
-                int end = Math.min(i + nodeBatchSize, totalNodes);
-                var batch = new ArrayList<Map<String, Object>>(end - i);
-                for (int j = i; j < end; j++) {
-                    CodeNode node = enrichedNodes.get(j);
-                    var props = new HashMap<String, Object>();
-                    props.put("id", node.getId());
-                    props.put("kind", node.getKind().getValue());
-                    props.put("label", node.getLabel());
-                    if (node.getFqn() != null) props.put("fqn", node.getFqn());
-                    if (node.getModule() != null) props.put("module", node.getModule());
-                    if (node.getFilePath() != null) props.put("filePath", node.getFilePath());
-                    if (node.getLineStart() != null) props.put("lineStart", node.getLineStart());
-                    if (node.getLineEnd() != null) props.put("lineEnd", node.getLineEnd());
-                    if (node.getLayer() != null) props.put("layer", node.getLayer());
-                    if (node.getAnnotations() != null && !node.getAnnotations().isEmpty()) {
-                        props.put("annotations", String.join(",", node.getAnnotations()));
-                    }
-                    // Include detector properties (framework, http_method, auth_type, etc.)
-                    if (node.getProperties() != null) {
-                        for (var entry : node.getProperties().entrySet()) {
-                            if (entry.getValue() != null) {
-                                props.put("prop_" + entry.getKey(), entry.getValue().toString());
-                            }
-                        }
-                    }
-                    batch.add(props);
-                }
-                try (Transaction tx = db.beginTx()) {
-                    tx.execute("UNWIND $nodes AS props CREATE (n:CodeNode) SET n = props",
-                            Map.of("nodes", batch));
-                    tx.commit();
-                }
-                nodesLoaded += batch.size();
-                if (nodesLoaded % 10000 < nodeBatchSize || nodesLoaded >= totalNodes) {
-                    CliOutput.info("  nodes: " + nf.format(nodesLoaded) + "/" + nf.format(totalNodes)
-                            + " (" + (100 * nodesLoaded / totalNodes) + "%)");
-                }
-            }
+            Set<String> loadedNodeIds = collectLoadedNodeIds(graph.nodes());
+            createStubNodesForExternalRefs(db, graph.edges(), loadedNodeIds);
 
-            // Create index on id for edge resolution and wait for it to come online
-            CliOutput.info("  Creating index on node ID...");
-            try (Transaction tx = db.beginTx()) {
-                tx.execute("CREATE INDEX IF NOT EXISTS FOR (n:CodeNode) ON (n.id)");
-                tx.commit();
-            }
-            // Wait for index to be populated (critical for edge MATCH performance)
-            try (Transaction tx = db.beginTx()) {
-                tx.execute("CALL db.awaitIndexes(300)");
-            } catch (Exception e) {
-                log.debug("Index await returned: {}", e.getMessage());
-                // Index may already be online, continue
-            }
-            CliOutput.info("  Index ready");
+            List<Map<String, Object>> validEdgeMaps = buildValidEdgeMaps(graph.edges());
+            int edgesLoaded = bulkLoadEdges(db, validEdgeMaps, nf);
 
-            // Bulk-load ALL edges (including those with external targets).
-            // Stub nodes are created below for any missing source/target IDs.
-            List<CodeEdge> validEdges = new ArrayList<>(enrichedEdges);
-
-            // Build set of all loaded node IDs for edge validation
-            Set<String> loadedNodeIds = new java.util.HashSet<>(enrichedNodes.size());
-            for (CodeNode n : enrichedNodes) {
-                loadedNodeIds.add(n.getId());
-            }
-
-            // Pre-scan edges for missing targets and create stub nodes
-            Set<String> stubIds = new java.util.LinkedHashSet<>();
-            for (CodeEdge edge : validEdges) {
-                String sourceId = edge.getSourceId();
-                String targetId = edge.getTarget() != null ? edge.getTarget().getId() : null;
-                if (sourceId != null && !loadedNodeIds.contains(sourceId)) stubIds.add(sourceId);
-                if (targetId != null && !loadedNodeIds.contains(targetId)) stubIds.add(targetId);
-            }
-            if (!stubIds.isEmpty()) {
-                CliOutput.info("  Creating " + stubIds.size() + " stub nodes for external references...");
-                var stubBatch = new ArrayList<Map<String, Object>>();
-                for (String stubId : stubIds) {
-                    stubBatch.add(Map.of("id", stubId, "kind", "external", "label", stubId));
-                    loadedNodeIds.add(stubId);
-                    if (stubBatch.size() >= 500) {
-                        try (Transaction tx = db.beginTx()) {
-                            tx.execute("UNWIND $batch AS n MERGE (node:CodeNode {id: n.id}) "
-                                    + "ON CREATE SET node.kind = n.kind, node.label = n.label",
-                                    Map.of("batch", stubBatch));
-                            tx.commit();
-                        }
-                        stubBatch.clear();
-                    }
-                }
-                if (!stubBatch.isEmpty()) {
-                    try (Transaction tx = db.beginTx()) {
-                        tx.execute("UNWIND $batch AS n MERGE (node:CodeNode {id: n.id}) "
-                                + "ON CREATE SET node.kind = n.kind, node.label = n.label",
-                                Map.of("batch", stubBatch));
-                        tx.commit();
-                    }
-                }
-            }
-
-            // Collect valid edge maps (pre-validate before batching)
-            var om = new com.fasterxml.jackson.databind.ObjectMapper();
-            var validEdgeMaps = new ArrayList<Map<String, Object>>(validEdges.size());
-            for (CodeEdge edge : validEdges) {
-                String sourceId = edge.getSourceId();
-                String targetId = edge.getTarget() != null ? edge.getTarget().getId() : null;
-                if (sourceId == null || targetId == null) continue;
-
-                // Validate edge kind comes from EdgeKind enum
-                String edgeKindValue = edge.getKind().getValue();
-                try {
-                    EdgeKind.fromValue(edgeKindValue);
-                } catch (IllegalArgumentException ex) {
-                    log.warn("Skipping edge with unknown kind: {}", edgeKindValue);
-                    continue;
-                }
-                var props = new HashMap<String, Object>();
-                props.put("sourceId", sourceId);
-                props.put("targetId", targetId);
-                props.put("edgeId", edge.getId() != null ? edge.getId() : "");
-                props.put("edgeKind", edgeKindValue);
-                props.put("edgeSourceId", sourceId);
-                if (edge.getProperties() != null && !edge.getProperties().isEmpty()) {
-                    try {
-                        props.put("edgeProperties", om.writeValueAsString(edge.getProperties()));
-                    } catch (Exception ignored) {}
-                }
-                validEdgeMaps.add(props);
-            }
-
-            int edgeBatchSize = 500;
-            int edgesLoaded = 0;
-            int totalEdges = validEdgeMaps.size();
-            CliOutput.info("  Loading " + nf.format(totalEdges) + " edges...");
-            for (int i = 0; i < totalEdges; i += edgeBatchSize) {
-                int end = Math.min(i + edgeBatchSize, totalEdges);
-                var batch = validEdgeMaps.subList(i, end);
-                try (Transaction tx = db.beginTx()) {
-                    tx.execute(
-                            "UNWIND $edges AS edge "
-                                    + "MATCH (s:CodeNode {id: edge.sourceId}), (t:CodeNode {id: edge.targetId}) "
-                                    + "CREATE (s)-[r:RELATES_TO {id: edge.edgeId, kind: edge.edgeKind, sourceId: edge.edgeSourceId}]->(t)",
-                            Map.of("edges", new ArrayList<>(batch)));
-                    tx.commit();
-                }
-                edgesLoaded += batch.size();
-                if (edgesLoaded % 10000 < edgeBatchSize || edgesLoaded >= totalEdges) {
-                    CliOutput.info("  edges: " + nf.format(edgesLoaded) + "/" + nf.format(totalEdges)
-                            + " (" + (100 * edgesLoaded / totalEdges) + "%)");
-                }
-            }
-
-            // Create additional indexes for fast queries
-            try (Transaction tx = db.beginTx()) {
-                tx.execute("CREATE INDEX IF NOT EXISTS FOR (n:CodeNode) ON (n.kind)");
-                tx.execute("CREATE INDEX IF NOT EXISTS FOR (n:CodeNode) ON (n.layer)");
-                tx.execute("CREATE INDEX IF NOT EXISTS FOR (n:CodeNode) ON (n.module)");
-                tx.execute("CREATE INDEX IF NOT EXISTS FOR (n:CodeNode) ON (n.filePath)");
-                tx.execute("CREATE INDEX IF NOT EXISTS FOR (n:CodeNode) ON (n.label_lower)");
-                tx.execute("CREATE INDEX IF NOT EXISTS FOR (n:CodeNode) ON (n.fqn_lower)");
-                tx.execute("CREATE FULLTEXT INDEX search_index IF NOT EXISTS "
-                        + "FOR (n:CodeNode) ON EACH [n.label_lower, n.fqn_lower] "
-                        + "OPTIONS {indexConfig: {`fulltext.analyzer`: 'keyword'}}");
-                tx.execute("CREATE FULLTEXT INDEX lexical_index IF NOT EXISTS "
-                        + "FOR (n:CodeNode) ON EACH [n.prop_lex_comment, n.prop_lex_config_keys] "
-                        + "OPTIONS {indexConfig: {`fulltext.analyzer`: 'standard'}}");
-                tx.commit();
-            }
-            // Wait for all indexes (including fulltext) to finish building
-            try (Transaction tx = db.beginTx()) {
-                tx.execute("CALL db.awaitIndexes(300)");
-            } catch (Exception e) {
-                log.debug("Secondary index await returned: {}", e.getMessage());
-            }
+            createSecondaryIndexes(db);
             CliOutput.info("  Created Neo4j indexes");
-            CliOutput.info("  Done in " + Duration.between(stepStart, Instant.now()).toMillis() + "ms");
+            logStepDone(stepStart);
 
-            Duration elapsed = Duration.between(start, Instant.now());
-            long secs = elapsed.toSeconds();
-            String timeStr = secs > 0 ? secs + "s" : elapsed.toMillis() + "ms";
-
-            System.out.println();
-            CliOutput.success("[OK] Enrichment complete -- "
-                    + nf.format(nodesLoaded) + " nodes, "
-                    + nf.format(edgesLoaded) + " edges in " + timeStr);
-            System.out.println();
-            CliOutput.info("  Graph:   " + graphPath);
-            CliOutput.info("  Time:    " + timeStr);
-            System.out.println();
-            CliOutput.info("  Next step: codeiq serve " + path);
-
+            printCompletionSummary(graphPath, nodesLoaded, edgesLoaded, nf, start);
             return 0;
 
         } catch (IOException | RuntimeException e) {
@@ -431,13 +278,281 @@ public class EnrichCommand implements Callable<Integer> {
             CliOutput.error("Enrichment failed: " + e.getMessage());
             return 1;
         } finally {
-            if (dbms != null) {
-                try {
-                    dbms.shutdown();
-                } catch (Exception ignored) {
-                }
-            }
+            shutdownQuietly(dbms);
         }
     }
 
+    private void clearGraph(GraphDatabaseService db) {
+        CliOutput.info("  Clearing existing graph...");
+        // Clear in batches to avoid memory pool limit on large graphs.
+        int deleted;
+        do {
+            try (Transaction tx = db.beginTx()) {
+                Result result = tx.execute(
+                        "MATCH (n) WITH n LIMIT " + CLEAR_BATCH_SIZE + " DETACH DELETE n RETURN count(*) AS cnt");
+                deleted = result.hasNext() ? ((Number) result.next().get("cnt")).intValue() : 0;
+                tx.commit();
+            }
+        } while (deleted > 0);
+    }
+
+    private int bulkLoadNodes(GraphDatabaseService db, List<CodeNode> nodes, NumberFormat nf) {
+        int totalNodes = nodes.size();
+        int nodesLoaded = 0;
+        // Smaller batches to avoid Neo4j memory pool limit (nodes carry prop_* properties).
+        for (int i = 0; i < totalNodes; i += NODE_BATCH_SIZE) {
+            int end = Math.min(i + NODE_BATCH_SIZE, totalNodes);
+            List<Map<String, Object>> batch = buildNodePropsBatch(nodes, i, end);
+            try (Transaction tx = db.beginTx()) {
+                tx.execute("UNWIND $nodes AS props CREATE (n:CodeNode) SET n = props",
+                        Map.of("nodes", batch));
+                tx.commit();
+            }
+            nodesLoaded += batch.size();
+            reportNodeProgress(nodesLoaded, totalNodes, nf);
+        }
+        return nodesLoaded;
+    }
+
+    private List<Map<String, Object>> buildNodePropsBatch(List<CodeNode> nodes, int start, int end) {
+        List<Map<String, Object>> batch = new ArrayList<>(end - start);
+        for (int j = start; j < end; j++) {
+            batch.add(toNodeProps(nodes.get(j)));
+        }
+        return batch;
+    }
+
+    private Map<String, Object> toNodeProps(CodeNode node) {
+        Map<String, Object> props = new HashMap<>();
+        props.put("id", node.getId());
+        props.put("kind", node.getKind().getValue());
+        props.put("label", node.getLabel());
+        putIfNotNull(props, "fqn", node.getFqn());
+        putIfNotNull(props, "module", node.getModule());
+        putIfNotNull(props, "filePath", node.getFilePath());
+        putIfNotNull(props, "lineStart", node.getLineStart());
+        putIfNotNull(props, "lineEnd", node.getLineEnd());
+        putIfNotNull(props, "layer", node.getLayer());
+        if (node.getAnnotations() != null && !node.getAnnotations().isEmpty()) {
+            props.put("annotations", String.join(",", node.getAnnotations()));
+        }
+        // Include detector properties (framework, http_method, auth_type, etc.)
+        if (node.getProperties() != null) {
+            for (var entry : node.getProperties().entrySet()) {
+                if (entry.getValue() != null) {
+                    props.put("prop_" + entry.getKey(), entry.getValue().toString());
+                }
+            }
+        }
+        return props;
+    }
+
+    private static void putIfNotNull(Map<String, Object> props, String key, Object value) {
+        if (value != null) {
+            props.put(key, value);
+        }
+    }
+
+    private void reportNodeProgress(int nodesLoaded, int totalNodes, NumberFormat nf) {
+        if (nodesLoaded % PROGRESS_REPORT_INTERVAL < NODE_BATCH_SIZE || nodesLoaded >= totalNodes) {
+            CliOutput.info("  nodes: " + nf.format(nodesLoaded) + "/" + nf.format(totalNodes)
+                    + " (" + (100 * nodesLoaded / totalNodes) + "%)");
+        }
+    }
+
+    private void createPrimaryIndex(GraphDatabaseService db) {
+        CliOutput.info("  Creating index on node ID...");
+        try (Transaction tx = db.beginTx()) {
+            tx.execute("CREATE INDEX IF NOT EXISTS FOR (n:CodeNode) ON (n.id)");
+            tx.commit();
+        }
+        // Wait for index to be populated (critical for edge MATCH performance).
+        awaitIndexes(db, "Index await returned: {}");
+        CliOutput.info("  Index ready");
+    }
+
+    private void awaitIndexes(GraphDatabaseService db, String debugTemplate) {
+        try (Transaction tx = db.beginTx()) {
+            tx.execute("CALL db.awaitIndexes(" + INDEX_AWAIT_SECONDS + ")");
+        } catch (Exception e) {
+            log.debug(debugTemplate, e.getMessage());
+        }
+    }
+
+    private Set<String> collectLoadedNodeIds(List<CodeNode> nodes) {
+        Set<String> loadedNodeIds = new HashSet<>(nodes.size());
+        for (CodeNode n : nodes) {
+            loadedNodeIds.add(n.getId());
+        }
+        return loadedNodeIds;
+    }
+
+    private void createStubNodesForExternalRefs(GraphDatabaseService db, List<CodeEdge> edges,
+                                                Set<String> loadedNodeIds) {
+        Set<String> stubIds = new LinkedHashSet<>();
+        for (CodeEdge edge : edges) {
+            String sourceId = edge.getSourceId();
+            String targetId = edge.getTarget() != null ? edge.getTarget().getId() : null;
+            if (sourceId != null && !loadedNodeIds.contains(sourceId)) {
+                stubIds.add(sourceId);
+            }
+            if (targetId != null && !loadedNodeIds.contains(targetId)) {
+                stubIds.add(targetId);
+            }
+        }
+        if (stubIds.isEmpty()) {
+            return;
+        }
+        CliOutput.info("  Creating " + stubIds.size() + " stub nodes for external references...");
+        flushStubBatches(db, stubIds, loadedNodeIds);
+    }
+
+    private void flushStubBatches(GraphDatabaseService db, Set<String> stubIds,
+                                  Set<String> loadedNodeIds) {
+        List<Map<String, Object>> stubBatch = new ArrayList<>();
+        for (String stubId : stubIds) {
+            stubBatch.add(Map.of("id", stubId, "kind", "external", "label", stubId));
+            loadedNodeIds.add(stubId);
+            if (stubBatch.size() >= STUB_BATCH_SIZE) {
+                writeStubBatch(db, stubBatch);
+                stubBatch.clear();
+            }
+        }
+        if (!stubBatch.isEmpty()) {
+            writeStubBatch(db, stubBatch);
+        }
+    }
+
+    private void writeStubBatch(GraphDatabaseService db, List<Map<String, Object>> stubBatch) {
+        try (Transaction tx = db.beginTx()) {
+            tx.execute(UNWIND_STUB_MERGE, Map.of("batch", stubBatch));
+            tx.commit();
+        }
+    }
+
+    private List<Map<String, Object>> buildValidEdgeMaps(List<CodeEdge> edges) {
+        ObjectMapper om = new ObjectMapper();
+        List<Map<String, Object>> validEdgeMaps = new ArrayList<>(edges.size());
+        for (CodeEdge edge : edges) {
+            Map<String, Object> props = toEdgeProps(edge, om);
+            if (props != null) {
+                validEdgeMaps.add(props);
+            }
+        }
+        return validEdgeMaps;
+    }
+
+    private Map<String, Object> toEdgeProps(CodeEdge edge, ObjectMapper om) {
+        String sourceId = edge.getSourceId();
+        String targetId = edge.getTarget() != null ? edge.getTarget().getId() : null;
+        if (sourceId == null || targetId == null) {
+            return null;
+        }
+        String edgeKindValue = edge.getKind().getValue();
+        try {
+            EdgeKind.fromValue(edgeKindValue);
+        } catch (IllegalArgumentException ex) {
+            log.warn("Skipping edge with unknown kind: {}", edgeKindValue);
+            return null;
+        }
+        Map<String, Object> props = new HashMap<>();
+        props.put("sourceId", sourceId);
+        props.put("targetId", targetId);
+        props.put("edgeId", edge.getId() != null ? edge.getId() : "");
+        props.put("edgeKind", edgeKindValue);
+        props.put("edgeSourceId", sourceId);
+        if (edge.getProperties() != null && !edge.getProperties().isEmpty()) {
+            try {
+                props.put("edgeProperties", om.writeValueAsString(edge.getProperties()));
+            } catch (JsonProcessingException ignored) {
+                // Best-effort: omit edge properties when they cannot be serialized.
+            }
+        }
+        return props;
+    }
+
+    private int bulkLoadEdges(GraphDatabaseService db, List<Map<String, Object>> validEdgeMaps,
+                              NumberFormat nf) {
+        int totalEdges = validEdgeMaps.size();
+        CliOutput.info("  Loading " + nf.format(totalEdges) + " edges...");
+        int edgesLoaded = 0;
+        for (int i = 0; i < totalEdges; i += EDGE_BATCH_SIZE) {
+            int end = Math.min(i + EDGE_BATCH_SIZE, totalEdges);
+            List<Map<String, Object>> batch = validEdgeMaps.subList(i, end);
+            try (Transaction tx = db.beginTx()) {
+                tx.execute(
+                        "UNWIND $edges AS edge "
+                                + "MATCH (s:CodeNode {id: edge.sourceId}), (t:CodeNode {id: edge.targetId}) "
+                                + "CREATE (s)-[r:RELATES_TO {id: edge.edgeId, kind: edge.edgeKind, sourceId: edge.edgeSourceId}]->(t)",
+                        Map.of("edges", new ArrayList<>(batch)));
+                tx.commit();
+            }
+            edgesLoaded += batch.size();
+            reportEdgeProgress(edgesLoaded, totalEdges, nf);
+        }
+        return edgesLoaded;
+    }
+
+    private void reportEdgeProgress(int edgesLoaded, int totalEdges, NumberFormat nf) {
+        if (edgesLoaded % PROGRESS_REPORT_INTERVAL < EDGE_BATCH_SIZE || edgesLoaded >= totalEdges) {
+            CliOutput.info("  edges: " + nf.format(edgesLoaded) + "/" + nf.format(totalEdges)
+                    + " (" + (100 * edgesLoaded / totalEdges) + "%)");
+        }
+    }
+
+    private void createSecondaryIndexes(GraphDatabaseService db) {
+        try (Transaction tx = db.beginTx()) {
+            tx.execute("CREATE INDEX IF NOT EXISTS FOR (n:CodeNode) ON (n.kind)");
+            tx.execute("CREATE INDEX IF NOT EXISTS FOR (n:CodeNode) ON (n.layer)");
+            tx.execute("CREATE INDEX IF NOT EXISTS FOR (n:CodeNode) ON (n.module)");
+            tx.execute("CREATE INDEX IF NOT EXISTS FOR (n:CodeNode) ON (n.filePath)");
+            tx.execute("CREATE INDEX IF NOT EXISTS FOR (n:CodeNode) ON (n.label_lower)");
+            tx.execute("CREATE INDEX IF NOT EXISTS FOR (n:CodeNode) ON (n.fqn_lower)");
+            tx.execute("CREATE FULLTEXT INDEX search_index IF NOT EXISTS "
+                    + "FOR (n:CodeNode) ON EACH [n.label_lower, n.fqn_lower] "
+                    + "OPTIONS {indexConfig: {`fulltext.analyzer`: 'keyword'}}");
+            tx.execute("CREATE FULLTEXT INDEX lexical_index IF NOT EXISTS "
+                    + "FOR (n:CodeNode) ON EACH [n.prop_lex_comment, n.prop_lex_config_keys] "
+                    + "OPTIONS {indexConfig: {`fulltext.analyzer`: 'standard'}}");
+            tx.commit();
+        }
+        // Wait for all indexes (including fulltext) to finish building.
+        awaitIndexes(db, "Secondary index await returned: {}");
+    }
+
+    private void printCompletionSummary(Path graphPath, int nodesLoaded, int edgesLoaded,
+                                        NumberFormat nf, Instant start) {
+        Duration elapsed = Duration.between(start, Instant.now());
+        long secs = elapsed.toSeconds();
+        String timeStr = secs > 0 ? secs + "s" : elapsed.toMillis() + "ms";
+
+        System.out.println();
+        CliOutput.success("[OK] Enrichment complete -- "
+                + nf.format(nodesLoaded) + " nodes, "
+                + nf.format(edgesLoaded) + " edges in " + timeStr);
+        System.out.println();
+        CliOutput.info("  Graph:   " + graphPath);
+        CliOutput.info("  Time:    " + timeStr);
+        System.out.println();
+        CliOutput.info("  Next step: codeiq serve " + path);
+    }
+
+    private static void shutdownQuietly(DatabaseManagementService dbms) {
+        if (dbms == null) {
+            return;
+        }
+        try {
+            dbms.shutdown();
+        } catch (Exception ignored) {
+            // Best-effort shutdown — already failing or already shut down.
+        }
+    }
+
+    private static void logStepDone(Instant stepStart) {
+        CliOutput.info("  Done in " + Duration.between(stepStart, Instant.now()).toMillis() + "ms");
+    }
+
+    /** In-flight enriched graph state passed between phases. */
+    private record EnrichedGraph(List<CodeNode> nodes, List<CodeEdge> edges) {
+    }
 }
