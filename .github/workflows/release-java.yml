@@ -23,22 +23,52 @@ jobs:
           server-password: MAVEN_PASSWORD
           gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
           gpg-passphrase: MAVEN_GPG_PASSPHRASE
-      - name: Set release version
+      - name: Configure git identity for signed release commit and tag
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name  "github-actions[bot]"
+          # Use the GPG key imported by setup-java (MAVEN_GPG_PRIVATE_KEY) for
+          # both commit and tag signing — same trust path as the artifact.
+          KEYID=$(gpg --list-secret-keys --with-colons | awk -F: '/^sec:/ {print $5; exit}')
+          if [ -z "$KEYID" ]; then
+            echo "no GPG secret key in agent — release-java.yml needs MAVEN_GPG_PRIVATE_KEY" >&2
+            exit 1
+          fi
+          git config user.signingkey  "$KEYID"
+          git config gpg.format       openpgp
+          git config commit.gpgsign   true
+          git config tag.gpgsign      true
+      - name: Set release version and create signed release commit
         env:
           RELEASE_VERSION: ${{ inputs.version }}
-        run: mvn versions:set -DnewVersion="$RELEASE_VERSION"
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+        # Commit the version bump on a detached HEAD off the workflow's
+        # checkout. The commit is reachable only via the tag created below —
+        # no push to `main`, so this works under branch protection.
+        # The commit captures the exact source tree that the deploy step
+        # will build from, fixing the prior "tag diverges from released
+        # artifact" gap (Reviewer finding 47b718b9).
+        run: |
+          mvn -B -ntp versions:set -DnewVersion="$RELEASE_VERSION" -DgenerateBackupPoms=false
+          git add pom.xml
+          git commit -S -m "chore(release): ${RELEASE_VERSION}"
       - name: Deploy to Maven Central
         env:
           MAVEN_USERNAME: ${{ secrets.OSS_NEXUS_USER }}
           MAVEN_PASSWORD: ${{ secrets.OSS_NEXUS_PASS }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
-        run: mvn clean deploy -P release -B
-      - name: Tag release
+        run: mvn -B -ntp -P release clean deploy
+      - name: Create signed annotated tag and push
         env:
           RELEASE_VERSION: ${{ inputs.version }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+        # Annotated + GPG-signed tag pointing at the release commit (the
+        # current HEAD after the commit step above). Push only the tag —
+        # the release commit lives only as a tag-reachable object so we
+        # never need to update `main`, and branch protection stays clean.
         run: |
-          git tag "v${RELEASE_VERSION}"
-          git push origin "v${RELEASE_VERSION}"
+          git tag -s "v${RELEASE_VERSION}" -m "codeiq ${RELEASE_VERSION}"
+          git push origin "refs/tags/v${RELEASE_VERSION}"
       - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: v${{ inputs.version }}

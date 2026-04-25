@@ -39,30 +39,32 @@ Run BEFORE creating the tag:
 
 ## 3. Cut a release (canonical path)
 
-Driven by `release-java.yml` via **manual `workflow_dispatch`** with a `version` input. The workflow itself bumps `pom.xml`, deploys to Maven Central, then creates and pushes the `vX.Y.Z` tag and the GitHub Release.
+Driven by `release-java.yml` via **manual `workflow_dispatch`** with a `version` input. The workflow does **everything**: it creates a release commit (signed) on a detached HEAD with the bumped version, deploys to Maven Central from that exact source tree, and then creates a GPG-signed annotated tag pointing at that release commit. The tag is the only persistent reference to the release commit — `main` is never directly pushed by the workflow, so branch protection stays clean.
 
 ```bash
-# 1. Promote CHANGELOG on main
+# 1. Promote CHANGELOG on main (PR + merge per branch protection)
 $EDITOR CHANGELOG.md  # move [Unreleased] → [X.Y.Z] - YYYY-MM-DD
-git add CHANGELOG.md
-git commit -S -m "chore(release): X.Y.Z"
-git push origin main
+gh pr create --fill --base main
+gh pr merge --squash --auto
 
 # 2. Trigger the release workflow with the target version
 gh workflow run release-java.yml --ref main -f version=X.Y.Z
 
-# 3. Watch it run (workflow handles versions:set, deploy, tag, GH Release)
+# 3. Watch it run
 gh run watch $(gh run list --workflow release-java.yml --limit 1 --json databaseId --jq '.[0].databaseId')
 ```
 
-`release-java.yml` then:
-1. Sets the pom version to `X.Y.Z` via `mvn versions:set`.
-2. Deploys to Sonatype Central with the `release` profile (`mvn -P release -B clean deploy`) — runs the full quality gate on the way (jacoco 85% + SpotBugs + dependency-check).
-3. Signs artifacts with `MAVEN_GPG_*` secrets.
-4. Creates the annotated tag `vX.Y.Z` and pushes it (the workflow has `contents: write`).
-5. Cuts a GitHub Release from the tag and uploads `code-iq-X.Y.Z-cli.jar`, with auto-generated release notes.
+`release-java.yml` then, in order:
+1. Configures git identity (`github-actions[bot]`) and binds it to the imported `MAVEN_GPG_PRIVATE_KEY` for both commit and tag signing — same trust path as the published artifact.
+2. Runs `mvn versions:set -DnewVersion=X.Y.Z` and creates a **GPG-signed release commit** on a detached HEAD capturing that tree.
+3. Runs `mvn -P release clean deploy` from that release commit's tree (full quality gate runs along the way: jacoco 85%, SpotBugs, OWASP Dependency-Check).
+4. Creates a **GPG-signed annotated tag `vX.Y.Z`** pointing at the release commit.
+5. Pushes only the tag (`git push origin refs/tags/vX.Y.Z`). The release commit lives only as a tag-reachable object — no `main` update.
+6. Cuts a GitHub Release from the tag and uploads `code-iq-X.Y.Z-cli.jar` with auto-generated release notes.
 
-If you prefer to drive the tag yourself (fork or downstream cut), `release-java.yml`'s `workflow_dispatch` is still the canonical entrypoint — push the tag manually only after the deploy succeeds. Direct tag-push without the workflow does **not** publish.
+The tag therefore points at the **exact source** that produced the artifact (no divergence between source tag and released artifact), and is annotated and GPG-signed — verifiable with `git tag --verify vX.Y.Z` provided the maintainer's public GPG key is trusted locally.
+
+Manual cuts on a fork or downstream consumer follow the same flow: trigger the workflow with the target version. Direct `git tag && git push origin vX.Y.Z` from a developer machine does **not** publish.
 
 ---
 
