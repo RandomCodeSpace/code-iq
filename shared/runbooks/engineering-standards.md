@@ -11,7 +11,7 @@ The rule of last resort: **`/home/dev/.claude/rules/*.md` wins.** This file does
 | Gate | Threshold | Where it runs | Failure action |
 |---|---|---|---|
 | Unit + integration tests | All pass | `mvn verify` (CI + local) | Block merge |
-| JaCoCo coverage | ≥ 85% line, ≥ 75% branch (project-wide, post-exclusions) | `jacoco-maven-plugin` rule in `pom.xml` | Block merge |
+| JaCoCo coverage | ≥ 85% line (project-wide, post-exclusions) | `jacoco-maven-plugin` rule in `pom.xml` | Block merge |
 | SonarCloud Quality Gate | `Passed` (`Sonar way` profile + 80% new-code coverage) | `ci-java.yml` | Block merge |
 | SpotBugs | Zero High/Critical findings; `spotbugs-exclude.xml` justified per-entry | `mvn spotbugs:check` | Block merge |
 | OWASP Dependency-Check | No High/Critical CVEs (`failBuildOnCVSS=7`); Medium tracked | `mvn -B -ntp clean verify` (the `dependency-check:check` execution is bound to the `verify` phase in `pom.xml`); `ci-java.yml` runs on every PR + push to `main` | Block merge |

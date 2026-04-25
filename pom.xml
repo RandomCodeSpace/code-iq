@@ -410,7 +410,32 @@
                 <version>${spotbugs.version}</version>
                 <configuration>
                     <excludeFilterFile>spotbugs-exclude.xml</excludeFilterFile>
+                    <!-- Hard gate semantics per engineering-standards.md §1:
+                         "Zero High/Critical findings". Threshold High filters
+                         out Medium/Low findings (so the gate doesn't trip on
+                         non-blocking findings); failOnError is the
+                         spotbugs-maven-plugin default for `check`, made
+                         explicit so a future config edit doesn't silently
+                         relax the gate. -->
+                    <threshold>High</threshold>
+                    <failOnError>true</failOnError>
                 </configuration>
+                <executions>
+                    <!-- Reviewer finding fd559a54 (RAN-47, R5-4):
+                         spotbugs-maven-plugin was declared but had no
+                         lifecycle binding, so `mvn verify` (and therefore
+                         CI on every PR) did not actually run SpotBugs.
+                         Bind `check` to the verify phase so the gate
+                         claimed in engineering-standards.md §1 is
+                         actually enforced on every build. -->
+                    <execution>
+                        <id>spotbugs-check-on-verify</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
 
             <plugin>

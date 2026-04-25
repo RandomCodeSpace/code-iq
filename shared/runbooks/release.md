@@ -14,7 +14,7 @@ codeiq ships in three forms. A "release" updates **all three** in lockstep:
 |---|---|---|
 | Library JAR | `io.github.randomcodespace.iq:code-iq` (POM packaging) | Maven Central via Sonatype Central Portal |
 | Executable CLI JAR | `target/code-iq-<version>-cli.jar` | GitHub Release asset |
-| Source tag | `v<version>` (annotated, ssh-signed) | Git tag pushed to `RandomCodeSpace/codeiq` |
+| Source tag | `v<version>` (annotated, GPG/OpenPGP-signed by `release-java.yml`) | Git tag pushed to `RandomCodeSpace/codeiq` |
 
 Versioning is [SemVer](https://semver.org/). Pre-`1.0.0` releases use `0.MINOR.PATCH`; breaking changes bump MINOR.
 
@@ -33,7 +33,7 @@ Run BEFORE creating the tag:
 5. SpotBugs clean: `mvn spotbugs:check` exits 0.
 6. CHANGELOG entry drafted under `[Unreleased]` and ready to promote.
 7. Working copy of `main` is clean (`git status --porcelain` empty).
-8. Local signing key present: `ssh-add -L | grep -F "$(cat ~/.ssh/id_ed25519.pub | awk '{print $2}')"` — required for the annotated tag.
+8. GPG release-signing secrets present in repo settings: `MAVEN_GPG_PRIVATE_KEY` and `MAVEN_GPG_PASSPHRASE` (verify via `gh secret list`). The workflow signs both the release commit and the annotated tag with the imported OpenPGP key — no local SSH or GPG key is required on the maintainer's machine for the GA path (Reviewer finding fd559a54, R5-7).
 
 ---
 

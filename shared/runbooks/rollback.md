@@ -62,7 +62,41 @@ Do NOT delete the bad git tag. Yanking tags after they have been seen by consume
 
 These are driven by `gh api` calls (see RAN-46 inventory). They are not in version control by themselves, so rollback is by re-running the prior call.
 
-- **Branch protection**: snapshot before any change with `gh api /repos/RandomCodeSpace/codeiq/branches/main/protection > /tmp/bp-before.json`. To roll back: `cat /tmp/bp-before.json | gh api -X PUT /repos/RandomCodeSpace/codeiq/branches/main/protection --input -`.
+- **Branch protection**: snapshot before any change with `gh api /repos/RandomCodeSpace/codeiq/branches/main/protection > /tmp/bp-before.json`. The GET payload is a denormalized view that GitHub's PUT endpoint does **not** accept verbatim (PUT flattens the nested objects: `enforce_admins.enabled` → bare boolean, `required_status_checks.checks[].context` strings → flat `contexts[]`, `*.url` fields are rejected). Reshape with the jq filter below before piping into PUT (Reviewer finding fd559a54, R5-5):
+
+  ```bash
+  jq '{
+    required_status_checks: (
+      if .required_status_checks == null then null
+      else {
+        strict: .required_status_checks.strict,
+        contexts: ([.required_status_checks.checks[]?.context] // [])
+      }
+      end
+    ),
+    enforce_admins: (.enforce_admins.enabled // false),
+    required_pull_request_reviews: (
+      if .required_pull_request_reviews == null then null
+      else {
+        dismiss_stale_reviews:           (.required_pull_request_reviews.dismiss_stale_reviews // false),
+        require_code_owner_reviews:      (.required_pull_request_reviews.require_code_owner_reviews // false),
+        required_approving_review_count: (.required_pull_request_reviews.required_approving_review_count // 1)
+      }
+      end
+    ),
+    restrictions: null,
+    required_linear_history:           (.required_linear_history.enabled // false),
+    allow_force_pushes:                (.allow_force_pushes.enabled // false),
+    allow_deletions:                   (.allow_deletions.enabled // false),
+    block_creations:                   (.block_creations.enabled // false),
+    required_conversation_resolution:  (.required_conversation_resolution.enabled // false),
+    lock_branch:                       (.lock_branch.enabled // false),
+    allow_fork_syncing:                (.allow_fork_syncing.enabled // false)
+  }' /tmp/bp-before.json \
+    | gh api -X PUT /repos/RandomCodeSpace/codeiq/branches/main/protection --input -
+  ```
+
+  The transform unwraps the `{enabled: bool}` envelopes, projects `checks[].context` strings out into the flat `contexts[]` PUT expects, drops `*.url` fields, and forces `restrictions: null` (apps/teams/users restrictions are out of scope for this repo). If you need to *change* a field instead of rolling back, edit the transformed payload before piping.
 - **CodeQL default setup**: re-toggle via Repository Settings → Code security → Code scanning. The disabled state is the safe default.
 - **Dependabot security updates**: `gh api -X PUT /repos/RandomCodeSpace/codeiq/automated-security-fixes` to enable, `-X DELETE` to disable.
 - **Workflow files** (`.github/workflows/*.yml`): revert via §2 — they are version-controlled.
