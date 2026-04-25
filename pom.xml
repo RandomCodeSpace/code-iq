@@ -31,6 +31,14 @@
         <checkstyle-plugin.version>3.6.0</checkstyle-plugin.version>
 
         <!--
+          Toggle for the frontend-maven-plugin. Defaults to false so
+          `mvn package` still bundles the React SPA. Backend-only
+          contributors can bypass the npm build with:
+            mvn test -Dfrontend.skip=true
+        -->
+        <frontend.skip>false</frontend.skip>
+
+        <!--
           Security override: Spring Boot 4.0.5 pulls tomcat-embed-core 11.0.20
           and jackson (tools.jackson.core) 3.1.0; both have CVEs fixed in the
           next patch release. Bumping these via the Spring-Boot-managed
@@ -246,6 +254,7 @@
                 <configuration>
                     <workingDirectory>src/main/frontend</workingDirectory>
                     <nodeVersion>v20.11.0</nodeVersion>
+                    <skip>${frontend.skip}</skip>
                 </configuration>
                 <executions>
                     <execution>
