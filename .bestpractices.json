@@ -1,0 +1,41 @@
+{
+  "$schema": "https://bestpractices.coreinfrastructure.org/projects.schema.json",
+  "_comment": "OpenSSF Best Practices self-assessment skeleton for RandomCodeSpace/codeiq. The numeric project_id and badge URL are populated by a board admin after registering the project at https://www.bestpractices.dev/ — RAN-46 AC #8 calls this out as auth-blocked. Once the registration is complete, fill `project_id` and re-render the README badge with the resolved URL.",
+  "project_id": null,
+  "name": "codeiq",
+  "description": "Deterministic code knowledge graph — scans codebases to map services, endpoints, entities, infrastructure, auth patterns, and framework usage. No AI, pure static analysis.",
+  "homepage_url": "https://github.com/RandomCodeSpace/codeiq",
+  "repo_url": "https://github.com/RandomCodeSpace/codeiq",
+  "license": "MIT",
+  "level": "passing",
+  "status": {
+    "basics": "self-assessed-passing",
+    "change_control": "self-assessed-passing",
+    "reporting": "self-assessed-passing",
+    "quality": "self-assessed-passing",
+    "security": "self-assessed-passing",
+    "analysis": "self-assessed-passing"
+  },
+  "evidence": {
+    "vulnerability_report_process": "SECURITY.md",
+    "release_process": "shared/runbooks/release.md",
+    "rollback_process": "shared/runbooks/rollback.md",
+    "first_time_setup": "shared/runbooks/first-time-setup.md",
+    "engineering_standards": "shared/runbooks/engineering-standards.md",
+    "license_file": "LICENSE",
+    "build_reproducible": "mvn -B -ntp clean verify",
+    "ci_workflow": ".github/workflows/ci-java.yml",
+    "code_scanning": ".github/workflows/codeql.yml",
+    "supply_chain_scorecard": ".github/workflows/scorecard.yml",
+    "dependency_updates": ".github/dependabot.yml",
+    "signed_commits": "scripts/setup-git-signed.sh",
+    "secret_scanning": "GitHub repo setting (secret_scanning + push_protection enabled)",
+    "static_analysis": "SpotBugs (mvn spotbugs:check) + SonarCloud Quality Gate",
+    "vulnerability_scanning": "OWASP Dependency-Check (mvn dependency-check:check) + Dependabot security updates"
+  },
+  "audit": {
+    "self_assessment_date": "2026-04-25",
+    "self_assessment_author": "TechLead (RAN-46)",
+    "registration_blocker": "https://www.bestpractices.dev/ requires human OAuth/form. Tracked under RAN-46 AC #8."
+  }
+}

@@ -12,6 +12,8 @@
   <a href="https://github.com/RandomCodeSpace/codeiq/blob/main/LICENSE"><img src="https://img.shields.io/github/license/RandomCodeSpace/codeiq?style=flat-square&label=License" alt="MIT License"></a>
   <a href="https://sonarcloud.io/summary/overall?id=RandomCodeSpace_codeiq"><img src="https://sonarcloud.io/api/project_badges/measure?project=RandomCodeSpace_codeiq&metric=security_rating" alt="Security"></a>
   <a href="https://sonarcloud.io/summary/overall?id=RandomCodeSpace_codeiq"><img src="https://sonarcloud.io/api/project_badges/measure?project=RandomCodeSpace_codeiq&metric=reliability_rating" alt="Reliability"></a>
+  <a href="https://api.securityscorecards.dev/projects/github.com/RandomCodeSpace/codeiq"><img src="https://api.securityscorecards.dev/projects/github.com/RandomCodeSpace/codeiq/badge" alt="OpenSSF Scorecard"></a>
+  <a href="https://www.bestpractices.dev/projects/codeiq"><img src="https://img.shields.io/badge/OpenSSF%20Best%20Practices-pending%20registration-lightgrey?style=flat-square&logo=openssf&logoColor=white" alt="OpenSSF Best Practices (pending registration — RAN-46 AC #8)"></a>
   <a href="https://github.com/RandomCodeSpace/codeiq"><img src="https://img.shields.io/badge/detectors-97-brightgreen?style=flat-square&logo=codefactor&logoColor=white" alt="97 Detectors"></a>
   <a href="https://github.com/RandomCodeSpace/codeiq"><img src="https://img.shields.io/badge/languages-35%2B-blue?style=flat-square&logo=stackblitz&logoColor=white" alt="35+ Languages"></a>
 </p>

@@ -1,0 +1,126 @@
+# Release Runbook — codeiq
+
+> **SSoT for shipping codeiq.** Owner: TechLead (until bootstrap completes); thereafter the engineer who owns the change. This runbook is the gate referenced by the bootstrap precondition (`RAN-46`): it MUST exist on `main` before any product `RAN-*` issue can leave `backlog`.
+
+---
+
+## 1. Release surfaces
+
+codeiq ships in three forms. A "release" updates **all three** in lockstep:
+
+| Surface | Artifact | Distribution |
+|---|---|---|
+| Library JAR | `io.github.randomcodespace.iq:code-iq` (POM packaging) | Maven Central via Sonatype Central Portal |
+| Executable CLI JAR | `target/code-iq-<version>-cli.jar` | GitHub Release asset |
+| Source tag | `v<version>` (annotated, ssh-signed) | Git tag pushed to `RandomCodeSpace/codeiq` |
+
+Versioning is [SemVer](https://semver.org/). Pre-`1.0.0` releases use `0.MINOR.PATCH`; breaking changes bump MINOR.
+
+Snapshot artifacts (`-SNAPSHOT`) are published from `main` by `beta-java.yml` to OSSRH snapshots; consumers must opt into the snapshot repo. Snapshots are **not** releases.
+
+---
+
+## 2. Pre-release checklist
+
+Run BEFORE creating the tag:
+
+1. `main` is green: `gh run list --branch main --workflow ci-java.yml --limit 1` → `success`.
+2. SonarCloud Quality Gate: `gh api /repos/RandomCodeSpace/codeiq/actions/runs?branch=main --jq '.workflow_runs[0].conclusion'` and SonarCloud project page both green.
+3. Coverage ≥ 85% (jacoco rule + Sonar new-code ≥ 80% — see [`engineering-standards.md`](engineering-standards.md)).
+4. Dependency audit clean: `mvn dependency-check:check -DfailBuildOnCVSS=7` exits 0; OSV-Scanner workflow latest run green.
+5. SpotBugs clean: `mvn spotbugs:check` exits 0.
+6. CHANGELOG entry drafted under `[Unreleased]` and ready to promote.
+7. Working copy of `main` is clean (`git status --porcelain` empty).
+8. Local signing key present: `ssh-add -L | grep -F "$(cat ~/.ssh/id_ed25519.pub | awk '{print $2}')"` — required for the annotated tag.
+
+---
+
+## 3. Cut a release (canonical path)
+
+Driven by `release-java.yml` triggered on a `v*` tag push.
+
+```bash
+# 1. Promote CHANGELOG
+$EDITOR CHANGELOG.md  # move [Unreleased] → [X.Y.Z] - YYYY-MM-DD
+
+# 2. Bump pom.xml version
+mvn versions:set -DnewVersion=X.Y.Z -DgenerateBackupPoms=false
+
+# 3. Commit and push
+git add pom.xml CHANGELOG.md
+git commit -S -m "chore(release): X.Y.Z"
+git push origin main
+
+# 4. Tag (annotated + ssh-signed) and push
+git tag -s vX.Y.Z -m "codeiq X.Y.Z"
+git push origin vX.Y.Z
+```
+
+`release-java.yml` then:
+1. Builds with `mvn -B -ntp clean verify` (full test suite + jacoco gate).
+2. Signs artifacts with `MAVEN_GPG_*` secrets.
+3. Publishes to Maven Central via `central-publishing-maven-plugin`.
+4. Uploads `code-iq-X.Y.Z-cli.jar` to a new GitHub Release.
+5. Records SBOM (CycloneDX) and provenance (SLSA) as Release assets.
+
+Track it: `gh run watch $(gh run list --workflow release-java.yml --limit 1 --json databaseId --jq '.[0].databaseId')`.
+
+---
+
+## 4. Post-release verification
+
+Within 30 minutes of the release workflow finishing:
+
+1. **Maven Central index**: `curl -fsS "https://repo.maven.apache.org/maven2/io/github/randomcodespace/iq/code-iq/X.Y.Z/code-iq-X.Y.Z.pom" | head -20`.
+2. **Smoke install**: in a clean directory, `mvn dependency:get -Dartifact=io.github.randomcodespace.iq:code-iq:X.Y.Z` succeeds.
+3. **CLI smoke**: download the GH Release JAR, run `java -jar code-iq-X.Y.Z-cli.jar version` and `java -jar code-iq-X.Y.Z-cli.jar analyze --help` — both exit 0.
+4. **GitHub Release** is marked `Latest` and links the changelog section.
+5. **codebase.repoUrl** in paperclip Project still resolves (`git ls-remote git@github.com:RandomCodeSpace/codeiq.git HEAD`).
+
+If any of (1)–(4) fails, [`rollback.md`](rollback.md) applies.
+
+---
+
+## 5. Hot-fix patch release (`X.Y.Z+1`)
+
+1. Branch from the release tag: `git switch -c hotfix/X.Y.Z+1 vX.Y.Z`.
+2. Apply the minimal fix; add a regression test.
+3. Open PR against `main`; merge with squash.
+4. Rebase the hotfix branch onto the post-merge `main` if needed; cut the tag from `main` per §3.
+
+Hotfixes do **not** skip the pre-release checklist.
+
+---
+
+## 6. Required GitHub secrets (org/repo level)
+
+| Secret | Used by | Owner |
+|---|---|---|
+| `SONAR_TOKEN` | `ci-java.yml` (Sonar gate) | TechLead |
+| `OSS_NEXUS_USER` / `OSS_NEXUS_PASS` | `release-java.yml` (Sonatype Central) | TechLead |
+| `MAVEN_GPG_KEY_ID` / `MAVEN_GPG_PASSPHRASE` / `MAVEN_GPG_PRIVATE_KEY` | `release-java.yml` (artifact signing) | TechLead |
+| `CODEQL_*` | n/a — uses `GITHUB_TOKEN` | n/a |
+
+Rotation policy: any compromise → rotate immediately + audit recent `release-java.yml` runs. Routine rotation: annually, recorded in [`engineering-standards.md`](engineering-standards.md).
+
+---
+
+## 7. Auth-blocked steps (escalation path)
+
+If a release step requires auth the runtime cannot satisfy, do **not** improvise:
+
+- Sonatype Central Portal namespace re-claim → block on board (human OAuth).
+- GitHub org admin escalation (e.g., re-enable a disabled secret) → block on `aksOps` GitHub owner.
+- OpenSSF Best Practices badge updates (if the badge is required for a Release announcement) → block on board to log into bestpractices.dev.
+
+In all cases: PATCH the relevant Paperclip issue to `blocked` with the exact ask, and `@`-mention the board.
+
+---
+
+## 8. References
+
+- [`rollback.md`](rollback.md) — what to do when a release goes bad.
+- [`first-time-setup.md`](first-time-setup.md) — how a new contributor builds and tests locally.
+- [`engineering-standards.md`](engineering-standards.md) — coverage/Sonar/CVE policy SSoT.
+- `pom.xml` — version, plugins, signing wiring.
+- `.github/workflows/release-java.yml` — the actual release pipeline.
