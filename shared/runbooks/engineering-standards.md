@@ -14,12 +14,13 @@ The rule of last resort: **`/home/dev/.claude/rules/*.md` wins.** This file does
 | JaCoCo coverage | ≥ 85% line, ≥ 75% branch (project-wide, post-exclusions) | `jacoco-maven-plugin` rule in `pom.xml` | Block merge |
 | SonarCloud Quality Gate | `Passed` (`Sonar way` profile + 80% new-code coverage) | `ci-java.yml` | Block merge |
 | SpotBugs | Zero High/Critical findings; `spotbugs-exclude.xml` justified per-entry | `mvn spotbugs:check` | Block merge |
-| OWASP Dependency-Check | No High/Critical CVEs (`failBuildOnCVSS=7`); Medium tracked | `mvn dependency-check:check` (CI nightly + on `release-java.yml`) | Block release |
-| OSV-Scanner | Clean, or every finding has a justification commit on file | weekly cron + on PR | Block release on High/Critical |
+| OWASP Dependency-Check | No High/Critical CVEs (`failBuildOnCVSS=7`); Medium tracked | `mvn -B -ntp clean verify` (the `dependency-check:check` execution is bound to the `verify` phase in `pom.xml`); `ci-java.yml` runs on every PR + push to `main` | Block merge |
 | OpenSSF Scorecard | Best-effort; no hard score floor; `Pinned-Dependencies` is a soft target | `scorecard.yml` (push to `main` + weekly) | Surface in security tab; do **not** gate merge |
 | Signed commits | Every commit on `main` must verify | Branch protection + `gh api ... /commits/{sha}/check-runs` | Block merge |
 
 Coverage exclusions are enumerated in `pom.xml` `<jacoco>` config — only generated ANTLR sources, the `application/` Spring Boot main, and pure data records are excluded. Adding to that list requires TechLead sign-off.
+
+**Planned, not yet enforced:** OSV-Scanner as a second-source CVE feed (cross-checks OWASP Dependency-Check against the OSV / GitHub Advisory Database). Tracked under [RAN-42](/RAN/issues/RAN-42); will land as `.github/workflows/osv-scanner.yml` and a row added to the table above. Until then OSV is **not** part of the gate — only OWASP Dependency-Check is.
 
 ---
 

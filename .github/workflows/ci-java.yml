@@ -18,7 +18,25 @@ jobs:
           distribution: 'temurin'
           java-version: '25'
           cache: 'maven'
-      - run: mvn clean verify -B
+      # Cache the OWASP Dependency-Check NVD data directory across runs so the
+      # CVE gate does not need to re-download the full feed on every PR.
+      # `key` is unique per run (forces a save on every run), `restore-keys`
+      # falls back to the most recent prior cache so the H2 DB is incrementally
+      # updated rather than rebuilt.
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/.m2/repository/org/owasp/dependency-check-data
+          key: dependency-check-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            dependency-check-${{ runner.os }}-
+      - name: Build + verify (jacoco 85% + SpotBugs + dependency-check)
+        env:
+          # When the NVD_API_KEY secret is unset, dependency-check falls back
+          # to the unauthenticated NVD endpoint (rate-limited but functional
+          # once the cache is warm). Provisioning the secret is tracked under
+          # RAN-42.
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: mvn -B -ntp clean verify
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
         if: always()
         with:

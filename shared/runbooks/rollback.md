@@ -25,7 +25,13 @@ If you are not sure, default to §2 and revert.
 ```bash
 git fetch origin main
 git switch -c revert/<short-name> origin/main
-git revert -m 1 <merge-sha>      # for squash merges, target the squash commit
+
+# Squash-merged PRs land as a single commit with one parent. Plain `git revert`
+# applies — do NOT pass `-m`, which only makes sense for true (multi-parent)
+# merge commits. Use `-m 1` only if `main` ever carries an actual merge commit
+# (which the squash-merge-only branch protection should prevent).
+git revert <squash-merge-sha>
+
 git push -u origin revert/<short-name>
 gh pr create --base main --fill --title "revert: <short-name>" --label "type:revert"
 gh pr merge --squash --auto

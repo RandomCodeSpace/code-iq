@@ -407,18 +407,26 @@
                 <artifactId>dependency-check-maven</artifactId>
                 <version>${owasp.dependency-check.version}</version>
                 <configuration>
-                    <!-- Fail build on High/Critical CVEs (CVSS >= 7) per security.md -->
+                    <!-- Hard gate: build fails on High/Critical CVEs (CVSS >= 7)
+                         per security.md AND on operational failures of the
+                         scanner itself. failOnError stays at the default (true)
+                         so a silent NVD-feed degradation does NOT pass as a
+                         green build (Reviewer round-3 finding #1). -->
                     <failBuildOnCVSS>7</failBuildOnCVSS>
-                    <!-- Do NOT fail the build on NVD-feed download/connection
-                         hiccups (the upstream NVD API is rate-limited and
-                         occasionally returns 5xx, which would otherwise red-X
-                         every PR). The gate still fails on real CVE findings
-                         via failBuildOnCVSS above; transient NVD outages just
-                         skip the analysis for that run.
-                         RAN-42 tracks making the gate fully robust (NVD API
-                         key, cached data, etc.); this is the minimal compromise
-                         to satisfy RAN-46 AC #5 without breaking PRs. -->
-                    <failOnError>false</failOnError>
+                    <!-- Stable on-disk cache directory. ci-java.yml caches
+                         this path between runs (actions/cache), which is the
+                         primary mitigation for transient NVD-feed/H2 issues:
+                         after the first successful run on a fresh runner, the
+                         cache holds a pre-populated H2 DB and incremental
+                         updates are short. -->
+                    <dataDirectory>${user.home}/.m2/repository/org/owasp/dependency-check-data</dataDirectory>
+                    <!-- Use NVD_API_KEY when available (drastically reduces
+                         throttle / 5xx rates from the NVD API). The build
+                         falls back to the unauthenticated path when the
+                         secret is unset; that path is rate-limited but works
+                         once the cache is warm. RAN-42 tracks the secret
+                         provisioning + a dedicated nightly NVD-refresh job. -->
+                    <nvdApiKey>${env.NVD_API_KEY}</nvdApiKey>
                 </configuration>
                 <executions>
                     <!-- Bind dependency-check:check into the verify phase so
