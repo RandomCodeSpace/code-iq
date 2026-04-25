@@ -6,6 +6,8 @@ on:
         description: 'Release version (e.g., 0.1.0)'
         required: true
 
+permissions: read-all
+
 jobs:
   release:
     runs-on: ubuntu-latest

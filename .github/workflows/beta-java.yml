@@ -2,6 +2,8 @@ name: Beta Release (Java)
 on:
   workflow_dispatch:    # Manual trigger ONLY
 
+permissions: read-all
+
 jobs:
   beta:
     runs-on: ubuntu-latest
