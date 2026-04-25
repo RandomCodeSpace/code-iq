@@ -15,6 +15,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.io.IOException;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
 import java.util.Map;
 
 /**
@@ -45,7 +48,10 @@ public class IntelligenceController {
      * Assemble an evidence pack for a symbol or file path.
      *
      * <p>At least one of {@code symbol} or {@code file} must be provided.
-     * The {@code file} parameter is path-traversal guarded.
+     * The {@code file} parameter is path-traversal guarded with the same two-stage
+     * (lexical {@code normalize} then {@link Path#toRealPath} re-check) guard used
+     * by {@code GraphController.readFile} and the MCP {@code read_file} tool, so a
+     * symlink inside the indexed repo cannot be used to leak off-tree files.
      *
      * @param symbol          symbol name to look up
      * @param file            file path relative to repo root (path traversal guarded)
@@ -68,14 +74,34 @@ public class IntelligenceController {
                     "At least one of 'symbol' or 'file' must be provided.");
         }
 
-        // Path traversal guard on file param
+        // Path-traversal guard on file param: two-stage lexical + symlink check.
         if (file != null && !file.isBlank()) {
-            java.nio.file.Path root = java.nio.file.Path.of(config.getRootPath())
-                    .toAbsolutePath().normalize();
-            java.nio.file.Path resolved = root.resolve(file).normalize();
-            if (!resolved.startsWith(root)) {
+            Path root;
+            try {
+                root = Path.of(config.getRootPath()).toRealPath();
+            } catch (IOException e) {
+                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                        "Failed to resolve codebase root: " + e.getMessage());
+            }
+            Path candidate = root.resolve(file).normalize();
+            if (!candidate.startsWith(root)) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "Invalid file path: path traversal detected.");
+            }
+            // Resolve symlinks if the file exists on disk and re-check containment.
+            // If the file is logical-only (graph reference, no on-disk file), the
+            // lexical guard above is sufficient — there is no symlink to traverse.
+            try {
+                Path real = candidate.toRealPath();
+                if (!real.startsWith(root)) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                            "Invalid file path: path traversal detected.");
+                }
+            } catch (NoSuchFileException ignored) {
+                // file may exist only as a graph reference — lexical guard already passed
+            } catch (IOException e) {
+                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                        "Failed to resolve file path: " + e.getMessage());
             }
         }
 

@@ -85,6 +85,44 @@ class AnalyzerTest {
         assertTrue(result.elapsed().toMillis() >= 0);
     }
 
+    /**
+     * Regression: AnalysisResult breakdown maps must iterate in deterministic
+     * sorted order so that JSON serialization is byte-stable across runs.
+     */
+    @Test
+    void breakdownMapsAreSortedDeterministically() throws IOException {
+        // File names chosen so SERVICE / CLASS / and the kind values would not
+        // appear in sorted order under the previous HashMap implementation.
+        Files.writeString(tempDir.resolve("Zeta.java"), "public class Zeta {}");
+        Files.writeString(tempDir.resolve("Alpha.java"), "public class Alpha {}");
+        Files.writeString(tempDir.resolve("Mu.java"), "public class Mu {}");
+
+        AnalysisResult result = analyzer.run(tempDir, progressMessages::add);
+
+        assertSortedKeys(result.languageBreakdown().keySet().stream().toList(),
+                "languageBreakdown");
+        assertSortedKeys(result.nodeBreakdown().keySet().stream().toList(),
+                "nodeBreakdown");
+        assertSortedKeys(result.edgeBreakdown().keySet().stream().toList(),
+                "edgeBreakdown");
+        assertSortedKeys(result.frameworkBreakdown().keySet().stream().toList(),
+                "frameworkBreakdown");
+
+        // Sanity: at least the kinds we expect should be present.
+        assertTrue(result.nodeBreakdown().keySet().contains("class"));
+        assertTrue(result.nodeBreakdown().keySet().contains("service"));
+    }
+
+    private static void assertSortedKeys(List<String> keys, String name) {
+        for (int i = 1; i < keys.size(); i++) {
+            String prev = keys.get(i - 1);
+            String cur = keys.get(i);
+            assertTrue(prev.compareTo(cur) < 0,
+                    name + " not in sorted order at index " + i + ": '"
+                            + prev + "' >= '" + cur + "' (full: " + keys + ")");
+        }
+    }
+
     @Test
     void reportsProgress() throws IOException {
         Files.writeString(tempDir.resolve("App.java"), "public class App {}");

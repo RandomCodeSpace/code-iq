@@ -9,10 +9,15 @@ import io.github.randomcodespace.iq.intelligence.provenance.ArtifactMetadata;
 import io.github.randomcodespace.iq.intelligence.provenance.ArtifactMetadataProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -71,6 +76,59 @@ class IntelligenceControllerTest {
         mockMvc.perform(get("/api/intelligence/evidence")
                 .param("file", "../../etc/passwd"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void evidenceEndpointRejectsSymlinkEscapingRoot(@TempDir Path tempDir) throws Exception {
+        Path target = Files.createTempFile("codeiq-evidence-escape-", ".txt");
+        try {
+            Files.writeString(target, "TOP SECRET", StandardCharsets.UTF_8);
+            Path link = tempDir.resolve("leak.txt");
+            try {
+                Files.createSymbolicLink(link, target.toAbsolutePath());
+            } catch (UnsupportedOperationException | IOException unsupported) {
+                // Filesystem does not support symlinks (e.g. Windows without privilege) — skip.
+                return;
+            }
+
+            CodeIqConfig config = new CodeIqConfig();
+            CodeIqConfigTestSupport.override(config).rootPath(tempDir.toAbsolutePath().toString()).done();
+            IntelligenceController controller =
+                    new IntelligenceController(assembler, metadataProvider, config);
+            MockMvc symlinkMvc = MockMvcBuilders.standaloneSetup(controller).build();
+
+            symlinkMvc.perform(get("/api/intelligence/evidence").param("file", "leak.txt"))
+                    .andExpect(status().isBadRequest());
+        } finally {
+            Files.deleteIfExists(target);
+        }
+    }
+
+    @Test
+    void evidenceEndpointAllowsInRepoSymlink(@TempDir Path tempDir) throws Exception {
+        Path real = tempDir.resolve("real.java");
+        Files.writeString(real, "class C {}", StandardCharsets.UTF_8);
+        Path link = tempDir.resolve("alias.java");
+        try {
+            Files.createSymbolicLink(link, real);
+        } catch (UnsupportedOperationException | IOException unsupported) {
+            return;
+        }
+
+        EvidencePack pack = new EvidencePack(
+                List.of(), List.of(), List.of(), List.of(), List.of(),
+                List.of(), metadata, CapabilityLevel.EXACT);
+        when(assembler.assemble(any(EvidencePackRequest.class), any())).thenReturn(pack);
+
+        CodeIqConfig config = new CodeIqConfig();
+        CodeIqConfigTestSupport.override(config).rootPath(tempDir.toAbsolutePath().toString()).done();
+        IntelligenceController controller =
+                new IntelligenceController(assembler, metadataProvider, config);
+        MockMvc symlinkMvc = MockMvcBuilders.standaloneSetup(controller).build();
+
+        symlinkMvc.perform(get("/api/intelligence/evidence").param("file", "alias.java"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.capabilityLevel").value("EXACT"));
     }
 
     @Test

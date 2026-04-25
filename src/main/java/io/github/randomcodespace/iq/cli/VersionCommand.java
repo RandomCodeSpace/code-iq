@@ -58,7 +58,7 @@ public class VersionCommand implements Callable<Integer> {
             allLanguages.addAll(d.getSupportedLanguages());
         }
 
-        CliOutput.bold("Code IQ " + version);
+        CliOutput.bold("codeiq " + version);
         CliOutput.info("  Java:       " + System.getProperty("java.version")
                 + " (" + System.getProperty("java.vendor") + ")");
         CliOutput.info("  Runtime:    " + System.getProperty("java.runtime.name"));

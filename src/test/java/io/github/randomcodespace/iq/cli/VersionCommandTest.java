@@ -35,7 +35,7 @@ class VersionCommandTest {
         System.setOut(System.out);
 
         assertEquals(0, exitCode);
-        assertTrue(output.contains("Code IQ"), "Should contain product name");
+        assertTrue(output.contains("codeiq"), "Should contain product name");
         assertTrue(output.contains("Detectors"), "Should mention detectors");
         assertTrue(output.contains("Languages"), "Should mention languages");
         assertTrue(output.contains("Java"), "Should mention Java runtime");

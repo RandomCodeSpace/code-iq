@@ -46,6 +46,10 @@ import java.util.zip.ZipOutputStream;
  * ├── flow.html          (interactive architecture diagram)
  * └── code-iq-*-cli.jar  (optional)
  * </pre>
+ * <p>
+ * The bundled CLI JAR keeps the historical {@code code-iq-*-cli.jar} filename because
+ * it tracks the Maven artifactId ({@code io.github.randomcodespace.iq:code-iq}), which
+ * is intentionally unchanged across the codeiq rename. See {@code CLAUDE.md}.
  */
 @Component
 @Command(name = "bundle", mixinStandardHelpOptions = true,
