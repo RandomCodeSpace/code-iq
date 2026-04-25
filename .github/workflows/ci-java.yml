@@ -29,6 +29,21 @@ jobs:
           key: dependency-check-${{ runner.os }}-${{ github.run_id }}
           restore-keys: |
             dependency-check-${{ runner.os }}-
+      # Pre-warm the OWASP Dependency-Check NVD cache as a SEPARATE Maven
+      # invocation. On a cold cache (first run on a branch / cache eviction)
+      # running `update-only` first avoids the dependency-check-maven 12.2.0
+      # H2 init race that surfaces as `NullPointerException: Cannot invoke
+      # BasicDataSource.getConnection() because connectionPool is null`
+      # during the verify phase (observed on PR #74 build run 24930518462).
+      # When the cache is warm this step short-circuits via the H2 incremental
+      # update path. `failOnError=false` so a transient NVD-feed problem here
+      # does not mask the real CVSS>=7 gate enforced in the verify step
+      # below — that step still hard-fails on operational scanner failures
+      # (Reviewer round-3 finding #1).
+      - name: Pre-warm dependency-check NVD cache
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: mvn -B -ntp dependency-check:update-only -DfailOnError=false
       - name: Build + verify (jacoco 85% + SpotBugs + dependency-check)
         env:
           # When the NVD_API_KEY secret is unset, dependency-check falls back

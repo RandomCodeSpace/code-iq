@@ -463,6 +463,17 @@
                          once the cache is warm. RAN-42 tracks the secret
                          provisioning + a dedicated nightly NVD-refresh job. -->
                     <nvdApiKey>${env.NVD_API_KEY}</nvdApiKey>
+                    <!-- NVD-feed resilience knobs. The unauthenticated /
+                         throttled NVD API path occasionally returns transient
+                         5xx / connection resets; without retries the
+                         dependency-check NvdApiProcessor surfaces an NPE
+                         from BasicDataSource.getConnection() because the H2
+                         pool is torn down mid-update (observed on PR #74
+                         build run 24930518462 — cold cache + fresh NVD
+                         download). Bumping retries + delay between calls
+                         keeps the update-only path stable. -->
+                    <nvdMaxRetryCount>10</nvdMaxRetryCount>
+                    <nvdApiDelay>4000</nvdApiDelay>
                     <!-- CPE-collision false-positive suppressions ONLY.
                          High/Critical CVEs MUST be fixed, not suppressed
                          (security.md §5). Each entry is justified, scoped
