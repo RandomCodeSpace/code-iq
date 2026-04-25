@@ -1,7 +1,7 @@
 {
   "$schema": "https://bestpractices.coreinfrastructure.org/projects.schema.json",
-  "_comment": "OpenSSF Best Practices self-assessment skeleton for RandomCodeSpace/codeiq. The numeric project_id and badge URL are populated by a board admin after registering the project at https://www.bestpractices.dev/ — RAN-46 AC #8 calls this out as auth-blocked. Once the registration is complete, fill `project_id` and re-render the README badge with the resolved URL.",
-  "project_id": null,
+  "_comment": "OpenSSF Best Practices self-assessment for RandomCodeSpace/codeiq. Registered 2026-04-25 by the board (RAN-46 AC #8). Live project page: https://www.bestpractices.dev/projects/12650",
+  "project_id": 12650,
   "name": "codeiq",
   "description": "Deterministic code knowledge graph — scans codebases to map services, endpoints, entities, infrastructure, auth patterns, and framework usage. No AI, pure static analysis.",
   "homepage_url": "https://github.com/RandomCodeSpace/codeiq",
@@ -36,6 +36,7 @@
   "audit": {
     "self_assessment_date": "2026-04-25",
     "self_assessment_author": "TechLead (RAN-46)",
-    "registration_blocker": "https://www.bestpractices.dev/ requires human OAuth/form. Tracked under RAN-46 AC #8."
+    "registered_at": "https://www.bestpractices.dev/projects/12650",
+    "registered_date": "2026-04-25"
   }
 }
