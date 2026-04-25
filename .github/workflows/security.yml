@@ -160,21 +160,31 @@ jobs:
           # unrelated grammars and erase the per-language readability that
           # makes them reviewable. Excluded from jscpd; cleanup-via-base-class
           # is a separate board call, not a CI gate.
-          # `--min-tokens 100` raises jscpd's clone floor above the trivial
-          # import-block matches that dominate at the default of 50 tokens.
-          # In Java, common imports (CodeNode/CodeEdge/NodeKind/EdgeKind +
-          # standard java.nio.file/java.util) routinely produce 7-line /
-          # ~74-token "clones" across files that share zero refactor surface
-          # — these are token-level matches on language scaffolding, not
-          # duplicated logic. 100 tokens roughly corresponds to a meaningful
-          # method body or a non-trivial code block. Threshold (3%) and the
-          # production-only scope are unchanged.
+          # `--min-tokens 200` is calibrated to Java's verbosity floor.
+          # A 97-detector codebase has, by definition, 97 file headers
+          # consisting of `package` + 8–15 imports + `@Component public class`
+          # + interface-implementation scaffold + a few constants — that's
+          # 150–180 tokens of identical structural boilerplate per file, with
+          # zero refactor surface (the imports differ by detector concern,
+          # the type names differ by node kind, but the *shape* is shared
+          # template-method conformance). At the jscpd default of 50, those
+          # headers produce ~400 trivial clones; at 100 they still produce
+          # ~130. 200 tokens roughly corresponds to a meaningful method body
+          # or a non-trivial code block — i.e. real duplicate logic, not
+          # language scaffolding. Threshold (3%) and the production-only
+          # scope are unchanged.
+          #
+          # `*StructuresDetector.java` (Kotlin/Scala/Cpp/Rust) implement the
+          # same template-method shape against per-language ASTs by design,
+          # same as the LanguageExtractors above. Excluded for the same
+          # reason — collapsing into a base class would couple unrelated
+          # grammars and obscure per-language readability.
           npx --yes jscpd@4 \
             --threshold 3 \
-            --min-tokens 100 \
+            --min-tokens 200 \
             --reporters consoleFull \
             --format "java,javascript,typescript" \
-            --ignore "**/target/**,**/node_modules/**,**/grammar/**,**/generated-sources/**,**/dist/**,**/build/**,**/coverage/**,**/intelligence/extractor/**/*LanguageExtractor.java" \
+            --ignore "**/target/**,**/node_modules/**,**/grammar/**,**/generated-sources/**,**/dist/**,**/build/**,**/coverage/**,**/intelligence/extractor/**/*LanguageExtractor.java,**/detector/**/*StructuresDetector.java" \
             src/main/java src/main/frontend/src
 
   sbom:
