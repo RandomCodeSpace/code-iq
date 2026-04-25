@@ -13,8 +13,9 @@ The rule of last resort: **`/home/dev/.claude/rules/*.md` wins.** This file does
 | Unit + integration tests | All pass | `mvn verify` (CI + local) | Block merge |
 | JaCoCo coverage | ≥ 85% line (project-wide, post-exclusions) | `jacoco-maven-plugin` rule in `pom.xml` | Block merge |
 | SpotBugs (Java lint) | Zero High/Critical findings; `spotbugs-exclude.xml` justified per-entry | `mvn spotbugs:check` (bound to `verify`) | Block merge |
-| OSV-Scanner (SCA via OSV.dev / GHSA) | Zero High/Critical CVEs in dependency tree | `.github/workflows/security.yml` | Block merge |
-| Trivy (filesystem + container scan) | Zero High/Critical findings (`severity: HIGH,CRITICAL`, `exit-code: 1`) | `.github/workflows/security.yml` | Block merge |
+| OSV-Scanner (SCA, npm lockfile) | Zero High/Critical CVEs in npm dependency tree | `.github/workflows/security.yml` | Block merge |
+| Trivy (filesystem + container scan, covers Maven + OS) | Zero High/Critical findings (`severity: HIGH,CRITICAL`, `exit-code: 1`) | `.github/workflows/security.yml` | Block merge |
+| Dependabot (cross-ecosystem) | Surfaces advisories on `pom.xml` + `package-lock.json` | `.github/dependabot.yml` + GitHub Security tab | Surface; auto-PRs gated by separate review |
 | Semgrep (SAST) | Zero ERROR-level findings on `p/security-audit` + `p/owasp-top-ten` + `p/java` | `.github/workflows/security.yml` | Block merge |
 | Gitleaks (secret scan) | Zero findings | `.github/workflows/security.yml` | Block merge |
 | jscpd (duplication) | < 3% on touched code, languages: Java + JS + TS | `.github/workflows/security.yml` | Block merge |
@@ -24,7 +25,7 @@ The rule of last resort: **`/home/dev/.claude/rules/*.md` wins.** This file does
 
 Coverage exclusions are enumerated in `pom.xml` `<jacoco>` config — only generated ANTLR sources, the `application/` Spring Boot main, and pure data records are excluded. Adding to that list requires TechLead sign-off.
 
-**Stack: OSS-CLI only.** Per RAN-46 board ruling (path B): no Sonar, no CodeQL, no NVD-direct tools (OWASP Dependency-Check). The OSS-CLI stack covers SCA (OSV-Scanner via OSV.dev = GHSA + RustSec + PyPA + Go vuln DB + ecosystem feeds), filesystem + container scan (Trivy), SAST (Semgrep), secret detection (Gitleaks), duplication (jscpd), and SBOM emission (`anchore/sbom-action` SPDX + CycloneDX). Cost: $0 — entire stack is OSS-CLI in GitHub Actions, free for public OSS.
+**Stack: OSS-CLI only.** Per RAN-46 board ruling (path B): no Sonar, no CodeQL, no NVD-direct tools (OWASP Dependency-Check). The OSS-CLI stack covers SCA (OSV-Scanner against the npm lockfile via OSV.dev = GHSA + ecosystem feeds; Trivy + Dependabot cover Maven and the rest of the filesystem — osv-scanner v2's Maven plugin depends on a `deps.dev` gRPC service that is intermittently unavailable in CI, so SCA on Java is delegated to Trivy), filesystem + container scan (Trivy), SAST (Semgrep), secret detection (Gitleaks), duplication (jscpd, `--min-tokens 100` to filter trivial token-level matches on common imports), and SBOM emission (`anchore/sbom-action` SPDX + CycloneDX). Cost: $0 — entire stack is OSS-CLI in GitHub Actions, free for public OSS.
 
 ---
 
@@ -76,8 +77,8 @@ Ground rules:
 
 | Concern | Tool | Where |
 |---|---|---|
-| SCA (vulnerable deps) | **OSV-Scanner** (OSV.dev / GHSA / ecosystem feeds; **not NVD**) | `.github/workflows/security.yml` |
-| Filesystem + container scan | **Trivy** | `.github/workflows/security.yml` |
+| SCA (npm) | **OSV-Scanner** against `src/main/frontend/package-lock.json` (OSV.dev / GHSA / ecosystem feeds; **not NVD**) | `.github/workflows/security.yml` |
+| SCA (Maven + OS) + filesystem + container scan | **Trivy** filesystem scan (covers `pom.xml` transitive resolution via Trivy's own DB, plus OS packages and any future container layers); Dependabot also surfaces Maven advisories via the GitHub Security tab | `.github/workflows/security.yml` + `.github/dependabot.yml` |
 | SAST | **Semgrep** (`p/security-audit`, `p/owasp-top-ten`, `p/java`) | `.github/workflows/security.yml` |
 | Secret scan | **Gitleaks** (full git history) | `.github/workflows/security.yml` |
 | Duplication | **jscpd** (Java + JS + TS, threshold < 3%) | `.github/workflows/security.yml` |
