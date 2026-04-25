@@ -413,15 +413,15 @@ bean for code paths that haven't been ported yet.
 - **Edge persistence**: Edges must be attached to source nodes before `bulkSave()`. MATCH silently returns 0 rows for missing nodes -- pre-validate IDs.
 - **ServiceDetector must scan filesystem**: Don't rely on node file paths for build file detection. Many build files (pom.xml) don't produce CodeNodes. Walk the filesystem directly.
 - **Generic, not example-specific**: Every feature must work for ALL architectures. Don't fix for the specific example given and forget other ecosystems.
-- **Neo4j indexes**: Created by `enrich` on `id`, `kind`, `layer`, `module`, `filePath`. Critical for query performance on large graphs.
+- **Neo4j indexes**: Created by `enrich` on `id`, `kind`, `layer`, `module`, `filePath`, `label_lower`, `fqn_lower`, plus two fulltext indexes (`search_index` over `[label_lower, fqn_lower]` and `lexical_index` over `[prop_lex_comment, prop_lex_config_keys]`). Critical for query performance and free-text search on large graphs.
 - **Default batch size is 500**: Performs better than 1000 for indexing.
 - **Spring Boot startup overhead**: 8-16s for embedded Neo4j + Spring context init.
-- **Virtual thread pinning**: H2 JDBC operations can pin carrier threads. Use `synchronized` blocks (not `ReentrantLock`).
+- **Virtual thread concurrency on the H2 cache**: JDK 25 + JEP 491 means neither `synchronized` nor `java.util.concurrent.locks.*` pin virtual-thread carriers, so the lock primitive is no longer the constraint. `AnalysisCache` uses a `ReentrantReadWriteLock` so virtual threads can read in parallel while writes stay serialized — this is what prevents `ClosedChannelException` from concurrent writes against H2's MVStore file channel. Do not regress to coarse `synchronized` methods "for virtual-thread safety"; that advice is stale.
 - **ANTLR generated sources**: Generated during `mvn generate-sources` from `.g4` files. Do not edit.
 - **`@ActiveProfiles("test")`**: Required on any `@SpringBootTest` to avoid Neo4j startup conflicts.
 - **Dead code detection**: Must filter by semantic edges only (calls, imports, depends_on). Exclude structural edges (contains, defines) and entry points (endpoints, config files).
 - **H2 reserved words**: `key`, `value`, `order` are reserved in H2 SQL. Use `meta_key`, `meta_value` etc. in CREATE TABLE statements.
-- **Cache versioning**: `AnalysisCache` has a `CACHE_VERSION` constant (currently 2). Bump it when changing hash algorithms or schema to auto-clear stale caches.
+- **Cache versioning**: `AnalysisCache` has a `CACHE_VERSION` constant (currently `4`). Bump it when changing the hash algorithm or H2 schema so stale caches are auto-cleared on next run.
 - **FileHasher uses SHA-256**: Changed from MD5. Hash output is 64 hex chars (not 32). Tests must expect 64-char hashes.
 - **SnakeYAML parses `on` as Boolean.TRUE**: In YAML files, bare `on` key becomes `Boolean.TRUE`. Use `String.valueOf(key)` comparisons, not `Boolean.TRUE.equals(key)` (SonarCloud S2159).
 - **Regex possessive quantifiers**: Use `*+` instead of `*` for nested quantifiers like `([^"\\]*(?:\\.[^"\\]*)*)` → `([^"\\]*+(?:\\.[^"\\]*+)*+)` to prevent stack overflow (SonarCloud S5998).
