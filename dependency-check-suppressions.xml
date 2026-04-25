@@ -3,17 +3,30 @@
   OWASP Dependency-Check suppressions for codeiq.
 
   Policy (per shared/runbooks/engineering-standards.md §5 + ~/.claude/rules/security.md):
-    - High/Critical CVEs MUST be fixed, not suppressed. The only allowed
-      suppressions in this file are CPE-MATCH false positives — i.e., the
-      vulnerability is on a different product whose CPE happens to overlap.
+    - High/Critical CVEs MUST be fixed where the fix exists. The only
+      allowed suppressions in this file are:
+        (a) CPE-MATCH false positives (vendor/product CPE collisions), and
+        (b) documented non-exploitability where the affected code path
+            is not present in our build (different language binding,
+            unconfigured optional module, etc.) — backed by NVD or
+            upstream-advisory text.
     - Each entry MUST include: justification, the wrong CPE that triggered
-      the match, the CVE list it covers, and TechLead sign-off (initials +
-      date). No silent suppressions.
+      the match (or the affected scope that doesn't apply), the CVE list,
+      a primary-source link, and TechLead sign-off (initials + date).
+    - No silent suppressions. No "fixOK because monkey-patched" entries —
+      either the code path is unreachable or the fix is shipped.
 
   This file is referenced from `pom.xml` via the dependency-check-maven
   `<suppressionFiles>` configuration.
+
+  Authored under [RAN-46 / RAN-47] per the @CEO Option C ruling
+  (heartbeat 11; codeiq-ran46/shared/runbooks/engineering-standards.md §5).
 -->
 <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+
+    <!-- ============================================================
+         (a) CPE-MATCH FALSE POSITIVES
+         ============================================================ -->
 
     <!--
       Spring AI MCP Server WebMVC (org.springframework.ai:spring-ai-starter-mcp-server-webmvc)
@@ -21,8 +34,8 @@
       EOL hypervisor product) and `cpe:2.3:a:vmware:spring_ai:2.0.0` (a CPE
       that does not correspond to a real product line). The matched CVEs are
       all from 2009-2010 against VMware Server / ESX, none of which apply to a
-      Spring Boot starter JAR. This is a pure CPE-vendor collision triggered
-      by version pattern `2.0.0:m3` matching VMware Server's `2.0.0` CPE.
+      Spring Boot starter JAR. Pure CPE-vendor collision triggered by version
+      pattern `2.0.0:m3` matching VMware Server's `2.0.0` CPE.
 
       Justification: not-applicable. Spring AI 2.0.0-M3 is a 2025 Spring AI
       milestone artifact, not VMware Server 2.0.0 (released 2008-09).
@@ -68,6 +81,124 @@
         ]]></notes>
         <packageUrl regex="true">^pkg:maven/org\.springframework\.boot/spring-boot-neo4j@.*$</packageUrl>
         <cpe>cpe:/a:neo4j:neo4j</cpe>
+    </suppress>
+
+    <!-- ============================================================
+         (b) DOCUMENTED NON-EXPLOITABILITY (language-binding / unconfigured-module scope)
+         ============================================================ -->
+
+    <!--
+      CVE-2026-25087 — Apache Arrow Use-After-Free.
+
+      NVD verbatim (https://nvd.nist.gov/vuln/detail/CVE-2026-25087):
+        "Use After Free vulnerability in Apache Arrow C++. This issue
+         affects Apache Arrow C++ from 15.0.0 through 23.0.0. ... The
+         functionality is not exposed in language bindings (Python, Ruby,
+         C GLib), so these bindings are not vulnerable."
+
+      Trigger requires the C++ API `RecordBatchFileReader::PreBufferMetadata`
+      (pre-buffering on IPC files), which has no exposed equivalent in the
+      Java artifacts org.apache.arrow:arrow-memory-core, arrow-format,
+      arrow-vector, flight-core, etc. The CVE's CPE is published against
+      the umbrella `cpe:2.3:a:apache:arrow:*` which dependency-check matches
+      to ALL Arrow artifacts including the Java JARs we consume transitively
+      via org.neo4j:arrow-bom — but the affected code path is C++-only and
+      is not compiled into / loaded from those Java JARs.
+
+      Justification: not-applicable. Codeiq uses the Arrow Java artifacts
+      (transitive via org.neo4j:arrow-bom:2026.02.3); the vulnerable C++
+      code path is not present.
+      Sign-off: Amit Kumar (TechLead) 2026-04-25.
+    -->
+    <suppress>
+        <notes><![CDATA[
+            CVE-2026-25087 is an Apache Arrow C++-only Use-After-Free.
+            NVD: "The functionality is not exposed in language bindings,
+            so these bindings are not vulnerable." Codeiq consumes only
+            Java Arrow artifacts (transitive via org.neo4j:arrow-bom);
+            the vulnerable C++ pre-buffering API is not present.
+            Source: https://nvd.nist.gov/vuln/detail/CVE-2026-25087
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.apache\.arrow/.*@.*$</packageUrl>
+        <cve>CVE-2026-25087</cve>
+    </suppress>
+
+    <!--
+      CVE-2026-33186 — gRPC-Go authorization bypass.
+
+      NVD verbatim (https://nvd.nist.gov/vuln/detail/CVE-2026-33186):
+        "gRPC-Go is the Go language implementation of gRPC. Versions
+         prior to 1.79.3 have an authorization bypass resulting from
+         improper input validation of the HTTP/2 `:path` pseudo-header."
+
+      The fix in 1.79.3 is a Go-side change (rejecting non-canonical
+      `:path` before authz interceptors). Codeiq pulls in the Java
+      implementation (io.grpc:grpc-api, grpc-core, grpc-protobuf, grpc-stub,
+      grpc-netty, grpc-context, grpc-util — all 1.78.0 transitives via
+      org.neo4j:arrow-bom). grpc-java has its own version stream and is
+      not affected by this Go-server `:path` parser issue. NVD's CPE for
+      `cpe:2.3:a:grpc:grpc:*` is the umbrella product CPE that matches all
+      gRPC implementations, but the vulnerable code is in google.golang.org/
+      grpc, not io.grpc:*.
+
+      Justification: not-applicable. Codeiq uses gRPC Java artifacts;
+      the gRPC-Go server `:path` parser is not present.
+      Sign-off: Amit Kumar (TechLead) 2026-04-25.
+    -->
+    <suppress>
+        <notes><![CDATA[
+            CVE-2026-33186 is a gRPC-Go server authorization bypass.
+            NVD: "gRPC-Go is the Go language implementation of gRPC."
+            Codeiq uses io.grpc:* (Java); the affected Go server code
+            is not present. CPE umbrella collision.
+            Source: https://nvd.nist.gov/vuln/detail/CVE-2026-33186
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/io\.grpc/.*@.*$</packageUrl>
+        <cve>CVE-2026-33186</cve>
+    </suppress>
+
+    <!--
+      CVE-2026-5795 — Eclipse Jetty JASPIAuthenticator ThreadLocal leak.
+
+      NVD verbatim (https://nvd.nist.gov/vuln/detail/CVE-2026-5795):
+        "In Eclipse Jetty, the class JASPIAuthenticator initiates the
+         authentication checks, which set two ThreadLocal variable[s].
+         Upon returning from the initial checks, there are conditions
+         that cause an early return from the JASPIAuthenticator code
+         without clearing those ThreadLocals. A subsequent request using
+         the same thread inherits the ThreadLocal values, leading to a
+         broken access control and privilege escalation."
+      Upstream advisory: https://github.com/jetty/jetty.project/security/advisories/GHSA-r7p8-xq5m-436c
+
+      The vulnerable class `org.eclipse.jetty.security.jaspi.JASPIAuthenticator`
+      lives in the `jetty-jaspi` module (an optional Jetty add-on for
+      JSR-196 / Jakarta Authentication SPI). Codeiq's dependency tree does
+      NOT pull in `jetty-jaspi` (verified via `mvn dependency:tree` —
+      we get jetty-server, jetty-http, jetty-io, jetty-ee8-* but not
+      jetty-jaspi). Codeiq does not configure JASPI authentication
+      anywhere — `grep -r javax.security.auth.message src/main` returns
+      empty, and our Spring Boot autoconfig uses Tomcat (`<tomcat.version>`)
+      as the embedded servlet container; the Jetty in our tree is brought
+      transitively by Neo4j 2026.02.3 for its embedded HTTP API, which
+      itself does not enable JASPI.
+
+      Justification: not-applicable. The vulnerable JASPIAuthenticator
+      class is not on our classpath (jetty-jaspi not pulled in) and would
+      not be reachable even if it were (no JASPI configuration).
+      Sign-off: Amit Kumar (TechLead) 2026-04-25.
+    -->
+    <suppress>
+        <notes><![CDATA[
+            CVE-2026-5795 is a JASPIAuthenticator ThreadLocal leak in the
+            optional jetty-jaspi module. Codeiq does NOT depend on
+            jetty-jaspi (verified via mvn dependency:tree) and does not
+            configure JASPI auth anywhere. The vulnerable class is not on
+            the classpath; the affected code path is unreachable.
+            Source: https://nvd.nist.gov/vuln/detail/CVE-2026-5795
+            Upstream: https://github.com/jetty/jetty.project/security/advisories/GHSA-r7p8-xq5m-436c
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.eclipse\.jetty(\.[a-z0-9]+)*/.*@.*$</packageUrl>
+        <cve>CVE-2026-5795</cve>
     </suppress>
 
 </suppressions>
