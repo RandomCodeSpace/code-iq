@@ -23,7 +23,7 @@ jobs:
           server-password: MAVEN_PASSWORD
           gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
           gpg-passphrase: MAVEN_GPG_PASSPHRASE
-      - name: Configure git identity for signed release commit and tag
+      - name: Configure git identity and non-interactive GPG for signed commit/tag
         run: |
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name  "github-actions[bot]"
@@ -38,9 +38,36 @@ jobs:
           git config gpg.format       openpgp
           git config commit.gpgsign   true
           git config tag.gpgsign      true
+          # Reviewer finding cf64b44d (RAN-47, R5-1):
+          # `git commit -S` / `git tag -s` invoke gpg interactively by default
+          # and fail in non-interactive Actions shells when the imported key
+          # has a passphrase. setup-java only wires the passphrase for Maven
+          # signing (via MAVEN_GPG_PASSPHRASE in settings.xml); git itself
+          # has no equivalent autoconfig. Configure the gpg-agent for loopback
+          # pinentry, point gpg.program at a thin wrapper that injects
+          # --batch / --pinentry-mode loopback / --passphrase from
+          # MAVEN_GPG_PASSPHRASE, so signing succeeds non-interactively.
+          mkdir -p "$HOME/.gnupg"
+          chmod 700 "$HOME/.gnupg"
+          printf '%s\n' 'use-agent' 'pinentry-mode loopback' > "$HOME/.gnupg/gpg.conf"
+          printf '%s\n' 'allow-loopback-pinentry' > "$HOME/.gnupg/gpg-agent.conf"
+          gpgconf --kill gpg-agent || true
+          # Wrapper script: git invokes this with the same flags as gpg.
+          # We exec into gpg with --batch + loopback + the passphrase from
+          # the env (MAVEN_GPG_PASSPHRASE is set on each step that signs).
+          cat > "$HOME/.gnupg/gpg-loopback.sh" <<'WRAPPER'
+          #!/usr/bin/env bash
+          # Non-interactive gpg wrapper for `git commit -S` / `git tag -s`.
+          # MAVEN_GPG_PASSPHRASE is set on the workflow step that signs.
+          exec gpg --batch --yes --pinentry-mode loopback \
+            --passphrase "${MAVEN_GPG_PASSPHRASE:-}" "$@"
+          WRAPPER
+          chmod +x "$HOME/.gnupg/gpg-loopback.sh"
+          git config gpg.program "$HOME/.gnupg/gpg-loopback.sh"
       - name: Set release version and create signed release commit
         env:
           RELEASE_VERSION: ${{ inputs.version }}
+          # Picked up by the gpg-loopback wrapper script for `git commit -S`.
           MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
         # Commit the version bump on a detached HEAD off the workflow's
         # checkout. The commit is reachable only via the tag created below —

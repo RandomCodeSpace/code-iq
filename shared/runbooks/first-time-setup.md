@@ -89,12 +89,14 @@ For a faster inner loop while iterating:
 
 ```bash
 mvn -B -ntp test \
-  -Dspotbugs.skip=true -Ddependency-check.skip=true     # unit + integration, no static analysis / CVE plugins
-mvn -B -ntp -Dtest=SomeDetectorTest test                # single test class
+  -Dspotbugs.skip=true -Ddependency-check.skip=true     # unit tests only (Surefire), no static analysis / CVE plugins
+mvn -B -ntp -Dtest=SomeDetectorTest test                # single unit test class
 mvn -B -ntp -DskipTests=true package                    # JAR only, no tests
+mvn -B -ntp verify \
+  -Dspotbugs.skip=true -Ddependency-check.skip=true     # unit + integration tests (Surefire + Failsafe), no static analysis / CVE plugins
 ```
 
-The first command **does run tests** — earlier drafts incorrectly passed `-DskipTests` here, which would have skipped them. Use `-Dspotbugs.skip` / `-Ddependency-check.skip` to keep the inner loop fast without dropping test coverage.
+The first command **does run tests** — earlier drafts incorrectly passed `-DskipTests` here, which would have skipped them. Reviewer finding cf64b44d (RAN-47, R5-3): Maven's `test` phase only runs Surefire (unit tests). This repo's integration tests are wired through Failsafe at the `integration-test` / `verify` phases — use the fourth form above when you need both unit + integration in the inner loop. Use `-Dspotbugs.skip` / `-Ddependency-check.skip` to keep things fast without dropping test coverage.
 
 Smoke-test the CLI end-to-end against this repo:
 

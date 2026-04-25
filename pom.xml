@@ -62,8 +62,14 @@
                 log4j-core 2.25.3 -> 2.25.4          (CVE-2026-34477 MOD,
                                                       CVE-2026-34478 MOD,
                                                       CVE-2026-34480 MOD)
+                log4j-api 2.25.3 -> 2.25.4           (umbrella-CPE attribution
+                                                      of log4j-core CVEs;
+                                                      bumped to keep the dep
+                                                      tree consistent and to
+                                                      stop the dep-check
+                                                      umbrella match)
                 log4j-layout-template-json 2.25.3 -> 2.25.4  (CVE-2026-34481 MOD)
-                  •both pulled in transitively by Neo4j 2026.02.3.
+                  •all three pulled in transitively by Neo4j 2026.02.3.
                 shiro-core 2.0.6 -> 2.1.0            (CVE-2026-23901 LOW)
                   •pulled in by neo4j-security.
                 mcp-core 1.1.0 -> 1.1.1              (CVE-2026-34237 MOD)
@@ -75,6 +81,11 @@
             <dependency>
                 <groupId>org.apache.logging.log4j</groupId>
                 <artifactId>log4j-core</artifactId>
+                <version>2.25.4</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.logging.log4j</groupId>
+                <artifactId>log4j-api</artifactId>
                 <version>2.25.4</version>
             </dependency>
             <dependency>
