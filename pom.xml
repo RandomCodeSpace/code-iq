@@ -427,6 +427,14 @@
                          once the cache is warm. RAN-42 tracks the secret
                          provisioning + a dedicated nightly NVD-refresh job. -->
                     <nvdApiKey>${env.NVD_API_KEY}</nvdApiKey>
+                    <!-- CPE-collision false-positive suppressions ONLY.
+                         High/Critical CVEs MUST be fixed, not suppressed
+                         (security.md §5). Each entry is justified, scoped
+                         tightly to the offending CPE, and TechLead-signed.
+                         See file header for the policy. -->
+                    <suppressionFiles>
+                        <suppressionFile>${project.basedir}/dependency-check-suppressions.xml</suppressionFile>
+                    </suppressionFiles>
                 </configuration>
                 <executions>
                     <!-- Bind dependency-check:check into the verify phase so

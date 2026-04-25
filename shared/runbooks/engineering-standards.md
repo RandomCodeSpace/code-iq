@@ -104,10 +104,12 @@ Rationale (per @CEO's RAN-46 ruling):
 
 The pipeline:
 
-| Cadence | Workflow | Artifact destination |
-|---|---|---|
-| `workflow_dispatch` (beta) | `.github/workflows/beta-java.yml` | Sonatype Central beta + GitHub pre-release |
-| `vX.Y.Z` tag push (GA) | `.github/workflows/release-java.yml` | Sonatype Central GA + GitHub Release |
+| Cadence | Workflow | Trigger | Artifact destination |
+|---|---|---|---|
+| Beta | `.github/workflows/beta-java.yml` | `workflow_dispatch` (manual) | Sonatype Central beta + GitHub pre-release |
+| GA | `.github/workflows/release-java.yml` | `workflow_dispatch` (manual, with `version` input) | Sonatype Central GA + GitHub Release |
+
+Both workflows are `workflow_dispatch`-only — there is no tag-push trigger and no automatic release on merge. A GA cut: the workflow builds a GPG-signed release commit on a detached HEAD, deploys from that exact tree, then creates and pushes a GPG-signed annotated `vX.Y.Z` tag pointing at the release commit plus a GitHub Release. Tags are an *output* of the GA workflow, not a trigger. See [`release.md`](release.md) §3 for the full sequence.
 
 Hello-world / pipeline proof: `git tag -l 'v0.0.1-beta.*' | wc -l` is non-zero (47+ beta tags as of the AC #10 ruling) and `gh release list` shows the corresponding GitHub pre-releases. AC #10 is satisfied by the existing pipeline; no new deploy scaffold is required.
 

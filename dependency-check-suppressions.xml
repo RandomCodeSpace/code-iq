@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  OWASP Dependency-Check suppressions for codeiq.
+
+  Policy (per shared/runbooks/engineering-standards.md §5 + ~/.claude/rules/security.md):
+    - High/Critical CVEs MUST be fixed, not suppressed. The only allowed
+      suppressions in this file are CPE-MATCH false positives — i.e., the
+      vulnerability is on a different product whose CPE happens to overlap.
+    - Each entry MUST include: justification, the wrong CPE that triggered
+      the match, the CVE list it covers, and TechLead sign-off (initials +
+      date). No silent suppressions.
+
+  This file is referenced from `pom.xml` via the dependency-check-maven
+  `<suppressionFiles>` configuration.
+-->
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+
+    <!--
+      Spring AI MCP Server WebMVC (org.springframework.ai:spring-ai-starter-mcp-server-webmvc)
+      is being matched against `cpe:2.3:a:vmware:server:2.0.0` (VMware Server, an
+      EOL hypervisor product) and `cpe:2.3:a:vmware:spring_ai:2.0.0` (a CPE
+      that does not correspond to a real product line). The matched CVEs are
+      all from 2009-2010 against VMware Server / ESX, none of which apply to a
+      Spring Boot starter JAR. This is a pure CPE-vendor collision triggered
+      by version pattern `2.0.0:m3` matching VMware Server's `2.0.0` CPE.
+
+      Justification: not-applicable. Spring AI 2.0.0-M3 is a 2025 Spring AI
+      milestone artifact, not VMware Server 2.0.0 (released 2008-09).
+      Sign-off: Amit Kumar (TechLead) 2026-04-25.
+    -->
+    <suppress>
+        <notes><![CDATA[
+            Spring AI MCP Server starter incorrectly matched against
+            cpe:2.3:a:vmware:server (VMware Server EOL hypervisor) due to
+            version-string overlap. CVEs are 2009/2010 VMware Server vulns,
+            not applicable to Spring AI. CPE collision only.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework\.ai/spring-ai-.*@.*$</packageUrl>
+        <cpe>cpe:/a:vmware:server</cpe>
+    </suppress>
+    <suppress>
+        <notes><![CDATA[
+            Spring AI MCP Server starter incorrectly matched against
+            cpe:2.3:a:vmware:spring_ai which is not a real CPE product line.
+            CPE collision only.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework\.ai/spring-ai-.*@.*$</packageUrl>
+        <cpe>cpe:/a:vmware:spring_ai</cpe>
+    </suppress>
+
+    <!--
+      spring-boot-neo4j (org.springframework.boot:spring-boot-neo4j) is the
+      Spring Boot autoconfiguration starter for Neo4j; it is NOT the Neo4j
+      database itself. Dependency-check matches its version (4.0.5) against
+      cpe:2.3:a:neo4j:neo4j:4.0.5. Neo4j-the-database CVEs apply to the Neo4j
+      server / driver artifacts (org.neo4j:* and org.neo4j.driver:*), not to
+      the Spring Boot starter.
+
+      Justification: not-applicable. spring-boot-neo4j is a configuration
+      bridge; it ships no Neo4j server code.
+      Sign-off: Amit Kumar (TechLead) 2026-04-25.
+    -->
+    <suppress>
+        <notes><![CDATA[
+            Spring Boot Neo4j starter incorrectly matched against
+            cpe:2.3:a:neo4j:neo4j. Starter contains no Neo4j server code.
+            CPE collision only.
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework\.boot/spring-boot-neo4j@.*$</packageUrl>
+        <cpe>cpe:/a:neo4j:neo4j</cpe>
+    </suppress>
+
+</suppressions>
