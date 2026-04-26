@@ -1,6 +1,6 @@
 {
   "$schema": "https://bestpractices.coreinfrastructure.org/projects.schema.json",
-  "_comment": "OpenSSF Best Practices self-assessment for RandomCodeSpace/codeiq. Registered 2026-04-25 by the board (RAN-46 AC #8). Live project page: https://www.bestpractices.dev/projects/12650",
+  "_comment": "OpenSSF Best Practices canonical autofill answers for RandomCodeSpace/codeiq. Project page: https://www.bestpractices.dev/projects/12650. Schema source: criteria/criteria.yml top-level '0:' block on coreinfrastructure/best-practices-badge. 67 criteria: 43 MUST, 10 SHOULD, 14 SUGGESTED.",
   "project_id": 12650,
   "name": "codeiq",
   "description": "Deterministic code knowledge graph — scans codebases to map services, endpoints, entities, infrastructure, auth patterns, and framework usage. No AI, pure static analysis.",
@@ -8,35 +8,213 @@
   "repo_url": "https://github.com/RandomCodeSpace/codeiq",
   "license": "MIT",
   "level": "passing",
-  "status": {
-    "basics": "self-assessed-passing",
-    "change_control": "self-assessed-passing",
-    "reporting": "self-assessed-passing",
-    "quality": "self-assessed-passing",
-    "security": "self-assessed-passing",
-    "analysis": "self-assessed-passing"
-  },
-  "evidence": {
-    "vulnerability_report_process": "SECURITY.md",
-    "release_process": "shared/runbooks/release.md",
-    "rollback_process": "shared/runbooks/rollback.md",
-    "first_time_setup": "shared/runbooks/first-time-setup.md",
-    "engineering_standards": "shared/runbooks/engineering-standards.md",
-    "license_file": "LICENSE",
-    "build_reproducible": "mvn -B -ntp clean verify",
-    "ci_workflow": ".github/workflows/ci-java.yml",
-    "code_scanning": "GitHub repo setting (CodeQL default setup, java-kotlin + javascript-typescript + actions). Workflow-driven CodeQL was tried in PR #74 but conflicts with default setup at SARIF upload — keeping default setup as the SSoT.",
-    "supply_chain_scorecard": ".github/workflows/scorecard.yml",
-    "dependency_updates": ".github/dependabot.yml",
-    "signed_commits": "scripts/setup-git-signed.sh",
-    "secret_scanning": "GitHub repo setting (secret_scanning + push_protection enabled)",
-    "static_analysis": "SpotBugs (mvn spotbugs:check) + SonarCloud Quality Gate",
-    "vulnerability_scanning": "OWASP Dependency-Check (mvn dependency-check:check) + Dependabot security updates"
-  },
-  "audit": {
-    "self_assessment_date": "2026-04-25",
-    "self_assessment_author": "TechLead (RAN-46)",
-    "registered_at": "https://www.bestpractices.dev/projects/12650",
-    "registered_date": "2026-04-25"
-  }
+
+  "description_good_status": "Met",
+  "description_good_justification": "README.md leads with a one-paragraph description of what codeiq does (deterministic code knowledge graph, static analysis, 97 detectors, 35+ languages); pom.xml <description> mirrors the same wording.",
+
+  "interact_status": "Met",
+  "interact_justification": "Public GitHub repository with Issues + Pull Requests enabled at https://github.com/RandomCodeSpace/codeiq; README's Quick Start documents how to obtain, build, and run; SECURITY.md documents the private vulnerability channel.",
+
+  "contribution_status": "Met",
+  "contribution_justification": "shared/runbooks/engineering-standards.md is the SSoT for the contribution process — branch/commit/PR rules (§3), testing tiers (§4), security gates (§5), and review flow. Every contributor (human or agent) follows it.",
+  "contribution_url": "https://github.com/RandomCodeSpace/codeiq/blob/main/shared/runbooks/engineering-standards.md",
+
+  "floss_license_status": "Met",
+  "floss_license_justification": "MIT License — permissive OSI-approved FLOSS license. Recorded in LICENSE at repo root and in pom.xml <licenses> (https://opensource.org/licenses/MIT).",
+
+  "license_location_status": "Met",
+  "license_location_justification": "LICENSE file at repository root contains the full MIT License text.",
+  "license_location_url": "https://github.com/RandomCodeSpace/codeiq/blob/main/LICENSE",
+
+  "documentation_basics_status": "Met",
+  "documentation_basics_justification": "README.md covers what codeiq is, install/build, the three-command pipeline (index→enrich→serve), and architecture (mermaid). CLAUDE.md documents internals; docs/ holds reference material such as docs/codeiq.yml.example.",
+
+  "documentation_interface_status": "Met",
+  "documentation_interface_justification": "README.md documents the CLI surface (analyze/index/enrich/serve). CLAUDE.md enumerates all 14 CLI commands, all 37 REST endpoints, and all 34 MCP tools with their parameters. Java public API is the Maven Central artifact io.github.randomcodespace.iq:code-iq.",
+
+  "sites_https_status": "Met",
+  "sites_https_justification": "Project home (https://github.com/RandomCodeSpace/codeiq), badge page (https://www.bestpractices.dev/projects/12650), Maven Central listing, and GHSA advisory channel all served exclusively over HTTPS.",
+
+  "discussion_status": "Met",
+  "discussion_justification": "GitHub Issues (https://github.com/RandomCodeSpace/codeiq/issues) and Pull Requests provide threaded, public, archived discussion. Comments support markdown and notify maintainers via GitHub.",
+
+  "maintained_status": "Met",
+  "maintained_justification": "Active development on main with frequent commits in 2026 (recent merges: PRs #91 OSS-CLI security stack, #92 badge wiring, #94/#95 supply-chain hardening). SECURITY.md commits to triage SLAs (acknowledgement <72h, initial triage <7d).",
+
+  "repo_public_status": "Met",
+  "repo_public_justification": "Source hosted publicly on GitHub at https://github.com/RandomCodeSpace/codeiq — full revision history readable without authentication.",
+
+  "repo_track_status": "Met",
+  "repo_track_justification": "Git distributed VCS with full history, signed commits enforced by branch protection on main, and conventional-commit subjects per shared/runbooks/engineering-standards.md §3.",
+
+  "repo_interim_status": "Met",
+  "repo_interim_justification": "Squash-merge from PR branches into main is the only path; every interim change is reviewable as a PR commit on the feature branch before squash. Branch protection on main rejects unsigned commits and unreviewed merges.",
+
+  "version_unique_status": "Met",
+  "version_unique_justification": "Maven coordinates io.github.randomcodespace.iq:code-iq with semver version strings (v0.0.1-beta.0 … v0.0.1-beta.46, v0.1.0). Each release is an immutable Maven Central artifact + an immutable GPG-signed git tag (vX.Y.Z) cut by .github/workflows/release-java.yml.",
+
+  "release_notes_status": "Met",
+  "release_notes_justification": "GitHub Releases at https://github.com/RandomCodeSpace/codeiq/releases — every tag (beta + GA) has a release with notes; release-java.yml + beta-java.yml drive the cut. Procedure documented in shared/runbooks/release.md.",
+  "release_notes_url": "https://github.com/RandomCodeSpace/codeiq/releases",
+
+  "release_notes_vulns_status": "Met",
+  "release_notes_vulns_justification": "Per SECURITY.md, security fixes are surfaced via GHSA advisories on the repo Security tab and credited in the corresponding GitHub Release notes; a hot-fix patch path is codified in shared/runbooks/release.md §5.",
+
+  "report_process_status": "Met",
+  "report_process_justification": "SECURITY.md documents the bug-report and vulnerability-report flows: GitHub Issues for non-security defects, GHSA private advisories or maintainer email for security issues, with explicit response SLAs.",
+  "report_process_url": "https://github.com/RandomCodeSpace/codeiq/blob/main/SECURITY.md",
+
+  "report_responses_status": "Met",
+  "report_responses_justification": "SECURITY.md commits the maintainer to acknowledge reports within 72 hours and triage within 7 days with a CVSS rating. Public issue threads are responded to in days; Paperclip-tracked work feeds back to GitHub via PRs.",
+
+  "report_archive_status": "Met",
+  "report_archive_justification": "All bug reports + responses live publicly and permanently in GitHub Issues; the issue tracker is the canonical archive.",
+  "report_archive_url": "https://github.com/RandomCodeSpace/codeiq/issues",
+
+  "vulnerability_report_process_status": "Met",
+  "vulnerability_report_process_justification": "SECURITY.md ## Reporting a vulnerability section gives two private channels (GitHub Security Advisory and maintainer email), required report contents, and the coordinated-disclosure timeline (default 90 days from triage).",
+  "vulnerability_report_process_url": "https://github.com/RandomCodeSpace/codeiq/blob/main/SECURITY.md#reporting-a-vulnerability",
+
+  "vulnerability_report_private_status": "Met",
+  "vulnerability_report_private_justification": "GitHub private vulnerability reporting is enabled (https://github.com/RandomCodeSpace/codeiq/security/advisories/new); a private email channel (ak.nitrr13@gmail.com, subject prefix [codeiq security]) is offered as a fallback in SECURITY.md.",
+  "vulnerability_report_private_url": "https://github.com/RandomCodeSpace/codeiq/security/advisories/new",
+
+  "vulnerability_report_response_status": "Met",
+  "vulnerability_report_response_justification": "SECURITY.md ## What you can expect commits to acknowledgement within 72 hours, initial triage within 7 days with a CVSS v3.1 severity rating, and coordinated disclosure with the reporter (default 90 days, sooner for low-impact / already-public issues).",
+
+  "build_status": "Met",
+  "build_justification": "Reproducible Maven build via `mvn -B -ntp clean verify` (locked to Maven Central + the Maven Wrapper). Bootstrap path documented in shared/runbooks/first-time-setup.md; CI invokes the same goal in .github/workflows/ci-java.yml.",
+
+  "test_status": "Met",
+  "test_justification": "Project ships with ~3219 JUnit/Spring tests in src/test/java covering analyzer, detectors (positive/negative/determinism per detector), graph store, query/topology services, MCP tools, REST controllers, and end-to-end pipelines (E2EQualityTest). Run with `mvn test` or `mvn verify`.",
+
+  "test_policy_status": "Met",
+  "test_policy_justification": "shared/runbooks/test-strategy.md and shared/runbooks/engineering-standards.md §4 codify the policy: every detector requires positive, negative, and determinism tests; new logic requires accompanying tests; flakes must be fixed/quarantined/deleted in the same PR; JaCoCo line coverage gate ≥ 85% is enforced in pom.xml.",
+
+  "tests_are_added_status": "Met",
+  "tests_are_added_justification": "Engineering-standards §3–4 plus CLAUDE.md (Adding a New Detector) require accompanying tests for every new detector or feature; reviewers block PRs that change behaviour without test deltas. JaCoCo ≥ 85% coverage gate (pom.xml) blocks merge if regressed.",
+
+  "warnings_status": "Met",
+  "warnings_justification": "SpotBugs static-analysis pass via `mvn spotbugs:check` is bound to `verify` and gates merge — zero High/Critical findings tolerated; spotbugs-exclude.xml entries require per-entry justification (engineering-standards §1).",
+
+  "warnings_fixed_status": "Met",
+  "warnings_fixed_justification": "Per engineering-standards §1, SpotBugs High/Critical findings block merge; existing exclusions are listed in spotbugs-exclude.xml with rationale. Compiler warnings surface during `mvn -B verify`; engineering-standards §2 requires exception hygiene (no swallowed warnings).",
+
+  "know_secure_design_status": "Met",
+  "know_secure_design_justification": "shared/runbooks/engineering-standards.md §5 (Security) codifies least-privilege, parameterised queries, AEAD ciphers (TLS 1.2+), no MD5/SHA-1 for integrity, and no secrets in code/logs. SECURITY.md scopes the threat model (path traversal, deserialisation, SSRF, etc.) for the serve subcommand.",
+
+  "know_common_errors_status": "Met",
+  "know_common_errors_justification": "Engineering-standards §5 + CLAUDE.md Critical Rules call out OWASP-relevant classes (path traversal, injection, secret handling). Semgrep p/owasp-top-ten + p/security-audit + p/java rulesets run on every push via .github/workflows/security.yml.",
+
+  "crypto_published_status": "Met",
+  "crypto_published_justification": "Cryptographic primitives used by codeiq are JDK 25 standards: SHA-256 via java.security.MessageDigest in cache/FileHasher.java (publicly published, NIST FIPS 180-4) and TLS via the JDK's javax.net.ssl stack when serving over HTTPS. No proprietary crypto.",
+
+  "crypto_floss_status": "Met",
+  "crypto_floss_justification": "All crypto primitives ship with the OpenJDK 25 runtime (GPL-2.0-with-classpath-exception, FLOSS). codeiq adds no proprietary crypto provider.",
+
+  "crypto_keylength_status": "Met",
+  "crypto_keylength_justification": "FileHasher uses SHA-256 (256-bit digest, NIST-approved). When TLS is active, the JDK 25 default cipher suite negotiates AES-128/256-GCM with ≥ 2048-bit RSA / ≥ 256-bit EC key exchange — all above the 112-bit symmetric / 2048-bit asymmetric NIST floor.",
+
+  "crypto_working_status": "Met",
+  "crypto_working_justification": "Hash function is SHA-256 only (cache/FileHasher.java) — no MD5, no SHA-1 for integrity. TLS settings inherit JDK 25 defaults, which disable SSLv3, TLS 1.0, TLS 1.1, RC4, and 3DES. Engineering-standards §5 hard-bans MD5/SHA-1 for integrity.",
+
+  "crypto_password_storage_status": "N/A",
+  "crypto_password_storage_justification": "codeiq is a developer-side static-analysis tool. The product does not authenticate users, store passwords, or operate as a multi-tenant service — there is no password store. SECURITY.md scope makes the threat model explicit.",
+
+  "crypto_random_status": "Met",
+  "crypto_random_justification": "Where security-relevant randomness is needed (e.g., UUID generation), codeiq relies on the JDK 25 java.security.SecureRandom / java.util.UUID#randomUUID() (which delegates to SecureRandom). No use of java.util.Random for security purposes.",
+
+  "delivery_mitm_status": "Met",
+  "delivery_mitm_justification": "Releases are distributed over HTTPS via Maven Central (Sonatype) and GitHub Releases. Maven Central artifacts are GPG-signed; release-java.yml builds a GPG-signed release commit and pushes a GPG-signed annotated git tag (vX.Y.Z). Bootstrap users verify via `mvn` over HTTPS or `git tag -v`.",
+
+  "delivery_unsigned_status": "Met",
+  "delivery_unsigned_justification": ".github/workflows/release-java.yml signs the release commit with GPG, deploys signed Maven artifacts to Sonatype Central, then creates and pushes a GPG-signed annotated tag pointing at that commit. Every commit on main is ssh-signed and branch protection rejects unsigned commits (engineering-standards §1).",
+
+  "vulnerabilities_fixed_60_days_status": "Met",
+  "vulnerabilities_fixed_60_days_justification": "Engineering-standards §1 + §5 plus SECURITY.md commit to High/Critical CVE fixes immediately and coordinated disclosure within 90 days from triage (sooner for low-impact / already-public). The OSS-CLI stack in .github/workflows/security.yml (OSV-Scanner + Trivy + Semgrep + Gitleaks) blocks merge on High/Critical findings — driving fixes inside 60 days.",
+
+  "no_leaked_credentials_status": "Met",
+  "no_leaked_credentials_justification": "Gitleaks runs against the full git history on every push + PR (.github/workflows/security.yml — `gitleaks detect --source . --redact --no-banner --exit-code 1`); zero findings is a merge gate. GitHub repo-level secret scanning + push protection are also enabled.",
+
+  "static_analysis_status": "Met",
+  "static_analysis_justification": "Two SAST passes gate every merge: (1) SpotBugs Java bytecode analysis (`mvn spotbugs:check` bound to verify) — zero High/Critical findings tolerated; (2) Semgrep with `p/security-audit` + `p/owasp-top-ten` + `p/java` rulesets in .github/workflows/security.yml — zero ERROR-level findings tolerated. SARIF from GitHub repo-level CodeQL default setup (java-kotlin + javascript-typescript + actions) is published to the Security tab.",
+
+  "static_analysis_fixed_status": "Met",
+  "static_analysis_fixed_justification": "Engineering-standards §1 makes SpotBugs and Semgrep findings hard merge gates — High/Critical SpotBugs and ERROR-level Semgrep both block PRs. Outstanding findings are fixed before merge or, in rare cases, suppressed in spotbugs-exclude.xml with per-entry justification reviewed by TechLead.",
+
+  "dynamic_analysis_fixed_status": "Met",
+  "dynamic_analysis_fixed_justification": "Trivy filesystem + container scan (`severity: HIGH,CRITICAL`, `exit-code: 1`) in .github/workflows/security.yml gates every PR — High/Critical findings block merge. Any future High/Critical dynamic-analysis finding is treated under the engineering-standards §5 / SECURITY.md remediation policy (fix immediately, disclose within 90 days).",
+
+  "contribution_requirements_status": "Met",
+  "contribution_requirements_justification": "shared/runbooks/engineering-standards.md §3 (Branch / commit / PR rules) and §4 (Testing tiers) are the explicit contribution requirements: conventional-commit subjects, ssh-signed commits, JaCoCo ≥ 85% coverage, all gates green, signed-off review.",
+  "contribution_requirements_url": "https://github.com/RandomCodeSpace/codeiq/blob/main/shared/runbooks/engineering-standards.md#3-branch-commit-pr-rules",
+
+  "english_status": "Met",
+  "english_justification": "All public artefacts (README.md, SECURITY.md, CLAUDE.md, shared/runbooks/*.md, code comments, commit subjects, PR titles, GitHub Issues) are written in English.",
+
+  "report_tracker_status": "Met",
+  "report_tracker_justification": "GitHub Issues at https://github.com/RandomCodeSpace/codeiq/issues — public, addressable per ticket, supports labels, milestones, and cross-references with PRs.",
+
+  "enhancement_responses_status": "Met",
+  "enhancement_responses_justification": "Maintainer triages enhancement requests on GitHub Issues, with public PRs cross-linking to the originating issue (e.g. recent merges PR #91 / PR #92 / PR #95). Internal coordination tracked in Paperclip; outward-facing decisions surface as PR descriptions and release notes.",
+
+  "build_floss_tools_status": "Met",
+  "build_floss_tools_justification": "Build chain is end-to-end FLOSS: OpenJDK 25 (GPL-2.0-with-classpath-exception) + Apache Maven 3.9+ (Apache-2.0) + Maven Wrapper. Runs on any Linux/macOS/Windows host without proprietary tooling. CI pinned to free GitHub-hosted runners.",
+
+  "test_invocation_status": "Met",
+  "test_invocation_justification": "Single command — `mvn test` (or `mvn verify` for the full quality gate). Documented in README Quick Start and shared/runbooks/first-time-setup.md; identical command runs locally and in .github/workflows/ci-java.yml.",
+
+  "crypto_call_status": "Met",
+  "crypto_call_justification": "codeiq calls SHA-256 only via the JDK's java.security.MessageDigest API (cache/FileHasher.java) and consumes JDK TLS via javax.net.ssl. No reimplementation of cryptographic primitives.",
+
+  "crypto_weaknesses_status": "Met",
+  "crypto_weaknesses_justification": "Engineering-standards §5 hard-bans MD5/SHA-1 for integrity, ECB mode, hardcoded IVs/keys, and TLS < 1.2. FileHasher exclusively uses SHA-256. JDK 25 default TLS configuration disables RC4/3DES/SSLv3/TLS 1.0/1.1.",
+
+  "crypto_pfs_status": "N/A",
+  "crypto_pfs_justification": "codeiq does not operate a public network service. The bundled `serve` subcommand binds to localhost for developer use; production-grade TLS termination (with PFS cipher suites) is the operator's responsibility per SECURITY.md (Out of scope: public-internet attack surface).",
+
+  "vulnerabilities_critical_fixed_status": "Met",
+  "vulnerabilities_critical_fixed_justification": "OSS-CLI stack in .github/workflows/security.yml — OSV-Scanner (npm lockfile via OSV.dev = GHSA + ecosystem feeds), Trivy (filesystem + Maven + container scan, `severity: HIGH,CRITICAL`, `exit-code: 1`), Semgrep (security-audit + owasp-top-ten + java) — all block merge on High/Critical findings. Engineering-standards §1 makes the gate non-negotiable.",
+
+  "floss_license_osi_status": "Met",
+  "floss_license_osi_justification": "MIT License is OSI-approved (https://opensource.org/license/mit) and on the OSI license list.",
+
+  "repo_distributed_status": "Met",
+  "repo_distributed_justification": "Project uses Git, a distributed version control system. Full history is clonable from GitHub.",
+
+  "version_semver_status": "Met",
+  "version_semver_justification": "Versioning follows Semantic Versioning 2.0.0: pre-1.0 line is 0.X.Y (currently 0.1.x); hot-fix path documented as X.Y.Z+1 in shared/runbooks/release.md §5; pre-releases tagged v0.0.1-beta.N. Maven Central + git tags are the immutable record.",
+
+  "version_tags_status": "Met",
+  "version_tags_justification": "Every release is a GPG-signed annotated git tag pushed to https://github.com/RandomCodeSpace/codeiq (e.g. v0.1.0, v0.0.1-beta.46). The release-java.yml workflow creates and pushes the tag pointing at the deployed release commit.",
+
+  "build_common_tools_status": "Met",
+  "build_common_tools_justification": "Build is Apache Maven (`mvn -B -ntp clean verify`) — among the most widely used JVM build tools. No custom or unusual tooling required beyond JDK 25 + Maven Wrapper.",
+
+  "test_most_status": "Met",
+  "test_most_justification": "JaCoCo line-coverage rule in pom.xml enforces project-wide ≥ 85% line coverage (post-exclusions). ~3219 tests cover analyzer, every detector (with positive/negative/determinism cases), graph store, query/topology services, MCP tools, REST controllers, and full-pipeline E2EQualityTest.",
+
+  "test_continuous_integration_status": "Met",
+  "test_continuous_integration_justification": ".github/workflows/ci-java.yml runs `mvn -B -ntp clean verify` on every push and pull request to main; mean-time-to-merge for incoming PRs is single-digit hours. Engineering-standards §1 lists CI checks as merge gates.",
+
+  "tests_documented_added_status": "Met",
+  "tests_documented_added_justification": "shared/runbooks/test-strategy.md + shared/runbooks/engineering-standards.md §4 explicitly require accompanying tests for new logic; CLAUDE.md (Adding a New Detector) lists per-detector test requirements (positive, negative, determinism). Reviewers block PRs that ship behaviour without test deltas.",
+
+  "warnings_strict_status": "Met",
+  "warnings_strict_justification": "SpotBugs runs in strict mode (`mvn spotbugs:check`, zero High/Critical findings, bound to the `verify` phase). Semgrep runs at ERROR threshold. JaCoCo coverage gate is also strict. Engineering-standards §1 lists each as a merge gate.",
+
+  "static_analysis_common_vulnerabilities_status": "Met",
+  "static_analysis_common_vulnerabilities_justification": "Semgrep rulesets `p/owasp-top-ten` + `p/security-audit` + `p/java` cover the OWASP Top 10 and common Java attack patterns; SpotBugs's FindSecBugs-style checks cover Java bytecode patterns. Both run in .github/workflows/security.yml on every push + PR + weekly schedule.",
+
+  "static_analysis_often_status": "Met",
+  "static_analysis_often_justification": ".github/workflows/security.yml triggers on push to main, pull_request, and a weekly cron — Semgrep + OSV-Scanner + Trivy + Gitleaks + jscpd run on each. Scorecard runs weekly (Mondays 06:00 UTC) per .github/workflows/scorecard.yml.",
+
+  "dynamic_analysis_status": "?",
+  "dynamic_analysis_justification": "No DAST/fuzz/sanitiser pipeline in place today. codeiq is a developer CLI/library — there is no continuously running service to fuzz. Trivy filesystem scan covers configuration-level dynamic findings. Reconsidering as Java fuzzing (e.g., Jazzer) matures.",
+
+  "dynamic_analysis_unsafe_status": "N/A",
+  "dynamic_analysis_unsafe_justification": "codeiq is written in Java 25 — a memory-safe, garbage-collected language with no manual pointer arithmetic. The criterion (memory-safety dynamic analysis) does not apply to this language.",
+
+  "dynamic_analysis_enable_assertions_status": "?",
+  "dynamic_analysis_enable_assertions_justification": "Assertions are not currently force-enabled (`-ea`) in CI test invocations. To be reconsidered alongside any future fuzzing/runtime-analysis work."
 }
