@@ -54,7 +54,7 @@
   "version_unique_justification": "Maven coordinates io.github.randomcodespace.iq:code-iq with semver version strings (v0.0.1-beta.0 … v0.0.1-beta.46, v0.1.0). Each release is an immutable Maven Central artifact + an immutable GPG-signed git tag (vX.Y.Z) cut by .github/workflows/release-java.yml.",
 
   "release_notes_status": "Met",
-  "release_notes_justification": "GitHub Releases at https://github.com/RandomCodeSpace/codeiq/releases — every tag (beta + GA) has a release with notes; release-java.yml + beta-java.yml drive the cut. Procedure documented in shared/runbooks/release.md.",
+  "release_notes_justification": "https://github.com/RandomCodeSpace/codeiq/releases — GitHub Releases page; every tag (beta + GA) has a human-readable release notes summary. CHANGELOG.md at repo root captures cross-cutting changes (https://github.com/RandomCodeSpace/codeiq/blob/main/CHANGELOG.md). release-java.yml + beta-java.yml drive the cut; procedure documented in shared/runbooks/release.md.",
   "release_notes_url": "https://github.com/RandomCodeSpace/codeiq/releases",
 
   "release_notes_vulns_status": "Met",
@@ -68,11 +68,11 @@
   "report_responses_justification": "SECURITY.md commits the maintainer to acknowledge reports within 72 hours and triage within 7 days with a CVSS rating. Public issue threads are responded to in days; Paperclip-tracked work feeds back to GitHub via PRs.",
 
   "report_archive_status": "Met",
-  "report_archive_justification": "All bug reports + responses live publicly and permanently in GitHub Issues; the issue tracker is the canonical archive.",
+  "report_archive_justification": "https://github.com/RandomCodeSpace/codeiq/issues — public GitHub Issues archive of all bug reports + responses, addressable per ticket and searchable indefinitely. The issue tracker is the canonical archive; closed issues remain publicly readable.",
   "report_archive_url": "https://github.com/RandomCodeSpace/codeiq/issues",
 
   "vulnerability_report_process_status": "Met",
-  "vulnerability_report_process_justification": "SECURITY.md ## Reporting a vulnerability section gives two private channels (GitHub Security Advisory and maintainer email), required report contents, and the coordinated-disclosure timeline (default 90 days from triage).",
+  "vulnerability_report_process_justification": "https://github.com/RandomCodeSpace/codeiq/blob/main/SECURITY.md#reporting-a-vulnerability — SECURITY.md \"Reporting a vulnerability\" section gives two private channels (GitHub Security Advisory at https://github.com/RandomCodeSpace/codeiq/security/advisories/new and maintainer email), required report contents, and the coordinated-disclosure timeline (default 90 days from triage).",
   "vulnerability_report_process_url": "https://github.com/RandomCodeSpace/codeiq/blob/main/SECURITY.md#reporting-a-vulnerability",
 
   "vulnerability_report_private_status": "Met",
@@ -146,7 +146,7 @@
   "dynamic_analysis_fixed_justification": "Trivy filesystem + container scan (`severity: HIGH,CRITICAL`, `exit-code: 1`) in .github/workflows/security.yml gates every PR — High/Critical findings block merge. Any future High/Critical dynamic-analysis finding is treated under the engineering-standards §5 / SECURITY.md remediation policy (fix immediately, disclose within 90 days).",
 
   "contribution_requirements_status": "Met",
-  "contribution_requirements_justification": "shared/runbooks/engineering-standards.md §3 (Branch / commit / PR rules) and §4 (Testing tiers) are the explicit contribution requirements: conventional-commit subjects, ssh-signed commits, JaCoCo ≥ 85% coverage, all gates green, signed-off review.",
+  "contribution_requirements_justification": "https://github.com/RandomCodeSpace/codeiq/blob/main/shared/runbooks/engineering-standards.md#3-branch-commit-pr-rules — engineering-standards.md §3 (Branch / commit / PR rules) and §4 (Testing tiers) are the explicit contribution requirements: conventional-commit subjects, ssh-signed commits, JaCoCo ≥ 85% coverage, all gates green, signed-off review.",
   "contribution_requirements_url": "https://github.com/RandomCodeSpace/codeiq/blob/main/shared/runbooks/engineering-standards.md#3-branch-commit-pr-rules",
 
   "english_status": "Met",
@@ -209,12 +209,12 @@
   "static_analysis_often_status": "Met",
   "static_analysis_often_justification": ".github/workflows/security.yml triggers on push to main, pull_request, and a weekly cron — Semgrep + OSV-Scanner + Trivy + Gitleaks + jscpd run on each. Scorecard runs weekly (Mondays 06:00 UTC) per .github/workflows/scorecard.yml.",
 
-  "dynamic_analysis_status": "?",
-  "dynamic_analysis_justification": "No DAST/fuzz/sanitiser pipeline in place today. codeiq is a developer CLI/library — there is no continuously running service to fuzz. Trivy filesystem scan covers configuration-level dynamic findings. Reconsidering as Java fuzzing (e.g., Jazzer) matures.",
+  "dynamic_analysis_status": "Unmet",
+  "dynamic_analysis_justification": "No DAST / fuzz / sanitiser pipeline in place today. codeiq is a developer CLI / library — there is no continuously running service to fuzz, and the bundled `serve` command binds to localhost. Trivy filesystem scan in .github/workflows/security.yml covers configuration-level dynamic findings, but that is not a full dynamic-analysis tool in the OpenSSF sense. To be reconsidered alongside Java fuzzing (e.g. Jazzer) as that ecosystem matures.",
 
   "dynamic_analysis_unsafe_status": "N/A",
   "dynamic_analysis_unsafe_justification": "codeiq is written in Java 25 — a memory-safe, garbage-collected language with no manual pointer arithmetic. The criterion (memory-safety dynamic analysis) does not apply to this language.",
 
-  "dynamic_analysis_enable_assertions_status": "?",
-  "dynamic_analysis_enable_assertions_justification": "Assertions are not currently force-enabled (`-ea`) in CI test invocations. To be reconsidered alongside any future fuzzing/runtime-analysis work."
+  "dynamic_analysis_enable_assertions_status": "Unmet",
+  "dynamic_analysis_enable_assertions_justification": "Assertions are not currently force-enabled (`-ea`) in CI test invocations (.github/workflows/ci-java.yml runs `mvn -B -ntp clean verify` with the JDK default of assertions off). To be reconsidered alongside any future fuzzing / runtime-analysis work; non-blocking for the `passing` tier."
 }
