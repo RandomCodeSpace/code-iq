@@ -429,6 +429,27 @@ bean for code paths that haven't been ported yet.
 - **SonarCloud project key**: `RandomCodeSpace_codeiq`, org: `randomcodespace`
 - **CI workflow**: Single `ci-java.yml` runs build + SonarCloud analysis. No cross-platform builds needed (JVM).
 
+## Supply-chain observability (OpenSSF)
+
+codeiq publishes two OpenSSF signals: the **Best Practices** badge (a self-attested checklist) and the **Scorecard** score (an automated supply-chain audit).
+
+### Best Practices badge
+
+- Project: https://www.bestpractices.dev/en/projects/12650 — registration unblocked between RAN-46 and RAN-52.
+- Source-of-truth manifest: `.bestpractices.json` at repo root (project_id, evidence map, audit dates).
+- Hard gate per the board: badge level **`passing`**. Final flip from `in_progress` → `passing` happens in the bestpractices.dev admin UI (board-owned). The repo-side criteria (CHANGELOG, SECURITY.md, signed commits, CI, code scanning, vulnerability scanning, SBOM, Scorecard wiring, dependency updates) all already point to evidence in this repo.
+
+### Scorecard baseline + target
+
+- Workflow: [`.github/workflows/scorecard.yml`](.github/workflows/scorecard.yml) — push to `main`, weekly cron (Mondays 06:00 UTC), `workflow_dispatch`. SARIF goes to the GitHub Security tab; results also land on https://api.securityscorecards.dev/projects/github.com/RandomCodeSpace/codeiq.
+- **Baseline (RAN-52 close, 2026-04-26):** captured by the first scheduled run after this PR lands. Read live from the Scorecard project page above; no static checked-in score (it would rot).
+- **Target:** ≥ **8.0 / 10**, with these checks at max: `Pinned-Dependencies`, `Token-Permissions`, `Branch-Protection`, `Code-Review`, `Maintained`, `License`, `SAST`, `Vulnerabilities`. **Stretch only** — Scorecard is observational; the `passing` Best Practices badge is the only hard gate per the board.
+- **Known floor reductions:** `Webhooks` (no public webhook surface — N/A), `Signed-Releases` (release-java workflow signs the GA commit; we are not yet signing every release artifact via Sigstore — tracked under follow-up).
+
+### OSS-CLI security stack
+
+The (B) OSS-CLI stack runs in [`.github/workflows/security.yml`](.github/workflows/security.yml): **Semgrep** (SAST), **OSV-Scanner** (deps, second-source CVE feed cross-checking OWASP Dependency-Check), **Trivy** (filesystem CVEs + IaC misconfig), **Gitleaks** (secret scan, Docker-image), **jscpd** (copy-paste detection), and **anchore/sbom-action** (SPDX SBOM). Triggers: push to `main`, PR, weekly cron, `workflow_dispatch`. SARIF outputs are uploaded to GitHub code scanning where supported, and every job uploads its raw report as a workflow artifact regardless. Findings are observability-only at the OSS-CLI bootstrap window — promote to gate-blocking once a clean baseline exists.
+
 ## Deploy
 
 codeiq's deploy surface is **Maven Central + GitHub Releases** (per RAN-46 AC #10 ruling, option a). The single Java JAR (with the React UI bundled inside) is published via two `workflow_dispatch`-only workflows: `.github/workflows/beta-java.yml` (manual beta cut → Sonatype Central beta + GitHub pre-release) and `.github/workflows/release-java.yml` (manual GA cut with a `version` input → the workflow builds a GPG-signed release commit on a detached HEAD, deploys from that exact tree, then creates and pushes a GPG-signed annotated `vX.Y.Z` tag pointing at the release commit + a GitHub Release). There is no static-CDN frontend, no hosted backend, no VPS — codeiq runs on the developer's machine. See [`shared/runbooks/release.md`](shared/runbooks/release.md) and [`shared/runbooks/engineering-standards.md`](shared/runbooks/engineering-standards.md) §7.1.

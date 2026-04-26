@@ -20,7 +20,7 @@ The rule of last resort: **`/home/dev/.claude/rules/*.md` wins.** This file does
 
 Coverage exclusions are enumerated in `pom.xml` `<jacoco>` config — only generated ANTLR sources, the `application/` Spring Boot main, and pure data records are excluded. Adding to that list requires TechLead sign-off.
 
-**Planned, not yet enforced:** OSV-Scanner as a second-source CVE feed (cross-checks OWASP Dependency-Check against the OSV / GitHub Advisory Database). Tracked under [RAN-42](/RAN/issues/RAN-42); will land as `.github/workflows/osv-scanner.yml` and a row added to the table above. Until then OSV is **not** part of the gate — only OWASP Dependency-Check is.
+**Observability stack (RAN-52, not part of the merge gate):** the (B) OSS-CLI stack runs in [`.github/workflows/security.yml`](../../.github/workflows/security.yml) — Semgrep (SAST), OSV-Scanner (deps, second-source CVE feed cross-checking OWASP Dependency-Check against the OSV / GitHub Advisory Database), Trivy (filesystem CVEs + IaC misconfig), Gitleaks (secret scan), jscpd (copy-paste detection), and `anchore/sbom-action` (SPDX SBOM). Triggers: push to `main`, PR, weekly cron, `workflow_dispatch`. SARIF outputs are uploaded to GitHub code scanning where supported and to workflow artifacts regardless. Findings stay observability-only at the OSS-CLI bootstrap window — promotion to gate-blocking happens once a clean baseline exists. The previously planned standalone `osv-scanner.yml` ([RAN-42](/RAN/issues/RAN-42)) is satisfied by this consolidated workflow.
 
 ---
 
@@ -73,6 +73,7 @@ Ground rules:
 - **Secrets** — never in code, config, or commit history. CI secrets are repo-level; rotation cadence is annual or on suspected exposure.
 - **CVE policy** — High/Critical → block; Medium → fix if a patched version exists, else document non-exploitability with TechLead sign-off; Low → tracked in the next dependency bump cycle.
 - **Vulnerability reporting** — see [`/SECURITY.md`](../../SECURITY.md). Private disclosure only.
+- **OSS-CLI observability stack** — [`.github/workflows/security.yml`](../../.github/workflows/security.yml) runs Semgrep / OSV-Scanner / Trivy / Gitleaks / jscpd / `anchore/sbom-action` weekly + on every PR; OpenSSF Scorecard runs in [`.github/workflows/scorecard.yml`](../../.github/workflows/scorecard.yml). See `/CLAUDE.md` "Supply-chain observability (OpenSSF)" for baseline + targets.
 
 ---
 

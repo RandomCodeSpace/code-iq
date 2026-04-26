@@ -1,7 +1,7 @@
 {
   "$schema": "https://bestpractices.coreinfrastructure.org/projects.schema.json",
-  "_comment": "OpenSSF Best Practices self-assessment skeleton for RandomCodeSpace/codeiq. The numeric project_id and badge URL are populated by a board admin after registering the project at https://www.bestpractices.dev/ — RAN-46 AC #8 calls this out as auth-blocked. Once the registration is complete, fill `project_id` and re-render the README badge with the resolved URL.",
-  "project_id": null,
+  "_comment": "OpenSSF Best Practices self-assessment for RandomCodeSpace/codeiq. Project page: https://www.bestpractices.dev/en/projects/12650. RAN-46 AC #8 (registration) was unblocked by the board between RAN-46 and RAN-52 — project_id is now wired and the README badge points at the live project URL. Flipping `badge_level` from `in_progress` to `passing` happens in the bestpractices.dev admin UI (still board-owned).",
+  "project_id": 12650,
   "name": "codeiq",
   "description": "Deterministic code knowledge graph — scans codebases to map services, endpoints, entities, infrastructure, auth patterns, and framework usage. No AI, pure static analysis.",
   "homepage_url": "https://github.com/RandomCodeSpace/codeiq",
@@ -34,8 +34,9 @@
     "vulnerability_scanning": "OWASP Dependency-Check (mvn dependency-check:check) + Dependabot security updates"
   },
   "audit": {
-    "self_assessment_date": "2026-04-25",
-    "self_assessment_author": "TechLead (RAN-46)",
-    "registration_blocker": "https://www.bestpractices.dev/ requires human OAuth/form. Tracked under RAN-46 AC #8."
+    "self_assessment_date": "2026-04-26",
+    "self_assessment_author": "TechLead (RAN-46, RAN-52)",
+    "registration_blocker": null,
+    "passing_blocker": "Final flip from `in_progress` to `passing` happens in the bestpractices.dev admin UI; tracked under RAN-52 AC #1 + AC #2."
   }
 }
