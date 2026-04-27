@@ -1,5 +1,7 @@
 package io.github.randomcodespace.iq.detector;
 
+import io.github.randomcodespace.iq.model.Confidence;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -8,6 +10,15 @@ import java.util.List;
  * Provides common utilities for line-based content processing.
  */
 public abstract class AbstractRegexDetector implements Detector {
+
+    /**
+     * Regex matches are pattern-only — no parse tree, no symbol resolution.
+     * Confidence floor for emissions from this base class is {@link Confidence#LEXICAL}.
+     */
+    @Override
+    public Confidence defaultConfidence() {
+        return Confidence.LEXICAL;
+    }
 
     /**
      * A single line of content with its 1-based line number.

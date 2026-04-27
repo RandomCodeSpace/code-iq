@@ -4,6 +4,7 @@ import com.github.javaparser.JavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import io.github.randomcodespace.iq.detector.AbstractRegexDetector;
 import io.github.randomcodespace.iq.detector.DetectorContext;
+import io.github.randomcodespace.iq.model.Confidence;
 
 import java.util.Optional;
 
@@ -15,6 +16,17 @@ public abstract class AbstractJavaParserDetector extends AbstractRegexDetector {
 
     private static final ThreadLocal<JavaParser> PARSER =
             ThreadLocal.withInitial(JavaParser::new);
+
+    /**
+     * JavaParser produces an AST — bump the inherited regex-default
+     * {@link Confidence#LEXICAL} up to {@link Confidence#SYNTACTIC}. Detectors
+     * that resolve symbols via JavaSymbolSolver (Phase 6+) should call
+     * {@code setConfidence(RESOLVED)} on emissions.
+     */
+    @Override
+    public Confidence defaultConfidence() {
+        return Confidence.SYNTACTIC;
+    }
 
     /**
      * Attempt to parse the source content into a JavaParser CompilationUnit.

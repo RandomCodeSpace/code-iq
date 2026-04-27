@@ -2,6 +2,7 @@ package io.github.randomcodespace.iq.detector;
 
 import io.github.randomcodespace.iq.model.CodeEdge;
 import io.github.randomcodespace.iq.model.CodeNode;
+import io.github.randomcodespace.iq.model.Confidence;
 import io.github.randomcodespace.iq.model.EdgeKind;
 import io.github.randomcodespace.iq.model.NodeKind;
 
@@ -15,6 +16,15 @@ import java.util.Map;
  * Provides defensive access methods for navigating parsed data structures.
  */
 public abstract class AbstractStructuredDetector implements Detector {
+
+    /**
+     * Structured (YAML/JSON/TOML/properties) parsing produces a parsed shape, not
+     * just a regex match — confidence floor is {@link Confidence#SYNTACTIC}.
+     */
+    @Override
+    public Confidence defaultConfidence() {
+        return Confidence.SYNTACTIC;
+    }
 
     /**
      * Safely cast an object to {@code Map<String, Object>}.

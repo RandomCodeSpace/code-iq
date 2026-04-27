@@ -1,5 +1,6 @@
 package io.github.randomcodespace.iq.detector;
 
+import io.github.randomcodespace.iq.model.Confidence;
 import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.atn.PredictionMode;
 import org.antlr.v4.runtime.tree.ParseTree;
@@ -21,6 +22,17 @@ import java.util.function.Function;
 public abstract class AbstractAntlrDetector extends AbstractRegexDetector {
 
     private static final Logger log = LoggerFactory.getLogger(AbstractAntlrDetector.class);
+
+    /**
+     * ANTLR parse trees are syntactic but not symbol-resolved — bump the
+     * regex-default {@link Confidence#LEXICAL} up to {@link Confidence#SYNTACTIC}.
+     * Subclasses that resolve symbols should call {@code setConfidence(RESOLVED)}
+     * explicitly on their emissions.
+     */
+    @Override
+    public Confidence defaultConfidence() {
+        return Confidence.SYNTACTIC;
+    }
 
     @Override
     public DetectorResult detect(DetectorContext ctx) {
