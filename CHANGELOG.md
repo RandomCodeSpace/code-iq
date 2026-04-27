@@ -41,8 +41,29 @@ for that specific tag for the per-commit details.
   summary of the Best Practices state, Scorecard baseline + target (≥ 8.0/10
   stretch with eight checks at max), known floor reductions, and the OSS-CLI
   stack reference. (RAN-52 AC #7)
+- `PROJECT_SUMMARY.md` (repo-root agent entry doc) and
+  [`docs/project/`](docs/project/) deep-dives (architecture, data-model,
+  build-and-run, conventions, ui, flows) — written for AI agents and humans
+  who need to understand and modify the codebase, every claim grounded in a
+  file path. Sits alongside `CLAUDE.md` (which remains the canonical
+  hand-maintained internals doc).
+- `docs/specs/` — directory for active architectural design specs. First
+  entry: `2026-04-27-resolver-spi-and-java-pilot-design.md`, the design for
+  sub-project 1 of the "robust graph" decomposition (symbol-resolver SPI
+  between parse and detect, Java pilot via JavaParser's `JavaSymbolSolver`,
+  `Confidence` enum + `source` field on every `CodeNode` / `CodeEdge`,
+  4–6 Java detectors migrated, 9 layers of aggressive testing). Implementation
+  in flight on `feat/sub-project-1-resolver-spi-and-java-pilot`.
 
 ### Changed
+
+- Documentation count drift fixed: detector total updated from **97 → 99**
+  (live count, excluding `Abstract*` and `*Helper*`); `NodeKind` total
+  updated from **32 → 34** (javadoc at `model/NodeKind.java` was stale by
+  two entries); `EdgeKind` total updated from **27 → 28** (javadoc at
+  `model/EdgeKind.java` was stale by one entry). `README.md`, `CLAUDE.md`,
+  `PROJECT_SUMMARY.md`, `docs/project/*.md`, and the source javadocs are
+  now in sync.
 
 - Branch protection on `main` requires every commit to be ssh-signed
   (RAN-46 AC #2). Force-pushes to `main` are rejected; squash-merge from

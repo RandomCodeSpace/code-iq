@@ -117,7 +117,7 @@ Rules to follow when modifying codeiq. Each item is grounded in an existing file
 
 ## Don't refactor (intentional non-standard choices)
 
-- **Single-file `NodeKind` and `EdgeKind` enums.** They're long (32+/27 values) and could be split, but they're load-bearing for cross-file uniqueness and detector readability. Don't split — keeps the type surface in one diff-friendly file. See `model/NodeKind.java`, `model/EdgeKind.java`.
+- **Single-file `NodeKind` and `EdgeKind` enums.** They're long (34/28 values) and could be split, but they're load-bearing for cross-file uniqueness and detector readability. Don't split — keeps the type surface in one diff-friendly file. See `model/NodeKind.java`, `model/EdgeKind.java`.
 - **No SDN hydration on the read path.** `graph/GraphStore.java` uses raw Cypher + `nodeFromNeo4j()` for reads; `graph/GraphRepository.java` (Spring Data Neo4j) is used **only for writes**. This is deliberate — SDN's hydration overhead was measured and rejected for the read path. Don't unify them.
 - **Auto-discovery via Spring `@Component` on detectors, no explicit registry.** Drop in a class, it's live. The `DetectorRegistry` exists to *introspect* the discovered set, not to register them. Don't replace with a manual registry.
 - **CLI profile selection in `CodeIqApplication.main` (not via Picocli's mechanism).** It's a string `if/else` on the first arg, and it pre-empts Picocli to set the Spring profile *before* the context starts. Looks ugly; works correctly. SpotBugs flagged the original duplicate branches; the current version was deliberately collapsed.

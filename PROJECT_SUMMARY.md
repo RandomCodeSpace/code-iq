@@ -142,7 +142,7 @@ CI gate is `mvn verify` — runs unit + integration tests **plus** SpotBugs and 
 - **SnakeYAML parses bare `on` as `Boolean.TRUE`.** Compare YAML keys with `String.valueOf(key)`, not `Boolean.TRUE.equals(key)` (SonarCloud S2159).
 - **Determinism gate:** every new detector needs a determinism test (run twice, assert equal output) — see existing `*DetectorTest.java` for the pattern.
 - **First `mvn verify` downloads ~1 GB NVD database** for OWASP dependency-check. Override locally with `-Ddependency-check.skip=true`.
-- **Counts drift between `CLAUDE.md` and code:** `CLAUDE.md` says "97 detectors" / "32 NodeKinds"; the live count is **99 concrete detectors** (excluding `Abstract*` and `*Helper*`) and **34 `NodeKind` values** (`model/NodeKind.java`). The `NodeKind` javadoc itself still says "32" — stale. Update both `CLAUDE.md` and the javadoc next time someone touches them.
+- **Live counts (verified 2026-04-27):** **99 concrete detectors** (excluding `Abstract*` and `*Helper*`), **34 `NodeKind` values**, **28 `EdgeKind` values**, **236 test files / 3,270 test methods**. `CLAUDE.md`, `README.md`, and the source javadocs are in sync. When adding a `NodeKind` / `EdgeKind` / detector, update the count in the source javadoc, `CLAUDE.md` (intro + package summary + key-files table), `README.md` (intro + mermaid subgraph), and this file in the same PR — drift is the default if you don't.
 - **Don't merge anything that fails `mvn verify`.** SpotBugs + dependency-check + tests are bound to `verify`, not `test`.
 
 ## Where to look next
@@ -153,7 +153,8 @@ CI gate is `mvn verify` — runs unit + integration tests **plus** SpotBugs and 
 - **Key flows (index→enrich→serve, MCP tool lifecycle)** → [`docs/project/flows.md`](docs/project/flows.md)
 - **Conventions (full)** → [`docs/project/conventions.md`](docs/project/conventions.md)
 - **Build & run details (Maven phases, ANTLR codegen, frontend embed)** → [`docs/project/build-and-run.md`](docs/project/build-and-run.md)
-- **Internal canonical reference (32-section deep doc, hand-maintained)** → [`CLAUDE.md`](CLAUDE.md)
+- **Active design specs (in-flight architectural work)** → [`docs/specs/`](docs/specs/) — currently: sub-project 1 (resolver SPI + Java pilot + confidence schema)
+- **Internal canonical reference (hand-maintained)** → [`CLAUDE.md`](CLAUDE.md)
 - **Engineering standards / release / rollback** → [`shared/runbooks/`](shared/runbooks/)
 
 (Skipped: `docs/project/integrations.md` — codeiq makes no runtime calls to external APIs / queues. The `docs/codeiq.yml.example` schema and `shared/runbooks/release.md` cover what little external surface exists at build/release time.)

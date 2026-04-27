@@ -29,7 +29,7 @@ codeiq's data model has **three storage layers**, each with its own schema and l
 
 ### `NodeKind` (enum)
 - **Defined in:** `model/NodeKind.java`.
-- **34 concrete values** (the file's javadoc still claims "32" — known stale, see `PROJECT_SUMMARY.md` §"Gotchas"):
+- **34 concrete values** (javadoc and file are in sync as of 2026-04-27):
 
 ```
 MODULE, PACKAGE, CLASS, METHOD, ENDPOINT, ENTITY, REPOSITORY, QUERY,
@@ -44,16 +44,15 @@ Each enum constant carries a lowercase `value` (e.g. `CLASS("class")`) used as t
 
 ### `EdgeKind` (enum)
 - **Defined in:** `model/EdgeKind.java`.
-- **27 values** per the file's javadoc (verified count). Includes:
+- **28 concrete values** (javadoc and file are in sync as of 2026-04-27):
 
 ```
 DEPENDS_ON, IMPORTS, EXTENDS, IMPLEMENTS, CALLS, INJECTS, EXPOSES,
-QUERIES, MAPS_TO, PRODUCES, CONSUMES, PUBLISHES, SUBSCRIBES, INVOKES_RMI,
-DEFINES, CONTAINS, OVERRIDES, CONNECTS_TO, TRIGGERS, PROVISIONS,
-SENDS_TO, RECEIVES_FROM, PROTECTS, RENDERS, REFERENCES_TABLE, ...
+QUERIES, MAPS_TO, PRODUCES, CONSUMES, PUBLISHES, LISTENS, INVOKES_RMI,
+EXPORTS_RMI, READS_CONFIG, MIGRATES, CONTAINS, DEFINES, OVERRIDES,
+CONNECTS_TO, TRIGGERS, PROVISIONS, SENDS_TO, RECEIVES_FROM, PROTECTS,
+RENDERS, REFERENCES_TABLE
 ```
-
-(Some values from the middle of the enum truncated in this summary — read `model/EdgeKind.java` for the authoritative list.)
 
 ### `layer` (string property, not an enum)
 Every node carries a `layer` property set by `analyzer/LayerClassifier.java` to one of: `frontend`, `backend`, `infra`, `shared`, `unknown`. Classification is deterministic — based on `kind`, `framework`, and path heuristics.
