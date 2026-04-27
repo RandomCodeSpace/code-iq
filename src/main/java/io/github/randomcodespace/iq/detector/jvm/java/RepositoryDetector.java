@@ -1,11 +1,18 @@
 package io.github.randomcodespace.iq.detector.jvm.java;
 
+import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
+import com.github.javaparser.ast.type.ClassOrInterfaceType;
+import com.github.javaparser.ast.type.Type;
+import com.github.javaparser.resolution.types.ResolvedType;
 import io.github.randomcodespace.iq.detector.AbstractRegexDetector;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorDbHelper;
 import io.github.randomcodespace.iq.detector.DetectorResult;
+import io.github.randomcodespace.iq.intelligence.resolver.Resolved;
+import io.github.randomcodespace.iq.intelligence.resolver.java.JavaResolved;
 import io.github.randomcodespace.iq.model.CodeEdge;
 import io.github.randomcodespace.iq.model.CodeNode;
+import io.github.randomcodespace.iq.model.Confidence;
 import io.github.randomcodespace.iq.model.EdgeKind;
 import io.github.randomcodespace.iq.model.NodeKind;
 import org.springframework.stereotype.Component;
@@ -116,6 +123,21 @@ public class RepositoryDetector extends AbstractRegexDetector {
             properties.put("entity_type", entityType);
         }
 
+        // RESOLVED tier: when ctx.resolved() carries a JavaResolved we look up
+        // the entity type's fully-qualified name via the symbol solver. The
+        // FQN rides on both the repo node (entity_fqn) and the QUERIES edge
+        // (target_fqn) so consumers (EntityLinker, query routing, the SPA)
+        // can pick the unambiguous reference when available.
+        Optional<JavaResolved> resolved = ctx.resolved()
+                .filter(Resolved::isAvailable)
+                .filter(JavaResolved.class::isInstance)
+                .map(JavaResolved.class::cast);
+        final String resolvedInterfaceName = interfaceName; // effectively-final capture for the lambda
+        Optional<String> entityFqn = (entityType != null)
+                ? resolved.flatMap(jr -> resolveEntityFqn(jr, resolvedInterfaceName))
+                : Optional.empty();
+        entityFqn.ifPresent(fqn -> properties.put("entity_fqn", fqn));
+
         // Extract @Query methods
         List<Map<String, String>> customQueries = new ArrayList<>();
         for (int i = 0; i < lines.length; i++) {
@@ -155,6 +177,13 @@ public class RepositoryDetector extends AbstractRegexDetector {
             edge.setSourceId(repoId);
             CodeNode targetRef = new CodeNode("*:" + entityType, NodeKind.ENTITY, entityType);
             edge.setTarget(targetRef);
+            if (entityFqn.isPresent()) {
+                Map<String, Object> edgeProps = new LinkedHashMap<>();
+                edgeProps.put("target_fqn", entityFqn.get());
+                edge.setProperties(edgeProps);
+                edge.setConfidence(Confidence.RESOLVED);
+                edge.setSource(getName());
+            }
             edges.add(edge);
         }
         DetectorDbHelper.addDbEdge(repoId, ctx.registry(), nodes, edges);
@@ -162,4 +191,44 @@ public class RepositoryDetector extends AbstractRegexDetector {
         return DetectorResult.of(nodes, edges);
     }
 
+    /**
+     * Use the resolver-attached symbol solver to find the entity type's FQN.
+     * Walks {@link JavaResolved#cu()}'s class hierarchy: locate the interface
+     * declaration matching {@code interfaceName}, take its first extended type
+     * (e.g. {@code JpaRepository<User, Long>}), then resolve the first type
+     * argument ({@code User}) to a fully-qualified name.
+     *
+     * <p>Returns empty on any solver failure — graceful fallback to the
+     * regex-extracted simple-name target.
+     */
+    private Optional<String> resolveEntityFqn(JavaResolved jr, String interfaceName) {
+        return jr.cu().findAll(ClassOrInterfaceDeclaration.class).stream()
+                .filter(d -> interfaceName.equals(d.getNameAsString()))
+                .findFirst()
+                .flatMap(this::firstTypeArgOfFirstParent)
+                .flatMap(RepositoryDetector::tryResolveFqn);
+    }
+
+    /** Take the first type argument of the first extended/implemented type, if any. */
+    private Optional<Type> firstTypeArgOfFirstParent(ClassOrInterfaceDeclaration decl) {
+        for (ClassOrInterfaceType parent : decl.getExtendedTypes()) {
+            var typeArgs = parent.getTypeArguments();
+            if (typeArgs.isPresent() && !typeArgs.get().isEmpty()) {
+                return Optional.of(typeArgs.get().get(0));
+            }
+        }
+        return Optional.empty();
+    }
+
+    private static Optional<String> tryResolveFqn(Type type) {
+        try {
+            ResolvedType rt = type.resolve();
+            if (rt.isReferenceType()) {
+                return Optional.of(rt.asReferenceType().getQualifiedName());
+            }
+            return Optional.of(rt.describe());
+        } catch (RuntimeException e) {
+            return Optional.empty();
+        }
+    }
 }
