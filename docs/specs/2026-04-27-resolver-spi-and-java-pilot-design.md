@@ -369,11 +369,11 @@ The plan that follows this spec will sequence work as:
 
 ## 18. References
 
-- [`PROJECT_SUMMARY.md`](../../../PROJECT_SUMMARY.md) — repo-wide entry point.
-- [`CLAUDE.md`](../../../CLAUDE.md) — canonical internals.
-- [`docs/project/architecture.md`](../../project/architecture.md) — pipeline + components, including the package layering rule that detectors may not depend on `analyzer/`.
-- [`docs/project/data-model.md`](../../project/data-model.md) — `NodeKind`, `EdgeKind`, Neo4j schema, H2 cache schema.
-- [`docs/project/conventions.md`](../../project/conventions.md) — detector authoring, base classes, "don't refactor" rules.
-- [`docs/project/build-and-run.md`](../../project/build-and-run.md) — Maven, ANTLR codegen, frontend bundling.
+- [`PROJECT_SUMMARY.md`](../../PROJECT_SUMMARY.md) — repo-wide entry point.
+- [`CLAUDE.md`](../../CLAUDE.md) — canonical internals.
+- [`docs/project/architecture.md`](../project/architecture.md) — pipeline + components, including the package layering rule that detectors may not depend on `analyzer/`.
+- [`docs/project/data-model.md`](../project/data-model.md) — `NodeKind`, `EdgeKind`, Neo4j schema, H2 cache schema.
+- [`docs/project/conventions.md`](../project/conventions.md) — detector authoring, base classes, "don't refactor" rules.
+- [`docs/project/build-and-run.md`](../project/build-and-run.md) — Maven, ANTLR codegen, frontend bundling.
 - JavaParser symbol-solver documentation: resolve via `context7` MCP at implementation time.
 - Sourcegraph SCIP and GitHub Stack Graphs as comparable patterns (informational only — not adopted in sub-project 1).
