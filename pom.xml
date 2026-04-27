@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.0.5</version>
+        <version>4.0.6</version>
         <relativePath/>
     </parent>
 
@@ -23,7 +23,7 @@
     <properties>
         <java.version>25</java.version>
         <neo4j.version>2026.04.0</neo4j.version>
-        <spring-ai.version>2.0.0-M3</spring-ai.version>
+        <spring-ai.version>2.0.0-M4</spring-ai.version>
         <picocli.version>4.7.7</picocli.version>
         <jacoco.version>0.8.14</jacoco.version>
         <spotbugs.version>4.9.8.3</spotbugs.version>
