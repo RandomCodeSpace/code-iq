@@ -9,6 +9,10 @@ import io.github.randomcodespace.iq.detector.DetectorRegistry;
 import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.intelligence.resolver.EmptyResolved;
 import io.github.randomcodespace.iq.intelligence.resolver.ResolverRegistry;
+import io.github.randomcodespace.iq.intelligence.resolver.java.JavaResolved;
+import io.github.randomcodespace.iq.intelligence.resolver.java.JavaSourceRootDiscovery;
+import io.github.randomcodespace.iq.intelligence.resolver.java.JavaSymbolResolver;
+import io.github.randomcodespace.iq.model.Confidence;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -138,6 +142,34 @@ class AnalyzerResolverWiringTest {
         assertNotNull(ctx);
         assertSame(EmptyResolved.INSTANCE, ctx.resolved().orElseThrow(),
                 "EmptyResolved is the only legal fallback — JavaDetector tests rely on this");
+    }
+
+    // ── DetectorContext: with JavaSymbolResolver registered, Java carries JavaResolved
+
+    @Test
+    void javaFilePicksUpJavaResolvedWhenResolverRegistered() throws IOException {
+        Files.writeString(tempDir.resolve("App.java"), "public class App {}");
+
+        AtomicReference<DetectorContext> seen = new AtomicReference<>();
+        ResolverRegistry registry = new ResolverRegistry(
+                List.of(new JavaSymbolResolver(new JavaSourceRootDiscovery())));
+        Analyzer analyzer = newAnalyzer(registry, captureCtx(seen));
+        analyzer.run(tempDir, null);
+
+        DetectorContext ctx = seen.get();
+        assertNotNull(ctx, "test detector must have been called");
+        assertTrue(ctx.resolved().isPresent(), "wiring must populate ctx.resolved()");
+
+        var resolved = ctx.resolved().orElseThrow();
+        assertNotSame(EmptyResolved.INSTANCE, resolved,
+                "with JavaSymbolResolver registered, Java files get JavaResolved");
+        assertInstanceOf(JavaResolved.class, resolved);
+
+        JavaResolved jr = (JavaResolved) resolved;
+        assertTrue(jr.isAvailable(), "JavaResolved is the RESOLVED tier — always available");
+        assertEquals(Confidence.RESOLVED, jr.sourceConfidence());
+        assertNotNull(jr.cu(), "the CU is the lazy-parsed App.java");
+        assertNotNull(jr.solver(), "the symbol solver is threaded through");
     }
 
     @Test

@@ -128,12 +128,62 @@ class JavaSymbolResolverTest {
     }
 
     @Test
-    void resolveStringAstReturnsEmpty(@TempDir Path tmp) throws ResolutionException {
+    void resolveValidJavaSourceStringReturnsJavaResolved(@TempDir Path tmp) throws ResolutionException {
+        // Lazy-parse path: the orchestrator hands us raw file content for
+        // Java (since its top-level structured parser doesn't cover Java).
+        // The resolver parses with the symbol-solver-configured JavaParser
+        // and threads the resulting CU into JavaResolved.
         resolver.bootstrap(tmp);
         DiscoveredFile java = new DiscoveredFile(Path.of("Foo.java"), "java", 100);
-        Resolved r = resolver.resolve(java, "not a CompilationUnit");
-        assertSame(EmptyResolved.INSTANCE, r,
-                "wrong AST type → EmptyResolved instead of ClassCastException");
+        Resolved r = resolver.resolve(java, "public class Foo {}");
+
+        assertNotSame(EmptyResolved.INSTANCE, r);
+        assertInstanceOf(JavaResolved.class, r);
+
+        JavaResolved jr = (JavaResolved) r;
+        assertNotNull(jr.cu(), "the CU is the parser output, never null on success");
+        assertNotNull(jr.solver(), "the solver is threaded through unchanged");
+    }
+
+    @Test
+    void resolveJunkInputNeverThrowsOrReturnsNull(@TempDir Path tmp) throws ResolutionException {
+        // JavaParser is permissive — it returns a CompilationUnit (possibly with
+        // attached Problems) for nearly any string input rather than refusing
+        // outright. The hard contract for this resolver path is therefore not
+        // "Empty for invalid Java" but "no exception, no null, no
+        // ClassCastException" — production analysis must keep going across
+        // files with syntax errors instead of taking the entire pass down.
+        resolver.bootstrap(tmp);
+        DiscoveredFile java = new DiscoveredFile(Path.of("Foo.java"), "java", 100);
+        Resolved r = resolver.resolve(java, "@@@ definitely not valid java !!!");
+        assertNotNull(r, "resolver must never return null");
+        // Don't pin the variant: JavaResolved (parsed with Problems) and
+        // EmptyResolved (parser couldn't even materialise a CU) are both
+        // legitimate outcomes for garbage input.
+    }
+
+    @Test
+    void resolveEmptyStringReturnsJavaResolvedWithEmptyCu(@TempDir Path tmp) throws ResolutionException {
+        // Edge case: empty source. JavaParser accepts this and returns an
+        // empty CU (no top-level types). That's still a parse — JavaResolved
+        // is fine; detectors that find no types will emit nothing.
+        resolver.bootstrap(tmp);
+        DiscoveredFile java = new DiscoveredFile(Path.of("Empty.java"), "java", 0);
+        Resolved r = resolver.resolve(java, "");
+
+        assertNotSame(EmptyResolved.INSTANCE, r);
+        assertInstanceOf(JavaResolved.class, r);
+        assertNotNull(((JavaResolved) r).cu());
+    }
+
+    @Test
+    void resolveUnknownAstTypeReturnsEmpty(@TempDir Path tmp) throws ResolutionException {
+        // Neither CompilationUnit nor String — caller shape we don't know.
+        // Defensive fallback rather than ClassCastException.
+        resolver.bootstrap(tmp);
+        DiscoveredFile java = new DiscoveredFile(Path.of("Foo.java"), "java", 100);
+        Resolved r = resolver.resolve(java, Path.of("/tmp/anything"));
+        assertSame(EmptyResolved.INSTANCE, r);
     }
 
     @Test

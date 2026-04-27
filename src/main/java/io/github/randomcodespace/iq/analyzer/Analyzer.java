@@ -199,11 +199,18 @@ public class Analyzer {
      * so one resolver failure can't take down the whole file's detector pass.
      * Returns {@link EmptyResolved#INSTANCE} on any failure (or when the
      * resolver itself returns null, defensive).
+     *
+     * <p>The orchestrator passes whatever it has: structured languages already
+     * have a {@code parsedAst} (YAML/JSON/etc. parse tree); for languages the
+     * top-level parser doesn't cover (Java, Python, …) we pass {@code content}
+     * as a fallback so language-specific resolvers can lazy-parse the source.
+     * Resolvers that don't understand the payload shape return EmptyResolved.
      */
-    private Resolved resolveFor(DiscoveredFile file, Object parsedAst) {
+    private Resolved resolveFor(DiscoveredFile file, Object parsedAst, String content) {
+        Object payload = parsedAst != null ? parsedAst : content;
         SymbolResolver resolver = resolverRegistry.resolverFor(file.language());
         try {
-            Resolved r = resolver.resolve(file, parsedAst);
+            Resolved r = resolver.resolve(file, payload);
             return r != null ? r : EmptyResolved.INSTANCE;
         } catch (ResolutionException e) {
             log.debug("resolver {} failed for {}: {}",
@@ -1355,7 +1362,7 @@ public class Analyzer {
                 parsedData,
                 moduleName,
                 infraRegistry
-        ).withResolved(resolveFor(file, parsedData));
+        ).withResolved(resolveFor(file, parsedData, content));
 
         List<Detector> detectors = detectorRegistry.detectorsForLanguage(file.language());
         if (detectors.isEmpty()) {
@@ -1563,7 +1570,7 @@ public class Analyzer {
                 content,
                 parsedData,
                 moduleName
-        ).withResolved(resolveFor(file, parsedData));
+        ).withResolved(resolveFor(file, parsedData, content));
 
         // Run matching detectors and merge results
         List<Detector> detectors = detectorRegistry.detectorsForLanguage(file.language());
@@ -1654,7 +1661,7 @@ public class Analyzer {
 
         String moduleName = DetectorUtils.deriveModuleName(file.path().toString(), file.language());
         var ctx = new DetectorContext(file.path().toString(), file.language(), content, null, moduleName)
-                .withResolved(resolveFor(file, null));
+                .withResolved(resolveFor(file, null, content));
 
         List<Detector> detectors = detectorRegistry.detectorsForLanguage(file.language());
         var allNodes = new ArrayList<CodeNode>();

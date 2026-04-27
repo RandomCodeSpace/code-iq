@@ -1,5 +1,8 @@
 package io.github.randomcodespace.iq.intelligence.resolver.java;
 
+import com.github.javaparser.JavaParser;
+import com.github.javaparser.ParseResult;
+import com.github.javaparser.ParserConfiguration;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.symbolsolver.JavaSymbolSolver;
 import com.github.javaparser.symbolsolver.resolution.typesolvers.CombinedTypeSolver;
@@ -71,13 +74,39 @@ public class JavaSymbolResolver implements SymbolResolver {
         if (file == null || !"java".equalsIgnoreCase(file.language())) {
             return EmptyResolved.INSTANCE;
         }
-        if (!(parsedAst instanceof CompilationUnit cu)) {
-            return EmptyResolved.INSTANCE;
-        }
         if (this.solver == null) {
             // bootstrap() not called or it failed silently — falling back to
             // EmptyResolved is the safe path. The orchestrator already logs
             // bootstrap failures from ResolverRegistry.
+            return EmptyResolved.INSTANCE;
+        }
+
+        CompilationUnit cu;
+        if (parsedAst instanceof CompilationUnit existing) {
+            // Caller already parsed (Analyzer's structured-language path, or
+            // a detector that pre-parsed). Reuse — no double-parse.
+            cu = existing;
+        } else if (parsedAst instanceof String source) {
+            // Lazy parse: Analyzer passes the raw file content for Java
+            // because the orchestrator-level structured parser doesn't cover
+            // Java. A fresh JavaParser per call is intentional — JavaParser
+            // instances aren't thread-safe and resolve() is invoked from
+            // virtual threads concurrently. Allocation cost is small relative
+            // to the parse itself, and the per-call instance carries the
+            // symbol solver so resolve()s on the resulting AST work.
+            ParserConfiguration cfg = new ParserConfiguration().setSymbolResolver(solver);
+            ParseResult<CompilationUnit> parseResult = new JavaParser(cfg).parse(source);
+            if (parseResult.getResult().isEmpty()) {
+                // Unparseable source — return EmptyResolved rather than
+                // surface a parse exception. Detectors that need the raw
+                // content already have ctx.content() — symbol resolution
+                // simply isn't available for files JavaParser can't accept.
+                return EmptyResolved.INSTANCE;
+            }
+            cu = parseResult.getResult().get();
+        } else {
+            // Neither a CompilationUnit nor a String — caller shape we don't
+            // understand. Defensive fallback rather than a ClassCastException.
             return EmptyResolved.INSTANCE;
         }
         return new JavaResolved(cu, solver);
