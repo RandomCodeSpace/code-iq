@@ -123,8 +123,11 @@ public class JavaSourceRootDiscovery {
 
     /** Cheap probe: does the directory tree under {@code root} have any {@code *.java}? */
     private static boolean containsJavaFile(Path root) {
-        try {
-            return Files.walk(root)
+        // try-with-resources: Files.walk holds an open directory stream; without
+        // a close, the file descriptor leaks for every plain-layout fallback
+        // scan. Cheap fix.
+        try (java.util.stream.Stream<Path> stream = Files.walk(root)) {
+            return stream
                     .filter(p -> !Files.isDirectory(p))
                     .anyMatch(p -> p.toString().endsWith(".java"));
         } catch (IOException e) {

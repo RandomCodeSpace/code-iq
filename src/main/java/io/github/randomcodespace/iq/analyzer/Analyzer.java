@@ -220,6 +220,15 @@ public class Analyzer {
             log.debug("resolver {} threw unexpectedly for {}: {}",
                     resolver.getClass().getSimpleName(), file.path(), e.toString());
             return EmptyResolved.INSTANCE;
+        } catch (StackOverflowError e) {
+            // Pathological generic / type-cycle inputs can blow JavaSymbolSolver's
+            // recursion stack. Catching the Error keeps the virtual-thread
+            // worker alive and the file's resolution simply degrades to lexical.
+            // Other Errors (OOM, ThreadDeath) are not caught — they're fatal and
+            // should propagate.
+            log.warn("resolver {} stack-overflowed for {} — falling back to lexical",
+                    resolver.getClass().getSimpleName(), file.path());
+            return EmptyResolved.INSTANCE;
         }
     }
 
