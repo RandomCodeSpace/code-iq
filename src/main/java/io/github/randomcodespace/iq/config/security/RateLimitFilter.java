@@ -113,8 +113,14 @@ public class RateLimitFilter extends OncePerRequestFilter {
         long retryAfterSec = Math.max(1L,
                 Duration.ofNanos(probe.getNanosToWaitForRefill()).toSeconds());
         String requestId = currentRequestId();
+        // CWE-117 / CodeQL java/log-injection: request method and URI flow
+        // from untrusted client headers; sanitize before logging via
+        // BearerAuthFilter.sanitizeForLog (strips \r\n\t with explicit
+        // single-char replace chains — the pattern CodeQL recognizes).
         log.warn("Rate-limited: {} {} (request_id={}, retry_after={}s)",
-                request.getMethod(), request.getRequestURI(), requestId, retryAfterSec);
+                BearerAuthFilter.sanitizeForLog(request.getMethod()),
+                BearerAuthFilter.sanitizeForLog(request.getRequestURI()),
+                requestId, retryAfterSec);
         // 429 — jakarta.servlet doesn't define a constant for this in all versions.
         response.setStatus(429);
         response.setHeader("Retry-After", String.valueOf(retryAfterSec));
