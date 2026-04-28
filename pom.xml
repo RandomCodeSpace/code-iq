@@ -260,7 +260,17 @@
                 <version>2.0.0</version>
                 <configuration>
                     <workingDirectory>src/main/frontend</workingDirectory>
-                    <nodeVersion>v20.11.0</nodeVersion>
+                    <!--
+                      Node 22 LTS. Vite 8 (PR #86 brought it in via the vite
+                      group) raised its minimum engine to ^20.19.0 || >=22.12.0,
+                      and v20.11.0 fails immediately at frontend-maven-plugin's
+                      `npm run build` step (`SyntaxError: ... 'styleText'` from
+                      rolldown's use of node:util.styleText, which only lands
+                      in Node 20.18+/22.x). Pinning to v22.12.0 — the minimum
+                      v22 release that satisfies Vite 8 — keeps us on a
+                      currently-supported LTS line.
+                    -->
+                    <nodeVersion>v22.12.0</nodeVersion>
                     <skip>${frontend.skip}</skip>
                 </configuration>
                 <executions>
