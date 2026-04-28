@@ -41,3 +41,12 @@ If the task asks for product/feature work and `shared/runbooks/release.md` is mi
 ## Auth escalation
 
 If you hit something requiring GitHub App / PAT / OAuth that the runtime cannot satisfy (org admin escalation, Sonatype Central re-namespace, OpenSSF Best Practices form, etc.), do **not** improvise auth: PATCH the issue to `blocked` with the exact ask and `@`-mention the board.
+
+
+<claude-mem-context>
+# Memory Context
+
+# [codeiq] recent context, 2026-04-28 1:14am UTC
+
+No previous sessions found.
+</claude-mem-context>
