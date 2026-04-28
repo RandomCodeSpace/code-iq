@@ -3,11 +3,17 @@ package io.github.randomcodespace.iq.detector.jvm.java;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
+import com.github.javaparser.ast.body.Parameter;
 import com.github.javaparser.ast.expr.*;
+import com.github.javaparser.ast.type.Type;
+import com.github.javaparser.resolution.types.ResolvedType;
 import io.github.randomcodespace.iq.detector.DetectorContext;
 import io.github.randomcodespace.iq.detector.DetectorResult;
+import io.github.randomcodespace.iq.intelligence.resolver.Resolved;
+import io.github.randomcodespace.iq.intelligence.resolver.java.JavaResolved;
 import io.github.randomcodespace.iq.model.CodeEdge;
 import io.github.randomcodespace.iq.model.CodeNode;
+import io.github.randomcodespace.iq.model.Confidence;
 import io.github.randomcodespace.iq.model.EdgeKind;
 import io.github.randomcodespace.iq.model.NodeKind;
 import org.springframework.stereotype.Component;
@@ -93,16 +99,25 @@ public class SpringRestDetector extends AbstractJavaParserDetector {
         String text = ctx.content();
         if (text == null || text.isEmpty()) return DetectorResult.empty();
 
-        Optional<CompilationUnit> cu = parse(ctx);
+        // Prefer the resolver-parsed CU when available — it has the symbol
+        // solver attached, so Type.resolve() works inside the AST walk for
+        // @RequestBody / @PathVariable type lifting.
+        Optional<JavaResolved> resolved = ctx.resolved()
+                .filter(Resolved::isAvailable)
+                .filter(JavaResolved.class::isInstance)
+                .map(JavaResolved.class::cast);
+
+        Optional<CompilationUnit> cu = resolved.map(JavaResolved::cu).or(() -> parse(ctx));
         if (cu.isPresent()) {
-            return detectWithAst(cu.get(), ctx);
+            return detectWithAst(cu.get(), ctx, resolved);
         }
         return detectWithRegex(ctx);
     }
 
     // ==================== AST-based detection ====================
 
-    private DetectorResult detectWithAst(CompilationUnit cu, DetectorContext ctx) {
+    private DetectorResult detectWithAst(CompilationUnit cu, DetectorContext ctx,
+                                          Optional<JavaResolved> resolved) {
         List<CodeNode> nodes = new ArrayList<>();
         List<CodeEdge> edges = new ArrayList<>();
 
@@ -200,6 +215,15 @@ public class SpringRestDetector extends AbstractJavaParserDetector {
                     edge.setSourceId(classNodeId);
                     edge.setTarget(node);
                     edges.add(edge);
+
+                    // RESOLVED tier: emit MAPS_TO edges for @RequestBody (and
+                    // @PathVariable / @RequestParam reference types) when the
+                    // symbol solver can pin a fully-qualified DTO. These ride
+                    // alongside the existing endpoint metadata so the SPA + MCP
+                    // can navigate from endpoint → DTO without a string-match
+                    // round trip through EntityLinker.
+                    resolved.ifPresent(jr ->
+                            addRequestBodyMapsToEdges(method, endpointId, edges));
                 }
             }
         });
@@ -208,6 +232,63 @@ public class SpringRestDetector extends AbstractJavaParserDetector {
         addHttpClientEdges(ctx, nodes, edges);
 
         return DetectorResult.of(nodes, edges);
+    }
+
+    /**
+     * For each parameter annotated with {@code @RequestBody} (and the few
+     * other reference-type binding annotations), try to resolve the parameter
+     * type via the symbol solver. On success, emit a {@link EdgeKind#MAPS_TO}
+     * edge from {@code endpointId} → {@code "*:" + simpleName} stamped with
+     * {@code Confidence.RESOLVED} and a {@code target_fqn} property.
+     *
+     * <p>Resolution failures are silent — the request body type might be a
+     * primitive (no edge needed), a third-party class missing from the
+     * classpath (genuinely unresolvable), or a generic type variable. The
+     * existing {@code parameters} property on the endpoint node still carries
+     * the simple name for the lexical / regex tier.
+     */
+    private void addRequestBodyMapsToEdges(MethodDeclaration method, String endpointId,
+                                            List<CodeEdge> edges) {
+        for (Parameter param : method.getParameters()) {
+            boolean isBindable = param.getAnnotations().stream().anyMatch(a ->
+                    "RequestBody".equals(a.getNameAsString()));
+            if (!isBindable) continue;
+            // Only emit MAPS_TO when the parameter type is a class/interface
+            // — primitive types (int, long) have no FQN and no DTO target.
+            Type paramType = param.getType();
+            if (!paramType.isClassOrInterfaceType()) continue;
+
+            Optional<String> fqn = tryResolveFqn(paramType);
+            if (fqn.isEmpty()) continue;
+
+            String simpleName = paramType.asClassOrInterfaceType().getNameAsString();
+            Map<String, Object> edgeProps = new LinkedHashMap<>();
+            edgeProps.put("target_fqn", fqn.get());
+            edgeProps.put("parameter_kind", "request_body");
+            edgeProps.put("parameter_name", param.getNameAsString());
+
+            CodeEdge mapsTo = new CodeEdge();
+            mapsTo.setId(endpointId + "->maps_to->*:" + fqn.get());
+            mapsTo.setKind(EdgeKind.MAPS_TO);
+            mapsTo.setSourceId(endpointId);
+            mapsTo.setTarget(new CodeNode("*:" + simpleName, NodeKind.CLASS, simpleName));
+            mapsTo.setProperties(edgeProps);
+            mapsTo.setConfidence(Confidence.RESOLVED);
+            mapsTo.setSource(getName());
+            edges.add(mapsTo);
+        }
+    }
+
+    private static Optional<String> tryResolveFqn(Type type) {
+        try {
+            ResolvedType rt = type.resolve();
+            if (rt.isReferenceType()) {
+                return Optional.of(rt.asReferenceType().getQualifiedName());
+            }
+            return Optional.of(rt.describe());
+        } catch (RuntimeException e) {
+            return Optional.empty();
+        }
     }
 
     /**
