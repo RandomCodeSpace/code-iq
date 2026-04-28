@@ -136,6 +136,16 @@ Hello-world / pipeline proof: `git tag -l 'v0.0.1-beta.*' | wc -l` is non-zero (
 
 If the product later needs a hosted demo or container surface, that is a **new RAN-* issue**, not a re-open of RAN-46.
 
+#### 7.1.1 Read-only deploy targets (sub-project 2)
+
+When a downstream consumer wants to run `codeiq serve` inside a hardened container runtime — Kubernetes / AKS / OpenShift with `securityContext.readOnlyRootFilesystem=true`, or any environment where the root filesystem is mounted read-only and only `/tmp` is writable — the canonical pattern is:
+
+1. CI builds the bundle (`index → enrich → bundle`) and uploads the zip to a private artifact registry (e.g. Nexus).
+2. An **init-container** copies the bundle into a writable `/tmp/codeiq-data` (`emptyDir` with `medium: Memory` for tmpfs, or default for disk-backed).
+3. The main container runs [`scripts/aks-launch.sh`](../../scripts/aks-launch.sh) which composes the JVM flag preset (Spring-Boot-loader tmpDir, `java.io.tmpdir`, `-XX:ErrorFile`, `-XX:HeapDumpPath`) and exec's `java -jar code-iq.jar serve /tmp/codeiq-data`.
+
+Zero source-code changes to the serve profile or Neo4j wiring — solved at the deployment layer plus the JVM-flag-preset launcher. Drift caught by `AksLaunchScriptSentinelTest`. Full deploy / verify / rollback steps in [`shared/runbooks/aks-read-only-deploy.md`](aks-read-only-deploy.md). Architecture rationale in [`docs/specs/2026-04-28-aks-read-only-deploy-design.md`](../../docs/specs/2026-04-28-aks-read-only-deploy-design.md).
+
 ---
 
 ## 8. Documentation

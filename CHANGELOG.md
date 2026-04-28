@@ -84,6 +84,18 @@ for that specific tag for the per-commit details.
   malformed inputs, determinism, concurrency-safe construction, and singleton
   invariants. Detector migrations to consume `ctx.resolved()` and the
   resolver-bootstrap-into-Analyzer hook follow in sub-project 1 Phase 5.
+- **AKS read-only deploy hardening** (sub-project 2): runbook at
+  [`shared/runbooks/aks-read-only-deploy.md`](shared/runbooks/aks-read-only-deploy.md),
+  JVM-flag-preset launcher at [`scripts/aks-launch.sh`](scripts/aks-launch.sh),
+  and a sentinel test asserting the script contains every required flag.
+  Enables `codeiq serve` inside an AKS pod with
+  `securityContext.readOnlyRootFilesystem=true` and a writable `/tmp`
+  emptyDir: an init-container copies the graph bundle from Nexus into
+  `/tmp/codeiq-data`; the main container runs `aks-launch.sh /tmp/codeiq-data`.
+  Zero source-code changes to the serve profile or Neo4j wiring — solved at
+  the deployment layer plus Spring-Boot-loader / `java.io.tmpdir` /
+  `-XX:ErrorFile` / `-XX:HeapDumpPath` overrides. Spec at
+  [`docs/specs/2026-04-28-aks-read-only-deploy-design.md`](docs/specs/2026-04-28-aks-read-only-deploy-design.md).
 
 ### Changed
 
