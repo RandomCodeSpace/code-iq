@@ -472,6 +472,61 @@ for that specific tag for the per-commit details.
     `McpToolsTest#readFileShouldHandleMissingFile` updated for new
     envelope contract. Full suite: 3680 tests / 0 failures / 0 errors.
 
+- **Production-readiness PR 5 of 5 — config validation, integration coverage,
+  docs refresh.** Final PR of the production-readiness series. Closes the
+  remaining audit findings around silent oversized-input clamping, missing
+  end-to-end coverage of the serving filter chain, and stale tech-stack
+  pins in `CLAUDE.md`.
+  - **MCP request-bound clamping in `McpTools`.** `queryNodes` /
+    `queryEdges` `limit` parameters are now `Math.min(requested,
+    mcp.limits.max_results)` so a caller asking for `LIMIT 1_000_000` no
+    longer trips the JVM into a multi-GB allocation before the
+    `run_cypher` row cap kicks in. `getEgoGraph` radius is clamped to
+    `mcp.limits.max_depth` for the same reason — a `radius=999` ego
+    walk on a hub node is a Cartesian explosion. `searchGraph` limit
+    follows the same rule. Per-call defense-in-depth on top of the
+    transaction-timeout cap from PR 2.
+  - **`ConfigValidator` hard ceilings + blank-string checks.** Added
+    explicit validations for fields previously only typed as
+    `Integer`/`Long` with no range:
+    - `mcp.limits.max_payload_bytes` — must be `> 0` (was silently
+      `null` → no payload cap → infinite-row run_cypher could OOM).
+    - `mcp.limits.rate_per_minute` — must be `> 0`.
+    - `mcp.limits.max_depth` — must be `1..100`. The 100 ceiling is a
+      DoS sentinel: variable-length Cypher with depth >100 is
+      pathological in practice (a graph with 100M nodes and fan-out 5
+      reaches every node by depth 12), so anything higher is either a
+      misconfig or a reconnaissance probe. Catch at config-load, not
+      at query time.
+    - `mcp.auth.token_env` / `mcp.auth.token` — when mode=bearer,
+      blank-string values fail validation rather than being silently
+      coerced to null and then fail-fasting at startup with a
+      mysterious "no token resolved" message.
+  - **`ServingChainIntegrationTest` (new — 9 cases).** Fills the gap
+    where each filter (`RequestIdFilter`, `SecurityHeadersFilter`,
+    `RateLimitFilter`, `BearerAuthFilter`) had unit-test coverage in
+    isolation but no test exercised the full chain together. Asserts
+    the cross-filter contract: 401 envelope shape with `request_id`
+    echoed in the `X-Request-Id` response header; 429 envelope with
+    `Retry-After` and `X-RateLimit-Remaining: 0`; security headers
+    present on every response (success, 401, 429); inbound
+    `X-Request-Id` propagated end-to-end when valid; control-char
+    inbound rejected and replaced with a generated UUID; rate-limit
+    bucket isolation per token (one client exhausting their bucket
+    does not affect another); health endpoint bypasses auth (kubelet
+    probes carry no token). Manually chains the four filters via
+    lambda `FilterChain` instances rather than spinning up a full
+    `@SpringBootTest` so the run is sub-second and doesn't need
+    Neo4j. Lives in `io.github.randomcodespace.iq.config.security`
+    package to access package-private `TokenResolver.resolve()`.
+  - **`CLAUDE.md` tech-stack pin refresh.** Stale version pins
+    updated to current: Spring Boot 4.0.5 → 4.0.6, Spring AI 2.0.0-M3
+    → 2.0.0-M4, Neo4j Embedded 2026.02.3 → 2026.04.0; added
+    Bucket4j 8.18.0, logstash-logback-encoder 9.0,
+    micrometer-registry-prometheus to the dependency list.
+  - **Tests:** new `ServingChainIntegrationTest` (9 cases). Full
+    suite: 3689 tests / 0 failures / 0 errors / 32 skipped.
+
 ## [0.1.0] - 2026-03-28
 
 First general-availability cut. See the
