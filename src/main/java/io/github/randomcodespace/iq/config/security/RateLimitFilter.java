@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
@@ -155,7 +156,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
     /** First 16 hex chars of SHA-256(input) — enough collision resistance for keying. */
     private static String sha256Short(String input) {
         try {
-            byte[] hash = MessageDigest.getInstance("SHA-256").digest(input.getBytes());
+            byte[] hash = MessageDigest.getInstance("SHA-256")
+                    .digest(input.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hash, 0, 8);
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 unavailable", e);
