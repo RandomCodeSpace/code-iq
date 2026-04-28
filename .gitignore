@@ -28,10 +28,34 @@ Thumbs.db
 *.mv.db
 
 # Environment & secrets
+# Broad .env* glob catches .env, .env.local, .env.prod, .env.test, .env.* — all
+# variants. Pre-PR-3 we only excluded the first two and several .env.<env>
+# variants would have committed silently.
 .env
-.env.local
+.env.*
+# Java keystores & PKCS#12 archives — high-value secrets that have shown up in
+# audits; never commit, even encrypted.
+*.jks
+*.p12
+*.pfx
+*.keystore
+# Generic credential / private-key patterns
 *.pem
 *.key
+# SSH private keys (public *.pub keys are fine).
+id_rsa
+id_ecdsa
+id_ed25519
+id_dsa
+# AWS / cloud credentials
+.aws/credentials
+credentials.json
+credentials.yaml
+secrets.json
+secrets.yaml
+# Service-account JSON (GCP / Firebase) — typically named *.serviceaccount.json.
+*-serviceaccount.json
+*.serviceaccount.json
 
 # Logs
 *.log

@@ -99,14 +99,35 @@ class BundleCommandTest {
             assertTrue(manifest.contains("\"backend\" : \"neo4j\""));
             assertTrue(manifest.contains("\"includes_source\" : true"));
 
-            // Verify serve.sh content
+            // Verify serve.sh content — air-gapped (no public-internet calls)
             String serveShell = new String(
                     zf.getInputStream(zf.getEntry("serve.sh")).readAllBytes(),
                     StandardCharsets.UTF_8);
             assertTrue(serveShell.contains("#!/usr/bin/env bash"));
             assertTrue(serveShell.contains("serve ./source"));
             assertTrue(serveShell.contains("--graph ./graph.db"));
-            assertTrue(serveShell.contains("maven.org"));
+            // Defense against re-introduction of network calls in launchers
+            assertFalse(serveShell.contains("curl"),
+                    "serve.sh must not include any curl/network call (RAN-46 air-gap rule)");
+            assertFalse(serveShell.contains("maven.org"),
+                    "serve.sh must not reference Maven Central (RAN-46 air-gap rule)");
+            assertTrue(serveShell.contains("sha256sum -c"),
+                    "serve.sh must verify checksums.sha256 by default");
+
+            // Verify checksums.sha256 entry exists, format-conforms to GNU
+            // sha256sum, and excludes itself (would be circular).
+            assertNotNull(zf.getEntry("checksums.sha256"),
+                    "Bundle must include checksums.sha256");
+            String checksums = new String(
+                    zf.getInputStream(zf.getEntry("checksums.sha256")).readAllBytes(),
+                    StandardCharsets.UTF_8);
+            assertFalse(checksums.contains("checksums.sha256"),
+                    "checksums.sha256 must not list itself (circular)");
+            assertTrue(checksums.matches("(?s)([0-9a-f]{64}  \\S.*\n)+"),
+                    "Each line must match GNU sha256sum format: <64-hex>  <path>");
+            // Sanity: manifest.json should appear in the checksums file.
+            assertTrue(checksums.contains("  manifest.json\n"),
+                    "Manifest entry must be checksummed");
         }
     }
 

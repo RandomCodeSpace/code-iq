@@ -365,6 +365,54 @@ for that specific tag for the per-commit details.
   topology tool as a targeted Cypher query so the snapshot isn't needed.
   The cache is the bridge; the rewrite reduces peak memory.
 
+- **Production-readiness PR 3 of 5 — supply chain & bundle integrity.**
+  Closes the air-gap drift, missing bundle integrity, and unpinned
+  scanner versions audit findings.
+  - **`codeiq bundle` SHA-256 manifest.** Every entry in `bundle.zip`
+    (manifest, scripts, graph DB files, H2 cache, source tree, flow.html,
+    optional CLI JAR) is now hashed as it streams through the
+    `ZipOutputStream`, and a `checksums.sha256` entry is written last in
+    standard GNU coreutils format. Receivers verify with
+    `sha256sum -c checksums.sha256`. The hash is computed by feeding each
+    chunk to both the SHA-256 digest and the ZIP stream — no double-read
+    even for multi-hundred-MB graph databases. Order is deterministic
+    (sorted dir walks + sorted git ls-files), so the resulting
+    `checksums.sha256` is byte-stable.
+  - **No public-internet calls in launcher scripts.** `serve.sh` and
+    `serve.bat` previously fell back to `curl -fL https://repo1.maven.org/...`
+    when the CLI JAR wasn't bundled — incompatible with the air-gapped
+    deploy model documented in `~/.claude/rules/build.md`. The Maven
+    Central download is removed; if the JAR is missing, the launcher
+    fails fast and tells the operator to either `--include-jar` when
+    bundling or stage from an internal artifact mirror. `serve.sh` also
+    runs `sha256sum -c --quiet checksums.sha256` automatically before
+    launching (skip with `CODEIQ_SKIP_VERIFY=1`).
+  - **Pinned Semgrep version.** `.github/workflows/security.yml` was
+    `pip install semgrep` (floating) — Scorecard's
+    `Pinned-Dependencies` flagged it. Now pinned to `semgrep==1.161.0`
+    (latest stable as of 2026-04-28). Bumps go through Dependabot's pip
+    ecosystem on a documented cadence.
+  - **Tightened secret-pattern exclusions.** `.gitignore` previously
+    only matched `.env` / `.env.local` — gaps for `.env.prod`,
+    `.env.test`, JKS / P12 keystores, SSH private keys, and
+    cloud-credential JSON. Broadened to `.env.*` plus explicit globs
+    for `*.jks`, `*.p12`, `*.pfx`, `*.keystore`, `id_{rsa,ecdsa,ed25519,dsa}`,
+    `credentials.{json,yaml}`, `secrets.{json,yaml}`,
+    `*.serviceaccount.json`. `.dockerignore` mirrors the same rules
+    (Docker resolves COPY against the build context, which includes
+    untracked working-tree files; .dockerignore does not inherit
+    .gitignore).
+  - **Bundle verification runbook.** `shared/runbooks/release.md` §4a
+    documents consumer-side `sha256sum -c` workflow, including the
+    deliberate exclusion of `checksums.sha256` from itself (would be
+    circular) and the Sigstore/GPG out-of-band signing that backs
+    `checksums.sha256` against tampering.
+  - **Tests:** `BundleCommandTest#bundleCreatesZipWithCorrectStructure`
+    extended with 4 new asserts: serve.sh contains no `curl`/`maven.org`
+    references (defense against re-introduction), `checksums.sha256`
+    exists, format-conforms to `<64-hex>  <path>`, and excludes itself.
+    Full suite: 3672 tests / 0 failures / 0 errors.
+
 ## [0.1.0] - 2026-03-28
 
 First general-availability cut. See the

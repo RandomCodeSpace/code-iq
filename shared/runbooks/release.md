@@ -80,6 +80,42 @@ Within 30 minutes of the release workflow finishing:
 
 If any of (1)–(4) fails, [`rollback.md`](rollback.md) applies.
 
+### 4a. Consumer-side bundle integrity (`codeiq bundle` artifacts)
+
+When operators receive a `*-bundle.zip` produced by `codeiq bundle`, they
+**must** verify integrity before launching the bundled `serve.sh` /
+`serve.bat`. The bundle ships a `checksums.sha256` entry in standard GNU
+coreutils format, generated as the last step of bundling
+(`BundleCommand#writeChecksumsManifest`).
+
+```bash
+# 1. Unzip into a clean directory.
+unzip myrepo-v1.0-bundle.zip -d myrepo-bundle/
+cd myrepo-bundle
+
+# 2. Verify every file. Exits non-zero if any entry is missing or modified;
+#    `checksums.sha256` itself is intentionally not listed (would be circular).
+sha256sum -c --quiet checksums.sha256
+
+# 3. (Optional) Skip via env var only when the bundle is trusted source-internal:
+#    CODEIQ_SKIP_VERIFY=1 ./serve.sh
+./serve.sh
+```
+
+`serve.sh` runs the same `sha256sum -c` automatically when the binary is
+on `PATH`. **Do not set `CODEIQ_SKIP_VERIFY=1` in production**: it
+disables the only consumer-side integrity gate when the bundle was
+delivered out-of-band (USB, internal mirror, AKS sidecar artifact). For
+verifying `checksums.sha256` itself against tampering, sign the
+bundle.zip out-of-band (Sigstore, GPG, or compare to the GitHub Release
+SHA-256 if the bundle was published to a release).
+
+If the consumer environment does not provide `sha256sum` (Windows without
+WSL, locked-down build agents), distribute the bundle via Sigstore-signed
+release and rely on the Sigstore client for integrity. `serve.bat`
+intentionally does **not** include a Windows-native verification step
+yet — tracked under follow-up.
+
 ---
 
 ## 5. Hot-fix patch release (`X.Y.Z+1`)

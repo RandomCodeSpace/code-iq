@@ -1,9 +1,37 @@
+# Build artifacts & VCS
 .git
 target
 node_modules
+
+# Documentation (not needed in image)
 *.md
 docs/
 tests/
 .github/
 helm/
+
+# Codeiq workspace under src/codeiq/ (development scratchpad)
 src/codeiq/
+
+# Secrets — explicit defense-in-depth; .dockerignore does NOT inherit
+# .gitignore (Docker resolves COPY against the build context, which
+# includes uncommitted/working-tree files). Audit RAN-46 §3.
+.env
+.env.*
+*.pem
+*.key
+*.jks
+*.p12
+*.pfx
+*.keystore
+id_rsa
+id_ecdsa
+id_ed25519
+id_dsa
+credentials.json
+credentials.yaml
+secrets.json
+secrets.yaml
+*.serviceaccount.json
+.aws/
+.codeiq/
