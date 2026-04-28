@@ -170,7 +170,13 @@ public class McpTools {
             @McpToolParam(description = "Node kind to filter by: endpoint, entity, class, method, guard, service, module, topic, queue, config_file, database_connection, component, interface, enum, etc.", required = false) String kind,
             @McpToolParam(description = "Maximum number of results to return (default: 50)", required = false) Integer limit) {
         try {
-            return toJson(queryService.listNodes(kind, limit != null ? limit : 50, 0));
+            // Clamp caller-supplied limit to mcp.limits.max_results (default 500).
+            // Pre-PR-5 a caller could ask for `limit: 1_000_000` and Neo4j
+            // would happily stream a million rows over the MCP transport,
+            // saturating the JSON encoder and the network. Part of the
+            // rate-limit / abuse-protection story (RAN-46 #2/#3).
+            int safeLimit = Math.min(limit != null ? limit : 50, maxResults);
+            return toJson(queryService.listNodes(kind, safeLimit, 0));
         } catch (Exception e) {
             return errorEnvelope("INTERNAL_ERROR", e);
         }
@@ -181,7 +187,8 @@ public class McpTools {
             @McpToolParam(description = "Edge kind to filter by: calls, imports, depends_on, queries, produces, consumes, protects, extends, implements, contains, connects_to, maps_to, etc.", required = false) String kind,
             @McpToolParam(description = "Maximum number of results to return (default: 50)", required = false) Integer limit) {
         try {
-            return toJson(queryService.listEdges(kind, limit != null ? limit : 50, 0));
+            int safeLimit = Math.min(limit != null ? limit : 50, maxResults);
+            return toJson(queryService.listEdges(kind, safeLimit, 0));
         } catch (Exception e) {
             return errorEnvelope("INTERNAL_ERROR", e);
         }
@@ -201,9 +208,14 @@ public class McpTools {
     @McpTool(name = "get_ego_graph", description = "Get the full subgraph within N hops of a center node — all reachable nodes and edges. Use for exploring the neighborhood of a component, understanding local architecture, or visualizing a module's context. Returns nodes and edges as a graph structure.")
     public String getEgoGraph(
             @McpToolParam(description = "Center node ID") String center,
-            @McpToolParam(description = "Number of hops from center node (default: 2, max: 10)", required = false) Integer radius) {
+            @McpToolParam(description = "Number of hops from center node (default: 2, max: configured mcp.limits.max_depth)", required = false) Integer radius) {
         try {
-            return toJson(queryService.egoGraph(center, radius != null ? radius : 2));
+            // Clamp radius to mcp.limits.max_depth (default 10). Pre-PR-5
+            // the description claimed "max: 10" but no code enforced it —
+            // a caller could ask for radius=999 and Neo4j would attempt a
+            // [*1..999] variable-length match.
+            int safeRadius = Math.min(radius != null ? radius : 2, maxDepth);
+            return toJson(queryService.egoGraph(center, safeRadius));
         } catch (Exception e) {
             return errorEnvelope("INTERNAL_ERROR", e);
         }
@@ -429,9 +441,10 @@ public class McpTools {
     @McpTool(name = "search_graph", description = "Full-text search across all node labels, IDs, file paths, and properties. Use as the starting point when the user mentions a name but you don't have the exact node ID. Returns matching nodes ranked by relevance.")
     public String searchGraph(
             @McpToolParam(description = "Search query") String query,
-            @McpToolParam(description = "Maximum results (default: 20)", required = false) Integer limit) {
+            @McpToolParam(description = "Maximum results (default: 20, hard cap: configured mcp.limits.max_results)", required = false) Integer limit) {
         try {
-            return toJson(queryService.searchGraph(query, limit != null ? limit : 20));
+            int safeLimit = Math.min(limit != null ? limit : 20, maxResults);
+            return toJson(queryService.searchGraph(query, safeLimit));
         } catch (Exception e) {
             return errorEnvelope("INTERNAL_ERROR", e);
         }

@@ -14,10 +14,18 @@
 
 ## Tech Stack
 
+> **Source of truth:** `pom.xml` and `src/main/frontend/package.json`. Update
+> these pins together — when `pom.xml` bumps, this list moves with it as part
+> of the same PR. Pre-PR-5 the list had drifted (Spring Boot 4.0.5,
+> Neo4j 2026.02.3, Spring AI 2.0.0-M3); PR 5 brought it back in sync.
+
 - Java 25 (virtual threads, pattern matching, records, sealed classes)
-- Spring Boot 4.0.5
-- Neo4j Embedded 2026.02.3 (Community Edition, no external server)
-- Spring AI 2.0.0-M3 (MCP server, `@McpTool` annotations, streamable HTTP)
+- Spring Boot 4.0.6 (parent POM `<version>`)
+- Neo4j Embedded 2026.04.0 (Community Edition, no external server)
+- Spring AI 2.0.0-M4 (MCP server, `@McpTool` annotations, streamable HTTP)
+- Bucket4j 8.18.0 (`bucket4j_jdk17-core`, in-process token-bucket rate limiter)
+- logstash-logback-encoder 9.0 (JSON-structured logging in `serving` profile)
+- micrometer-registry-prometheus (`/actuator/prometheus`, version managed by Boot BOM)
 - JavaParser 3.28.0 (Java AST analysis)
 - ANTLR 4.13.2 (TypeScript/JavaScript, Python, Go, C#, Rust, C++ grammars)
 - Picocli 4.7.7 (CLI framework, integrated with Spring Boot)

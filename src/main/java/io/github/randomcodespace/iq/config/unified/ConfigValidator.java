@@ -64,6 +64,45 @@ public final class ConfigValidator {
         Integer maxRes = c.mcp().limits().maxResults();
         if (maxRes != null && maxRes <= 0)
             errs.add(new ConfigError("mcp.limits.max_results", "must be > 0", "validator"));
+        Long maxPayload = c.mcp().limits().maxPayloadBytes();
+        if (maxPayload != null && maxPayload <= 0)
+            errs.add(new ConfigError("mcp.limits.max_payload_bytes", "must be > 0", "validator"));
+        Integer ratePerMin = c.mcp().limits().ratePerMinute();
+        if (ratePerMin != null && ratePerMin <= 0)
+            errs.add(new ConfigError("mcp.limits.rate_per_minute", "must be > 0", "validator"));
+        Integer maxDepth = c.mcp().limits().maxDepth();
+        if (maxDepth != null) {
+            if (maxDepth <= 0)
+                errs.add(new ConfigError("mcp.limits.max_depth", "must be > 0", "validator"));
+            // Hard ceiling on max_depth — variable-length Cypher with depth >100
+            // is almost always either a misconfig or a reconnaissance probe.
+            // A graph with 100M nodes and a fan-out of 5 reaches every node by
+            // depth 12 anyway; depth >100 is pathological in practice.
+            if (maxDepth > 100)
+                errs.add(new ConfigError("mcp.limits.max_depth",
+                        "must be <= 100 (variable-length Cypher above this depth is "
+                                + "pathological); got " + maxDepth, "validator"));
+        }
+
+        // mcp.auth.* — blank-string checks for required fields
+        // When mcp.auth.mode=bearer, either token_env (env var name) or token
+        // (literal config value) must resolve to a non-blank string. The
+        // TokenResolver also fail-fasts at startup, but catching this in
+        // `codeiq config validate` lets operators see the issue before
+        // launching the server.
+        if ("bearer".equalsIgnoreCase(c.mcp().auth().mode())) {
+            String tokenEnvName = c.mcp().auth().tokenEnv();
+            String tokenLiteral = c.mcp().auth().token();
+            // Blank means "set but empty" — silently coerced to null at
+            // config-read but TokenResolver would still fail. Catch here.
+            if (tokenEnvName != null && tokenEnvName.isBlank())
+                errs.add(new ConfigError("mcp.auth.token_env",
+                        "must be non-blank when set (use unset for default CODEIQ_MCP_TOKEN)",
+                        "validator"));
+            if (tokenLiteral != null && tokenLiteral.isBlank())
+                errs.add(new ConfigError("mcp.auth.token",
+                        "must be non-blank when set", "validator"));
+        }
 
         // observability.log_format / log_level
         if (c.observability().logFormat() != null && !LOG_FORMATS.contains(c.observability().logFormat()))
