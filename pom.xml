@@ -489,6 +489,42 @@
     </build>
 
     <profiles>
+        <!--
+          Mutation testing profile — Phase 7 Layer 9 (non-gating).
+          Run: mvn -P mutation org.pitest:pitest-maven:mutationCoverage
+                   -Dfrontend.skip=true -Ddependency-check.skip=true
+          Targets the resolver SPI surface and Confidence model. Reports under
+          target/pit-reports/. Apache-2.0 licensed (preferred-license tier).
+        -->
+        <profile>
+            <id>mutation</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.pitest</groupId>
+                        <artifactId>pitest-maven</artifactId>
+                        <version>1.18.0</version>
+                        <configuration>
+                            <targetClasses>
+                                <param>io.github.randomcodespace.iq.intelligence.resolver.*</param>
+                                <param>io.github.randomcodespace.iq.intelligence.resolver.java.*</param>
+                                <param>io.github.randomcodespace.iq.model.Confidence</param>
+                            </targetClasses>
+                            <targetTests>
+                                <param>io.github.randomcodespace.iq.intelligence.resolver.*</param>
+                                <param>io.github.randomcodespace.iq.intelligence.resolver.java.*</param>
+                                <param>io.github.randomcodespace.iq.model.ConfidenceTest</param>
+                            </targetTests>
+                            <outputFormats>
+                                <outputFormat>HTML</outputFormat>
+                                <outputFormat>XML</outputFormat>
+                            </outputFormats>
+                            <timestampedReports>false</timestampedReports>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
         <profile>
             <id>release</id>
             <build>
