@@ -34,6 +34,20 @@ public class CodeEdge {
     @ConvertWith(converter = MapToJsonConverter.class)
     private Map<String, Object> properties = new HashMap<>();
 
+    /**
+     * Confidence in this edge's existence and target accuracy. Defaults to
+     * {@link Confidence#LEXICAL} for backward compatibility with edges
+     * persisted before this field existed.
+     */
+    @ConvertWith(converter = ConfidenceConverter.class)
+    private Confidence confidence = Confidence.LEXICAL;
+
+    /**
+     * Detector class simple name that emitted this edge, e.g.
+     * {@code "SpringServiceDetector"}. Stamped by detector base classes.
+     */
+    private String source;
+
     public CodeEdge() {
     }
 
@@ -88,6 +102,35 @@ public class CodeEdge {
 
     public void setProperties(Map<String, Object> properties) {
         this.properties = properties;
+    }
+
+    /**
+     * @return confidence stamped by the detector. Never {@code null} — falls
+     *         back to {@link Confidence#LEXICAL} for edges loaded before this
+     *         field existed.
+     */
+    public Confidence getConfidence() {
+        return confidence != null ? confidence : Confidence.LEXICAL;
+    }
+
+    /**
+     * Set confidence. {@code null} is normalized to {@link Confidence#LEXICAL}
+     * so the field is never null at rest.
+     */
+    public void setConfidence(Confidence confidence) {
+        this.confidence = confidence != null ? confidence : Confidence.LEXICAL;
+    }
+
+    /**
+     * @return the simple class name of the detector that emitted this edge,
+     *         or {@code null} if the edge was constructed bare.
+     */
+    public String getSource() {
+        return source;
+    }
+
+    public void setSource(String source) {
+        this.source = source;
     }
 
     @Override

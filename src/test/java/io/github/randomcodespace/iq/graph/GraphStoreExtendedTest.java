@@ -51,6 +51,9 @@ class GraphStoreExtendedTest {
         when(neo4jNode.getProperty("layer", null)).thenReturn(null);
         when(neo4jNode.getProperty("lineStart", null)).thenReturn(null);
         when(neo4jNode.getProperty("lineEnd", null)).thenReturn(null);
+        when(neo4jNode.getProperty("annotations", null)).thenReturn(null);
+        when(neo4jNode.getProperty("confidence", null)).thenReturn(null);
+        when(neo4jNode.getProperty("source", null)).thenReturn(null);
         return neo4jNode;
     }
 

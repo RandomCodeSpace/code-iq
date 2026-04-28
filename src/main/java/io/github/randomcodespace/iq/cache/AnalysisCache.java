@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.randomcodespace.iq.model.CodeEdge;
 import io.github.randomcodespace.iq.model.CodeNode;
+import io.github.randomcodespace.iq.model.Confidence;
 import io.github.randomcodespace.iq.model.EdgeKind;
 import io.github.randomcodespace.iq.model.NodeKind;
 import org.slf4j.Logger;
@@ -39,8 +40,8 @@ public final class AnalysisCache implements Closeable {
 
     private static final Logger log = LoggerFactory.getLogger(AnalysisCache.class);
 
-    /** Bump when hash algorithm or schema changes to force cache invalidation. */
-    private static final int CACHE_VERSION = 4;
+    /** Bump when hash algorithm or serialization shape changes to force cache invalidation. */
+    private static final int CACHE_VERSION = 5;
 
     private static final String SCHEMA_SQL = """
             CREATE TABLE IF NOT EXISTS cache_meta (
@@ -689,6 +690,10 @@ public final class AnalysisCache implements Closeable {
         if (node.getLineStart() != null) data.put("line_start", node.getLineStart());
         if (node.getLineEnd() != null) data.put("line_end", node.getLineEnd());
         if (node.getLayer() != null) data.put("layer", node.getLayer());
+        // Confidence is never null at rest (setter normalizes to LEXICAL); store the
+        // enum name. Source is optional and stays null for bare construction.
+        data.put("confidence", node.getConfidence().name());
+        if (node.getSource() != null) data.put("source", node.getSource());
         if (node.getAnnotations() != null && !node.getAnnotations().isEmpty()) {
             data.put("annotations", node.getAnnotations());
         }
@@ -720,6 +725,20 @@ public final class AnalysisCache implements Closeable {
             if (data.get("line_start") instanceof Number n) node.setLineStart(n.intValue());
             if (data.get("line_end") instanceof Number n) node.setLineEnd(n.intValue());
             node.setLayer((String) data.get("layer"));
+            // Confidence + source: missing/malformed values fall back to LEXICAL/null
+            // — never throw — so legacy cache rows without these fields still load.
+            Object confObj = data.get("confidence");
+            if (confObj instanceof String confStr) {
+                try {
+                    node.setConfidence(Confidence.fromString(confStr));
+                } catch (IllegalArgumentException ignored) {
+                    // keep default LEXICAL
+                }
+            }
+            Object srcObj = data.get("source");
+            if (srcObj instanceof String src) {
+                node.setSource(src);
+            }
             if (data.get("annotations") instanceof List<?> list) {
                 node.setAnnotations(list.stream().map(Object::toString).toList());
             }
@@ -743,6 +762,9 @@ public final class AnalysisCache implements Closeable {
         if (edge.getTarget() != null) {
             data.put("target_id", edge.getTarget().getId());
         }
+        // Confidence is never null at rest; source is optional.
+        data.put("confidence", edge.getConfidence().name());
+        if (edge.getSource() != null) data.put("source", edge.getSource());
         if (edge.getProperties() != null && !edge.getProperties().isEmpty()) {
             data.put("properties", edge.getProperties());
         }
@@ -772,6 +794,19 @@ public final class AnalysisCache implements Closeable {
             }
 
             CodeEdge edge = new CodeEdge(id, EdgeKind.fromValue(kindStr), sourceId, target);
+            // Confidence + source: missing/malformed → LEXICAL/null, never throw.
+            Object confObj = data.get("confidence");
+            if (confObj instanceof String confStr) {
+                try {
+                    edge.setConfidence(Confidence.fromString(confStr));
+                } catch (IllegalArgumentException ignored) {
+                    // keep default LEXICAL
+                }
+            }
+            Object srcObj = data.get("source");
+            if (srcObj instanceof String src) {
+                edge.setSource(src);
+            }
             if (data.get("properties") instanceof Map<?, ?> map) {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> props = (Map<String, Object>) map;

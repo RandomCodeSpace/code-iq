@@ -2,7 +2,7 @@ package io.github.randomcodespace.iq.model;
 
 /**
  * Types of nodes in the Code IQ graph.
- * Mirrors the 32 node kinds from the Python implementation.
+ * Mirrors the 34 node kinds from the Python implementation.
  */
 public enum NodeKind {
 

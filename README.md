@@ -37,13 +37,13 @@ java -jar target/code-iq-*-cli.jar serve /path/to/repo
 
 ## How It Works
 
-codeiq scans source files using 97 detectors across 35+ languages, builds a knowledge graph of code relationships, and serves it via REST API, MCP server, and React UI.
+codeiq scans source files using 99 detectors across 35+ languages, builds a knowledge graph of code relationships, and serves it via REST API, MCP server, and React UI.
 
 ```mermaid
 graph TD
     subgraph "1. Index"
         A[File Discovery] -->|git ls-files| B[Parsing Layer]
-        B -->|JavaParser / ANTLR / Regex| C[97 Detectors]
+        B -->|JavaParser / ANTLR / Regex| C[99 Detectors]
         C -->|Virtual Threads| D[Graph Builder]
         D --> E[(H2 Cache)]
     end
@@ -225,7 +225,7 @@ See `docs/codeiq.yml.example` for the full schema.
 
 ```mermaid
 graph LR
-    subgraph "Node Types (32)"
+    subgraph "Node Types (34)"
         direction TB
         N1[service] --- N2[endpoint]
         N2 --- N3[class]
@@ -236,7 +236,7 @@ graph LR
         N7 --- N8[config_file]
     end
 
-    subgraph "Edge Types (27)"
+    subgraph "Edge Types (28)"
         direction TB
         E1[calls] --- E2[imports]
         E2 --- E3[depends_on]
@@ -265,7 +265,7 @@ All results are 100% deterministic across runs.
 ```bash
 git clone https://github.com/RandomCodeSpace/codeiq.git
 cd codeiq
-mvn clean package    # Build + test (3,219 tests)
+mvn clean package    # Build + test (3,270 tests across 236 files)
 mvn test             # Tests only
 ```
 

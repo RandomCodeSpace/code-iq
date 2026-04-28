@@ -3,6 +3,7 @@ package io.github.randomcodespace.iq.detector.jvm.java;
 import io.github.randomcodespace.iq.detector.AbstractRegexDetector;
 import io.github.randomcodespace.iq.model.CodeEdge;
 import io.github.randomcodespace.iq.model.CodeNode;
+import io.github.randomcodespace.iq.model.Confidence;
 import io.github.randomcodespace.iq.model.EdgeKind;
 import io.github.randomcodespace.iq.model.NodeKind;
 
@@ -17,6 +18,17 @@ import java.util.regex.Pattern;
 public abstract class AbstractJavaMessagingDetector extends AbstractRegexDetector {
 
     protected static final Pattern CLASS_RE = Pattern.compile("(?:public\\s+)?class\\s+(\\w+)");
+
+    /**
+     * Java messaging detectors layer language-aware semantics on top of regex
+     * matching (matched class name → emit messaging edge with kind). Bump the
+     * inherited regex-default {@link Confidence#LEXICAL} up to
+     * {@link Confidence#SYNTACTIC}.
+     */
+    @Override
+    public Confidence defaultConfidence() {
+        return Confidence.SYNTACTIC;
+    }
 
     /**
      * Extract the first class name from the source text.

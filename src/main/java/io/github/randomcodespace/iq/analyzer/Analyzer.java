@@ -11,6 +11,7 @@ import io.github.randomcodespace.iq.config.unified.CodeIqUnifiedConfig;
 import io.github.randomcodespace.iq.detector.AbstractAntlrDetector;
 import io.github.randomcodespace.iq.detector.Detector;
 import io.github.randomcodespace.iq.detector.DetectorContext;
+import io.github.randomcodespace.iq.detector.DetectorEmissionDefaults;
 import io.github.randomcodespace.iq.detector.DetectorRegistry;
 import io.github.randomcodespace.iq.detector.DetectorResult;
 import io.github.randomcodespace.iq.detector.DetectorUtils;
@@ -1311,6 +1312,9 @@ public class Analyzer {
             }
             try {
                 DetectorResult result = detector.detect(ctx);
+                // Stamp confidence + source defaults on every emission whose source
+                // is null. Detectors that already explicitly stamp are left alone.
+                DetectorEmissionDefaults.applyDefaults(result, detector);
                 allNodes.addAll(result.nodes());
                 allEdges.addAll(result.edges());
             } catch (Throwable e) {
@@ -1514,6 +1518,8 @@ public class Analyzer {
             try {
                 Instant detStart = Instant.now();
                 DetectorResult result = detector.detect(ctx);
+                // Stamp orchestrator-managed confidence + source defaults.
+                DetectorEmissionDefaults.applyDefaults(result, detector);
                 long detMs = Duration.between(detStart, Instant.now()).toMillis();
                 if (detMs > 2000) {
                     log.warn("🐢 SLOW DETECTOR: {} on {}: {}ms",
@@ -1601,6 +1607,8 @@ public class Analyzer {
                 } else {
                     result = detector.detect(ctx);
                 }
+                // Stamp orchestrator-managed confidence + source defaults.
+                DetectorEmissionDefaults.applyDefaults(result, detector);
                 allNodes.addAll(result.nodes());
                 allEdges.addAll(result.edges());
             } catch (Throwable e) {

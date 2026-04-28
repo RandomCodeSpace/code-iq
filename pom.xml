@@ -195,6 +195,14 @@
             <version>3.28.0</version>
         </dependency>
 
+        <!-- JavaParser symbol solver — JavaSymbolSolver + ReflectionTypeSolver
+             for the resolver SPI Java backend. Same release train as core. -->
+        <dependency>
+            <groupId>com.github.javaparser</groupId>
+            <artifactId>javaparser-symbol-solver-core</artifactId>
+            <version>3.28.0</version>
+        </dependency>
+
         <!-- ANTLR Runtime -->
         <dependency>
             <groupId>org.antlr</groupId>

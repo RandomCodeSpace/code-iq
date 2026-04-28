@@ -63,6 +63,11 @@ class ProvenanceNeo4jRoundTripTest {
         when(neo4jNode.getProperty("lineStart", null)).thenReturn(null);
         when(neo4jNode.getProperty("lineEnd", null)).thenReturn(null);
         when(neo4jNode.getProperty("annotations", null)).thenReturn(null);
+        // confidence + source are typed first-class fields read by nodeFromNeo4j;
+        // this test doesn't care about them, so stub null (legacy/unset) and let the
+        // reader fall back to its defaults.
+        when(neo4jNode.getProperty("confidence", null)).thenReturn(null);
+        when(neo4jNode.getProperty("source", null)).thenReturn(null);
 
         // Property keys as stored by bulkSave (prop_ prefix, values as String)
         when(neo4jNode.getPropertyKeys()).thenReturn(List.of(
@@ -122,6 +127,8 @@ class ProvenanceNeo4jRoundTripTest {
         when(neo4jNode.getProperty("lineStart", null)).thenReturn(null);
         when(neo4jNode.getProperty("lineEnd", null)).thenReturn(null);
         when(neo4jNode.getProperty("annotations", null)).thenReturn(null);
+        when(neo4jNode.getProperty("confidence", null)).thenReturn(null);
+        when(neo4jNode.getProperty("source", null)).thenReturn(null);
 
         // Only required provenance keys (no repo_url, no commit_sha)
         when(neo4jNode.getPropertyKeys()).thenReturn(List.of(

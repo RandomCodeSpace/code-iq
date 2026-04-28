@@ -43,6 +43,20 @@ public class CodeNode {
     /** Layer classification: frontend, backend, infra, shared, unknown. */
     private String layer;
 
+    /**
+     * Confidence in this node's existence and shape, set by the detector that
+     * emitted it. Defaults to {@link Confidence#LEXICAL} (least committal) so
+     * a node persisted before this field existed reads back without surprise.
+     */
+    @ConvertWith(converter = ConfidenceConverter.class)
+    private Confidence confidence = Confidence.LEXICAL;
+
+    /**
+     * Detector class simple name that emitted this node, e.g.
+     * {@code "SpringServiceDetector"}. Stamped by detector base classes.
+     */
+    private String source;
+
     private List<String> annotations = new ArrayList<>();
 
     @ConvertWith(converter = MapToJsonConverter.class)
@@ -132,6 +146,36 @@ public class CodeNode {
 
     public void setLayer(String layer) {
         this.layer = layer;
+    }
+
+    /**
+     * @return confidence stamped by the detector. Never {@code null} — falls
+     *         back to {@link Confidence#LEXICAL} for nodes loaded before this
+     *         field existed.
+     */
+    public Confidence getConfidence() {
+        return confidence != null ? confidence : Confidence.LEXICAL;
+    }
+
+    /**
+     * Set confidence. {@code null} is normalized to {@link Confidence#LEXICAL}
+     * so the field is never null at rest.
+     */
+    public void setConfidence(Confidence confidence) {
+        this.confidence = confidence != null ? confidence : Confidence.LEXICAL;
+    }
+
+    /**
+     * @return the simple class name of the detector that emitted this node,
+     *         or {@code null} if the node was constructed bare (e.g. in tests
+     *         or by code paths that have not been migrated).
+     */
+    public String getSource() {
+        return source;
+    }
+
+    public void setSource(String source) {
+        this.source = source;
     }
 
     public List<String> getAnnotations() {

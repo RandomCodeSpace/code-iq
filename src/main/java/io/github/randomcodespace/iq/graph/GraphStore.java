@@ -3,6 +3,7 @@ package io.github.randomcodespace.iq.graph;
 import io.github.randomcodespace.iq.flow.FlowDataSource;
 import io.github.randomcodespace.iq.model.CodeEdge;
 import io.github.randomcodespace.iq.model.CodeNode;
+import io.github.randomcodespace.iq.model.Confidence;
 import io.github.randomcodespace.iq.model.EdgeKind;
 import io.github.randomcodespace.iq.model.NodeKind;
 import org.neo4j.graphdb.GraphDatabaseService;
@@ -37,6 +38,7 @@ import java.util.stream.Collectors;
 @ConditionalOnBean(GraphRepository.class)
 public class GraphStore implements FlowDataSource {
     private static final String PROP_CNT = "cnt";
+    private static final String PROP_CONFIDENCE = "confidence";
     private static final String PROP_CONNECTIONS = "connections";
     private static final String PROP_EXT = "ext";
     private static final String PROP_FILEPATH = "filePath";
@@ -211,20 +213,33 @@ public class GraphStore implements FlowDataSource {
                     skipped++;
                     continue;
                 }
-                edgeBatch.add(Map.of(
-                        PROP_SOURCEID, sourceId,
-                        PROP_TARGETID, targetId,
-                        "edgeId", edge.getId(),
-                        PROP_KIND, edge.getKind().getValue()
-                ));
+                // HashMap (not Map.of) so we can null-skip optional fields.
+                Map<String, Object> edgeProps = new HashMap<>(6);
+                edgeProps.put(PROP_SOURCEID, sourceId);
+                edgeProps.put(PROP_TARGETID, targetId);
+                edgeProps.put("edgeId", edge.getId());
+                edgeProps.put(PROP_KIND, edge.getKind().getValue());
+                edgeProps.put(PROP_CONFIDENCE, edge.getConfidence().name());
+                if (edge.getSource() != null) {
+                    edgeProps.put(PROP_SOURCE, edge.getSource());
+                }
+                edgeBatch.add(edgeProps);
                 created++;
             }
             if (!edgeBatch.isEmpty()) {
                 try (Transaction tx = graphDb.beginTx()) {
+                    // coalesce(e.source, NULL) — Cypher accepts missing map keys as NULL,
+                    // so omitting `source` from the param map cleanly results in r.source IS NULL.
                     tx.execute("""
                             UNWIND $batch AS e
                             MATCH (s:CodeNode {id: e.sourceId}), (t:CodeNode {id: e.targetId})
-                            CREATE (s)-[:RELATES_TO {id: e.edgeId, kind: e.kind, sourceId: e.sourceId}]->(t)
+                            CREATE (s)-[:RELATES_TO {
+                                id: e.edgeId,
+                                kind: e.kind,
+                                sourceId: e.sourceId,
+                                confidence: e.confidence,
+                                source: e.source
+                            }]->(t)
                             """, Map.of("batch", edgeBatch));
                     tx.commit();
                 }
@@ -252,6 +267,12 @@ public class GraphStore implements FlowDataSource {
         if (node.getLineStart() != null) props.put("lineStart", node.getLineStart());
         if (node.getLineEnd() != null) props.put("lineEnd", node.getLineEnd());
         if (node.getLayer() != null) props.put(PROP_LAYER, node.getLayer());
+        // Confidence + source are typed first-class fields on CodeNode (not entries
+        // in node.getProperties()) — store as bare Neo4j properties alongside layer/kind.
+        // Confidence is never null at rest (setter normalizes to LEXICAL); store the
+        // enum name so Cypher filters like WHERE n.confidence = 'RESOLVED' match.
+        props.put(PROP_CONFIDENCE, node.getConfidence().name());
+        if (node.getSource() != null) props.put(PROP_SOURCE, node.getSource());
         if (node.getAnnotations() != null && !node.getAnnotations().isEmpty()) {
             props.put("annotations", String.join(",", node.getAnnotations()));
         }
@@ -1151,7 +1172,8 @@ public class GraphStore implements FlowDataSource {
         try (Transaction tx = graphDb.beginTx()) {
             var result = tx.execute(
                     "MATCH (s:CodeNode)-[r:RELATES_TO]->(t:CodeNode) "
-                            + "RETURN r.id AS id, r.kind AS kind, s.id AS sourceId, t.id AS targetId");
+                            + "RETURN r.id AS id, r.kind AS kind, s.id AS sourceId, t.id AS targetId, "
+                            + "r.confidence AS confidence, r.source AS source");
             while (result.hasNext()) {
                 var row = result.next();
                 String sourceId = (String) row.get(PROP_SOURCEID);
@@ -1168,9 +1190,32 @@ public class GraphStore implements FlowDataSource {
                     } catch (IllegalArgumentException e) {
                         continue;
                     }
-                    source.getEdges().add(new CodeEdge(edgeId, edgeKind, sourceId, target));
+                    CodeEdge edge = new CodeEdge(edgeId, edgeKind, sourceId, target);
+                    applyEdgeConfidenceAndSource(edge, row);
+                    source.getEdges().add(edge);
                 }
             }
+        }
+    }
+
+    /**
+     * Apply confidence + source from a Cypher row to an edge. Missing or malformed
+     * confidence falls back to {@link Confidence#LEXICAL} — never throws — so legacy
+     * edges written before these fields existed read back cleanly. Source stays null
+     * when missing.
+     */
+    private static void applyEdgeConfidenceAndSource(CodeEdge edge, Map<String, Object> row) {
+        Object confObj = row.get(PROP_CONFIDENCE);
+        if (confObj instanceof String confStr) {
+            try {
+                edge.setConfidence(Confidence.fromString(confStr));
+            } catch (IllegalArgumentException ignored) {
+                // keep default LEXICAL
+            }
+        }
+        Object srcObj = row.get(PROP_SOURCE);
+        if (srcObj instanceof String src) {
+            edge.setSource(src);
         }
     }
 
@@ -1181,7 +1226,8 @@ public class GraphStore implements FlowDataSource {
     private void hydrateEdgesForNode(Transaction tx, CodeNode node) {
         var result = tx.execute(
                 "MATCH (s:CodeNode {id: $nodeId})-[r:RELATES_TO]->(t:CodeNode) "
-                        + "RETURN r.id AS id, r.kind AS kind, t.id AS targetId, t",
+                        + "RETURN r.id AS id, r.kind AS kind, t.id AS targetId, t, "
+                        + "r.confidence AS confidence, r.source AS source",
                 Map.of(PROP_NODEID, node.getId()));
         while (result.hasNext()) {
             var row = result.next();
@@ -1194,10 +1240,15 @@ public class GraphStore implements FlowDataSource {
             } catch (IllegalArgumentException e) {
                 continue;
             }
+            // targetId is read from the row but not used here — the lightweight target
+            // node is built from the embedded `t` Node value. Suppress unused warning.
+            assert targetId == null || !targetId.isEmpty();
             // Build a lightweight target node (id only for reference)
             var targetNeo4j = (org.neo4j.graphdb.Node) row.get("t");
             CodeNode target = nodeFromNeo4j(targetNeo4j);
-            node.getEdges().add(new CodeEdge(edgeId, edgeKind, node.getId(), target));
+            CodeEdge edge = new CodeEdge(edgeId, edgeKind, node.getId(), target);
+            applyEdgeConfidenceAndSource(edge, row);
+            node.getEdges().add(edge);
         }
     }
 
@@ -1216,6 +1267,18 @@ public class GraphStore implements FlowDataSource {
         node.setModule((String) neo4jNode.getProperty(PROP_MODULE, null));
         node.setFilePath((String) neo4jNode.getProperty(PROP_FILEPATH, null));
         node.setLayer((String) neo4jNode.getProperty(PROP_LAYER, null));
+        // Restore confidence + source. Missing/malformed confidence falls back to
+        // LEXICAL — least committal — so legacy nodes written before these fields
+        // existed read back without surprise. Source stays null when missing.
+        String confStr = (String) neo4jNode.getProperty(PROP_CONFIDENCE, null);
+        if (confStr != null) {
+            try {
+                node.setConfidence(Confidence.fromString(confStr));
+            } catch (IllegalArgumentException ignored) {
+                // keep default LEXICAL — never throw on legacy/garbled values
+            }
+        }
+        node.setSource((String) neo4jNode.getProperty(PROP_SOURCE, null));
 
         Object lineStart = neo4jNode.getProperty("lineStart", null);
         if (lineStart instanceof Number n) node.setLineStart(n.intValue());

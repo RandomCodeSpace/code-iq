@@ -2,7 +2,7 @@
 
 ## What This Project Is
 
-**codeiq** -- a CLI tool + server that scans codebases to build a deterministic code knowledge graph. No AI, no external APIs -- pure static analysis. 97 detectors, 35+ languages, Neo4j Embedded graph database, Spring AI MCP server, REST API, web UI.
+**codeiq** -- a CLI tool + server that scans codebases to build a deterministic code knowledge graph. No AI, no external APIs -- pure static analysis. 99 detectors, 35+ languages, Neo4j Embedded graph database, Spring AI MCP server, REST API, web UI.
 
 - **Maven coordinates:** `io.github.randomcodespace.iq:code-iq` (artifactId intentionally unchanged)
 - **CLI command:** `codeiq` (via `java -jar`; JAR filename remains `code-iq-*-cli.jar`)
@@ -101,7 +101,7 @@ io.github.randomcodespace.iq
   |-- graph/                       # GraphStore (Neo4j facade), GraphRepository (SDN, writes only)
   |-- health/                      # GraphHealthIndicator (Spring Actuator)
   |-- mcp/                         # McpTools (34 @McpTool methods, read-only, includes intelligence tools)
-  |-- model/                       # CodeNode, CodeEdge, NodeKind (32), EdgeKind (27)
+  |-- model/                       # CodeNode, CodeEdge, NodeKind (34), EdgeKind (28), Confidence
   |-- intelligence/               # Intelligence enrichment (Phase 2-5)
   |   |-- lexical/                # LexicalEnricher, LexicalQueryService, DocCommentExtractor, SnippetStore
   |   |-- extractor/              # LanguageEnricher, LanguageExtractor, LanguageExtractionResult
@@ -328,8 +328,8 @@ mvn dependency-check:check
 | `analyzer/ServiceDetector.java` | Service boundary detection from build files (30+ build systems) |
 | `analyzer/linker/*.java` | Cross-file linkers: TopicLinker, EntityLinker, ModuleContainmentLinker |
 | `detector/Detector.java` | Detector interface |
-| `model/NodeKind.java` | 32 node types enum |
-| `model/EdgeKind.java` | 27 edge types enum |
+| `model/NodeKind.java` | 34 node types enum |
+| `model/EdgeKind.java` | 28 edge types enum |
 | `model/CodeNode.java` | Graph node entity |
 | `model/CodeEdge.java` | Graph edge entity |
 | `graph/GraphStore.java` | Neo4j facade (UNWIND bulk save, Cypher reads, indexes) |
