@@ -23,7 +23,7 @@ Read directly from the `pom.xml` `<properties>` block and `src/main/frontend/pac
 | Graph DB | Neo4j Embedded 2026.02.3 (Community) | `pom.xml` `<neo4j.version>` |
 | MCP | Spring AI 2.0.0-M3 (`spring-ai-starter-mcp-server-webmvc`) | `pom.xml` `<spring-ai.version>` |
 | CLI | Picocli 4.7.7 (`picocli-spring-boot-starter`) | `pom.xml` `<picocli.version>` |
-| AST (Java) | JavaParser 3.28.0 | `[CLAUDE.md]` — `pom.xml` references via dep |
+| AST + symbols (Java) | JavaParser 3.28.0 + `javaparser-symbol-solver-core` 3.28.0 (Apache-2.0) | `pom.xml` `javaparser` deps; `intelligence/resolver/java/JavaSymbolResolver.java` |
 | Parsers (35+ langs) | ANTLR 4.13.2 (TS/JS, Python, Go, C#, Rust, C++) | `[CLAUDE.md]` |
 | Cache | H2 in embedded mode (incremental analysis cache) | `src/main/java/io/github/randomcodespace/iq/cache/AnalysisCache.java` |
 | Frontend | React 18.3 + AntD 5.24 + ECharts 5.6 + react-router 7 | `src/main/frontend/package.json` |
@@ -114,7 +114,7 @@ CI gate is `mvn verify` — runs unit + integration tests **plus** SpotBugs and 
 **Required env / external services:** none. codeiq is offline-first by design — Neo4j and H2 are embedded; no external server, no network calls at runtime. Air-gapped install: `git clone` + Maven mirror + `mvn package`. See [`shared/runbooks/first-time-setup.md`](shared/runbooks/first-time-setup.md).
 
 **Cache + graph dirs at runtime** (created in your scanned repo):
-- `.codeiq/cache/` — H2 incremental analysis cache (`CACHE_VERSION=4` constant near the top of `cache/AnalysisCache.java`)
+- `.codeiq/cache/` — H2 incremental analysis cache (`CACHE_VERSION=5` constant near the top of `cache/AnalysisCache.java`; bumped from 4 for the resolver `confidence` + `source` schema, so stale v4 caches drop and rebuild on first run after upgrade)
 - `.codeiq/graph/graph.db/` — Neo4j Embedded data dir
 
 ## Conventions an agent must respect
@@ -138,7 +138,9 @@ CI gate is `mvn verify` — runs unit + integration tests **plus** SpotBugs and 
 - **Edges must be attached to source nodes before `bulkSave()`.** Cypher `MATCH` silently returns 0 rows for missing source IDs — pre-validate.
 - **`@ActiveProfiles("test")` is required on every `@SpringBootTest`** to avoid Neo4j auto-startup conflicts.
 - **`AnalysisCache` uses a `ReentrantReadWriteLock`** (not `synchronized`). JEP 491 (Java 25) means lock primitives no longer pin virtual-thread carriers; the read/write lock is what prevents `ClosedChannelException` on H2's MVStore under concurrent virtual-thread access. Don't "simplify" to `synchronized`.
-- **Bump `CACHE_VERSION` in `cache/AnalysisCache.java`** (top of file) when you change the file-hash algorithm or H2 schema. Stale caches auto-clear on next run.
+- **Bump `CACHE_VERSION` in `cache/AnalysisCache.java`** (top of file) when you change the file-hash algorithm or H2 schema. Stale caches auto-clear on next run. Currently `5` (bumped from 4 for the resolver `confidence` + `source` schema).
+- **Symbol resolver is index-time only.** `Analyzer.bootstrapResolvers()` is reached from `run` / `runBatchedIndex` / `runSmartIndex` only — never at `serve`. The SPI lives at `intelligence/resolver/`; the Java backend wraps `javaparser-symbol-solver-core`. RESOLVED-tier edges and `target_fqn` properties land at index-time and are then served read-only from Neo4j.
+- **`JavaSymbolResolver.resolve(String)` enforces strict parse-success.** Partial-CU outputs from JavaParser problems are converted to `EmptyResolved` so the graph never carries phantom RESOLVED edges from broken parses. Detectors must handle `EmptyResolved` as "lexical fallback".
 - **SnakeYAML parses bare `on` as `Boolean.TRUE`.** Compare YAML keys with `String.valueOf(key)`, not `Boolean.TRUE.equals(key)` (SonarCloud S2159).
 - **Determinism gate:** every new detector needs a determinism test (run twice, assert equal output) — see existing `*DetectorTest.java` for the pattern.
 - **First `mvn verify` downloads ~1 GB NVD database** for OWASP dependency-check. Override locally with `-Ddependency-check.skip=true`.
