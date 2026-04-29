@@ -59,6 +59,12 @@ public class LdapAuthDetector extends AbstractRegexDetector {
             "csharp", CSHARP_PATTERNS
     );
 
+    // Quick-reject pre-screen — see CertificateAuthDetector for rationale.
+    // Most code files don't mention LDAP at all; one regex pass over content
+    // skips the lines × patterns double loop in those cases.
+    private static final Pattern PRE_SCREEN = Pattern.compile(
+            "(?i:ldap)|DirectoryServices|DirectoryEntry");
+
     @Override
     public String getName() {
         return "ldap_auth";
@@ -78,6 +84,9 @@ public class LdapAuthDetector extends AbstractRegexDetector {
 
         String text = ctx.content();
         if (text == null || text.isEmpty()) {
+            return DetectorResult.empty();
+        }
+        if (!PRE_SCREEN.matcher(text).find()) {
             return DetectorResult.empty();
         }
 

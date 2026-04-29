@@ -78,6 +78,17 @@ public class SessionHeaderAuthDetector extends AbstractRegexDetector {
             PROP_CSRF, PROP_CSRF
     );
 
+    // Quick-reject pre-screen — see CertificateAuthDetector for rationale.
+    // Single regex pass over file content; if no distinctive substring of any
+    // pattern in ALL_PATTERNS is present, the file cannot match — short-circuit
+    // before the lines × patterns double loop. Profiling on polyglot-bench
+    // showed this detector at ~23% of detector CPU; most TS/Python files have
+    // no auth keyword at all.
+    private static final Pattern PRE_SCREEN = Pattern.compile(
+            "express-session|cookie-session|@SessionAttributes|SessionMiddleware|"
+                    + "HttpSession|SESSION_ENGINE|"
+                    + "(?i:X-API|Authorization|api[_-]?key|csurf|csrf|getHeader)");
+
     @Override
     public String getName() {
         return "session_header_auth";
@@ -96,6 +107,9 @@ public class SessionHeaderAuthDetector extends AbstractRegexDetector {
 
         String text = ctx.content();
         if (text == null || text.isEmpty()) {
+            return DetectorResult.empty();
+        }
+        if (!PRE_SCREEN.matcher(text).find()) {
             return DetectorResult.empty();
         }
 
