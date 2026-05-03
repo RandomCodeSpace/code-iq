@@ -40,7 +40,12 @@ public final class ConfigDefaults {
                         true,
                         "http",
                         "/mcp",
-                        new McpAuthConfig("none", "CODEIQ_MCP_TOKEN", null, null),
+                        // Default: no auth out of the box. Operators opt into
+                        // bearer for production by setting mcp.auth.mode=bearer
+                        // (and providing a token via CODEIQ_MCP_TOKEN env var or
+                        // mcp.auth.token). Setting mode=none + allow_unauthenticated=false
+                        // explicitly remains a fail-fast safety valve — see TokenResolver.
+                        new McpAuthConfig("none", "CODEIQ_MCP_TOKEN", null, Boolean.TRUE),
                         new McpLimitsConfig(15_000, 500, 2_000_000L, 300, 10),
                         new McpToolsConfig(List.of("*"), List.of())
                 ),
