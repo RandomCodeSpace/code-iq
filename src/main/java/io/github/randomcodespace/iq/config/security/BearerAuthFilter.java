@@ -75,10 +75,21 @@ public class BearerAuthFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
         if (!tokenResolver.isAuthRequired()) {
-            // mode=none with allow_unauthenticated=true. Pass through; the
-            // SecurityFilterChain's authorizeHttpRequests rules still apply,
-            // but anonymous principals will satisfy permitAll endpoints only.
-            chain.doFilter(request, response);
+            // mode=none with allow_unauthenticated=true. Set a fake
+            // authenticated principal so /api/**, /mcp/**, /actuator/**
+            // (all `.authenticated()` in SecurityConfig) actually pass.
+            // Without this, the bypass branch is inert because the chain
+            // still requires a Principal and `.anonymous()` is disabled.
+            var auth = new PreAuthenticatedAuthenticationToken(
+                    "anonymous-mcp-client", "N/A",
+                    List.of(new SimpleGrantedAuthority("ROLE_MCP_CLIENT")));
+            auth.setAuthenticated(true);
+            SecurityContextHolder.getContext().setAuthentication(auth);
+            try {
+                chain.doFilter(request, response);
+            } finally {
+                SecurityContextHolder.clearContext();
+            }
             return;
         }
 
