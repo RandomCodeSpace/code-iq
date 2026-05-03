@@ -18,8 +18,8 @@ export default defineConfig({
       output: {
         manualChunks: {
           'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-antd': ['antd', '@ant-design/icons'],
-          'vendor-echarts': ['echarts', 'echarts-for-react'],
+          'vendor-ds': ['@ossrandom/design-system'],
+          'vendor-ds-charts': ['@ossrandom/design-system/charts', 'd3-hierarchy'],
         },
       },
     },

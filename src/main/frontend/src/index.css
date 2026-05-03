@@ -2,13 +2,133 @@ body {
   margin: 0;
   padding: 0;
 }
-/* Ant Design handles all theming */
 
-/* MCP tool list: allow multiline descriptions */
-.mcp-tool-menu .ant-menu-item {
-  height: auto !important;
-  line-height: normal !important;
-  padding-top: 4px !important;
-  padding-bottom: 4px !important;
-  white-space: normal !important;
+/* Layout-only — visuals come from design-system tokens. */
+.codeiq-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 16px;
+  height: 56px;
+}
+
+.codeiq-brand {
+  color: var(--accent);
+  font-size: var(--fs-h4);
+  font-weight: var(--fw-semibold);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.codeiq-content {
+  padding: 16px;
+}
+
+.codeiq-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.codeiq-mcp-url {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--border-1);
+  border-radius: 6px;
+  background: var(--bg-2);
+  color: var(--fg-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  max-width: 360px;
+  overflow: hidden;
+}
+
+.codeiq-mcp-url > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.codeiq-mcp-url > button {
+  flex: none;
+  background: transparent;
+  border: 0;
+  padding: 2px;
+  color: var(--fg-3);
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.codeiq-mcp-url > button:hover {
+  color: var(--fg-1);
+  background: var(--bg-3);
+}
+
+/* Stats grid — auto-fit so cards flow on mobile. */
+.codeiq-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+/* Hide the design-system Treemap's engine badge (renders "canvas"/"webgl"
+   in a corner — debug affordance, not desired in app chrome). */
+.rcs-treemap-engine-badge {
+  display: none !important;
+}
+
+.codeiq-breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-1);
+  border-radius: 6px;
+  background: var(--bg-1);
+  font-size: 12px;
+  color: var(--fg-2);
+  font-family: var(--font-mono);
+}
+
+.codeiq-breadcrumb button {
+  background: transparent;
+  border: 0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+}
+
+.codeiq-breadcrumb button:hover:not(:disabled) {
+  background: var(--bg-3);
+  color: var(--fg-1);
+}
+
+.codeiq-breadcrumb button:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.codeiq-breadcrumb-sep {
+  opacity: 0.4;
+  user-select: none;
+}
+
+@media (max-width: 600px) {
+  .codeiq-header {
+    padding: 0 12px;
+  }
+  .codeiq-content {
+    padding: 12px;
+  }
+  .codeiq-mcp-url {
+    display: none;
+  }
 }

@@ -31,6 +31,18 @@ management:
     web:
       exposure:
         include: health,info,metrics
+  endpoint:
+    health:
+      # Spring Boot 4 enabled strict group-membership validation by default,
+      # which fails startup if a `health.group.*.include` references a
+      # health-contributor bean that hasn't registered yet (or is profile-
+      # gated and not active in the current profile). The serving profile
+      # references `graphHealthIndicator` from a profile-gated bean, and the
+      # validation runs before all profile-conditional beans are visible —
+      # so the readiness include trips it. Disable the strict validation;
+      # missing health contributors are silently skipped at probe time,
+      # which is the desired behaviour.
+      validate-group-membership: false
 
 # Runtime codeiq.* values (cache dir, limits, pipeline tuning, MCP auth, etc.)
 # are sourced from codeiq.yml / env / CLI via CodeIqUnifiedConfig (see

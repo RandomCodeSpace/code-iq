@@ -3,9 +3,9 @@ package io.github.randomcodespace.iq.health;
 import io.github.randomcodespace.iq.graph.GraphStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.HealthIndicator;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -37,8 +37,16 @@ import java.util.concurrent.atomic.AtomicReference;
  * name + a static reason — operators correlate via the WARN log line that
  * carries the full exception.
  */
+// Profile-gated rather than @ConditionalOnBean(GraphStore.class) — the
+// latter is documented as fragile on user @Component classes (its
+// evaluation depends on bean-definition ordering during scan, and the
+// readiness group config in application.yml references this bean by
+// name). @Profile("serving") activates earlier, in lockstep with
+// GraphStore (also a serving-profile bean), so Spring's
+// "Included health contributor 'graphHealthIndicator' in group
+// 'readiness' does not exist" startup validation passes deterministically.
 @Component
-@ConditionalOnBean(GraphStore.class)
+@Profile("serving")
 public class GraphHealthIndicator implements HealthIndicator {
 
     private static final Logger log = LoggerFactory.getLogger(GraphHealthIndicator.class);

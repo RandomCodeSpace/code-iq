@@ -1,23 +1,15 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect, Fragment } from 'react';
 import {
-  Card, Col, Row, Statistic, Spin, Alert, Typography, Modal, Table, Drawer, Menu,
-  Form, Input, InputNumber, Select, Button, Space, Tag,
-} from 'antd';
-import {
-  NodeIndexOutlined, BranchesOutlined, FileOutlined, CodeOutlined,
-  ApiOutlined, SafetyOutlined, AppstoreOutlined, BuildOutlined,
-  PlayCircleOutlined, ClockCircleOutlined, SearchOutlined,
-  BarChartOutlined, ThunderboltOutlined, SafetyCertificateOutlined,
-  HistoryOutlined,
-} from '@ant-design/icons';
-import ReactECharts from 'echarts-for-react';
+  Card, Spin, Alert, Modal, Drawer, Stat, Table, ScrollDiv, Space,
+} from '@ossrandom/design-system';
+import { Treemap } from '@ossrandom/design-system/charts';
+import type { TreemapNode } from '@ossrandom/design-system/charts';
 import { useApi } from '@/hooks/useApi';
 import { api } from '@/lib/api';
-import { useTheme } from '@/context/ThemeContext';
-import { TOOLS, CATEGORIES, toolsByCategory, type McpTool } from '@/lib/mcp-tools';
 import type { StatsResponse, FileTreeResponse, FileTreeNode } from '@/types/api';
+import { Icon } from '@/components/Icons';
 
-// ── Stats ──
+// ── Stats helpers ──
 
 function flattenToRecord(val: unknown): Record<string, number> {
   if (!val || typeof val !== 'object') return {};
@@ -35,39 +27,62 @@ function sumValues(rec: Record<string, number>): number {
   return Object.values(rec).reduce((a, b) => a + b, 0);
 }
 
-function StatCard({ title, value, icon, detail, detailTitle }: {
-  title: string; value: number | string; icon: React.ReactNode;
-  detail?: Record<string, number>; detailTitle?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const hasDetail = detail && Object.keys(detail).length > 0 && sumValues(detail) > 0;
-  const tableData = hasDetail
-    ? Object.entries(detail!).sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ key: name, name, count }))
-    : [];
-  return (
-    <>
-      <Card hoverable={!!hasDetail} onClick={() => hasDetail && setOpen(true)}
-        style={{ cursor: hasDetail ? 'pointer' : 'default', height: '100%' }} size="small">
-        <Statistic title={title} value={value} prefix={icon} valueStyle={{ fontSize: 18 }} />
-      </Card>
-      <Modal title={detailTitle ?? title} open={open} onCancel={() => setOpen(false)} footer={null} width={600}>
-        <Table dataSource={tableData} pagination={tableData.length > 15 ? { pageSize: 15 } : false} size="small"
-          columns={[
-            { title: 'Name', dataIndex: 'name', key: 'name' },
-            { title: 'Count', dataIndex: 'count', key: 'count', align: 'right' as const, render: (v: number) => v.toLocaleString() },
-          ]} />
-      </Modal>
-    </>
-  );
-}
-
 function isComputedStats(s: StatsResponse): s is StatsResponse & {
   graph: { nodes: number; edges: number; files: number };
   languages: Record<string, number>; frameworks: Record<string, number>;
   connections?: unknown; auth?: unknown; architecture?: unknown;
 } { return 'graph' in s; }
 
-// ── Treemap ──
+interface BreakdownRow { key: string; name: string; count: number }
+
+function StatCard({ title, value, icon, detail, detailTitle }: {
+  title: string; value: number | string; icon: React.ReactNode;
+  detail?: Record<string, number>; detailTitle?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const hasDetail = detail && Object.keys(detail).length > 0 && sumValues(detail) > 0;
+  const tableData: BreakdownRow[] = hasDetail
+    ? Object.entries(detail!).sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ key: name, name, count }))
+    : [];
+
+  const cardEl = (
+    <Card padding="sm" hoverable={!!hasDetail} style={{ height: '100%' }}>
+      <Stat
+        label={<Space size="xs" align="center">{icon}<span>{title}</span></Space>}
+        value={value}
+      />
+    </Card>
+  );
+
+  return (
+    <>
+      {hasDetail ? (
+        <div role="button" tabIndex={0}
+          onClick={() => setOpen(true)}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(true); } }}
+          style={{ cursor: 'pointer', height: '100%' }}>
+          {cardEl}
+        </div>
+      ) : cardEl}
+      <Modal open={open} onClose={() => setOpen(false)} title={detailTitle ?? title} size="md">
+        <ScrollDiv maxHeight={420} thin>
+          <Table<BreakdownRow>
+            rowKey="key"
+            density="compact"
+            data={tableData}
+            columns={[
+              { key: 'name', title: 'Name', dataKey: 'name' },
+              { key: 'count', title: 'Count', dataKey: 'count', align: 'right',
+                render: (v) => (typeof v === 'number' ? v.toLocaleString() : String(v)) },
+            ]}
+          />
+        </ScrollDiv>
+      </Modal>
+    </>
+  );
+}
+
+// ── Treemap data ──
 
 const LANG_COLORS: Record<string, string> = {
   java: '#b07219', python: '#3572A5', typescript: '#3178c6', javascript: '#f1e05a',
@@ -85,8 +100,6 @@ const EXT_TO_LANG: Record<string, string> = {
   h: 'cpp', sh: 'shell', md: 'markdown', html: 'html',
   css: 'css', sql: 'sql', proto: 'proto',
 };
-
-interface EChartsTreeNode { name: string; value?: number; children?: EChartsTreeNode[]; itemStyle?: { color: string } }
 
 function inferLang(name: string): string {
   return EXT_TO_LANG[name.split('.').pop()?.toLowerCase() ?? ''] ?? 'other';
@@ -115,47 +128,56 @@ function collapseTree(nodes: FileTreeNode[]): FileTreeNode[] {
   });
 }
 
-function toEChartsNodes(nodes: FileTreeNode[]): EChartsTreeNode[] {
-  const result: EChartsTreeNode[] = [];
-  for (const n of nodes) {
+function buildTreemapTree(
+  nodes: FileTreeNode[],
+  parentPath: string,
+  pathMap: WeakMap<TreemapNode, string>,
+): TreemapNode[] {
+  // Sort children by name so the treemap layout is stable across page
+  // loads regardless of API result ordering. d3-hierarchy's squarified
+  // layout is deterministic in input order; so deterministic input ⇒
+  // deterministic visual.
+  const sorted = [...nodes].sort((a, b) => a.name.localeCompare(b.name));
+  const out: TreemapNode[] = [];
+  for (const n of sorted) {
+    const fullPath = parentPath ? `${parentPath}/${n.name}` : n.name;
     if (n.nodeCount <= 0 && (!n.children || n.children.length === 0)) continue;
     if (n.type === 'directory' && n.children && n.children.length > 0) {
-      const children = toEChartsNodes(n.children);
+      const children = buildTreemapTree(n.children, fullPath, pathMap);
       if (children.length === 0) continue;
-      result.push({ name: n.name, children, itemStyle: { color: LANG_COLORS[dominantLang(n.children)] ?? '#666' } });
+      const node: TreemapNode = {
+        name: n.name,
+        children,
+        color: LANG_COLORS[dominantLang(n.children)] ?? '#666',
+      };
+      pathMap.set(node, fullPath);
+      out.push(node);
     } else {
-      result.push({ name: n.name, value: Math.max(n.nodeCount, 1), itemStyle: { color: LANG_COLORS[inferLang(n.name)] ?? '#666' } });
+      const node: TreemapNode = {
+        name: n.name,
+        value: Math.max(n.nodeCount, 1),
+        color: LANG_COLORS[inferLang(n.name)] ?? '#666',
+      };
+      pathMap.set(node, fullPath);
+      out.push(node);
     }
   }
-  return result;
+  return out;
 }
 
-// ── MCP ──
-
-const CATEGORY_ICONS: Record<string, React.ReactNode> = {
-  stats: <BarChartOutlined />, query: <SearchOutlined />, topology: <BranchesOutlined />,
-  flow: <AppstoreOutlined />, analysis: <ThunderboltOutlined />, security: <SafetyCertificateOutlined />,
-  code: <CodeOutlined />,
-};
-
-function resolveUrl(tool: McpTool, params: Record<string, string>): string {
-  return typeof tool.url === 'function' ? tool.url(params) : tool.url;
-}
-
-function countResults(json: unknown): number | null {
-  if (Array.isArray(json)) return json.length;
-  if (json && typeof json === 'object') {
-    const obj = json as Record<string, unknown>;
-    for (const k of ['nodes', 'services', 'kinds']) if (Array.isArray(obj[k])) return (obj[k] as unknown[]).length;
-  }
-  return null;
+function useViewportHeight(offset: number): number {
+  const [h, setH] = useState(() => (typeof window === 'undefined' ? 600 : window.innerHeight - offset));
+  useEffect(() => {
+    const onResize = () => setH(window.innerHeight - offset);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [offset]);
+  return Math.max(360, h);
 }
 
 // ── Main ──
 
 export default function Dashboard() {
-  const { isDark } = useTheme();
-
   // Stats
   const { data: stats, loading: statsLoading, error: statsError } = useApi(() => api.getStats(), []);
   const { data: kinds } = useApi(() => api.getKinds(), []);
@@ -182,272 +204,152 @@ export default function Dashboard() {
     if (g?.edges_by_kind && typeof g.edges_by_kind === 'object') Object.assign(edgeKindBreakdown, flattenToRecord(g.edges_by_kind));
   }
 
+  // Treemap height — header(56) + content padding(32) + stats row(~110) +
+  // breadcrumb(38) + gaps(24)
+  const treemapHeight = useViewportHeight(56 + 32 + 110 + 38 + 24);
+
   // Treemap
   const { data: treeData, loading: treeLoading } = useApi<FileTreeResponse>(() => api.getFileTree(), []);
-  const treemapData = useMemo(() => toEChartsNodes(collapseTree(treeData?.tree ?? [])), [treeData]);
+  const { treemapRoot, pathMap } = useMemo(() => {
+    const map = new WeakMap<TreemapNode, string>();
+    const children = buildTreemapTree(collapseTree(treeData?.tree ?? []), '', map);
+    const root: TreemapNode = { name: 'root', children };
+    return { treemapRoot: root, pathMap: map };
+  }, [treeData]);
 
-  // File viewer — dblclick only (single click = treemap navigate)
+  // Drill state — names of the directories we've drilled into, in order.
+  // Empty = full tree. Single-click on a directory pushes; clicking a
+  // breadcrumb segment slices back to that depth.
+  const [focusPath, setFocusPath] = useState<string[]>([]);
+
+  // Reset focus when the underlying tree changes (e.g., re-fetch after enrich).
+  useEffect(() => { setFocusPath([]); }, [treemapRoot]);
+
+  // Walk treemapRoot along focusPath. Falls back to root if any segment is
+  // missing (defensive — shouldn't happen since focusPath only ever holds
+  // names we just clicked).
+  const focusedRoot = useMemo(() => {
+    let cur: TreemapNode = treemapRoot;
+    for (const name of focusPath) {
+      const child = cur.children?.find(c => c.name === name);
+      if (!child) return treemapRoot;
+      cur = child;
+    }
+    return cur;
+  }, [treemapRoot, focusPath]);
+
+  // File viewer
   const [fileDrawer, setFileDrawer] = useState<{ path: string; content: string } | null>(null);
   const [fileLoading, setFileLoading] = useState(false);
-  const onDblClickNode = useCallback(async (params: { data?: { children?: unknown[] }; treePathInfo?: Array<{ name: string }> }) => {
-    if (params.data?.children && (params.data.children as unknown[]).length > 0) return;
-    const pathParts = params.treePathInfo?.map(p => p.name).filter(Boolean) ?? [];
-    if (pathParts.length === 0) return;
-    const filePath = pathParts.join('/');
+  const onTreemapNodeClick = useCallback(async (node: TreemapNode) => {
+    // Directory — drill down one level.
+    if (node.children && node.children.length > 0) {
+      setFocusPath(prev => [...prev, node.name]);
+      return;
+    }
+    // Leaf — open file in drawer.
+    const filePath = pathMap.get(node);
+    if (!filePath) return;
     setFileLoading(true);
+    setFileDrawer({ path: filePath, content: '' });
     try { setFileDrawer({ path: filePath, content: await api.readFile(filePath) }); }
     catch { setFileDrawer({ path: filePath, content: '// Could not load file' }); }
     finally { setFileLoading(false); }
-  }, []);
-  const treemapEvents = useMemo(() => ({ dblclick: onDblClickNode }), [onDblClickNode]);
+  }, [pathMap]);
 
-  const chartOption = useMemo(() => ({
-    tooltip: {
-      formatter: (info: { name: string; value: number; treePathInfo?: Array<{ name: string }> }) => {
-        const path = info.treePathInfo?.map(p => p.name).filter(Boolean).join('/') ?? info.name;
-        return `<b>${path}</b><br/>Nodes: ${(info.value ?? 0).toLocaleString()}<br/><i style="color:#888">Double-click to view source</i>`;
-      },
-    },
-    series: [{
-      type: 'treemap', data: treemapData, top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%',
-      leafDepth: 2, drillDownIcon: '▶ ', roam: false, nodeClick: 'zoomToNode',
-      breadcrumb: {
-        show: true, bottom: 8, left: 'center', height: 28,
-        itemStyle: {
-          color: isDark ? '#000' : '#1a1a1a',
-          borderColor: isDark ? '#555' : '#333',
-          borderWidth: 1,
-          shadowBlur: 6,
-          shadowColor: 'rgba(0,0,0,0.4)',
-          borderRadius: 4,
-        },
-        textStyle: { color: '#fff', fontSize: 13, fontWeight: 'bold' as const },
-        emphasis: {
-          itemStyle: { color: isDark ? '#1a1a1a' : '#333' },
-          textStyle: { color: '#fff' },
-        },
-      },
-      levels: [
-        { itemStyle: { borderColor: isDark ? '#303030' : '#bbb', borderWidth: 3, gapWidth: 3 },
-          upperLabel: { show: true, height: 28, color: isDark ? '#e0e0e0' : '#333', fontSize: 13, fontWeight: 'bold' as const } },
-        { itemStyle: { borderColor: isDark ? '#404040' : '#ccc', borderWidth: 2, gapWidth: 2 },
-          upperLabel: { show: true, height: 22, fontSize: 11, color: isDark ? '#ccc' : '#555' } },
-        { itemStyle: { borderColor: isDark ? '#4a4a4a' : '#ddd', borderWidth: 1, gapWidth: 1 }, label: { show: true, fontSize: 10 } },
-      ],
-      label: { show: true, formatter: '{b}', fontSize: 11, color: isDark ? '#ddd' : '#333' },
-    }],
-  }), [treemapData, isDark]);
-
-  // MCP Console
-  const [selectedTool, setSelectedTool] = useState<McpTool | null>(TOOLS[0] ?? null);
-  const [toolModalOpen, setToolModalOpen] = useState(false);
-  const [mcpResponse, setMcpResponse] = useState('');
-  const [mcpStatus, setMcpStatus] = useState<number | null>(null);
-  const [mcpDuration, setMcpDuration] = useState<number | null>(null);
-  const [executing, setExecuting] = useState(false);
-  const [mcpResultCount, setMcpResultCount] = useState<number | null>(null);
-  const [responseModalOpen, setResponseModalOpen] = useState(false);
-  const [history, setHistory] = useState<Array<{ toolName: string; status: number; duration: number; response: string }>>([]);
-  const [paletteQuery, setPaletteQuery] = useState('');
-  const [form] = Form.useForm();
-  const grouped = toolsByCategory();
-
-
-  const selectTool = useCallback((tool: McpTool) => {
-    setSelectedTool(tool);
-    const defaults: Record<string, string> = {};
-    tool.params.forEach(p => { if (p.default !== undefined) defaults[p.name] = p.default; });
-    form.setFieldsValue(defaults);
-  }, [form]);
-
-  const execute = useCallback(async () => {
-    if (!selectedTool) return;
-    const values = form.getFieldsValue();
-    const params: Record<string, string> = {};
-    for (const [k, v] of Object.entries(values)) { if (v !== undefined && v !== null && v !== '') params[k] = String(v); }
-    if (selectedTool.params.filter(p => p.required && !params[p.name]?.trim()).length) { form.validateFields(); return; }
-    setExecuting(true);
-    const start = performance.now();
-    try {
-      const res = await fetch(resolveUrl(selectedTool, params), {
-        method: selectedTool.method ?? 'GET',
-        ...(selectedTool.method === 'POST' ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(params) } : {}),
-      });
-      const elapsed = Math.round(performance.now() - start);
-      setMcpStatus(res.status); setMcpDuration(elapsed);
-      const ct = res.headers.get('content-type') ?? '';
-      let text: string;
-      if (ct.includes('json')) { const json = await res.json(); text = JSON.stringify(json, null, 2); setMcpResultCount(countResults(json)); }
-      else { text = await res.text(); setMcpResultCount(null); }
-      setMcpResponse(text); setResponseModalOpen(true);
-      setHistory(prev => [{ toolName: selectedTool.name, status: res.status, duration: elapsed, response: text }, ...prev.slice(0, 19)]);
-    } catch (err) {
-      const elapsed = Math.round(performance.now() - start);
-      setMcpStatus(0); setMcpDuration(elapsed);
-      const text = JSON.stringify({ error: err instanceof Error ? err.message : String(err) }, null, 2);
-      setMcpResponse(text); setMcpResultCount(null); setResponseModalOpen(true);
-      setHistory(prev => [{ toolName: selectedTool.name, status: 0, duration: elapsed, response: text }, ...prev.slice(0, 19)]);
-    } finally { setExecuting(false); }
-  }, [selectedTool, form]);
-
-  const q = paletteQuery.toLowerCase().trim();
-  const filteredMenuItems = CATEGORIES.map(cat => {
-    const tools = (grouped[cat.id] ?? []).filter(t => !q || t.name.includes(q) || t.description.toLowerCase().includes(q));
-    return {
-      key: cat.id, icon: CATEGORY_ICONS[cat.id] ?? <ApiOutlined />, label: cat.label,
-      children: tools.map(tool => ({
-        key: tool.name,
-        label: (
-          <div style={{ lineHeight: 1.4, padding: '6px 0' }}>
-            <div style={{ fontSize: 12, fontWeight: 500 }}>{tool.name}</div>
-            <div style={{ fontSize: 11, color: '#888', whiteSpace: 'normal', marginTop: 2 }}>{tool.description}</div>
-          </div>
-        ),
-      })),
-    };
-  }).filter(cat => cat.children.length > 0);
-
-  if (statsLoading || treeLoading) return <div style={{ textAlign: 'center', padding: 80 }}><Spin size="large" /></div>;
-  if (statsError) return <Alert type="error" message="Failed to load stats" description={statsError} showIcon style={{ margin: 24 }} />;
+  if (statsLoading || treeLoading) {
+    return <div style={{ textAlign: 'center', padding: 80 }}><Spin size="lg" /></div>;
+  }
+  if (statsError) {
+    return <Alert severity="danger" title="Failed to load stats">{statsError}</Alert>;
+  }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px)', margin: '-16px -24px', padding: '8px 10px 0' }}>
-      {/* Stats row */}
-      <Row gutter={[8, 8]} style={{ flexShrink: 0, marginBottom: 8 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div className="codeiq-stats-grid">
         {[
-          { t: 'Nodes', v: nodeCount.toLocaleString(), i: <NodeIndexOutlined />, d: nodeKindBreakdown, dt: 'Nodes by Kind' },
-          { t: 'Edges', v: edgeCount.toLocaleString(), i: <BranchesOutlined />, d: edgeKindBreakdown, dt: 'Edges by Kind' },
-          { t: 'Files', v: fileCount.toLocaleString(), i: <FileOutlined /> },
-          { t: 'Languages', v: Object.keys(languages).length, i: <CodeOutlined />, d: languages, dt: 'Languages' },
-          { t: 'Frameworks', v: Object.keys(frameworks).length, i: <BuildOutlined />, d: frameworks, dt: 'Frameworks' },
-          { t: 'Connections', v: sumValues(connections), i: <ApiOutlined />, d: connections, dt: 'Connections' },
-          { t: 'Security', v: sumValues(auth), i: <SafetyOutlined />, d: auth, dt: 'Auth Patterns' },
-          { t: 'Code Structure', v: sumValues(architecture), i: <AppstoreOutlined />, d: architecture, dt: 'Code Structure' },
+          { t: 'Nodes', v: nodeCount.toLocaleString(), i: <Icon.Nodes />, d: nodeKindBreakdown, dt: 'Nodes by Kind' },
+          { t: 'Edges', v: edgeCount.toLocaleString(), i: <Icon.Branches />, d: edgeKindBreakdown, dt: 'Edges by Kind' },
+          { t: 'Files', v: fileCount.toLocaleString(), i: <Icon.File /> },
+          { t: 'Languages', v: Object.keys(languages).length, i: <Icon.Code />, d: languages, dt: 'Languages' },
+          { t: 'Frameworks', v: Object.keys(frameworks).length, i: <Icon.Build />, d: frameworks, dt: 'Frameworks' },
+          { t: 'Connections', v: sumValues(connections), i: <Icon.Api />, d: connections, dt: 'Connections' },
+          { t: 'Security', v: sumValues(auth), i: <Icon.Safety />, d: auth, dt: 'Auth Patterns' },
+          { t: 'Code Structure', v: sumValues(architecture), i: <Icon.Appstore />, d: architecture, dt: 'Code Structure' },
         ].map(s => (
-          <Col key={s.t} xs={12} sm={8} md={6} lg={3}>
-            <StatCard title={s.t} value={s.v} icon={s.i} detail={s.d} detailTitle={s.dt} />
-          </Col>
+          <StatCard key={s.t} title={s.t} value={s.v} icon={s.i} detail={s.d} detailTitle={s.dt} />
         ))}
-      </Row>
-
-      {/* Main area: Treemap (left) + MCP Console (right) */}
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 8 }}>
-        {/* Treemap */}
-        <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
-          {treemapData.length > 0 ? (
-            <ReactECharts option={chartOption} style={{ height: '100%', width: '100%' }}
-              theme={isDark ? 'dark' : undefined} opts={{ renderer: 'canvas' }} onEvents={treemapEvents} />
-          ) : (
-            <div style={{ textAlign: 'center', padding: 60 }}>
-              <Typography.Text type="secondary">No file data. Run index + enrich first.</Typography.Text>
-            </div>
-          )}
-        </div>
-
-        {/* MCP Tools — 20% */}
-        <div style={{ width: '20%', flexShrink: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden',
-          border: isDark ? '1px solid #303030' : '1px solid #e8e8e8', borderRadius: 8, background: isDark ? '#141414' : '#fff' }}>
-          <div style={{ padding: '10px 12px 6px', flexShrink: 0 }}>
-            <Typography.Text strong style={{ fontSize: 14 }}>MCP Tools</Typography.Text>
-            <Input size="small" placeholder="Search tools..." prefix={<SearchOutlined style={{ color: '#888' }} />}
-              allowClear value={paletteQuery} onChange={e => setPaletteQuery(e.target.value)} style={{ marginTop: 6 }} />
-          </div>
-          <div style={{ flex: 1, overflow: 'auto' }}>
-            <Menu mode="inline" className="mcp-tool-menu" selectedKeys={[]}
-              defaultOpenKeys={paletteQuery ? CATEGORIES.map(c => c.id) : ['stats']}
-              items={filteredMenuItems}
-              onClick={({ key }: { key: string }) => {
-                const t = TOOLS.find(t => t.name === key);
-                if (t) { selectTool(t); setToolModalOpen(true); }
-              }}
-              style={{ borderRight: 'none', fontSize: 11 }} />
-          </div>
-        </div>
       </div>
 
-      {/* MCP Tool Form Modal */}
-      <Modal
-        title={selectedTool ? (
-          <Space size={4}>
-            <span>{selectedTool.name}</span>
-            <Tag color={selectedTool.method === 'POST' ? 'orange' : 'green'}>{selectedTool.method ?? 'GET'}</Tag>
-          </Space>
-        ) : 'Tool'}
-        open={toolModalOpen}
-        onCancel={() => setToolModalOpen(false)}
-        footer={null}
-        width={500}
-      >
-        {selectedTool && (
-          <>
-            <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>{selectedTool.description}</Typography.Paragraph>
-            {selectedTool.params.length > 0 ? (
-              <Form form={form} layout="vertical" onFinish={() => { execute(); setToolModalOpen(false); }} size="small">
-                {selectedTool.params.map(param => (
-                  <Form.Item key={param.name} name={param.name} style={{ marginBottom: 8 }}
-                    label={<Space><span>{param.name}</span>{param.required && <Tag color="red" style={{ fontSize: 10 }}>required</Tag>}</Space>}
-                    rules={param.required ? [{ required: true, message: `${param.name} is required` }] : []}
-                    tooltip={param.description}>
-                    {param.options ? (
-                      <Select allowClear placeholder={param.description} options={param.options.filter(Boolean).map(o => ({ label: o, value: o }))} />
-                    ) : param.type === 'number' ? (
-                      <InputNumber placeholder={param.default ?? ''} style={{ width: '100%' }} />
-                    ) : param.type === 'boolean' ? (
-                      <Select options={[{ label: 'true', value: 'true' }, { label: 'false', value: 'false' }]} />
-                    ) : (
-                      <Input placeholder={param.default ?? ''} onPressEnter={() => { execute(); setToolModalOpen(false); }} />
-                    )}
-                  </Form.Item>
-                ))}
-                <Button type="primary" icon={<PlayCircleOutlined />} loading={executing} onClick={() => { execute(); setToolModalOpen(false); }} block>
-                  Run
-                </Button>
-              </Form>
-            ) : (
-              <Button type="primary" icon={<PlayCircleOutlined />} loading={executing} block
-                onClick={() => { execute(); setToolModalOpen(false); }}>
-                Run
-              </Button>
-            )}
+      <div className="codeiq-breadcrumb" aria-label="Drill path">
+        <button
+          type="button"
+          onClick={() => setFocusPath([])}
+          disabled={focusPath.length === 0}
+          aria-label="Back to root"
+        >
+          root
+        </button>
+        {focusPath.map((seg, i) => (
+          <Fragment key={`${i}-${seg}`}>
+            <span className="codeiq-breadcrumb-sep">/</span>
+            <button
+              type="button"
+              onClick={() => setFocusPath(focusPath.slice(0, i + 1))}
+              disabled={i === focusPath.length - 1}
+            >
+              {seg}
+            </button>
+          </Fragment>
+        ))}
+      </div>
 
-            {history.length > 0 && (
-              <div style={{ marginTop: 12, borderTop: '1px solid rgba(128,128,128,0.15)', paddingTop: 8 }}>
-                <Typography.Text type="secondary" style={{ fontSize: 11 }}><HistoryOutlined /> Recent</Typography.Text>
-                {history.slice(0, 5).map((entry, i) => (
-                  <div key={i} onClick={() => { setMcpResponse(entry.response); setMcpStatus(entry.status); setMcpDuration(entry.duration); setResponseModalOpen(true); }}
-                    style={{ padding: '3px 0', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
-                    <Tag color={entry.status >= 200 && entry.status < 300 ? 'green' : 'red'} style={{ fontSize: 10 }}>{entry.status}</Tag>
-                    <span style={{ flex: 1 }}>{entry.toolName}</span>
-                    <span style={{ color: '#888' }}>{entry.duration}ms</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
+      <div>
+        {focusedRoot.children && focusedRoot.children.length > 0 ? (
+          <Treemap
+            // key forces a remount when the focused subtree changes — the
+            // design-system Treemap caches layout on `data` identity, and a
+            // remount is the simplest way to ensure a clean redraw.
+            key={focusPath.join('/') || 'root'}
+            data={focusedRoot}
+            height={treemapHeight}
+            engine="canvas"
+            // One level at a time — each cell maps 1:1 to a direct child of
+            // the focused subtree, so a click is always unambiguous (drill
+            // into a directory or open a file). With deeper maxDepth the
+            // user's click would pick the deepest leaf under the cursor,
+            // breaking drill-down.
+            maxDepth={1}
+            padding={2}
+            onNodeClick={onTreemapNodeClick}
+            valueFormat={(v) => v.toLocaleString()}
+          />
+        ) : (
+          <Card padding="lg" style={{ minHeight: 360 }}>
+            <div style={{ textAlign: 'center', padding: 60, opacity: 0.7 }}>
+              {treemapRoot.children && treemapRoot.children.length > 0
+                ? 'This folder is empty. Use the breadcrumb above to go back.'
+                : 'No file data. Run index + enrich first.'}
+            </div>
+          </Card>
         )}
-      </Modal>
+      </div>
 
-      {/* MCP Response Modal */}
-      <Modal title={
-        <Space>
-          <span>Response</span>
-          {mcpStatus !== null && <Tag color={mcpStatus >= 200 && mcpStatus < 300 ? 'green' : mcpStatus >= 400 ? 'red' : 'orange'}>{mcpStatus}</Tag>}
-          {mcpDuration !== null && <Typography.Text type="secondary" style={{ fontSize: 12 }}><ClockCircleOutlined /> {mcpDuration}ms</Typography.Text>}
-          {mcpResultCount !== null && <Typography.Text type="secondary" style={{ fontSize: 12 }}>{mcpResultCount} results</Typography.Text>}
-        </Space>
-      } open={responseModalOpen} onCancel={() => setResponseModalOpen(false)} footer={null} width={700}>
-        <pre style={{ margin: 0, fontSize: 12, maxHeight: 500, overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-          background: isDark ? '#0a0a0a' : '#fafafa', padding: 12, borderRadius: 4 }}>{mcpResponse}</pre>
-      </Modal>
-
-      {/* File viewer Drawer (double-click on leaf file) */}
-      <Drawer title={fileDrawer?.path} placement="right" width="60%" open={!!fileDrawer} onClose={() => setFileDrawer(null)} styles={{ body: { padding: 0 } }}>
-        {fileLoading ? <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div> : (
-          <pre style={{ margin: 0, padding: 16, fontSize: 13, lineHeight: 1.5, overflow: 'auto', height: '100%',
-            background: isDark ? '#0a0a0a' : '#fafafa', color: isDark ? '#d4d4d4' : '#1f1f1f' }}>{fileDrawer?.content}</pre>
+      <Drawer
+        open={!!fileDrawer}
+        onClose={() => setFileDrawer(null)}
+        placement="right"
+        width="60vw"
+        title={fileDrawer?.path}
+      >
+        {fileLoading ? (
+          <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
+        ) : (
+          <pre style={{ margin: 0, padding: 0, fontSize: 13, lineHeight: 1.5, fontFamily: 'var(--font-mono)' }}>
+            {fileDrawer?.content}
+          </pre>
         )}
       </Drawer>
-
     </div>
   );
 }
