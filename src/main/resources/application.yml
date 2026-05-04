@@ -98,7 +98,16 @@ spring:
     exclude:
       - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
   cache:
-    type: simple
+    # Caffeine replaces the default ConcurrentMapCacheManager which was
+    # unbounded — every @Cacheable region in QueryService (node-detail,
+    # file-tree, consumers, callers, etc.) accumulated lifetime-of-process
+    # entries keyed by node-id / depth / offset. maximumSize=1000 caps each
+    # named region at 1000 entries; expireAfterWrite=5m bounds staleness.
+    # Both are intentionally generous for a read-only graph that doesn't
+    # change between enrich runs.
+    type: caffeine
+    caffeine:
+      spec: maximumSize=1000,expireAfterWrite=5m
 
 logging:
   level:

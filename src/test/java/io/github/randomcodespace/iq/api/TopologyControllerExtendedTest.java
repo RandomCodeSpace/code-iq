@@ -49,6 +49,7 @@ class TopologyControllerExtendedTest {
     private GraphStore graphStore;
 
     private TopologyController controller;
+    private io.github.randomcodespace.iq.query.TopologySnapshotProvider snapshotProvider;
 
     @TempDir
     Path tempDir;
@@ -58,7 +59,9 @@ class TopologyControllerExtendedTest {
         var config = new CodeIqConfig();
         // Use the temp dir as rootPath so H2 fallback finds no cache file
         CodeIqConfigTestSupport.override(config).rootPath(tempDir.toString()).done();
-        controller = new TopologyController(topologyService, graphStore, config);
+        snapshotProvider = new io.github.randomcodespace.iq.query.TopologySnapshotProvider(
+                graphStore, config);
+        controller = new TopologyController(topologyService, snapshotProvider);
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
 
@@ -335,8 +338,8 @@ class TopologyControllerExtendedTest {
         mockMvc.perform(get("/api/topology").accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
 
-        // Invalidate
-        controller.invalidateCache();
+        // Invalidate the shared snapshot (controller no longer holds its own cache)
+        snapshotProvider.invalidate();
 
         // Second call should reload data (count called again)
         mockMvc.perform(get("/api/topology").accept(MediaType.APPLICATION_JSON))

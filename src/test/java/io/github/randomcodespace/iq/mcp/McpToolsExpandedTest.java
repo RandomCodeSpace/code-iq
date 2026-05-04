@@ -64,10 +64,15 @@ class McpToolsExpandedTest {
         config = new CodeIqConfig();
         CodeIqConfigTestSupport.override(config).rootPath(".").done();
         objectMapper = new ObjectMapper();
+        // Default the GraphStore as having data so the snapshot provider takes
+        // its Neo4j path (count > 0 → findAll). Lenient because tests that
+        // don't reach a topology tool never read it.
+        org.mockito.Mockito.lenient().when(graphStore.count()).thenReturn(1L);
+        var snapshotProvider = new io.github.randomcodespace.iq.query.TopologySnapshotProvider(graphStore, config);
         mcpTools = new McpTools(
                 queryService, config, objectMapper,
                 Optional.empty(), graphDb, statsService,
-                new TopologyService(), graphStore,
+                new TopologyService(), graphStore, snapshotProvider,
                 Optional.empty(), Optional.empty(), null
         );
     }

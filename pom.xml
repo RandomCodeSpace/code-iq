@@ -170,6 +170,19 @@
             <version>8.18.0</version>
         </dependency>
 
+        <!-- Caffeine: bounded in-process cache (Apache-2.0). Required because
+             CodeIqApplication enables @EnableCaching but Spring Boot defaults
+             to ConcurrentMapCacheManager (unbounded, no TTL, no eviction) when
+             no provider is on the classpath. Caffeine + the cache.type=caffeine
+             configuration in application.yml gives every @Cacheable region a
+             max-size + write-expiry, capping lifetime-of-process growth on
+             unique-key caches like node-detail and file-tree. Spring Boot
+             manages the version via its parent BOM. -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+
         <!-- Logstash JSON encoder (MIT). Drops a structured JSON line per log
              event with timestamp, level, logger, thread, message, MDC entries
              (request_id, etc.), and optional stack trace. Used in the serving

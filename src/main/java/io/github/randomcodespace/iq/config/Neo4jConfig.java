@@ -9,6 +9,7 @@ import org.neo4j.driver.AuthTokens;
 import org.neo4j.driver.Driver;
 import org.neo4j.driver.GraphDatabase;
 import org.neo4j.graphdb.GraphDatabaseService;
+import org.neo4j.io.ByteUnit;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -46,7 +47,15 @@ public class Neo4jConfig {
                 // (e.g. unbounded variable-length match on a hub node) from hogging
                 // the page cache and starving readiness/liveness probes. Audit
                 // finding #2 (HIGH) — runs alongside per-tool timeouts in McpTools.
-                .setConfig(GraphDatabaseSettings.transaction_timeout, Duration.ofSeconds(30));
+                .setConfig(GraphDatabaseSettings.transaction_timeout, Duration.ofSeconds(30))
+                // Bound Neo4j off-heap page cache. Without an explicit cap, embedded
+                // Neo4j auto-sizes the page cache to ~50% of free RAM at startup,
+                // which races the JVM heap inside an AKS pod (single cgroup memory
+                // limit) and triggers OOMKilled before either side stabilises. Sized
+                // for the read-only serving workload — the ~200 K-node graphs we
+                // ship today fit comfortably in 256 MB; lift this if your store
+                // grows past ~500 MB on disk.
+                .setConfig(GraphDatabaseSettings.pagecache_memory, ByteUnit.mebiBytes(256));
 
         // Read-only mode for serving profile — no lock files, no transaction logs.
         // Required for read-only filesystems (e.g., AKS with read-only volumes).
