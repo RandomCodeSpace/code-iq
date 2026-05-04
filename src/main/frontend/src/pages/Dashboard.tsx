@@ -208,8 +208,13 @@ export default function Dashboard() {
   // breadcrumb(38) + gaps(24)
   const treemapHeight = useViewportHeight(56 + 32 + 110 + 38 + 24);
 
-  // Treemap
-  const { data: treeData, loading: treeLoading } = useApi<FileTreeResponse>(() => api.getFileTree(), []);
+  // Treemap. Cap initial fetch at depth 8 — enough for a fully-qualified Java
+  // path (src/main/java/io/github/<org>/<pkg>/<sub>/File.java = 8 segments)
+  // and most other languages, but spares the 200 K-node case from shipping
+  // the full tree for paths the user will never drill into. Past depth 8
+  // the directory renders as a leaf with its aggregate node count; on-demand
+  // subtree fetching is a follow-up (Phase 2).
+  const { data: treeData, loading: treeLoading } = useApi<FileTreeResponse>(() => api.getFileTree(8), []);
   const { treemapRoot, pathMap } = useMemo(() => {
     const map = new WeakMap<TreemapNode, string>();
     const children = buildTreemapTree(collapseTree(treeData?.tree ?? []), '', map);
