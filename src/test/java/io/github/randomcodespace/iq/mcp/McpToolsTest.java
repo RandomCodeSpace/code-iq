@@ -57,7 +57,11 @@ class McpToolsTest {
         config = new CodeIqConfig();
         CodeIqConfigTestSupport.override(config).rootPath(".").done();
         objectMapper = new ObjectMapper();
-        mcpTools = new McpTools(queryService, config, objectMapper, java.util.Optional.ofNullable(flowEngine), graphDb, statsService, new io.github.randomcodespace.iq.query.TopologyService(), graphStore, java.util.Optional.empty(), java.util.Optional.empty(), null);
+        // Default GraphStore.count() so TopologySnapshotProvider takes its
+        // Neo4j path; tests that hit topology tools stub findAll() too.
+        org.mockito.Mockito.lenient().when(graphStore.count()).thenReturn(1L);
+        var snapshotProvider = new io.github.randomcodespace.iq.query.TopologySnapshotProvider(graphStore, config);
+        mcpTools = new McpTools(queryService, config, objectMapper, java.util.Optional.ofNullable(flowEngine), graphDb, statsService, new io.github.randomcodespace.iq.query.TopologyService(), graphStore, snapshotProvider, java.util.Optional.empty(), java.util.Optional.empty(), null);
     }
 
     private Map<String, Object> parseJson(String json) throws IOException {

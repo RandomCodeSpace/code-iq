@@ -20,6 +20,7 @@ import io.github.randomcodespace.iq.model.CodeNode;
 import io.github.randomcodespace.iq.query.QueryService;
 import io.github.randomcodespace.iq.query.StatsService;
 import io.github.randomcodespace.iq.query.TopologyService;
+import io.github.randomcodespace.iq.query.TopologySnapshotProvider;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Result;
 import org.slf4j.Logger;
@@ -36,8 +37,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * MCP tool definitions using Spring AI annotations.
@@ -62,6 +61,7 @@ public class McpTools {
     private final StatsService statsService;
     private final TopologyService topologyService;
     private final GraphStore graphStore;
+    private final TopologySnapshotProvider snapshotProvider;
     private final EvidencePackAssembler evidencePackAssembler;
     private final ArtifactMetadataProvider artifactMetadataProvider;
 
@@ -70,22 +70,12 @@ public class McpTools {
     /** Hard depth cap on variable-length traversals (default 10). */
     private final int maxDepth;
 
-    /**
-     * 60s TTL on the full-graph snapshot used by the topology tools. Without
-     * this, every concurrent {@code blast_radius} / {@code find_path} /
-     * {@code service_dependencies} call paid the full {@code findAll()} cost
-     * and double-allocated multi-GB heaps on large graphs (audit C1 HIGH).
-     */
-    private static final long CACHE_TTL_NANOS = TimeUnit.SECONDS.toNanos(60);
-    private final AtomicReference<CachedSnapshot> graphSnapshot = new AtomicReference<>();
-
-    private record CachedSnapshot(CacheData data, long takenAtNanos) {}
-
     public McpTools(QueryService queryService,
                     CodeIqConfig config, ObjectMapper objectMapper,
                     Optional<FlowEngine> flowEngine, GraphDatabaseService graphDb,
                     StatsService statsService, TopologyService topologyService,
                     GraphStore graphStore,
+                    TopologySnapshotProvider snapshotProvider,
                     Optional<EvidencePackAssembler> evidencePackAssembler,
                     Optional<ArtifactMetadataProvider> artifactMetadataProvider,
                     CodeIqUnifiedConfig unifiedConfig) {
@@ -97,6 +87,7 @@ public class McpTools {
         this.statsService = statsService;
         this.topologyService = topologyService;
         this.graphStore = graphStore;
+        this.snapshotProvider = snapshotProvider;
         this.evidencePackAssembler = evidencePackAssembler.orElse(null);
         this.artifactMetadataProvider = artifactMetadataProvider.orElse(null);
         McpLimitsConfig lim = unifiedConfig != null && unifiedConfig.mcp() != null
@@ -106,44 +97,32 @@ public class McpTools {
     }
 
     /**
-     * Load graph data on-demand from Neo4j, served from a 60-second TTL cache
-     * to avoid double-allocating the full graph under concurrent topology calls.
-     * <p>
-     * Audit C1 (HIGH) — without the cache, every {@code service_dependencies},
-     * {@code blast_radius}, {@code find_path}, {@code find_bottlenecks},
-     * {@code find_circular_deps}, {@code find_dead_services}, {@code find_node}
-     * call paid the full {@code findAll()} cost and two concurrent calls
-     * double-allocated. On a 5M-node graph that is multi-GB per call.
-     * <p>
-     * TODO (follow-up): refactor TopologyService to use Cypher queries instead
-     * of in-memory traversal so the snapshot isn't needed at all. The cache
-     * is the bridge fix.
+     * Adapt the shared {@link TopologySnapshotProvider} to the local
+     * {@link CacheData} record that the topology tool methods consume.
+     *
+     * <p>The provider holds the snapshot (60 s TTL, deduplicates concurrent
+     * loads); this thin wrapper keeps the existing call shape inside
+     * {@code McpTools} and preserves the legacy "no analysis data" error
+     * contract on which test fixtures + MCP error envelopes depend. The
+     * actual cache used to live here as a per-bean {@code AtomicReference};
+     * {@code TopologyController} kept a second one with no TTL, so under
+     * mixed REST + MCP traffic two multi-MB snapshots coexisted on heap.
+     * The shared provider eliminates that duplicate.
      */
     private CacheData getCachedData() {
-        long now = System.nanoTime();
-        CachedSnapshot current = graphSnapshot.get();
-        if (current != null && (now - current.takenAtNanos()) < CACHE_TTL_NANOS) {
-            return current.data();
-        }
-        // Stale or missing — recompute. Two concurrent recomputes can both
-        // hit findAll() once before either replaces the snapshot; that's fine
-        // (rare, bounded to the TTL window) and far less than the previous
-        // every-call double-allocation behavior.
-        List<CodeNode> nodes = graphStore.findAll();
-        List<CodeEdge> edges = nodes.stream()
-                .flatMap(n -> n.getEdges().stream())
-                .toList();
-        if (nodes.isEmpty()) {
+        TopologySnapshotProvider.Snapshot snap = snapshotProvider.snapshot();
+        // MCP topology tools can't operate on a missing-or-empty graph —
+        // collapse "no source" and "loaded but empty" into the same error
+        // since both leave the tool with nothing to traverse.
+        if (!snap.loaded() || snap.nodes().isEmpty()) {
             throw new RuntimeException("No analysis data available. Run 'codeiq analyze' first.");
         }
-        CacheData fresh = new CacheData(nodes, edges);
-        graphSnapshot.set(new CachedSnapshot(fresh, System.nanoTime()));
-        return fresh;
+        return new CacheData(snap.nodes(), snap.edges());
     }
 
-    /** Test-only — invalidate the snapshot cache so a new {@code findAll()} runs next call. */
+    /** Test-only — invalidate the shared snapshot so a new {@code findAll()} runs next call. */
     void invalidateGraphSnapshotCacheForTesting() {
-        graphSnapshot.set(null);
+        snapshotProvider.invalidate();
     }
 
     @McpTool(name = "get_stats", description = "Get graph overview: total nodes, edges, files, languages, and frameworks detected. Use when asked about project size, composition, or what was analyzed. Returns JSON with counts and breakdowns.")

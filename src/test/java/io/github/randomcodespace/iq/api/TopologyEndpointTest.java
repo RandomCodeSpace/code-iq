@@ -66,16 +66,18 @@ class TopologyEndpointTest {
 
         objectMapper = new ObjectMapper();
 
-        // GraphStore returns >0 count so TopologyController loads from Neo4j
+        // GraphStore returns >0 count so TopologySnapshotProvider loads from Neo4j
         lenient().when(graphStore.count()).thenReturn(1L);
         lenient().when(graphStore.findAll()).thenReturn(List.of());
 
-        var topologyController = new TopologyController(topologyService, graphStore, config);
+        var snapshotProvider = new io.github.randomcodespace.iq.query.TopologySnapshotProvider(
+                graphStore, config);
+        var topologyController = new TopologyController(topologyService, snapshotProvider);
         mockMvc = MockMvcBuilders.standaloneSetup(topologyController).build();
 
         mcpTools = new McpTools(queryService, config, objectMapper,
                 Optional.empty(), graphDb, new StatsService(),
-                new TopologyService(), graphStore,
+                new TopologyService(), graphStore, snapshotProvider,
                 Optional.empty(), Optional.empty(), null);
     }
 

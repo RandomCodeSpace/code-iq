@@ -49,10 +49,11 @@ class McpToolsEvidenceTest {
                 Map.of(), "cafebabe");
         org.mockito.Mockito.lenient().when(metadataProvider.current()).thenReturn(metadata);
 
+        var snapshotProvider = new io.github.randomcodespace.iq.query.TopologySnapshotProvider(graphStore, config);
         mcpTools = new McpTools(
                 queryService, config, objectMapper,
                 Optional.empty(), graphDb,
-                statsService, topologyService, graphStore,
+                statsService, topologyService, graphStore, snapshotProvider,
                 Optional.of(assembler), Optional.of(metadataProvider), null);
     }
 
@@ -70,10 +71,12 @@ class McpToolsEvidenceTest {
 
     @Test
     void getEvidencePackReturnsErrorWhenAssemblerAbsent() {
+        var noConfig = new CodeIqConfig();
         McpTools noAssembler = new McpTools(
-                queryService, new CodeIqConfig(), objectMapper,
+                queryService, noConfig, objectMapper,
                 Optional.empty(), graphDb,
                 statsService, topologyService, graphStore,
+                new io.github.randomcodespace.iq.query.TopologySnapshotProvider(graphStore, noConfig),
                 Optional.empty(), Optional.empty(), null);
 
         String result = noAssembler.getEvidencePack("Foo", null, null, null);
@@ -89,10 +92,12 @@ class McpToolsEvidenceTest {
 
     @Test
     void getArtifactMetadataReturnsErrorWhenAbsent() {
+        var noMetaConfig = new CodeIqConfig();
         McpTools noMeta = new McpTools(
-                queryService, new CodeIqConfig(), objectMapper,
+                queryService, noMetaConfig, objectMapper,
                 Optional.empty(), graphDb,
                 statsService, topologyService, graphStore,
+                new io.github.randomcodespace.iq.query.TopologySnapshotProvider(graphStore, noMetaConfig),
                 Optional.empty(), Optional.empty(), null);
 
         String result = noMeta.getArtifactMetadata();

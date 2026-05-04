@@ -40,11 +40,31 @@ fi
 mkdir -p /tmp/spring-boot-loader
 
 # JVM flag preset. Every entry has a non-default behavior that without it
-# would write outside /tmp. Order: -D system properties first, then -XX.
-# Don't reorder — keep it greppable for the sentinel test.
+# would write outside /tmp OR break under cgroup memory limits. Order: -D
+# system properties first, then -XX. Don't reorder — keep it greppable for
+# the sentinel test.
+#
+# Memory caps explained:
+#   MaxRAMPercentage=50     Heap ceiling = 50% of cgroup memory limit. The
+#                           remaining 50% covers Neo4j off-heap page cache
+#                           (capped at 256 MB in Neo4jConfig), Metaspace,
+#                           JIT code cache, Tomcat NIO buffers, and OS slack.
+#                           At limits.memory: 4Gi this lands the JVM at
+#                           ~2 GiB heap which is 4× the working set of a
+#                           200 K-node graph.
+#   InitialRAMPercentage=25 Lower start, lets G1 grow on demand. Avoids
+#                           paying the full heap reservation up-front so a
+#                           pod that's only doing health probes stays small.
+#   ExitOnOutOfMemoryError  Fail-fast on JVM-side OOM. Lets K8s restart
+#                           cleanly instead of looping in a degraded state
+#                           where readiness probes timeout.
 JAVA_OPTS=(
   -Dorg.springframework.boot.loader.tmpDir=/tmp/spring-boot-loader
   -Djava.io.tmpdir=/tmp
+  -XX:MaxRAMPercentage=50
+  -XX:InitialRAMPercentage=25
+  -XX:+UseG1GC
+  -XX:+ExitOnOutOfMemoryError
   -XX:ErrorFile=/tmp/hs_err_pid%p.log
   -XX:HeapDumpPath=/tmp
   -XX:+HeapDumpOnOutOfMemoryError
