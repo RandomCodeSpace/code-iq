@@ -660,7 +660,7 @@ class GraphControllerTest {
                 Map.of("name", "src", "type", "directory", "nodeCount", 10L, "children", List.of()),
                 Map.of("name", "pom.xml", "type", "file", "nodeCount", 1L, "children", List.of())));
         treeResult.put("total_files", 3L);
-        when(queryService.getFileTree(any(), anyInt(), anyBoolean())).thenReturn(treeResult);
+        when(queryService.getFileTree(any(), anyInt(), anyBoolean(), any())).thenReturn(treeResult);
 
         mockMvc.perform(get("/api/file-tree"))
                 .andExpect(status().isOk())
@@ -678,7 +678,7 @@ class GraphControllerTest {
         Map<String, Object> treeResult = new LinkedHashMap<>();
         treeResult.put("tree", List.of());
         treeResult.put("total_files", 0L);
-        when(queryService.getFileTree(eq(2), anyInt(), anyBoolean())).thenReturn(treeResult);
+        when(queryService.getFileTree(eq(2), anyInt(), anyBoolean(), any())).thenReturn(treeResult);
 
         mockMvc.perform(get("/api/file-tree").param("depth", "2"))
                 .andExpect(status().isOk())
@@ -690,12 +690,12 @@ class GraphControllerTest {
         Map<String, Object> treeResult = new LinkedHashMap<>();
         treeResult.put("tree", List.of());
         treeResult.put("total_files", 0L);
-        when(queryService.getFileTree(eq(10), anyInt(), anyBoolean())).thenReturn(treeResult);
+        when(queryService.getFileTree(eq(10), anyInt(), anyBoolean(), any())).thenReturn(treeResult);
 
         mockMvc.perform(get("/api/file-tree").param("depth", "999"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.total_files").value(0));
 
-        verify(queryService).getFileTree(eq(10), anyInt(), anyBoolean());
+        verify(queryService).getFileTree(eq(10), anyInt(), anyBoolean(), any());
     }
 }

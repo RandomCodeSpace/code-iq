@@ -637,7 +637,7 @@ class QueryServiceTest {
     @Test
     @SuppressWarnings("unchecked")
     void getFileTreeShouldBuildHierarchicalTree() {
-        when(graphStore.getFilePathsWithCounts(anyInt())).thenReturn(new GraphStore.FilePathResult(List.of(
+        when(graphStore.getFilePathsWithCounts(anyInt(), any())).thenReturn(new GraphStore.FilePathResult(List.of(
                 Map.of("filePath", "src/main/Foo.java", "nodeCount", 3L),
                 Map.of("filePath", "src/main/Bar.java", "nodeCount", 1L),
                 Map.of("filePath", "src/test/FooTest.java", "nodeCount", 2L),
@@ -665,7 +665,7 @@ class QueryServiceTest {
     @Test
     @SuppressWarnings("unchecked")
     void getFileTreeShouldIncludePathFieldAtEveryLevel() {
-        when(graphStore.getFilePathsWithCounts(anyInt())).thenReturn(new GraphStore.FilePathResult(List.of(
+        when(graphStore.getFilePathsWithCounts(anyInt(), any())).thenReturn(new GraphStore.FilePathResult(List.of(
                 Map.of("filePath", "src/main/java/Foo.java", "nodeCount", 2L),
                 Map.of("filePath", "pom.xml", "nodeCount", 1L)), false));
 
@@ -700,7 +700,7 @@ class QueryServiceTest {
     @Test
     @SuppressWarnings("unchecked")
     void getFileTreeShouldSortDirectoriesBeforeFiles() {
-        when(graphStore.getFilePathsWithCounts(anyInt())).thenReturn(new GraphStore.FilePathResult(List.of(
+        when(graphStore.getFilePathsWithCounts(anyInt(), any())).thenReturn(new GraphStore.FilePathResult(List.of(
                 Map.of("filePath", "README.md", "nodeCount", 1L),
                 Map.of("filePath", "src/Foo.java", "nodeCount", 2L)), false));
 
@@ -714,7 +714,7 @@ class QueryServiceTest {
     @Test
     @SuppressWarnings("unchecked")
     void getFileTreeShouldRespectDepthLimit() {
-        when(graphStore.getFilePathsWithCounts(anyInt())).thenReturn(new GraphStore.FilePathResult(List.of(
+        when(graphStore.getFilePathsWithCounts(anyInt(), any())).thenReturn(new GraphStore.FilePathResult(List.of(
                 Map.of("filePath", "src/main/java/Foo.java", "nodeCount", 5L)), false));
 
         Map<String, Object> result = service.getFileTree(2);
@@ -731,7 +731,7 @@ class QueryServiceTest {
     @Test
     @SuppressWarnings("unchecked")
     void getFileTreeShouldReturnEmptyTreeForNoNodes() {
-        when(graphStore.getFilePathsWithCounts(anyInt())).thenReturn(new GraphStore.FilePathResult(List.of(), false));
+        when(graphStore.getFilePathsWithCounts(anyInt(), any())).thenReturn(new GraphStore.FilePathResult(List.of(), false));
 
         Map<String, Object> result = service.getFileTree(null);
 
@@ -748,10 +748,10 @@ class QueryServiceTest {
                 Map.of("filePath", "src/A.java", "nodeCount", 1L),
                 Map.of("filePath", "lib/C.java", "nodeCount", 3L));
 
-        when(graphStore.getFilePathsWithCounts(anyInt())).thenReturn(new GraphStore.FilePathResult(paths, false));
+        when(graphStore.getFilePathsWithCounts(anyInt(), any())).thenReturn(new GraphStore.FilePathResult(paths, false));
         Map<String, Object> first = service.getFileTree(null);
 
-        when(graphStore.getFilePathsWithCounts(anyInt())).thenReturn(new GraphStore.FilePathResult(paths, false));
+        when(graphStore.getFilePathsWithCounts(anyInt(), any())).thenReturn(new GraphStore.FilePathResult(paths, false));
         Map<String, Object> second = service.getFileTree(null);
 
         assertEquals(first.toString(), second.toString());
@@ -762,7 +762,7 @@ class QueryServiceTest {
     void getFileTreeShouldUpgradeFileToDirectoryWhenUsedAsIntermediate() {
         // Simulates a monorepo where SERVICE nodes have directory-like filePaths
         // e.g., "packages/api" (SERVICE) AND "packages/api/src/index.ts" (source file)
-        when(graphStore.getFilePathsWithCounts(anyInt())).thenReturn(new GraphStore.FilePathResult(List.of(
+        when(graphStore.getFilePathsWithCounts(anyInt(), any())).thenReturn(new GraphStore.FilePathResult(List.of(
                 Map.of("filePath", "packages/api", "nodeCount", 1L),
                 Map.of("filePath", "packages/api/src/index.ts", "nodeCount", 5L),
                 Map.of("filePath", "packages/api/src/users.ts", "nodeCount", 3L),

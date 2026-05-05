@@ -95,9 +95,12 @@ export const api = {
   traceImpact: (id: string, depth = 3) =>
     fetchJson<Record<string, unknown>>(`${BASE}/triage/impact/${encodeURIComponent(id)}?depth=${depth}`),
 
-  getFileTree: (depth?: number) => {
-    const params = depth !== undefined ? `?depth=${depth}` : '';
-    return fetchJson<FileTreeResponse>(`${BASE}/file-tree${params}`);
+  getFileTree: (depth?: number, path?: string) => {
+    const qs = new URLSearchParams();
+    if (depth !== undefined) qs.set('depth', String(depth));
+    if (path !== undefined && path !== '') qs.set('path', path);
+    const suffix = qs.toString() ? `?${qs}` : '';
+    return fetchJson<FileTreeResponse>(`${BASE}/file-tree${suffix}`);
   },
 
   getTopology: () =>

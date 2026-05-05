@@ -211,13 +211,43 @@ public class GraphController {
     public Map<String, Object> getFileTree(
             @RequestParam(required = false) Integer depth,
             @RequestParam(required = false) Integer maxFiles,
+            @RequestParam(required = false) String path,
             @RequestParam(defaultValue = "true") boolean excludeTests) {
         requireQueryService();
         // depth=null means unlimited (full tree for treemap). Otherwise cap at maxDepth.
         Integer cappedDepth = (depth != null) ? Math.min(depth, config.getMaxDepth()) : null;
         // Default unlimited for treemap
         int limit = (maxFiles != null) ? maxFiles : Integer.MAX_VALUE;
-        return queryService.getFileTree(cappedDepth, limit, excludeTests);
+        String normalizedPath = normalizeFileTreePath(path);
+        return queryService.getFileTree(cappedDepth, limit, excludeTests, normalizedPath);
+    }
+
+    /**
+     * Validate + normalize a user-supplied filesystem path before it reaches the query
+     * layer. Rejects {@code ..} traversal, leading slashes, and overlong inputs;
+     * trims trailing slashes. {@code null} and blank inputs collapse to {@code null}
+     * which means "root tree" downstream.
+     */
+    private static String normalizeFileTreePath(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        String p = raw.trim();
+        while (p.endsWith("/")) p = p.substring(0, p.length() - 1);
+        while (p.startsWith("/")) p = p.substring(1);
+        if (p.length() > 1024) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST,
+                    "path too long");
+        }
+        // Reject path-traversal segments. Splitting first prevents false positives on
+        // legitimate filenames that happen to contain ".." as a substring.
+        for (String seg : p.split("/")) {
+            if ("..".equals(seg)) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.BAD_REQUEST,
+                        "path must not contain '..' segments");
+            }
+        }
+        return p.isEmpty() ? null : p;
     }
 
     @GetMapping("/capabilities")
