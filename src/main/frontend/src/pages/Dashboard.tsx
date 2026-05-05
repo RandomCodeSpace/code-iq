@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, Fragment } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef, Fragment } from 'react';
 import {
   Card, Spin, Alert, Modal, Drawer, Stat, Table, ScrollDiv, Space,
 } from '@ossrandom/design-system';
@@ -132,6 +132,7 @@ function buildTreemapTree(
   nodes: FileTreeNode[],
   parentPath: string,
   pathMap: WeakMap<TreemapNode, string>,
+  truncatedDirMap: WeakMap<TreemapNode, boolean>,
 ): TreemapNode[] {
   // Sort children by name so the treemap layout is stable across page
   // loads regardless of API result ordering. d3-hierarchy's squarified
@@ -143,7 +144,7 @@ function buildTreemapTree(
     const fullPath = parentPath ? `${parentPath}/${n.name}` : n.name;
     if (n.nodeCount <= 0 && (!n.children || n.children.length === 0)) continue;
     if (n.type === 'directory' && n.children && n.children.length > 0) {
-      const children = buildTreemapTree(n.children, fullPath, pathMap);
+      const children = buildTreemapTree(n.children, fullPath, pathMap, truncatedDirMap);
       if (children.length === 0) continue;
       const node: TreemapNode = {
         name: n.name,
@@ -153,16 +154,58 @@ function buildTreemapTree(
       pathMap.set(node, fullPath);
       out.push(node);
     } else {
+      // A directory with no children but nodeCount > 0 is the backend's depth-cap
+      // marker — descendants exist but weren't fetched. Render as a leaf and
+      // flag for lazy expansion on click (Phase 2/3 path-rooted refetch).
+      const isTruncatedDir = n.type === 'directory' && n.nodeCount > 0;
       const node: TreemapNode = {
         name: n.name,
         value: Math.max(n.nodeCount, 1),
-        color: LANG_COLORS[inferLang(n.name)] ?? '#666',
+        color: LANG_COLORS[isTruncatedDir ? 'other' : inferLang(n.name)] ?? '#666',
       };
       pathMap.set(node, fullPath);
+      if (isTruncatedDir) truncatedDirMap.set(node, true);
       out.push(node);
     }
   }
   return out;
+}
+
+/**
+ * Walk down to leaves and sum their values. Used when flattening the visible
+ * level for label rendering: the design-system Treemap canvas only paints
+ * names on leaf cells (its `isLeaf` check guards label drawing), so
+ * directories at the focused level have to be rendered as leaves with a
+ * pre-aggregated value to keep the cell-sizing accurate.
+ */
+function aggregateLeafValue(node: TreemapNode): number {
+  if (!node.children || node.children.length === 0) return node.value ?? 1;
+  let sum = 0;
+  for (const c of node.children) sum += aggregateLeafValue(c);
+  return sum;
+}
+
+/**
+ * Splice a freshly-fetched subtree into the right slot of the existing tree.
+ * Matches by absolute filesystem path (which the backend emits unchanged in
+ * `path` for both root and path-rooted responses), then replaces the
+ * directory's children. Returns a new tree array — the caller should treat
+ * the result as immutable.
+ */
+function mergeSubtree(
+  tree: FileTreeNode[],
+  fsPath: string,
+  subtree: FileTreeNode[],
+): FileTreeNode[] {
+  return tree.map(n => {
+    if (n.path === fsPath && n.type === 'directory') {
+      return { ...n, children: subtree };
+    }
+    if (n.children && n.children.length > 0 && fsPath.startsWith(n.path + '/')) {
+      return { ...n, children: mergeSubtree(n.children, fsPath, subtree) };
+    }
+    return n;
+  });
 }
 
 function useViewportHeight(offset: number): number {
@@ -208,18 +251,51 @@ export default function Dashboard() {
   // breadcrumb(38) + gaps(24)
   const treemapHeight = useViewportHeight(56 + 32 + 110 + 38 + 24);
 
-  // Treemap. Cap initial fetch at depth 8 — enough for a fully-qualified Java
+  // Treemap. Initial fetch caps at depth 8 — enough for a fully-qualified Java
   // path (src/main/java/io/github/<org>/<pkg>/<sub>/File.java = 8 segments)
-  // and most other languages, but spares the 200 K-node case from shipping
-  // the full tree for paths the user will never drill into. Past depth 8
-  // the directory renders as a leaf with its aggregate node count; on-demand
-  // subtree fetching is a follow-up (Phase 2).
-  const { data: treeData, loading: treeLoading } = useApi<FileTreeResponse>(() => api.getFileTree(8), []);
-  const { treemapRoot, pathMap } = useMemo(() => {
-    const map = new WeakMap<TreemapNode, string>();
-    const children = buildTreemapTree(collapseTree(treeData?.tree ?? []), '', map);
+  // and the typical TS/Python/Go layouts. Directories beyond depth 8 come
+  // back as truncation markers (type=directory, children=[], nodeCount>0);
+  // when the user clicks one, we fetch its subtree on demand via the
+  // path-rooted /api/file-tree?path=… endpoint and splice it into place.
+  const [treeData, setTreeData] = useState<FileTreeResponse | null>(null);
+  const [treeLoading, setTreeLoading] = useState(true);
+  const [subtreeLoading, setSubtreeLoading] = useState(false);
+  const loadedPathsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    let cancelled = false;
+    setTreeLoading(true);
+    api.getFileTree(8)
+      .then(r => { if (!cancelled) setTreeData(r); })
+      .catch(() => { /* surface via empty-tree state */ })
+      .finally(() => { if (!cancelled) setTreeLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const ensureSubtreeLoaded = useCallback(async (fsPath: string) => {
+    if (loadedPathsRef.current.has(fsPath)) return;
+    // Mark eagerly to dedupe concurrent clicks; revert on failure so the
+    // user can retry by clicking again.
+    loadedPathsRef.current.add(fsPath);
+    setSubtreeLoading(true);
+    try {
+      const sub = await api.getFileTree(8, fsPath);
+      setTreeData(prev => prev
+        ? { ...prev, tree: mergeSubtree(prev.tree, fsPath, sub.tree) }
+        : prev);
+    } catch {
+      loadedPathsRef.current.delete(fsPath);
+    } finally {
+      setSubtreeLoading(false);
+    }
+  }, []);
+
+  const { treemapRoot, pathMap, truncatedDirMap } = useMemo(() => {
+    const pMap = new WeakMap<TreemapNode, string>();
+    const tMap = new WeakMap<TreemapNode, boolean>();
+    const children = buildTreemapTree(collapseTree(treeData?.tree ?? []), '', pMap, tMap);
     const root: TreemapNode = { name: 'root', children };
-    return { treemapRoot: root, pathMap: map };
+    return { treemapRoot: root, pathMap: pMap, truncatedDirMap: tMap };
   }, [treeData]);
 
   // Drill state — names of the directories we've drilled into, in order.
@@ -227,8 +303,11 @@ export default function Dashboard() {
   // breadcrumb segment slices back to that depth.
   const [focusPath, setFocusPath] = useState<string[]>([]);
 
-  // Reset focus when the underlying tree changes (e.g., re-fetch after enrich).
-  useEffect(() => { setFocusPath([]); }, [treemapRoot]);
+  // Reset focus only on a fresh full-tree load (total_files indicates the
+  // initial fetch landed). Subtree-merge updates also bump treeData but keep
+  // total_files unchanged, so the user's drill position survives lazy loads.
+  const totalFiles = treeData?.total_files;
+  useEffect(() => { setFocusPath([]); }, [totalFiles]);
 
   // Walk treemapRoot along focusPath. Falls back to root if any segment is
   // missing (defensive — shouldn't happen since focusPath only ever holds
@@ -243,12 +322,53 @@ export default function Dashboard() {
     return cur;
   }, [treemapRoot, focusPath]);
 
+  // Render-only flat copy of the focused level. The design-system Treemap
+  // only paints names on leaf cells (its canvas path checks `!n.children?.length`
+  // before drawing the label), so directories at the visible level — which
+  // legitimately have children for drill-down — appear as unlabelled
+  // rectangles. Strip children for the render pass to satisfy the leaf
+  // check; the original TreemapNode (with intact children) stays in
+  // `focusedRoot` and is recovered via `renderToOriginal` in the click
+  // handler so drill-down still works.
+  const { focusedRootForRender, renderToOriginal } = useMemo(() => {
+    const map = new WeakMap<TreemapNode, TreemapNode>();
+    const flat = (focusedRoot.children ?? []).map(c => {
+      if (c.children && c.children.length > 0) {
+        const rendered: TreemapNode = {
+          name: c.name,
+          value: aggregateLeafValue(c),
+          color: c.color,
+        };
+        map.set(rendered, c);
+        return rendered;
+      }
+      // Files and truncated-directory markers are already leaves; preserve
+      // identity so existing pathMap / truncatedDirMap lookups keep working.
+      return c;
+    });
+    return {
+      focusedRootForRender: { name: focusedRoot.name, children: flat },
+      renderToOriginal: map,
+    };
+  }, [focusedRoot]);
+
   // File viewer
   const [fileDrawer, setFileDrawer] = useState<{ path: string; content: string } | null>(null);
   const [fileLoading, setFileLoading] = useState(false);
-  const onTreemapNodeClick = useCallback(async (node: TreemapNode) => {
-    // Directory — drill down one level.
+  const onTreemapNodeClick = useCallback(async (clicked: TreemapNode) => {
+    // Resolve the original TreemapNode behind the rendered (children-stripped)
+    // cell so pathMap / truncatedDirMap / drill-down keep working.
+    const node = renderToOriginal.get(clicked) ?? clicked;
+    // Directory with children — drill down one level.
     if (node.children && node.children.length > 0) {
+      setFocusPath(prev => [...prev, node.name]);
+      return;
+    }
+    // Truncated directory (depth-cap marker) — fetch its subtree, then drill in.
+    if (truncatedDirMap.get(node)) {
+      const fsPath = pathMap.get(node);
+      if (!fsPath) return;
+      await ensureSubtreeLoaded(fsPath);
       setFocusPath(prev => [...prev, node.name]);
       return;
     }
@@ -260,7 +380,7 @@ export default function Dashboard() {
     try { setFileDrawer({ path: filePath, content: await api.readFile(filePath) }); }
     catch { setFileDrawer({ path: filePath, content: '// Could not load file' }); }
     finally { setFileLoading(false); }
-  }, [pathMap]);
+  }, [pathMap, truncatedDirMap, renderToOriginal, ensureSubtreeLoaded]);
 
   if (statsLoading || treeLoading) {
     return <div style={{ textAlign: 'center', padding: 80 }}><Spin size="lg" /></div>;
@@ -307,6 +427,11 @@ export default function Dashboard() {
             </button>
           </Fragment>
         ))}
+        {subtreeLoading && (
+          <span style={{ marginLeft: 8, opacity: 0.7 }} aria-live="polite">
+            <Spin size="sm" /> loading subtree…
+          </span>
+        )}
       </div>
 
       <div>
@@ -316,7 +441,7 @@ export default function Dashboard() {
             // design-system Treemap caches layout on `data` identity, and a
             // remount is the simplest way to ensure a clean redraw.
             key={focusPath.join('/') || 'root'}
-            data={focusedRoot}
+            data={focusedRootForRender}
             height={treemapHeight}
             engine="canvas"
             // One level at a time — each cell maps 1:1 to a direct child of

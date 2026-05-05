@@ -376,18 +376,36 @@ public class QueryService {
         return TEST_FILE_PATTERN.matcher(fileName).find();
     }
 
-    @Cacheable(value = "file-tree", key = "#maxDepth + '-' + #maxFiles + '-' + #excludeTests")
     public Map<String, Object> getFileTree(Integer maxDepth, int maxFiles, boolean excludeTests) {
-        GraphStore.FilePathResult filePathResult = graphStore.getFilePathsWithCounts(maxFiles);
+        return getFileTree(maxDepth, maxFiles, excludeTests, null);
+    }
+
+    /**
+     * Path-rooted variant of file-tree. When {@code path} is non-null, the returned tree
+     * is rooted at that filesystem path (its descendants only). Output {@code path}
+     * fields remain absolute so the frontend can stitch the subtree back into the
+     * full tree at the matching node without bookkeeping.
+     */
+    @Cacheable(
+            value = "file-tree",
+            key = "#maxDepth + '-' + #maxFiles + '-' + #excludeTests + '-' + (#path == null ? '_root' : #path)")
+    public Map<String, Object> getFileTree(Integer maxDepth, int maxFiles, boolean excludeTests, String path) {
+        GraphStore.FilePathResult filePathResult = graphStore.getFilePathsWithCounts(maxFiles, path);
         List<Map<String, Object>> rows = excludeTests
                 ? filePathResult.rows().stream().filter(r -> !isTestPath((String) r.get("filePath"))).toList()
                 : filePathResult.rows();
 
+        // When path-rooted, strip the prefix before walking so the local TreeNode root
+        // represents the focused directory rather than the absolute filesystem root.
+        String prefix = (path != null && !path.isBlank()) ? path + "/" : "";
         TreeNode root = new TreeNode("", PROP_DIRECTORY);
         for (Map<String, Object> row : rows) {
             String filePath = (String) row.get("filePath");
             long count = ((Number) row.get(PROP_NODECOUNT)).longValue();
-            String[] parts = filePath.split("/", -1);
+            String walkPath = prefix.isEmpty()
+                    ? filePath
+                    : (filePath.startsWith(prefix) ? filePath.substring(prefix.length()) : filePath);
+            String[] parts = walkPath.split("/", -1);
             TreeNode current = root;
             for (int i = 0; i < parts.length; i++) {
                 String part = parts[i];
@@ -408,7 +426,10 @@ public class QueryService {
             }
         }
 
-        List<Map<String, Object>> tree = buildTreeOutput(root, maxDepth, 1, "");
+        // Pass the focused path as the parentPath so emitted "path" fields are absolute
+        // — frontend can match these directly against the node it's expanding.
+        String outputParentPath = (path != null && !path.isBlank()) ? path : "";
+        List<Map<String, Object>> tree = buildTreeOutput(root, maxDepth, 1, outputParentPath);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("tree", tree);
         result.put("total_files", (long) rows.size());

@@ -678,20 +678,34 @@ public class GraphStore implements FlowDataSource {
      * exist the {@link FilePathResult#truncated()} flag is set to {@code true}.
      */
     public FilePathResult getFilePathsWithCounts(int maxFiles) {
+        return getFilePathsWithCounts(maxFiles, null);
+    }
+
+    /**
+     * Path-rooted variant: when {@code pathPrefix} is non-null/non-blank, limits results
+     * to files whose {@code filePath} is a descendant of the prefix (matches
+     * {@code prefix + "/*"}). Used by the file-tree REST endpoint to fetch subtrees on
+     * demand instead of shipping the full tree on every page load.
+     */
+    public FilePathResult getFilePathsWithCounts(int maxFiles, String pathPrefix) {
         List<Map<String, Object>> rows = new ArrayList<>();
         try (Transaction tx = graphDb.beginTx()) {
-            // When maxFiles is very large (e.g., Integer.MAX_VALUE for unlimited treemap),
-            // skip the LIMIT clause entirely to avoid integer overflow
-            String query = "MATCH (n:CodeNode) WHERE n.filePath IS NOT NULL "
-                    + "RETURN n.filePath AS filePath, count(n) AS nodeCount "
-                    + "ORDER BY n.filePath";
-            Result result;
-            if (maxFiles < 1_000_000) {
-                result = tx.execute(query + " LIMIT $limit",
-                        Map.of(PROP_LIMIT, (long) (maxFiles + 1)));
-            } else {
-                result = tx.execute(query);
+            StringBuilder query = new StringBuilder(
+                    "MATCH (n:CodeNode) WHERE n.filePath IS NOT NULL");
+            Map<String, Object> params = new HashMap<>();
+            if (pathPrefix != null && !pathPrefix.isBlank()) {
+                // Append "/" so "src/main" matches "src/main/Foo.java" but not "src/main2/...".
+                query.append(" AND n.filePath STARTS WITH $prefix");
+                params.put("prefix", pathPrefix + "/");
             }
+            query.append(" RETURN n.filePath AS filePath, count(n) AS nodeCount ORDER BY n.filePath");
+            // When maxFiles is very large (e.g., Integer.MAX_VALUE for unlimited treemap),
+            // skip the LIMIT clause entirely to avoid integer overflow.
+            if (maxFiles < 1_000_000) {
+                query.append(" LIMIT $limit");
+                params.put(PROP_LIMIT, (long) (maxFiles + 1));
+            }
+            Result result = tx.execute(query.toString(), params);
             while (result.hasNext()) {
                 var row = result.next();
                 Map<String, Object> m = new LinkedHashMap<>();
