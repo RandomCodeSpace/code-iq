@@ -227,6 +227,9 @@ codeiq serve /path/to/repo           # needs enrich if using index
 - `GET /api/intelligence/capabilities` -- Capability matrix
 
 ### MCP Tools (34, via `@McpTool` annotation)
+
+The protocol-level server name is **`CODE MCP`** (set via `spring.ai.mcp.server.name` in `application.yml`). Project-scoped registration lives in `.mcp.json` at the repo root.
+
 `get_stats`, `get_detailed_stats`, `query_nodes`, `query_edges`, `get_node_neighbors`, `get_ego_graph`, `find_cycles`, `find_shortest_path`, `find_consumers`, `find_producers`, `find_callers`, `find_dependencies`, `find_dependents`, `find_dead_code`, `generate_flow`, `run_cypher`, `find_component_by_file`, `trace_impact`, `find_related_endpoints`, `search_graph`, `read_file`, `get_topology`, `service_detail`, `service_dependencies`, `service_dependents`, `blast_radius`, `find_path`, `find_bottlenecks`, `find_circular_deps`, `find_dead_services`, `find_node`, `get_evidence_pack`, `get_artifact_metadata`, `get_capabilities`
 
 ## Adding a New Detector

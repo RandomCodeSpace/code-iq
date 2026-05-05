@@ -57,7 +57,7 @@ codeiq:
     enabled: true
 
 spring.ai.mcp.server:
-  name: codeiq
+  name: "CODE MCP"
   version: 0.1.0
   protocol: STREAMABLE
   streamable-http:

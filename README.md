@@ -35,6 +35,18 @@ java -jar target/code-iq-*-cli.jar serve /path/to/repo
 # Open http://localhost:8080
 ```
 
+### Use with Claude Code (MCP)
+
+While `serve` is running, register the MCP server once on your machine:
+
+```bash
+claude mcp add --scope user code-mcp -t http http://localhost:8080/mcp
+```
+
+The server publishes itself as **`CODE MCP`**. Inside this repo a project-scoped
+`.mcp.json` is committed at the root, so cloning + opening in Claude Code
+auto-registers it for codeiq development without the manual step.
+
 ## How It Works
 
 codeiq scans source files using 99 detectors across 35+ languages, builds a knowledge graph of code relationships, and serves it via REST API, MCP server, and React UI.
