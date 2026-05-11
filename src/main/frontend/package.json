@@ -16,7 +16,7 @@
     "d3-hierarchy": "^3.1.2",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
-    "react-router-dom": "^7.1.5"
+    "react-router-dom": "^7.15.0"
   },
   "overrides": {
     "dompurify": "^3.3.3",
