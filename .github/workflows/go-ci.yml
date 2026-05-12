@@ -1,0 +1,47 @@
+name: go-ci
+
+on:
+  push:
+    branches: [main]
+    paths: ['go/**', '.github/workflows/go-ci.yml']
+  pull_request:
+    branches: [main]
+    paths: ['go/**', '.github/workflows/go-ci.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    name: vet / test / staticcheck / gosec / govulncheck
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: "1"
+    defaults:
+      run:
+        working-directory: go
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+          cache-dependency-path: go/go.sum
+      - name: Install C toolchain
+        run: sudo apt-get update -y && sudo apt-get install -y build-essential
+      - name: go vet
+        run: go vet ./...
+      - name: go test (race)
+        run: go test ./... -race -count=1
+      - name: staticcheck
+        run: |
+          go install honnef.co/go/tools/cmd/staticcheck@2024.1.1
+          "$(go env GOPATH)/bin/staticcheck" ./...
+      - name: gosec
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@v2.21.4
+          "$(go env GOPATH)/bin/gosec" -quiet ./...
+      - name: govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          "$(go env GOPATH)/bin/govulncheck" ./...
