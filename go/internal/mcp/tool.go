@@ -84,6 +84,16 @@ func (t Tool) asSDKTool() (*mcpsdk.Tool, mcpsdk.ToolHandler) {
 		if err != nil {
 			return nil, err
 		}
+		// Plain-string returns are passed through verbatim — generate_flow
+		// emits already-rendered Mermaid/DOT/YAML/JSON strings that
+		// MUST NOT be JSON-encoded again (would surround with quotes
+		// and escape every newline). Matches Java McpTools.generateFlow
+		// which returns the rendered string directly.
+		if s, ok := out.(string); ok {
+			return &mcpsdk.CallToolResult{
+				Content: []mcpsdk.Content{&mcpsdk.TextContent{Text: s}},
+			}, nil
+		}
 		body, err := json.Marshal(out)
 		if err != nil {
 			return nil, fmt.Errorf("mcp: marshal tool result for %q: %w", t.Name, err)
