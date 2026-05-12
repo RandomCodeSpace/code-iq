@@ -35,8 +35,8 @@ func DirtyBool() bool {
 	return Dirty == "true"
 }
 
-// Features returns the compile-time feature flags. Static for phase 1 — kuzu
-// joins the list in phase 2 once the Kuzu wrapper lands.
+// Features returns the compile-time feature flags. "kuzu" joined the list in
+// phase 2 with the Kuzu wrapper landing under internal/graph.
 func Features() []string {
-	return []string{"cgo", "sqlite", "tree-sitter"}
+	return []string{"cgo", "kuzu", "sqlite", "tree-sitter"}
 }

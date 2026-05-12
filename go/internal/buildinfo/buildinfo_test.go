@@ -37,7 +37,7 @@ func TestGoVersion(t *testing.T) {
 
 func TestFeatures(t *testing.T) {
 	f := Features()
-	wantContains := []string{"cgo", "sqlite", "tree-sitter"}
+	wantContains := []string{"cgo", "kuzu", "sqlite", "tree-sitter"}
 	for _, w := range wantContains {
 		found := false
 		for _, got := range f {
