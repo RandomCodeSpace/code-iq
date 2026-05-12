@@ -10,7 +10,9 @@ import (
 	"time"
 
 	"github.com/randomcodespace/codeiq/go/internal/buildinfo"
+	"github.com/randomcodespace/codeiq/go/internal/flow"
 	"github.com/randomcodespace/codeiq/go/internal/graph"
+	iqquery "github.com/randomcodespace/codeiq/go/internal/intelligence/query"
 	"github.com/randomcodespace/codeiq/go/internal/mcp"
 	"github.com/randomcodespace/codeiq/go/internal/model"
 	"github.com/randomcodespace/codeiq/go/internal/query"
@@ -99,7 +101,17 @@ To register with Claude Code, add to .mcp.json at the repo root:
 					}
 					return nodes, edges, nil
 				}),
-				Topology:   query.NewTopology(store),
+				Topology:     query.NewTopology(store),
+				Flow:         flow.NewEngine(store),
+				QueryPlanner: iqquery.NewPlanner(iqquery.CapabilityMatrixFor),
+				// Evidence assembler + ArtifactMeta are wired by the
+				// intelligence/evidence loader once it lands the on-disk
+				// manifest format. Until then get_evidence_pack and
+				// get_artifact_metadata return the legacy `{"error":
+				// "...unavailable. Run 'enrich' first."}` envelope which
+				// matches the Java contract for the "no metadata yet"
+				// path. RegisterIntelligence registers the tools either
+				// way so tools/list is stable.
 				RootPath:   root,
 				MaxResults: maxResults,
 				MaxDepth:   maxDepth,
@@ -131,16 +143,24 @@ To register with Claude Code, add to .mcp.json at the repo root:
 	return cmd
 }
 
-// registerAllTools wires every tool family available in the current build
-// onto srv. Today only RegisterGraph is in place — RegisterTopology,
-// RegisterFlow, and RegisterIntelligence land as their sections of phase 3
-// complete. Each Register call is best-effort: a missing function (the
-// parallel agent's still-in-flight package) means that tool family is
-// absent from `tools/list` until the function lands; the server still
-// starts.
+// registerAllTools wires every tool family onto srv. All four families
+// land here unconditionally — graph (20) + topology (9) + flow (1) +
+// intelligence (4) = 34 tools — matching the Java McpTools registration
+// count. The `optionalRegisterHooks` slice remains for forward-compat
+// with new tool families that may land in later phases (drill-down
+// flows, query planner v2, etc.) without re-touching this function.
 func registerAllTools(srv *mcp.Server, d *mcp.Deps) error {
 	if err := mcp.RegisterGraph(srv, d); err != nil {
 		return fmt.Errorf("register graph tools: %w", err)
+	}
+	if err := mcp.RegisterTopology(srv, d); err != nil {
+		return fmt.Errorf("register topology tools: %w", err)
+	}
+	if err := mcp.RegisterFlow(srv, d); err != nil {
+		return fmt.Errorf("register flow tools: %w", err)
+	}
+	if err := mcp.RegisterIntelligence(srv, d); err != nil {
+		return fmt.Errorf("register intelligence tools: %w", err)
 	}
 	for _, hook := range optionalRegisterHooks {
 		if hook == nil {
@@ -154,8 +174,8 @@ func registerAllTools(srv *mcp.Server, d *mcp.Deps) error {
 }
 
 // optionalRegisterHooks is the registration hook list for tool families
-// whose package may or may not be linked into the binary yet. Each phase-3
-// section appends to this slice from its own file (see mcp_hooks.go for
-// the parallel-agent-friendly registration pattern). Today the slice is
-// empty — graph tools are unconditional via registerAllTools above.
+// whose package may or may not be linked into the binary yet. Reserved
+// for future tool-family extensions; the four core families
+// (graph / topology / flow / intelligence) are wired unconditionally
+// above.
 var optionalRegisterHooks []func(*mcp.Server, *mcp.Deps) error
