@@ -25,6 +25,11 @@ func (s *Store) Cypher(query string, args ...map[string]any) ([]map[string]any, 
 	if s.conn == nil {
 		return nil, fmt.Errorf("graph: store closed")
 	}
+	if s.readOnly {
+		if kw := MutationKeyword(query); kw != "" {
+			return nil, fmt.Errorf("graph: write query rejected on read-only store (blocked keyword: %s)", kw)
+		}
+	}
 	var params map[string]any
 	if len(args) > 0 {
 		params = args[0]
@@ -35,6 +40,61 @@ func (s *Store) Cypher(query string, args ...map[string]any) ([]map[string]any, 
 	}
 	defer qr.Close()
 	return decodeResult(qr)
+}
+
+// CypherRows runs query, materialises up to maxRows result rows, and
+// reports whether the query produced more rows than the cap. Used by
+// the run_cypher MCP tool which needs to surface a `truncated` flag
+// without inlining `LIMIT N` into the user-supplied query string (the
+// query may already have its own LIMIT — see the McpTools row-cap
+// gotcha in CLAUDE.md).
+//
+// The mutation gate from Cypher() applies here too: on a read-only
+// store, any blocked-keyword query short-circuits with an error.
+func (s *Store) CypherRows(query string, args map[string]any, maxRows int) ([]map[string]any, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.conn == nil {
+		return nil, false, fmt.Errorf("graph: store closed")
+	}
+	if s.readOnly {
+		if kw := MutationKeyword(query); kw != "" {
+			return nil, false, fmt.Errorf("graph: write query rejected on read-only store (blocked keyword: %s)", kw)
+		}
+	}
+	qr, err := execQuery(s.conn, query, args)
+	if err != nil {
+		return nil, false, fmt.Errorf("graph: cypher: %w", err)
+	}
+	defer qr.Close()
+	if maxRows <= 0 {
+		maxRows = 1
+	}
+	rows := make([]map[string]any, 0, maxRows)
+	truncated := false
+	for qr.HasNext() {
+		if len(rows) >= maxRows {
+			// Drain one more tuple to confirm there *are* more rows; we don't
+			// keep the value, just the truncated flag.
+			truncated = true
+			t, err := qr.Next()
+			if err == nil {
+				t.Close()
+			}
+			break
+		}
+		tuple, err := qr.Next()
+		if err != nil {
+			return rows, truncated, fmt.Errorf("next: %w", err)
+		}
+		row, err := tuple.GetAsMap()
+		tuple.Close()
+		if err != nil {
+			return rows, truncated, fmt.Errorf("decode row: %w", err)
+		}
+		rows = append(rows, row)
+	}
+	return rows, truncated, nil
 }
 
 // execQuery dispatches to Query for no-params and Prepare+Execute for

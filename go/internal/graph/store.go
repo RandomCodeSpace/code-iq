@@ -16,18 +16,20 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	kuzu "github.com/kuzudb/go-kuzu"
 )
 
 // Store is the embedded Kuzu graph store facade. It owns one Kuzu database
 // and a single long-lived connection. The zero value is not usable — call
-// Open to construct.
+// Open or OpenReadOnly to construct.
 type Store struct {
-	mu   sync.Mutex
-	db   *kuzu.Database
-	conn *kuzu.Connection
-	path string
+	mu       sync.Mutex
+	db       *kuzu.Database
+	conn     *kuzu.Connection
+	path     string
+	readOnly bool
 }
 
 // Open creates or opens a Kuzu database at the given directory path. Kuzu
@@ -49,6 +51,39 @@ func Open(path string) (*Store, error) {
 	}
 	return &Store{db: db, conn: conn, path: path}, nil
 }
+
+// OpenReadOnly opens an existing Kuzu store in read-only mode and sets a
+// wall-clock timeout on every Cypher query. queryTimeout matches the Java
+// DBMS-level `transaction_timeout=30s` cap (Neo4jConfig). Configurable via
+// codeiq.yml `mcp.limits.query_timeout`.
+//
+// All writes from a Store opened this way are rejected at the Cypher
+// gateway (Store.Cypher) before they hit Kuzu — the SDK-level read-only
+// flag protects on-disk state but does not surface a Go error, it just
+// silently no-ops some statements. Belt-and-braces.
+//
+// queryTimeout <= 0 disables the per-query timeout. Kuzu interprets the
+// timeout in milliseconds; we accept a Go duration for ergonomics.
+func OpenReadOnly(path string, queryTimeout time.Duration) (*Store, error) {
+	sys := kuzu.DefaultSystemConfig()
+	sys.ReadOnly = true
+	db, err := kuzu.OpenDatabase(path, sys)
+	if err != nil {
+		return nil, fmt.Errorf("graph: open read-only %q: %w", path, err)
+	}
+	conn, err := kuzu.OpenConnection(db)
+	if err != nil {
+		db.Close()
+		return nil, fmt.Errorf("graph: open ro conn: %w", err)
+	}
+	if queryTimeout > 0 {
+		conn.SetTimeout(uint64(queryTimeout / time.Millisecond))
+	}
+	return &Store{db: db, conn: conn, path: path, readOnly: true}, nil
+}
+
+// IsReadOnly reports whether the store rejects mutating Cypher.
+func (s *Store) IsReadOnly() bool { return s.readOnly }
 
 // Close releases the connection and database. Safe to call multiple times;
 // the second and subsequent calls are no-ops.
