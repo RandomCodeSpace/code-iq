@@ -16,6 +16,9 @@ target/
 *.swo
 *~
 
+# Claude Code local state (progress trackers, settings, ralph-loop state)
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db
