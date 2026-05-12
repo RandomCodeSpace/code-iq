@@ -77,3 +77,14 @@ func Parse(lang Language, source []byte) (*Tree, error) {
 func NodeText(n *sitter.Node, source []byte) string {
 	return n.Content(source)
 }
+
+func tsLanguage(l Language) (*sitter.Language, error) {
+	switch l {
+	case LanguageJava:
+		return javaLanguage(), nil
+	case LanguagePython:
+		return pythonLanguage(), nil
+	default:
+		return nil, fmt.Errorf("unsupported language: %v", l)
+	}
+}
