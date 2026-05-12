@@ -37,5 +37,7 @@
     "consumers": 0
   },
   "auth": {},
-  "architecture": {}
+  "architecture": {
+    "modules": 16
+  }
 }
