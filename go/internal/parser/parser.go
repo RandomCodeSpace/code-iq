@@ -16,6 +16,7 @@ const (
 	LanguageUnknown Language = iota
 	LanguageJava
 	LanguagePython
+	LanguageTypeScript
 )
 
 func (l Language) String() string {
@@ -24,6 +25,8 @@ func (l Language) String() string {
 		return "java"
 	case LanguagePython:
 		return "python"
+	case LanguageTypeScript:
+		return "typescript"
 	default:
 		return "unknown"
 	}
@@ -37,6 +40,8 @@ func LanguageFromExtension(ext string) Language {
 		return LanguageJava
 	case ".py", ".pyw":
 		return LanguagePython
+	case ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs":
+		return LanguageTypeScript
 	default:
 		return LanguageUnknown
 	}
@@ -84,6 +89,8 @@ func tsLanguage(l Language) (*sitter.Language, error) {
 		return javaLanguage(), nil
 	case LanguagePython:
 		return pythonLanguage(), nil
+	case LanguageTypeScript:
+		return typescriptLanguage(), nil
 	default:
 		return nil, fmt.Errorf("unsupported language: %v", l)
 	}

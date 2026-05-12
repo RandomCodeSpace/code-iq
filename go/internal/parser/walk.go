@@ -76,14 +76,16 @@ func ParseByName(lang string, source []byte) (*Tree, error) {
 }
 
 func languageFromName(lang string) (Language, error) {
-	// TS and Go are added in their respective Phase-2 tasks (20, 22) — until
-	// then ParseByName returns an error for those keys. Adding new languages
-	// is just an extra case here plus an entry in tsLanguage().
+	// Go is added in Phase-2 Task 22 — until then ParseByName returns an
+	// error for "go". Adding new languages is just an extra case here plus
+	// an entry in tsLanguage().
 	switch strings.ToLower(strings.TrimSpace(lang)) {
 	case "java":
 		return LanguageJava, nil
 	case "python", "py":
 		return LanguagePython, nil
+	case "typescript", "ts", "tsx", "javascript", "js":
+		return LanguageTypeScript, nil
 	}
 	return LanguageUnknown, errUnsupportedLanguageName{name: lang}
 }
