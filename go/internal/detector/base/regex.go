@@ -28,3 +28,22 @@ func FindLineNumber(text string, offset int) int {
 	}
 	return line
 }
+
+// FileName extracts just the filename component of a path (after the last
+// '/' or '\\'). Mirrors Java AbstractRegexDetector.fileName().
+func FileName(path string) string {
+	if path == "" {
+		return ""
+	}
+	lastSlash := -1
+	for i := len(path) - 1; i >= 0; i-- {
+		if path[i] == '/' || path[i] == '\\' {
+			lastSlash = i
+			break
+		}
+	}
+	if lastSlash >= 0 {
+		return path[lastSlash+1:]
+	}
+	return path
+}
