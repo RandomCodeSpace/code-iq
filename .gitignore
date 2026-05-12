@@ -97,6 +97,7 @@ dist/
 build/
 *.whl
 pyproject.toml
+!go/testdata/**/pyproject.toml
 uv.lock
 .venv/
 venv/
