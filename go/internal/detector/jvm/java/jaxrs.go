@@ -89,9 +89,19 @@ func (d JaxrsDetector) Detect(ctx *detector.Context) *detector.Result {
 			continue
 		}
 
-		// Method-level @Path
+		// Method-level @Path: scan a small window. When looking BACKWARD,
+		// stop at the class/interface declaration line so we don't pick up
+		// the class-level @Path above it.
+		lowerBound := max0(i - 3)
+		for k := i - 1; k >= lowerBound; k-- {
+			stripped := strings.TrimSpace(lines[k])
+			if strings.Contains(stripped, "class ") || strings.Contains(stripped, "interface ") {
+				lowerBound = k + 1
+				break
+			}
+		}
 		var methodPath string
-		for k := max0(i - 3); k < min0(i+4, len(lines)); k++ {
+		for k := lowerBound; k < min0(i+4, len(lines)); k++ {
 			if k == i {
 				continue
 			}
