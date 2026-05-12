@@ -120,3 +120,7 @@ graph.db/
 # Phase A baseline
 .seeds/
 docs/superpowers/baselines/**/raw/**
+
+# Agent-generated plans / scratch (not project deliverables)
+go-port-phase4-plan.md
+phase*-plan.md
