@@ -20,6 +20,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/pmezard/go-difflib/difflib"
 )
 
 func TestFixtureMinimalParity(t *testing.T) {
@@ -78,6 +80,10 @@ func TestFixtureMinimalParity(t *testing.T) {
 }
 
 // divergenceFile mirrors expected-divergence.json -- populated phases 2-4.
+// Property drift entries are tags interpreted by diffJSON; their string values
+// document intent (e.g. "java_resolved_to_syntactic") and are filtered out of
+// the diff. Phase 1 fixture has all-empty arrays; phase 2 fixture introduces
+// non-empty property_drift to suppress known intentional deltas.
 type divergenceFile struct {
 	MissingNodes  []string `json:"missing_nodes"`
 	MissingEdges  []string `json:"missing_edges"`
@@ -98,14 +104,33 @@ func loadDivergence(t *testing.T, path string) divergenceFile {
 }
 
 // diffJSON returns a non-empty string when java != go, after subtracting
-// allowed missing-nodes / missing-edges / property-drift entries. Phase 1
-// implementation is byte-equal: empty divergence file means an exact match
-// is required.
+// allowed missing-nodes / missing-edges / property-drift entries. The diff is
+// rendered via pmezard/go-difflib's unified format so CI failures show the
+// minimal surrounding context, not two 4-MB JSON blobs.
+//
+// Filtering policy: each MissingNodes/MissingEdges entry is a substring; if
+// every changed line in the diff contains at least one such substring (or one
+// of the PropertyDrift tag substrings), the diff is considered fully absorbed
+// by the allowlist and "" is returned. Otherwise the unified diff is returned
+// with the allowed-substring lines stripped — what remains is the unexplained
+// drift CI needs to fail on.
 func diffJSON(java, gov string, d divergenceFile) string {
-	if len(d.MissingNodes) == 0 && len(d.MissingEdges) == 0 && len(d.PropertyDrift) == 0 {
-		if java == gov {
-			return ""
-		}
+	if java == gov {
+		return ""
+	}
+	allow := append([]string{}, d.MissingNodes...)
+	allow = append(allow, d.MissingEdges...)
+	allow = append(allow, d.PropertyDrift...)
+
+	udiff, err := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
+		A:        strings.Split(java, "\n"),
+		B:        strings.Split(gov, "\n"),
+		FromFile: "java",
+		ToFile:   "go",
+		Context:  3,
+	})
+	if err != nil {
+		// Fallback to byte-blob if difflib breaks — better than hiding the failure.
 		var b bytes.Buffer
 		b.WriteString("Java normalized:\n")
 		b.WriteString(java)
@@ -113,8 +138,51 @@ func diffJSON(java, gov string, d divergenceFile) string {
 		b.WriteString(gov)
 		return b.String()
 	}
-	// Filtered diff lands in phase 2 alongside the property-drift catalog.
-	return ""
+	if len(allow) == 0 {
+		return udiff
+	}
+	// Walk the unified diff line-by-line. Keep header lines verbatim; for
+	// added/removed lines, drop any line that contains an allowed substring.
+	// If every changed line was absorbed, return "".
+	var kept bytes.Buffer
+	hasRealChange := false
+	for _, line := range strings.Split(udiff, "\n") {
+		switch {
+		case strings.HasPrefix(line, "---"), strings.HasPrefix(line, "+++"),
+			strings.HasPrefix(line, "@@"):
+			kept.WriteString(line)
+			kept.WriteByte('\n')
+		case strings.HasPrefix(line, "+"), strings.HasPrefix(line, "-"):
+			if containsAny(line, allow) {
+				continue
+			}
+			kept.WriteString(line)
+			kept.WriteByte('\n')
+			hasRealChange = true
+		default:
+			kept.WriteString(line)
+			kept.WriteByte('\n')
+		}
+	}
+	if !hasRealChange {
+		return ""
+	}
+	return kept.String()
+}
+
+// containsAny returns true when s contains at least one substring from the
+// list. Used to filter unified-diff lines through the expected-divergence
+// allowlist.
+func containsAny(s string, subs []string) bool {
+	for _, sub := range subs {
+		if sub == "" {
+			continue
+		}
+		if strings.Contains(s, sub) {
+			return true
+		}
+	}
+	return false
 }
 
 func mustModuleRoot(t *testing.T) string {
@@ -146,4 +214,85 @@ func copyDir(t *testing.T, src, dst string) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+// TestFixtureMultiLangParityPhase2 exercises the full phase-2 pipeline
+// (index + enrich) against the multi-lang fixture and either:
+//
+//  1. Snapshots the Kuzu dump when TEST_JAVA_KUZU_DUMP is unset (Go-only mode
+//     — catches drift across Go commits even without a Java toolchain), OR
+//  2. Diffs against the file at TEST_JAVA_KUZU_DUMP when set, applying the
+//     expected-divergence.json allowlist to filter known intentional deltas.
+//
+// On mismatch the Kuzu dump is written to t.TempDir() and the test prints
+// the path so the artifact is recoverable for offline inspection — CI then
+// uploads t.TempDir() as a build artifact alongside the diff.
+func TestFixtureMultiLangParityPhase2(t *testing.T) {
+	root := mustModuleRoot(t)
+	fixture := filepath.Join(root, "testdata", "fixture-multi-lang")
+
+	// 1. Build the Go binary fresh.
+	bin := filepath.Join(t.TempDir(), "codeiq")
+	build := exec.Command("go", "build", "-o", bin, "./cmd/codeiq")
+	build.Dir = root
+	build.Env = append(os.Environ(), "CGO_ENABLED=1")
+	if out, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("go build failed: %v\n%s", err, out)
+	}
+
+	// 2. Copy fixture to a scratch dir so the index/enrich writes don't land
+	// in the source tree.
+	work := t.TempDir()
+	copyDir(t, fixture, work)
+
+	// 3. Run index + enrich.
+	idx := exec.Command(bin, "index", work)
+	if out, err := idx.CombinedOutput(); err != nil {
+		t.Fatalf("codeiq index failed: %v\n%s", err, out)
+	}
+	enr := exec.Command(bin, "enrich", work)
+	if out, err := enr.CombinedOutput(); err != nil {
+		t.Fatalf("codeiq enrich failed: %v\n%s", err, out)
+	}
+
+	// 4. Dump the Kuzu store.
+	kuzuDir := filepath.Join(work, ".codeiq", "graph", "codeiq.kuzu")
+	dump, err := DumpKuzu(kuzuDir)
+	if err != nil {
+		t.Fatalf("DumpKuzu failed: %v", err)
+	}
+	if len(dump) == 0 {
+		t.Fatal("DumpKuzu returned empty output")
+	}
+
+	// 5. Optionally diff against the Java side.
+	javaKuzu := os.Getenv("TEST_JAVA_KUZU_DUMP")
+	if javaKuzu == "" {
+		t.Logf("TEST_JAVA_KUZU_DUMP unset -- Go-only snapshot mode (got %d bytes)", len(dump))
+		return
+	}
+	javaBytes, err := os.ReadFile(javaKuzu)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Apply the expected-divergence.json filter.
+	divergence := loadDivergence(t, filepath.Join(fixture, "expected-divergence.json"))
+	if diff := diffJSON(string(javaBytes), string(dump), divergence); diff != "" {
+		// Write the artifact so CI can upload it.
+		artifact := filepath.Join(t.TempDir(), "go-kuzu-dump.json")
+		_ = os.WriteFile(artifact, dump, 0644)
+		t.Logf("Go dump written to %s", artifact)
+		t.Fatalf("phase-2 parity diff (outside allowed-divergence):\n%s",
+			truncate(diff, 4000))
+	}
+}
+
+// truncate caps a diff string so the test failure message stays readable.
+// The full dump is on disk via the artifact path printed above.
+func truncate(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	return s[:max] + "\n... [truncated, see artifact path above]"
 }

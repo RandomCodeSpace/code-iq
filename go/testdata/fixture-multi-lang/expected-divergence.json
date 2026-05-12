@@ -1,19 +1,9 @@
 {
-  "comment": "Phase 2 allowed Java-vs-Go divergences against the multi-lang fixture. Reserved slots: (1) Java RESOLVED-tier edges that drop to SYNTACTIC because the Go side does not yet bootstrap a full symbol resolver; (2) lex_comment whitespace differences when Java collapses via String.trim()+space and the Go side does the same (no daylight expected today — slot reserved). Update before adding new detectors that intentionally differ.",
+  "comment": "Phase 2 allowed Java-vs-Go divergences against the multi-lang fixture. Entries are tags interpreted by parity.diffJSON; the strings here document intent. Reserved tags: 'java_resolved_to_syntactic' (Java RESOLVED-tier edges drop to SYNTACTIC because the Go side does not yet bootstrap a full symbol resolver), 'lex_comment_whitespace' (Java + Go both do trim+single-space — no daylight expected today, slot reserved for CI catches).",
   "missing_nodes": [],
   "missing_edges": [],
   "property_drift": [
-    {
-      "kind": "confidence_downgrade",
-      "from": "RESOLVED",
-      "to": "SYNTACTIC",
-      "scope": "java",
-      "reason": "Go-side JavaSymbolResolver not yet wired in phase 2; calls/type edges fall back to syntactic"
-    },
-    {
-      "kind": "lex_comment_whitespace",
-      "scope": "*",
-      "reason": "Reserved — Java + Go both collapse on trim+single-space; populate if a diff appears in CI."
-    }
+    "java_resolved_to_syntactic",
+    "lex_comment_whitespace"
   ]
 }
