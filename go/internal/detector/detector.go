@@ -27,6 +27,12 @@ type Context struct {
 	Content    string
 	Tree       *parser.Tree // nil for languages without a tree-sitter grammar
 	ModuleName string
+	// ParsedData is the pre-parsed structured payload for YAML/JSON/TOML/INI/
+	// properties files. Wrapped in the same envelope shape used by the Java
+	// side: a map with keys "type" (e.g. "yaml", "yaml_multi", "json", "toml",
+	// "ini", "properties") and "data" / "documents". nil for files that don't
+	// participate in structured parsing.
+	ParsedData map[string]any
 }
 
 // Result is what a single Detect call returns. Mirrors Java DetectorResult.

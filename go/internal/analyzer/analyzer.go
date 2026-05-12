@@ -107,11 +107,13 @@ func (a *Analyzer) processFile(f DiscoveredFile, gb *GraphBuilder) error {
 	if tree != nil {
 		defer tree.Close()
 	}
+	parsed, _ := parser.ParseStructured(f.Language, content)
 	ctx := &detector.Context{
-		FilePath: f.RelPath,
-		Language: f.Language.String(),
-		Content:  string(content),
-		Tree:     tree,
+		FilePath:   f.RelPath,
+		Language:   f.Language.String(),
+		Content:    string(content),
+		Tree:       tree,
+		ParsedData: parsed,
 	}
 
 	entry := &cache.Entry{

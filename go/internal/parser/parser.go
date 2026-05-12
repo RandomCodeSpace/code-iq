@@ -18,6 +18,18 @@ const (
 	LanguagePython
 	LanguageTypeScript
 	LanguageGo
+	// Structured / textual languages added in phase 4 (batch 1 / 2). No
+	// tree-sitter grammar — the analyzer parses these via the structured
+	// parser in internal/parser/structured.go.
+	LanguageYaml
+	LanguageJSON
+	LanguageTOML
+	LanguageINI
+	LanguageProperties
+	LanguageSQL
+	LanguageBatch
+	LanguageVue
+	LanguageSvelte
 )
 
 func (l Language) String() string {
@@ -30,6 +42,24 @@ func (l Language) String() string {
 		return "typescript"
 	case LanguageGo:
 		return "go"
+	case LanguageYaml:
+		return "yaml"
+	case LanguageJSON:
+		return "json"
+	case LanguageTOML:
+		return "toml"
+	case LanguageINI:
+		return "ini"
+	case LanguageProperties:
+		return "properties"
+	case LanguageSQL:
+		return "sql"
+	case LanguageBatch:
+		return "batch"
+	case LanguageVue:
+		return "vue"
+	case LanguageSvelte:
+		return "svelte"
 	default:
 		return "unknown"
 	}
@@ -47,6 +77,24 @@ func LanguageFromExtension(ext string) Language {
 		return LanguageTypeScript
 	case ".go":
 		return LanguageGo
+	case ".yaml", ".yml":
+		return LanguageYaml
+	case ".json":
+		return LanguageJSON
+	case ".toml":
+		return LanguageTOML
+	case ".ini", ".cfg":
+		return LanguageINI
+	case ".properties":
+		return LanguageProperties
+	case ".sql":
+		return LanguageSQL
+	case ".bat", ".cmd":
+		return LanguageBatch
+	case ".vue":
+		return LanguageVue
+	case ".svelte":
+		return LanguageSvelte
 	default:
 		return LanguageUnknown
 	}
@@ -68,10 +116,20 @@ func (t *Tree) Close() {
 }
 
 // Parse parses the source bytes in the given language. The returned Tree must
-// be Close()d.
+// be Close()d. Returns (nil, nil) for structured / textual languages without
+// a tree-sitter grammar (yaml/json/toml/ini/properties/sql/batch/vue/svelte)
+// — those are handled by the structured / regex paths, not tree-sitter.
+// Returns an error for LanguageUnknown (truly unsupported).
 func Parse(lang Language, source []byte) (*Tree, error) {
+	if lang == LanguageUnknown {
+		return nil, fmt.Errorf("unsupported language: %v", lang)
+	}
 	tsLang, err := tsLanguage(lang)
 	if err != nil {
+		// Structured / textual languages are a soft miss, not an error.
+		if isStructuredOrTextual(lang) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	p := sitter.NewParser()
@@ -81,6 +139,18 @@ func Parse(lang Language, source []byte) (*Tree, error) {
 		return nil, fmt.Errorf("tree-sitter parse: %w", err)
 	}
 	return &Tree{Lang: lang, Source: source, Root: root}, nil
+}
+
+// isStructuredOrTextual reports whether the language is handled by the
+// structured / textual parser path (no tree-sitter grammar).
+func isStructuredOrTextual(l Language) bool {
+	switch l {
+	case LanguageYaml, LanguageJSON, LanguageTOML, LanguageINI,
+		LanguageProperties, LanguageSQL, LanguageBatch, LanguageVue,
+		LanguageSvelte:
+		return true
+	}
+	return false
 }
 
 // NodeText returns the source text for a tree-sitter node.

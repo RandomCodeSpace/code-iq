@@ -87,6 +87,24 @@ func languageFromName(lang string) (Language, error) {
 		return LanguageTypeScript, nil
 	case "go", "golang":
 		return LanguageGo, nil
+	case "yaml", "yml":
+		return LanguageYaml, nil
+	case "json":
+		return LanguageJSON, nil
+	case "toml":
+		return LanguageTOML, nil
+	case "ini", "cfg":
+		return LanguageINI, nil
+	case "properties":
+		return LanguageProperties, nil
+	case "sql":
+		return LanguageSQL, nil
+	case "batch", "bat", "cmd":
+		return LanguageBatch, nil
+	case "vue":
+		return LanguageVue, nil
+	case "svelte":
+		return LanguageSvelte, nil
 	}
 	return LanguageUnknown, errUnsupportedLanguageName{name: lang}
 }
