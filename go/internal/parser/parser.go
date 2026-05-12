@@ -17,6 +17,7 @@ const (
 	LanguageJava
 	LanguagePython
 	LanguageTypeScript
+	LanguageGo
 )
 
 func (l Language) String() string {
@@ -27,6 +28,8 @@ func (l Language) String() string {
 		return "python"
 	case LanguageTypeScript:
 		return "typescript"
+	case LanguageGo:
+		return "go"
 	default:
 		return "unknown"
 	}
@@ -42,6 +45,8 @@ func LanguageFromExtension(ext string) Language {
 		return LanguagePython
 	case ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs":
 		return LanguageTypeScript
+	case ".go":
+		return LanguageGo
 	default:
 		return LanguageUnknown
 	}
@@ -91,6 +96,8 @@ func tsLanguage(l Language) (*sitter.Language, error) {
 		return pythonLanguage(), nil
 	case LanguageTypeScript:
 		return typescriptLanguage(), nil
+	case LanguageGo:
+		return goLanguage(), nil
 	default:
 		return nil, fmt.Errorf("unsupported language: %v", l)
 	}
