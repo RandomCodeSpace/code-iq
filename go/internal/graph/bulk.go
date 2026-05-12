@@ -126,3 +126,84 @@ func stringProp(p map[string]any, key string) string {
 	}
 	return ""
 }
+
+// edgeColumns is the column order written to each rel-table staging CSV.
+// MUST match the per-kind REL table DDL in schema.go: the FROM/TO node
+// primary keys come first (Kuzu COPY convention for rel tables), followed
+// by the user columns id, confidence, source, props.
+var edgeColumns = []string{"from", "to", "id", "confidence", "source", "props"}
+
+// BulkLoadEdges groups edges by Kind and issues one COPY FROM per rel
+// table. A mixed-kind batch is split internally — callers don't need to
+// pre-partition. Empty input is a no-op.
+func (s *Store) BulkLoadEdges(edges []*model.CodeEdge) error {
+	if len(edges) == 0 {
+		return nil
+	}
+	byKind := make(map[model.EdgeKind][]*model.CodeEdge)
+	for _, e := range edges {
+		byKind[e.Kind] = append(byKind[e.Kind], e)
+	}
+	// Iterate in canonical EdgeKind order so the COPY sequence is
+	// deterministic — matters for parity diffing against the Java side.
+	for _, kind := range model.AllEdgeKinds() {
+		group, ok := byKind[kind]
+		if !ok {
+			continue
+		}
+		if err := s.copyEdgeGroup(kind, group); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// copyEdgeGroup stages one rel-table CSV and issues COPY <REL> FROM. The
+// first two columns are the FROM and TO node primary keys per Kuzu's rel
+// COPY convention.
+func (s *Store) copyEdgeGroup(kind model.EdgeKind, edges []*model.CodeEdge) error {
+	tmp, err := os.CreateTemp("", "codeiq-edges-*.csv")
+	if err != nil {
+		return fmt.Errorf("graph: temp csv: %w", err)
+	}
+	defer os.Remove(tmp.Name())
+
+	w := csv.NewWriter(tmp)
+	for _, e := range edges {
+		props, err := json.Marshal(e.Properties)
+		if err != nil {
+			tmp.Close()
+			return fmt.Errorf("graph: marshal edge props: %w", err)
+		}
+		row := []string{
+			e.SourceID,
+			e.TargetID,
+			e.ID,
+			e.Confidence.String(),
+			e.Source,
+			string(props),
+		}
+		if err := w.Write(row); err != nil {
+			tmp.Close()
+			return fmt.Errorf("graph: csv write: %w", err)
+		}
+	}
+	w.Flush()
+	if err := w.Error(); err != nil {
+		tmp.Close()
+		return fmt.Errorf("graph: csv flush: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("graph: csv close: %w", err)
+	}
+
+	q := fmt.Sprintf(
+		"COPY %s FROM '%s' (header=false)",
+		relTableName(kind),
+		filepath.ToSlash(tmp.Name()),
+	)
+	if _, err := s.Cypher(q); err != nil {
+		return fmt.Errorf("graph: copy %s: %w", relTableName(kind), err)
+	}
+	return nil
+}
