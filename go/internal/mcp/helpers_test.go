@@ -2,12 +2,24 @@ package mcp_test
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/randomcodespace/codeiq/go/internal/mcp"
 )
+
+// unmarshalJSON parses a text-content body into a map. Fails the test on
+// parse error so individual tool tests stay focused on assertions.
+func unmarshalJSON(t *testing.T, body string) map[string]any {
+	t.Helper()
+	var out map[string]any
+	if err := json.Unmarshal([]byte(body), &out); err != nil {
+		t.Fatalf("unmarshal: %v\nbody=%s", err, body)
+	}
+	return out
+}
 
 // textContent is an alias for the SDK type so the graph-tool test file
 // doesn't need to import mcpsdk directly. The interface is satisfied

@@ -165,6 +165,74 @@ func (t *Topology) crossServiceConnections() ([]connection, error) {
 	return out, nil
 }
 
+// ServiceDependencies returns the cross-service runtime connections that
+// originate from serviceName, plus the distinct set of services it
+// depends on. Mirrors TopologyService.serviceDependencies on the Java
+// side — same key shape (service / depends_on / connections / count) so
+// the JSON envelope is structurally identical.
+func (t *Topology) ServiceDependencies(serviceName string) (*OrderedMap, error) {
+	conns, err := t.crossServiceConnections()
+	if err != nil {
+		return nil, err
+	}
+	rows := make([]map[string]any, 0)
+	seenTargets := map[string]struct{}{}
+	dependsOn := make([]string, 0)
+	for _, c := range conns {
+		if c.source != serviceName {
+			continue
+		}
+		rows = append(rows, map[string]any{
+			"source": c.source,
+			"target": c.target,
+			"type":   c.kind,
+		})
+		if _, dup := seenTargets[c.target]; !dup {
+			seenTargets[c.target] = struct{}{}
+			dependsOn = append(dependsOn, c.target)
+		}
+	}
+	out := newOrdered()
+	out.Put("service", serviceName)
+	out.Put("depends_on", dependsOn)
+	out.Put("connections", rows)
+	out.Put("count", len(dependsOn))
+	return out, nil
+}
+
+// ServiceDependents returns the cross-service runtime connections that
+// terminate at serviceName, plus the distinct set of services that
+// depend on it. Mirrors TopologyService.serviceDependents.
+func (t *Topology) ServiceDependents(serviceName string) (*OrderedMap, error) {
+	conns, err := t.crossServiceConnections()
+	if err != nil {
+		return nil, err
+	}
+	rows := make([]map[string]any, 0)
+	seenSources := map[string]struct{}{}
+	dependedBy := make([]string, 0)
+	for _, c := range conns {
+		if c.target != serviceName {
+			continue
+		}
+		rows = append(rows, map[string]any{
+			"source": c.source,
+			"target": c.target,
+			"type":   c.kind,
+		})
+		if _, dup := seenSources[c.source]; !dup {
+			seenSources[c.source] = struct{}{}
+			dependedBy = append(dependedBy, c.source)
+		}
+	}
+	out := newOrdered()
+	out.Put("service", serviceName)
+	out.Put("depended_by", dependedBy)
+	out.Put("connections", rows)
+	out.Put("count", len(dependedBy))
+	return out, nil
+}
+
 // ServiceDetail returns endpoints / entities / guards / databases / queues
 // for a specific service. Mirrors TopologyService.serviceDetail.
 func (t *Topology) ServiceDetail(serviceName string) (*OrderedMap, error) {
