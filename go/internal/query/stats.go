@@ -14,6 +14,8 @@
 package query
 
 import (
+	"bytes"
+	"encoding/json"
 	"sort"
 	"strings"
 
@@ -41,6 +43,36 @@ func (m *OrderedMap) Put(k string, v any) {
 		m.Keys = append(m.Keys, k)
 	}
 	m.Values[k] = v
+}
+
+// MarshalJSON emits keys in insertion order — the whole point of OrderedMap.
+// Empty/zero maps emit `{}`. Nested OrderedMaps recurse correctly through
+// json.Encoder's reflective path because MarshalJSON is declared on the
+// pointer receiver and the package always passes *OrderedMap values around.
+func (m *OrderedMap) MarshalJSON() ([]byte, error) {
+	if m == nil {
+		return []byte("null"), nil
+	}
+	var buf bytes.Buffer
+	buf.WriteByte('{')
+	for i, k := range m.Keys {
+		if i > 0 {
+			buf.WriteByte(',')
+		}
+		kb, err := json.Marshal(k)
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(kb)
+		buf.WriteByte(':')
+		vb, err := json.Marshal(m.Values[k])
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(vb)
+	}
+	buf.WriteByte('}')
+	return buf.Bytes(), nil
 }
 
 // ComputeStats returns the seven-category breakdown:
