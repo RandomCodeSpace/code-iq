@@ -1,6 +1,7 @@
 package graph
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/randomcodespace/codeiq/go/internal/model"
@@ -151,6 +152,131 @@ func (s *Store) FindOutgoingNeighbors(id string) ([]*model.CodeNode, error) {
 		return nil, fmt.Errorf("graph: outgoing neighbors: %w", err)
 	}
 	return rowsToNodes(rows), nil
+}
+
+// LoadAllNodes pulls every CodeNode row out of Kuzu in deterministic ID
+// order and hydrates the columns + the JSON `props` blob back into
+// model.CodeNode. Used by the stats command, which currently re-uses the
+// in-memory StatsService.ComputeStats path rather than per-category Cypher
+// aggregations. On large graphs this is materially heavier than the Java
+// side's TopologyService refactor — see the gotcha in CLAUDE.md for the
+// follow-up plan. Empty graph returns (nil, nil).
+func (s *Store) LoadAllNodes() ([]*model.CodeNode, error) {
+	rows, err := s.Cypher(`
+		MATCH (n:CodeNode)
+		RETURN n.id AS id, n.kind AS kind, n.label AS label, n.fqn AS fqn,
+		       n.file_path AS file_path, n.line_start AS line_start,
+		       n.line_end AS line_end, n.module AS module, n.layer AS layer,
+		       n.language AS language, n.framework AS framework,
+		       n.confidence AS confidence, n.source AS source,
+		       n.props AS props
+		ORDER BY n.id`)
+	if err != nil {
+		return nil, fmt.Errorf("graph: load all nodes: %w", err)
+	}
+	out := make([]*model.CodeNode, 0, len(rows))
+	for _, r := range rows {
+		n := &model.CodeNode{}
+		if v, ok := r["id"].(string); ok {
+			n.ID = v
+		}
+		if v, ok := r["kind"].(string); ok {
+			if k, err := model.ParseNodeKind(v); err == nil {
+				n.Kind = k
+			}
+		}
+		if v, ok := r["label"].(string); ok {
+			n.Label = v
+		}
+		if v, ok := r["fqn"].(string); ok {
+			n.FQN = v
+		}
+		if v, ok := r["file_path"].(string); ok {
+			n.FilePath = v
+		}
+		n.LineStart = int(asInt64(r["line_start"]))
+		n.LineEnd = int(asInt64(r["line_end"]))
+		if v, ok := r["module"].(string); ok {
+			n.Module = v
+		}
+		if v, ok := r["layer"].(string); ok {
+			if l, err := model.ParseLayer(v); err == nil {
+				n.Layer = l
+			}
+		}
+		if v, ok := r["confidence"].(string); ok {
+			if c, err := model.ParseConfidence(v); err == nil {
+				n.Confidence = c
+			}
+		}
+		if v, ok := r["source"].(string); ok {
+			n.Source = v
+		}
+		// Hydrate JSON-encoded properties. The bulk loader writes an empty
+		// `{}` for nil maps so a parse failure here is a real corruption,
+		// not a missing field — but we tolerate the failure and fall back
+		// to nil to keep the stats path lossy-tolerant rather than fatal.
+		n.Properties = map[string]any{}
+		if propsStr, ok := r["props"].(string); ok && propsStr != "" {
+			_ = json.Unmarshal([]byte(propsStr), &n.Properties)
+		}
+		// The first-class language / framework columns mirror what the bulk
+		// loader pulled out of Properties — re-stamp them so StatsService
+		// path that reads Properties sees the same view.
+		if v, ok := r["language"].(string); ok && v != "" {
+			n.Properties["language"] = v
+		}
+		if v, ok := r["framework"].(string); ok && v != "" {
+			n.Properties["framework"] = v
+		}
+		out = append(out, n)
+	}
+	return out, nil
+}
+
+// LoadAllEdges pulls every edge from every rel table, hydrating model.CodeEdge.
+// Determinism: rows come out grouped by EdgeKind in declaration order, then
+// sorted by edge id within each kind. Empty graph returns (nil, nil).
+func (s *Store) LoadAllEdges() ([]*model.CodeEdge, error) {
+	var out []*model.CodeEdge
+	for _, kind := range model.AllEdgeKinds() {
+		tbl := relTableName(kind)
+		rows, err := s.Cypher(fmt.Sprintf(`
+			MATCH (a:CodeNode)-[r:%s]->(b:CodeNode)
+			RETURN r.id AS id, r.confidence AS confidence,
+			       r.source AS source, r.props AS props,
+			       a.id AS source_id, b.id AS target_id
+			ORDER BY r.id`, tbl))
+		if err != nil {
+			return nil, fmt.Errorf("graph: load edges %s: %w", tbl, err)
+		}
+		for _, r := range rows {
+			e := &model.CodeEdge{Kind: kind}
+			if v, ok := r["id"].(string); ok {
+				e.ID = v
+			}
+			if v, ok := r["source_id"].(string); ok {
+				e.SourceID = v
+			}
+			if v, ok := r["target_id"].(string); ok {
+				e.TargetID = v
+			}
+			if v, ok := r["confidence"].(string); ok {
+				if c, err := model.ParseConfidence(v); err == nil {
+					e.Confidence = c
+				}
+			}
+			if v, ok := r["source"].(string); ok {
+				e.Source = v
+			}
+			e.Properties = map[string]any{}
+			if propsStr, ok := r["props"].(string); ok && propsStr != "" {
+				_ = json.Unmarshal([]byte(propsStr), &e.Properties)
+			}
+			out = append(out, e)
+		}
+	}
+	return out, nil
 }
 
 // asInt64 coerces Kuzu's count(*) cell to int64. Kuzu returns counts as

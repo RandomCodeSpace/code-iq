@@ -26,6 +26,65 @@ import (
 // edge slices. Stateless — the zero value is usable.
 type StatsService struct{}
 
+// StoreStatsService is a thin store-backed wrapper around StatsService. It
+// lazy-loads the full node + edge lists on the first call and reuses them
+// for subsequent ComputeStats / ComputeCategory invocations. Use this when
+// the caller has a graph.Store handle (e.g. the CLI / MCP) rather than
+// pre-materialised slices.
+//
+// The wrapper is a bridge for the read path while the targeted-Cypher
+// rewrite is in flight — same `getCachedData()` snapshot pattern the Java
+// side uses for the same reason (see the CLAUDE.md gotcha entry).
+type StoreStatsService struct {
+	loader func() ([]*model.CodeNode, []*model.CodeEdge, error)
+	once   bool
+	nodes  []*model.CodeNode
+	edges  []*model.CodeEdge
+	err    error
+	base   StatsService
+}
+
+// NewStatsServiceFromStore returns a StoreStatsService bound to the loader
+// callback. The CLI passes `func() (...) { return store.LoadAllNodes(), ... }`.
+// Decoupling from graph.Store avoids a query→graph import cycle (graph already
+// imports model, but tests want to feed in arbitrary slices).
+func NewStatsServiceFromStore(loader func() ([]*model.CodeNode, []*model.CodeEdge, error)) *StoreStatsService {
+	return &StoreStatsService{loader: loader}
+}
+
+func (s *StoreStatsService) load() error {
+	if s.once {
+		return s.err
+	}
+	s.once = true
+	s.nodes, s.edges, s.err = s.loader()
+	return s.err
+}
+
+// ComputeStats lazy-loads and forwards to StatsService.ComputeStats. Returns
+// an empty *OrderedMap (not nil) on loader failure so the JSON output is
+// always well-formed; callers that care about the underlying error must use
+// LoadErr() after the call.
+func (s *StoreStatsService) ComputeStats() *OrderedMap {
+	if err := s.load(); err != nil {
+		return newOrdered()
+	}
+	return s.base.ComputeStats(s.nodes, s.edges)
+}
+
+// ComputeCategory lazy-loads and forwards to StatsService.ComputeCategory.
+// Returns nil for unknown categories (matches the in-memory API).
+func (s *StoreStatsService) ComputeCategory(category string) *OrderedMap {
+	if err := s.load(); err != nil {
+		return newOrdered()
+	}
+	return s.base.ComputeCategory(s.nodes, s.edges, category)
+}
+
+// LoadErr returns the loader error, if any, captured during the first call
+// to ComputeStats / ComputeCategory.
+func (s *StoreStatsService) LoadErr() error { return s.err }
+
 // OrderedMap preserves insertion order — equivalent to Java's
 // LinkedHashMap. Stats JSON output relies on a deterministic top-level key
 // order matching the Java side for parity diffing.
