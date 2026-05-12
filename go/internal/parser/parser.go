@@ -30,6 +30,23 @@ const (
 	LanguageBatch
 	LanguageVue
 	LanguageSvelte
+	// Additional languages discovered through file extension but parsed via
+	// regex/structured paths (no tree-sitter grammar wired in).
+	LanguageCSharp
+	LanguageKotlin
+	LanguageScala
+	LanguageCpp
+	LanguageRust
+	LanguageTerraform
+	LanguageBicep
+	LanguageProto
+	LanguageDockerfile
+	LanguageXML
+	LanguageMarkdown
+	LanguagePowerShell
+	LanguageBash
+	LanguageRuby
+	LanguageGroovy
 )
 
 func (l Language) String() string {
@@ -60,6 +77,36 @@ func (l Language) String() string {
 		return "vue"
 	case LanguageSvelte:
 		return "svelte"
+	case LanguageCSharp:
+		return "csharp"
+	case LanguageKotlin:
+		return "kotlin"
+	case LanguageScala:
+		return "scala"
+	case LanguageCpp:
+		return "cpp"
+	case LanguageRust:
+		return "rust"
+	case LanguageTerraform:
+		return "terraform"
+	case LanguageBicep:
+		return "bicep"
+	case LanguageProto:
+		return "proto"
+	case LanguageDockerfile:
+		return "dockerfile"
+	case LanguageXML:
+		return "xml"
+	case LanguageMarkdown:
+		return "markdown"
+	case LanguagePowerShell:
+		return "powershell"
+	case LanguageBash:
+		return "bash"
+	case LanguageRuby:
+		return "ruby"
+	case LanguageGroovy:
+		return "groovy"
 	default:
 		return "unknown"
 	}
@@ -95,6 +142,34 @@ func LanguageFromExtension(ext string) Language {
 		return LanguageVue
 	case ".svelte":
 		return LanguageSvelte
+	case ".cs":
+		return LanguageCSharp
+	case ".kt", ".kts":
+		return LanguageKotlin
+	case ".scala", ".sc":
+		return LanguageScala
+	case ".cpp", ".cc", ".cxx", ".hpp", ".hh", ".hxx", ".h":
+		return LanguageCpp
+	case ".rs":
+		return LanguageRust
+	case ".tf", ".tfvars":
+		return LanguageTerraform
+	case ".bicep":
+		return LanguageBicep
+	case ".proto":
+		return LanguageProto
+	case ".xml":
+		return LanguageXML
+	case ".md", ".markdown":
+		return LanguageMarkdown
+	case ".ps1", ".psm1", ".psd1":
+		return LanguagePowerShell
+	case ".sh", ".bash", ".zsh":
+		return LanguageBash
+	case ".rb":
+		return LanguageRuby
+	case ".groovy", ".gradle":
+		return LanguageGroovy
 	default:
 		return LanguageUnknown
 	}
@@ -147,7 +222,13 @@ func isStructuredOrTextual(l Language) bool {
 	switch l {
 	case LanguageYaml, LanguageJSON, LanguageTOML, LanguageINI,
 		LanguageProperties, LanguageSQL, LanguageBatch, LanguageVue,
-		LanguageSvelte:
+		LanguageSvelte,
+		// Regex-handled languages: no tree-sitter grammar wired; detectors
+		// consume the raw content directly.
+		LanguageCSharp, LanguageKotlin, LanguageScala, LanguageCpp,
+		LanguageRust, LanguageTerraform, LanguageBicep, LanguageProto,
+		LanguageDockerfile, LanguageXML, LanguageMarkdown,
+		LanguagePowerShell, LanguageBash, LanguageRuby, LanguageGroovy:
 		return true
 	}
 	return false
