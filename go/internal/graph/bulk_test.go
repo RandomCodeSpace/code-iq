@@ -223,6 +223,52 @@ func TestBulkLoadNodesCommaInProperties(t *testing.T) {
 	}
 }
 
+// TestBulkLoadEdgesPipeInTargetID is a regression test for Istio-style IDs
+// that contain the field delimiter '|' literally (e.g. EDS cluster names
+// "inbound|7070|tcplocal|s1tcp.none" parsed from JSON config). Go's csv.Writer
+// RFC-4180-wraps such fields in '"', but Kuzu's default ESCAPE is backslash
+// not doubled-quote — so without explicit QUOTE='"', ESCAPE='"' the COPY
+// FROM splits the wrapped field on each interior '|' and aborts with
+// "expected N values per row, but got more". Fix: explicit QUOTE/ESCAPE in
+// the COPY FROM clause.
+func TestBulkLoadEdgesPipeInTargetID(t *testing.T) {
+	s, err := graph.Open(filepath.Join(t.TempDir(), "g.kuzu"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	if err := s.ApplySchema(); err != nil {
+		t.Fatal(err)
+	}
+	// Istio-flavoured target ID with literal pipes.
+	target := "json:istio/none_cds.json:inbound|7070|tcplocal|s1tcp.none"
+	nodes := []*model.CodeNode{
+		{ID: "json:istio/none_cds.json", Kind: model.NodeModule, Label: "none_cds.json"},
+		{ID: target, Kind: model.NodeConfigKey, Label: "inbound|7070|tcplocal|s1tcp.none"},
+	}
+	if err := s.BulkLoadNodes(nodes); err != nil {
+		t.Fatalf("BulkLoadNodes with pipe-bearing ID: %v", err)
+	}
+	edges := []*model.CodeEdge{{
+		ID:         "json:istio/none_cds.json->" + target,
+		Kind:       model.EdgeContains,
+		SourceID:   "json:istio/none_cds.json",
+		TargetID:   target,
+		Confidence: model.ConfidenceSyntactic,
+		Source:     "JsonStructureDetector",
+	}}
+	if err := s.BulkLoadEdges(edges); err != nil {
+		t.Fatalf("BulkLoadEdges with pipe-bearing target ID: %v", err)
+	}
+	rows, err := s.Cypher("MATCH ()-[r:CONTAINS]->() RETURN r.id AS id")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("want 1 CONTAINS row, got %d: %v", len(rows), rows)
+	}
+}
+
 // TestBulkLoadEdgesEmpty — zero edges is a no-op like the node path.
 func TestBulkLoadEdgesEmpty(t *testing.T) {
 	s, err := graph.Open(filepath.Join(t.TempDir(), "g.kuzu"))
