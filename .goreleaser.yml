@@ -17,9 +17,11 @@ env:
 before:
   hooks:
     # Sanity gate. Failing here aborts the release before any binary
-    # leaves the runner.
-    - cd go && go mod download
-    - cd go && go test ./... -count=1
+    # leaves the runner. Goreleaser runs each hook via exec.Command
+    # (no shell), so bare `cd go && …` fails — `cd` isn't an executable
+    # in $PATH. Wrap in `sh -c` to get a working-directory side-effect.
+    - sh -c "cd go && go mod download"
+    - sh -c "cd go && go test ./... -count=1"
 
 builds:
   - id: codeiq
