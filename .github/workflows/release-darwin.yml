@@ -27,6 +27,12 @@ permissions:
   id-token: write      # Sigstore keyless via GitHub OIDC
   attestations: write
 
+# Pass the input/ref to the shell via env vars (not inline `${{ }}`
+# interpolation) — Semgrep `yaml.github-actions.security.run-shell-injection`
+# rule. inputs.tag for workflow_dispatch; GITHUB_REF_NAME for tag pushes.
+env:
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
 jobs:
   release-darwin:
     name: release (darwin / arm64)
@@ -48,7 +54,6 @@ jobs:
           GOOS: darwin
           GOARCH: arm64
         run: |
-          TAG="${GITHUB_REF_NAME:-${{ github.event.inputs.tag }}}"
           VERSION="${TAG#v}"
           go build \
             -trimpath \
@@ -62,7 +67,6 @@ jobs:
       - name: Package archive
         working-directory: go
         run: |
-          TAG="${GITHUB_REF_NAME:-${{ github.event.inputs.tag }}}"
           VERSION="${TAG#v}"
           ARCHIVE_DIR="codeiq_${VERSION}_darwin_arm64"
           mkdir -p "${ARCHIVE_DIR}"
@@ -76,7 +80,6 @@ jobs:
         uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
       - name: Generate SBOM
         run: |
-          TAG="${GITHUB_REF_NAME:-${{ github.event.inputs.tag }}}"
           VERSION="${TAG#v}"
           ARCHIVE="codeiq_${VERSION}_darwin_arm64.tar.gz"
           syft "$ARCHIVE" --output spdx-json="${ARCHIVE}.sbom.spdx.json"
@@ -85,7 +88,6 @@ jobs:
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
       - name: Sign archive (Sigstore keyless, bundle format)
         run: |
-          TAG="${GITHUB_REF_NAME:-${{ github.event.inputs.tag }}}"
           VERSION="${TAG#v}"
           ARCHIVE="codeiq_${VERSION}_darwin_arm64.tar.gz"
           cosign sign-blob \
@@ -97,7 +99,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="${GITHUB_REF_NAME:-${{ github.event.inputs.tag }}}"
           VERSION="${TAG#v}"
           # Retry up to 3 times to handle race with release-go.yml
           # creating the Release.
