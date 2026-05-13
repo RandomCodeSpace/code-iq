@@ -43,10 +43,17 @@ func NewAnalyzer(opts Options) *Analyzer {
 }
 
 // Stats reports per-run counts.
+//
+// Plan §1.5 — DedupedNodes/DedupedEdges/DroppedEdges expose dedup activity
+// so operators can see "graph collapsed 312 duplicate nodes, dropped 14
+// phantom edges" — the visibility is what makes "meaningful" diagnosable.
 type Stats struct {
-	Files int
-	Nodes int
-	Edges int
+	Files        int
+	Nodes        int
+	Edges        int
+	DedupedNodes int
+	DedupedEdges int
+	DroppedEdges int
 }
 
 // Run executes FileDiscovery → parse → detectors → GraphBuilder → cache writes
@@ -86,9 +93,12 @@ func (a *Analyzer) Run(root string) (Stats, error) {
 
 	snap := gb.Snapshot()
 	return Stats{
-		Files: len(files),
-		Nodes: len(snap.Nodes),
-		Edges: len(snap.Edges),
+		Files:        len(files),
+		Nodes:        len(snap.Nodes),
+		Edges:        len(snap.Edges),
+		DedupedNodes: snap.DedupedNodes,
+		DedupedEdges: snap.DedupedEdges,
+		DroppedEdges: snap.DroppedEdges,
 	}, nil
 }
 

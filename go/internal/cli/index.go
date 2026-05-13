@@ -76,6 +76,11 @@ Java and Python.`,
 				fmt.Fprintf(cmd.OutOrStdout(),
 					"Files: %d  Nodes: %d  Edges: %d  Cache: %s\n",
 					stats.Files, stats.Nodes, stats.Edges, dbPath)
+				if stats.DedupedNodes > 0 || stats.DedupedEdges > 0 || stats.DroppedEdges > 0 {
+					fmt.Fprintf(cmd.OutOrStdout(),
+						"Deduped: %d nodes, %d edges  Dropped: %d phantom edges\n",
+						stats.DedupedNodes, stats.DedupedEdges, stats.DroppedEdges)
+				}
 				return nil
 			},
 		}
