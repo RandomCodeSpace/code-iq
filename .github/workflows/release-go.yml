@@ -1,0 +1,124 @@
+name: release-go
+
+# Tag-triggered release pipeline for the codeiq Go binary.
+#
+# Trigger: push a tag matching `v*.*.*` (e.g. `git tag v1.0.0 && git push --tags`).
+# Cross-OS build via per-runner matrix (CGO + native kuzudb/sqlite means
+# we can't cross-compile cleanly from a single host).
+#
+# Phase 5 of the Java→Go port. Replaces release-java.yml (kept around
+# until Phase 6 cutover for any emergency Java release).
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v1.0.0). Must already exist.'
+        required: true
+
+permissions:
+  contents: write
+  id-token: write      # Sigstore keyless via GitHub OIDC
+  packages: write
+  attestations: write
+
+jobs:
+  # Per-target release. Runs the same .goreleaser.yml on each runner;
+  # archives are merged in the publish job below.
+  build:
+    name: build (${{ matrix.os }} / ${{ matrix.goarch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            goarch: amd64
+            runner: ubuntu-latest
+          - os: linux
+            goarch: arm64
+            runner: ubuntu-24.04-arm
+          - os: darwin
+            goarch: arm64
+            runner: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.10'
+          cache: true
+          cache-dependency-path: go/go.sum
+      - name: Install build deps (linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -y && sudo apt-get install -y build-essential
+      - name: Install Syft (SBOM)
+        uses: anchore/sbom-action/download-syft@v0
+      - name: Install Cosign (signing)
+        uses: sigstore/cosign-installer@v3
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: '~> v2'
+          # Single-target build per runner; combined publish runs in a
+          # separate job that consumes all three artifact bundles.
+          args: build --single-target --clean --snapshot
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.goarch }}
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeiq-${{ matrix.os }}-${{ matrix.goarch }}
+          path: dist/codeiq_*/codeiq*
+          retention-days: 1
+
+  # Combined publish: pulls the three binaries built above, packages
+  # them with SBOMs, signs the checksum manifest via Sigstore keyless,
+  # and uploads the GitHub Release. Runs on linux only.
+  release:
+    name: publish release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.10'
+          cache: true
+          cache-dependency-path: go/go.sum
+      - name: Install build deps
+        run: sudo apt-get update -y && sudo apt-get install -y build-essential
+      - name: Install Syft (SBOM)
+        uses: anchore/sbom-action/download-syft@v0
+      - name: Install Cosign (signing)
+        uses: sigstore/cosign-installer@v3
+      - name: Download pre-built binaries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: codeiq-*
+          path: prebuilt
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: '~> v2'
+          # Full release: archives + SBOMs + cosign sigs + GitHub Release
+          # draft + (optional) Homebrew tap. The owning org sets
+          # HOMEBREW_TAP_GITHUB_TOKEN to publish to homebrew-codeiq;
+          # forks leave it unset and the brew step skips silently.
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_OWNER: RandomCodeSpace
+          HOMEBREW_TAP_REPO: homebrew-codeiq
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+      - name: Attest release artifacts (build provenance)
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: 'dist/codeiq_*.tar.gz'

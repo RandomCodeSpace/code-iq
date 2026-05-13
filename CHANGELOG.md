@@ -16,6 +16,23 @@ for that specific tag for the per-commit details.
 
 ### Added
 
+- **Phase 5 release infrastructure for the Go binary** —
+  `.goreleaser.yml` + `.github/workflows/release-go.yml` cut a
+  multi-platform (linux/amd64, linux/arm64, darwin/arm64) release on
+  every `v*.*.*` tag push. Each archive ships with an SPDX SBOM
+  (Syft), and the `checksums.sha256` manifest is keyless-signed via
+  Cosign + GitHub OIDC (Sigstore Rekor transparency log). Optional
+  Homebrew tap publish to `RandomCodeSpace/homebrew-codeiq` —
+  skipped silently when the secret isn't configured, so forks can
+  reuse the same workflow. Build provenance attestations via
+  `actions/attest-build-provenance`. Runbook at
+  [`shared/runbooks/release-go.md`](shared/runbooks/release-go.md).
+- **`.github/workflows/perf-gate.yml`** — per-PR perf-regression gate.
+  Runs `codeiq index` against `fixture-multi-lang` and fails the build
+  if wall-clock exceeds 8 s, node count drops below 40, or the
+  phantom-edge drop ratio crosses 50%. Catches regex-pathology
+  regressions like the CertificateAuthDetector pre-screen miss that
+  blew up PSA indexing from 0.1 s to 42 s mid-port.
 - **Go port (Phases 1-4 of the rewrite)** — codeiq is being ported from
   Java/Spring Boot to a single static Go binary on the `port/go-port`
   branch. PR #130. 100 detectors at 1:1 parity with the Java side; 34 MCP
