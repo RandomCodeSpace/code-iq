@@ -43,40 +43,65 @@ func New() *Extractor { return &Extractor{} }
 // Language returns "go".
 func (e *Extractor) Language() string { return "go" }
 
-// Extract dispatches by node kind. CLASS is the registry kind for Go structs
-// here — the Java side uses CLASS + COMPONENT; the per-task brief is CLASS
-// only, so we mirror that.
+// Extract dispatches by node kind. Single-node convenience wrapper —
+// production paths use ExtractFromTree.
 func (e *Extractor) Extract(ctx extractor.Context, node *model.CodeNode) extractor.Result {
-	switch node.Kind {
-	case model.NodeMethod, model.NodeClass:
-	default:
+	tree, _ := parser.ParseByName("go", []byte(ctx.Content))
+	if tree != nil {
+		defer tree.Close()
+	}
+	out := e.ExtractFromTree(ctx, tree, []*model.CodeNode{node})
+	if len(out) == 0 {
 		return extractor.EmptyResult()
 	}
-	tree, err := parser.ParseByName("go", []byte(ctx.Content))
-	if err != nil || tree == nil || tree.Root == nil {
-		return extractor.EmptyResult()
+	return out[0]
+}
+
+// ExtractFromTree walks the pre-parsed tree once per input node, returning
+// one Result per node in matching order. tree may be nil — every result is
+// EmptyResult in that case.
+func (e *Extractor) ExtractFromTree(ctx extractor.Context, tree *parser.Tree, nodes []*model.CodeNode) []extractor.Result {
+	results := make([]extractor.Result, len(nodes))
+	for i := range results {
+		results[i] = extractor.EmptyResult()
 	}
-	defer tree.Close()
+	if tree == nil || tree.Root == nil {
+		return results
+	}
 	root := tree.Root.RootNode()
 	if root == nil {
-		return extractor.EmptyResult()
+		return results
 	}
-
-	switch node.Kind {
-	case model.NodeMethod:
-		return extractor.Result{
-			CallEdges:  collectGoCallEdges(root, ctx.Content, node, ctx.Registry),
-			Confidence: model.CapabilityPartial,
+	// matchInterfaceAssertion only reads ctx.Content; compute once per file.
+	var ifaceAssertion string
+	var ifaceAssertionComputed bool
+	for i, node := range nodes {
+		if node == nil {
+			continue
 		}
-	case model.NodeClass:
-		if iface := matchInterfaceAssertion(ctx.Content); iface != "" {
-			return extractor.Result{
-				TypeHints:  map[string]string{"implements_types": iface},
-				Confidence: model.CapabilityPartial,
+		switch node.Kind {
+		case model.NodeMethod:
+			edges := collectGoCallEdges(root, ctx.Content, node, ctx.Registry)
+			if len(edges) > 0 {
+				results[i] = extractor.Result{
+					CallEdges:  edges,
+					Confidence: model.CapabilityPartial,
+				}
+			}
+		case model.NodeClass:
+			if !ifaceAssertionComputed {
+				ifaceAssertion = matchInterfaceAssertion(ctx.Content)
+				ifaceAssertionComputed = true
+			}
+			if ifaceAssertion != "" {
+				results[i] = extractor.Result{
+					TypeHints:  map[string]string{"implements_types": ifaceAssertion},
+					Confidence: model.CapabilityPartial,
+				}
 			}
 		}
 	}
-	return extractor.EmptyResult()
+	return results
 }
 
 // matchInterfaceAssertion runs the package-level regex against the source. The

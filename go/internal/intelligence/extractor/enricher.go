@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/randomcodespace/codeiq/go/internal/model"
+	"github.com/randomcodespace/codeiq/go/internal/parser"
 )
 
 // Enricher orchestrates per-language extractors over a node list. Mirrors
@@ -114,12 +115,23 @@ func (en *Enricher) Enrich(nodes []*model.CodeNode, edges *[]*model.CodeEdge, ro
 				Content:  content,
 				Registry: registry,
 			}
+			// Parse once per file; reuse the tree across every node in this
+			// file via ExtractFromTree. Eliminates the per-node re-parse that
+			// pprof on airflow flagged as 91% of total allocations.
+			tree, _ := parser.ParseByName(t.ext.Language(), raw)
+			if tree != nil {
+				defer tree.Close()
+			}
+			results := t.ext.ExtractFromTree(ctx, tree, t.ns)
 			var localEdges []*model.CodeEdge
-			for _, n := range t.ns {
-				r := t.ext.Extract(ctx, n)
+			for j, r := range results {
+				if j >= len(t.ns) {
+					break
+				}
+				n := t.ns[j]
 				localEdges = append(localEdges, r.CallEdges...)
 				localEdges = append(localEdges, r.SymbolReferences...)
-				if len(r.TypeHints) > 0 {
+				if len(r.TypeHints) > 0 && n != nil {
 					if n.Properties == nil {
 						n.Properties = map[string]any{}
 					}

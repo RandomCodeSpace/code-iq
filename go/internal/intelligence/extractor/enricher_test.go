@@ -8,13 +8,14 @@ import (
 	"testing"
 
 	"github.com/randomcodespace/codeiq/go/internal/model"
+	"github.com/randomcodespace/codeiq/go/internal/parser"
 )
 
 // fakeExtractor is a test-only LanguageExtractor that records each call so we
 // can assert the orchestrator's read-once contract and per-language dispatch.
 type fakeExtractor struct {
 	lang       string
-	calls      int32 // atomic counter of Extract() invocations
+	calls      int32 // counts per-node visits (across both Extract and ExtractFromTree)
 	filesSeen  []string
 	emitEdge   bool
 	emitHint   bool
@@ -25,9 +26,9 @@ type fakeExtractor struct {
 
 func (f *fakeExtractor) Language() string { return f.lang }
 
-func (f *fakeExtractor) Extract(ctx Context, node *model.CodeNode) Result {
-	atomic.AddInt32(&f.calls, 1)
-	f.filesSeen = append(f.filesSeen, ctx.FilePath)
+// resultFor synthesises a Result for one node — shared between Extract and
+// ExtractFromTree so behaviour is identical regardless of call path.
+func (f *fakeExtractor) resultFor(node *model.CodeNode) Result {
 	r := EmptyResult()
 	if f.emitEdge {
 		r.CallEdges = []*model.CodeEdge{{
@@ -45,6 +46,26 @@ func (f *fakeExtractor) Extract(ctx Context, node *model.CodeNode) Result {
 		r.TypeHints = map[string]string{f.hintKey: f.hintValue}
 	}
 	return r
+}
+
+func (f *fakeExtractor) Extract(ctx Context, node *model.CodeNode) Result {
+	atomic.AddInt32(&f.calls, 1)
+	f.filesSeen = append(f.filesSeen, ctx.FilePath)
+	return f.resultFor(node)
+}
+
+func (f *fakeExtractor) ExtractFromTree(ctx Context, _ *parser.Tree, nodes []*model.CodeNode) []Result {
+	atomic.AddInt32(&f.calls, int32(len(nodes)))
+	f.filesSeen = append(f.filesSeen, ctx.FilePath)
+	results := make([]Result, len(nodes))
+	for i, n := range nodes {
+		if n == nil {
+			results[i] = EmptyResult()
+			continue
+		}
+		results[i] = f.resultFor(n)
+	}
+	return results
 }
 
 func TestEnricher_DispatchesPerLanguageAndAppendsEdges(t *testing.T) {
