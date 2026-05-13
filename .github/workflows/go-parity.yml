@@ -42,7 +42,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           # Pin to 1.25.x — 1.26+ isn't on enough developer machines yet.
-          go-version: '1.25.7'
+          go-version: '1.25.10'
           cache: true
           cache-dependency-path: go/go.sum
       - name: Install C toolchain
@@ -65,13 +65,18 @@ jobs:
       - name: Java graph → normalized JSON
         # Run from inside the fixture so Neo4j path resolution finds the
         # store enrich wrote. java-normalize.jq pivots the Java
-        # {nodes:[...], edges:[...]} shape into the per-file array shape
+        # {nodes:[...]} shape into the per-file array shape
         # parity.Normalize uses on the Go side.
+        #
+        # The Java CLI prints Logback JSON log lines to stdout BEFORE the
+        # graph JSON, so we capture everything then awk to the first line
+        # that is exactly "{" — that's the pretty-printed graph object.
         run: |
           cd /tmp/fm-java
           java -Dspring.profiles.active=serving \
             -jar "$GITHUB_WORKSPACE"/target/code-iq-*-cli.jar graph . -f json \
-            > /tmp/java-raw.json
+            > /tmp/java-raw-with-logs.json
+          awk '/^\{$/ {f=1} f' /tmp/java-raw-with-logs.json > /tmp/java-raw.json
           jq -f "$GITHUB_WORKSPACE"/go/parity/java-normalize.jq /tmp/java-raw.json \
             > /tmp/java-normalized.json
 

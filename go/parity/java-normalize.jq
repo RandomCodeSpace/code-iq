@@ -34,7 +34,14 @@ def sort_edges: sort_by(.kind, .sourceId, .targetId);
 })) as $by_path |
 
 # Attach edges to their source file's group.
-reduce (.edges[]) as $e ($by_path;
+#
+# The Java `graph -f json` command currently emits only nodes — the
+# `.edges` key is absent on its output. Default to an empty list so the
+# reduction is a no-op and the resulting per-file groups carry empty
+# edge arrays (the Go side compares structurally and the
+# expected-divergence allow-list absorbs the gap). When the Java side
+# learns to export edges, drop the `// []` fallback.
+reduce ((.edges // [])[]) as $e ($by_path;
     # find the path whose nodes contain $e.sourceId
     . as $groups |
     ($groups | to_entries

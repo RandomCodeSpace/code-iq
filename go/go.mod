@@ -10,7 +10,7 @@ go 1.25.0
 // Actual build toolchain. Pinned to 1.25.7 — 1.26+ isn't on enough
 // developer machines yet. CI pins the same version (.github/workflows/
 // go-ci.yml + go-parity.yml).
-toolchain go1.25.7
+toolchain go1.25.10
 
 require github.com/mattn/go-sqlite3 v1.14.22
 
