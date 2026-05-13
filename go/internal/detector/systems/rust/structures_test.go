@@ -53,8 +53,13 @@ func TestRustStructuresPositive(t *testing.T) {
 	for _, n := range r.Nodes {
 		kinds[n.Kind]++
 	}
-	if kinds[model.NodeModule] != 2 {
-		t.Errorf("expected 2 MODULE (mods), got %d", kinds[model.NodeModule])
+	// 2 mod declarations + 1 file-anchor module node = 3 MODULE nodes
+	if kinds[model.NodeModule] != 3 {
+		t.Errorf("expected 3 MODULE (2 mods + file anchor), got %d", kinds[model.NodeModule])
+	}
+	// 2 use imports → 2 external module anchor nodes
+	if kinds[model.NodeExternal] != 2 {
+		t.Errorf("expected 2 EXTERNAL (use targets), got %d", kinds[model.NodeExternal])
 	}
 	if kinds[model.NodeClass] < 1 {
 		t.Errorf("expected >=1 CLASS (struct), got %d", kinds[model.NodeClass])

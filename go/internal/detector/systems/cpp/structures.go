@@ -45,13 +45,20 @@ func (d StructuresDetector) Detect(ctx *detector.Context) *detector.Result {
 	var edges []*model.CodeEdge
 	fp := ctx.FilePath
 	lines := strings.Split(text, "\n")
+	seen := map[string]bool{}
 
-	// #include statements → IMPORTS edges
+	// #include statements → IMPORTS edges — emit anchor nodes so the edges
+	// survive GraphBuilder's phantom-drop. Pre-fix, both endpoints were
+	// free-form strings (file path and header path) with no matching
+	// CodeNode anywhere.
 	for _, line := range lines {
 		if m := cppIncludeRE.FindStringSubmatch(line); len(m) >= 2 {
 			imp := m[1]
-			e := model.NewCodeEdge(fp+":includes:"+imp, model.EdgeImports, fp, imp)
+			srcID := base.EnsureFileAnchor(ctx, "cpp", "CppStructuresDetector", model.ConfidenceLexical, &nodes, seen)
+			tgtID := base.EnsureExternalAnchor(imp, "cpp:external", "CppStructuresDetector", model.ConfidenceLexical, &nodes, seen)
+			e := model.NewCodeEdge(srcID+"->imports->"+tgtID, model.EdgeImports, srcID, tgtID)
 			e.Source = "CppStructuresDetector"
+			e.Confidence = model.ConfidenceLexical
 			edges = append(edges, e)
 		}
 	}

@@ -40,12 +40,18 @@ func (d StructuresDetector) Detect(ctx *detector.Context) *detector.Result {
 	var nodes []*model.CodeNode
 	var edges []*model.CodeEdge
 	fp := ctx.FilePath
+	seen := map[string]bool{}
 
-	// use imports
+	// use imports — emit anchor nodes so the edges survive GraphBuilder's
+	// phantom-drop. Pre-fix, both endpoints were free-form strings (file
+	// path and module path) with no matching CodeNode anywhere.
 	for _, m := range rustUseRE.FindAllStringSubmatchIndex(text, -1) {
 		target := text[m[2]:m[3]]
-		e := model.NewCodeEdge(fp+":imports:"+target, model.EdgeImports, fp, target)
+		srcID := base.EnsureFileAnchor(ctx, "rust", "RustStructuresDetector", model.ConfidenceLexical, &nodes, seen)
+		tgtID := base.EnsureExternalAnchor(target, "rust:external", "RustStructuresDetector", model.ConfidenceLexical, &nodes, seen)
+		e := model.NewCodeEdge(srcID+"->imports->"+tgtID, model.EdgeImports, srcID, tgtID)
 		e.Source = "RustStructuresDetector"
+		e.Confidence = model.ConfidenceLexical
 		edges = append(edges, e)
 	}
 

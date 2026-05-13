@@ -57,9 +57,13 @@ func TestCppStructuresPositive(t *testing.T) {
 	for _, n := range r.Nodes {
 		kinds[n.Kind]++
 	}
-	// 1 namespace + 2 classes (Animal, Dog) + 1 struct (Point treated as class) = 4 class/module
-	if kinds[model.NodeModule] != 1 {
-		t.Errorf("expected 1 MODULE (namespace), got %d", kinds[model.NodeModule])
+	// 1 namespace + 1 file-anchor = 2 MODULE nodes
+	if kinds[model.NodeModule] != 2 {
+		t.Errorf("expected 2 MODULE (namespace + file anchor), got %d", kinds[model.NodeModule])
+	}
+	// 2 #includes → 2 external header anchor nodes
+	if kinds[model.NodeExternal] != 2 {
+		t.Errorf("expected 2 EXTERNAL (include targets), got %d", kinds[model.NodeExternal])
 	}
 	// Classes + structs both go to CLASS — 2 classes + 1 struct + 1
 	// false-positive from "enum class Mode" matching CLASS_RE (Java parity
