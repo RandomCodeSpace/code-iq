@@ -221,9 +221,9 @@ func TestEnricher_BoundedConcurrency(t *testing.T) {
 	dir := t.TempDir()
 	nodes := make([]*model.CodeNode, 0, nFiles)
 	for i := 0; i < nFiles; i++ {
-		rel := filepath.Join("src", filepath.Base(t.TempDir())+".java")
-		// One file per node; deterministic distinct paths.
-		rel = filepath.Join("src", "f", "F"+itoa(i)+".java")
+		// Deterministic distinct file paths so the orchestrator schedules
+		// one task per file.
+		rel := filepath.Join("src", "f", "F"+itoa(i)+".java")
 		writeFile(t, filepath.Join(dir, rel), "class F"+itoa(i)+" {}")
 		n := model.NewCodeNode("n:"+itoa(i), model.NodeClass, "F"+itoa(i))
 		n.FilePath = rel
