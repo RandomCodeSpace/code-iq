@@ -77,9 +77,8 @@ ls dist/
 ```
 
 The `--snapshot` flag forces a fake version `<incpatch>-next` and
-disables publish steps (no GitHub upload, no signing, no Homebrew).
-CGO is needed locally — `CGO_ENABLED=1` is set in
-`.goreleaser.yml/env`.
+disables publish steps (no GitHub upload, no signing). CGO is needed
+locally — `CGO_ENABLED=1` is set in `.goreleaser.yml/env`.
 
 ## Failure recovery
 
@@ -90,9 +89,6 @@ CGO is needed locally — `CGO_ENABLED=1` is set in
 - **Signing failure (OIDC token)** — usually transient. Re-run the
   workflow. The OIDC permissions in `release-go.yml` are correct;
   GitHub occasionally has Sigstore connectivity issues.
-- **Homebrew tap PR fails** — check the PAT scope and that the tap
-  repo exists. The main release still publishes; only the Formula
-  bump skips.
 
 ## What this does NOT do
 

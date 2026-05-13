@@ -102,8 +102,8 @@ CGO_ENABLED=1 go build -o /usr/local/bin/codeiq ./cmd/codeiq
 ```
 
 **Required env / external services**: none for build. At run-time the
-binary reads `OLLAMA_API_KEY` (optional) and `HOMEBREW_TAP_GITHUB_TOKEN`
-(release-side only).
+binary reads `OLLAMA_API_KEY` (optional, switches `codeiq review` to
+Ollama Cloud).
 
 ## Conventions an agent must respect
 

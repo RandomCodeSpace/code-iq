@@ -61,8 +61,8 @@ builds:
       - -X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Dirty={{.IsGitDirty}}'
     goos: [linux]
     goarch: [arm64]
-  # darwin/arm64 deferred — needs a macos runner. Follow-up:
-  # release-darwin.yml attaches macOS binaries to the same draft Release.
+  # darwin/arm64 ships from `release-darwin.yml` (macos-14 runner) and
+  # attaches to the same Release that this config creates.
 
 archives:
   - id: codeiq

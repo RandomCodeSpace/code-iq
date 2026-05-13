@@ -146,11 +146,10 @@ the graph) are dropped at snapshot. Every run prints a
 "Deduped: N nodes, M edges  Dropped: K phantom edges" line so graph
 hygiene is visible.
 
-See [`docs/project/architecture.md`](docs/project/architecture.md) for
-the pipeline (FileDiscovery → tree-sitter / regex → detectors →
-GraphBuilder → linkers → LayerClassifier → Kuzu) and
-[`docs/project/conventions.md`](docs/project/conventions.md) for the
-detector authoring contract.
+Pipeline: FileDiscovery → tree-sitter / regex → detectors →
+GraphBuilder → linkers → LayerClassifier → Kuzu. See
+[`CLAUDE.md`](CLAUDE.md) for the full architecture and the detector
+authoring contract.
 
 ## Releases
 

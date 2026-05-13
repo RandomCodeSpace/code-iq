@@ -1,17 +1,14 @@
 name: release-go
 
-# Tag-triggered release pipeline for the codeiq Go binary.
+# Tag-triggered release pipeline for the codeiq Go binary (linux/amd64
+# + linux/arm64). darwin/arm64 ships from `release-darwin.yml` on the
+# same tag.
 #
 # Trigger: push a tag matching `v*.*.*` (e.g. `git tag v0.3.0 && git push --tags`).
 #
-# v0.3.0 scope: linux/amd64 + linux/arm64 only. Single ubuntu-latest
-# runner builds both via the linux→linux cross-compile with
-# gcc-aarch64-linux-gnu (CGO permits this cross — both kuzu and
-# go-sqlite3 build cleanly).
-#
-# darwin/arm64 deferred — needs a macos runner and separate matrix.
-# Follow-up: add a `release-darwin.yml` that attaches darwin binaries
-# to the same draft Release.
+# Single ubuntu-latest runner builds both linux archs via
+# linux→linux cross-compile with gcc-aarch64-linux-gnu (CGO permits
+# this cross — both kuzu and go-sqlite3 build cleanly).
 
 on:
   push:
