@@ -73,7 +73,12 @@ func (s *Store) copyNodeBatch(batch []*model.CodeNode) error {
 	// Cleanup runs whether COPY succeeds or fails.
 	defer os.Remove(tmp.Name())
 
+	// Use pipe '|' as the field delimiter so that JSON property values
+	// containing commas (e.g. {"language":"python","module":"glob"}) are not
+	// mis-parsed by Kuzu's CSV reader. Go's json.Marshal never emits '|',
+	// so it is unambiguous as a separator.
 	w := csv.NewWriter(tmp)
+	w.Comma = '|'
 	for _, n := range batch {
 		row, err := encodeNodeRow(n)
 		if err != nil {
@@ -96,8 +101,9 @@ func (s *Store) copyNodeBatch(batch []*model.CodeNode) error {
 
 	// Kuzu COPY FROM with explicit column list. ToSlash for Windows path
 	// portability — Kuzu's parser accepts forward slashes on all platforms.
+	// DELIM='|' matches the pipe-separated staging file written above.
 	q := fmt.Sprintf(
-		"COPY CodeNode(%s) FROM '%s' (header=false)",
+		"COPY CodeNode(%s) FROM '%s' (header=false, DELIM='|')",
 		strings.Join(nodeColumns, ", "),
 		filepath.ToSlash(tmp.Name()),
 	)
@@ -226,7 +232,9 @@ func (s *Store) copyEdgeBatch(kind model.EdgeKind, batch []*model.CodeEdge) erro
 	}
 	defer os.Remove(tmp.Name())
 
+	// Use pipe '|' as the field delimiter — see copyNodeBatch for the rationale.
 	w := csv.NewWriter(tmp)
+	w.Comma = '|'
 	for _, e := range batch {
 		props, err := json.Marshal(e.Properties)
 		if err != nil {
@@ -255,8 +263,9 @@ func (s *Store) copyEdgeBatch(kind model.EdgeKind, batch []*model.CodeEdge) erro
 		return fmt.Errorf("graph: csv close: %w", err)
 	}
 
+	// DELIM='|' matches the pipe-separated staging file written above.
 	q := fmt.Sprintf(
-		"COPY %s FROM '%s' (header=false)",
+		"COPY %s FROM '%s' (header=false, DELIM='|')",
 		relTableName(kind),
 		filepath.ToSlash(tmp.Name()),
 	)
