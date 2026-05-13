@@ -12,7 +12,7 @@ go 1.25.0
 // go-ci.yml + go-parity.yml).
 toolchain go1.25.10
 
-require github.com/mattn/go-sqlite3 v1.14.22
+require github.com/mattn/go-sqlite3 v1.14.44
 
 require (
 	github.com/google/uuid v1.6.0
