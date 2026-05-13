@@ -162,6 +162,10 @@ func registerAllTools(srv *mcp.Server, d *mcp.Deps) error {
 	if err := mcp.RegisterIntelligence(srv, d); err != nil {
 		return fmt.Errorf("register intelligence tools: %w", err)
 	}
+	// Plan §2 — consolidated tools alongside the deprecated 34.
+	if err := mcp.RegisterConsolidated(srv, d); err != nil {
+		return fmt.Errorf("register consolidated tools: %w", err)
+	}
 	for _, hook := range optionalRegisterHooks {
 		if hook == nil {
 			continue
