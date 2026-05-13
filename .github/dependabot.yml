@@ -1,4 +1,4 @@
-# Dependabot configuration for codeiq.
+# Dependabot configuration for codeiq (Go).
 # Docs: https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 #
 # Strategy:
@@ -6,15 +6,15 @@
 #   * grouped updates per ecosystem so PR fan-out stays manageable
 #   * security updates fire whenever needed regardless of the weekly slot
 #
-# RAN-46 AC #4: Dependabot (security + version updates, weekly, grouped). Also
-# enable repo-level "Dependabot security updates" via gh api (the version-updates
-# below cover routine bumps; security updates are the reactive channel).
+# Java + npm sections were removed at the Phase 6 cutover (PR #132); the
+# Spring Boot / React SPA is gone and `pom.xml` / `src/main/frontend/` no
+# longer exist.
 
 version: 2
 updates:
-  # ----- Maven (the codeiq application) -----
-  - package-ecosystem: "maven"
-    directory: "/"
+  # ----- Go modules (the codeiq application) -----
+  - package-ecosystem: "gomod"
+    directory: "/go"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -28,38 +28,24 @@ updates:
       prefix: "chore(deps)"
       include: "scope"
     groups:
-      spring:
+      kuzu:
         patterns:
-          - "org.springframework*"
-          - "org.springframework.boot:*"
-          - "org.springframework.security:*"
-          - "org.springframework.ai:*"
-      jackson:
+          - "github.com/kuzudb/*"
+      tree-sitter:
         patterns:
-          - "com.fasterxml.jackson*"
-      neo4j:
+          - "github.com/smacker/go-tree-sitter*"
+      mcp:
         patterns:
-          - "org.neo4j:*"
-          - "org.neo4j.driver:*"
-      antlr:
+          - "github.com/modelcontextprotocol/*"
+      cobra-viper:
         patterns:
-          - "org.antlr:*"
-      maven-plugins:
+          - "github.com/spf13/*"
+      sqlite:
         patterns:
-          - "org.apache.maven.plugins:*"
-          - "org.codehaus.*"
-          - "org.jacoco:*"
-          - "com.github.spotbugs:*"
-          - "org.owasp:*"
-          - "org.sonarsource.scanner.maven:*"
-          - "org.sonatype.central:*"
+          - "github.com/mattn/go-sqlite3"
       test-libs:
         patterns:
-          - "org.junit.jupiter:*"
-          - "org.mockito:*"
-          - "org.assertj:*"
-          - "org.hamcrest:*"
-          - "com.h2database:*"
+          - "github.com/stretchr/testify"
 
   # ----- GitHub Actions (CI / release / security) -----
   - package-ecosystem: "github-actions"
@@ -80,46 +66,3 @@ updates:
       actions:
         patterns:
           - "*"
-
-  # ----- Frontend (npm under src/main/frontend) -----
-  - package-ecosystem: "npm"
-    directory: "/src/main/frontend"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "08:00"
-      timezone: "Etc/UTC"
-    open-pull-requests-limit: 5
-    labels:
-      - "type:dependencies"
-      - "area:frontend"
-    commit-message:
-      prefix: "chore(frontend)"
-      include: "scope"
-    groups:
-      react:
-        patterns:
-          - "react"
-          - "react-dom"
-          - "@types/react*"
-      ant-design:
-        patterns:
-          - "antd"
-          - "@ant-design/*"
-      vite:
-        patterns:
-          - "vite"
-          - "@vitejs/*"
-      echarts:
-        patterns:
-          - "echarts"
-          - "echarts-for-react"
-      eslint:
-        patterns:
-          - "eslint*"
-          - "@eslint/*"
-          - "@typescript-eslint/*"
-      typescript:
-        patterns:
-          - "typescript"
-          - "@types/*"
