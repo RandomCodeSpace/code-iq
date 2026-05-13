@@ -2,7 +2,10 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
+	"runtime"
+	"runtime/pprof"
 
 	"github.com/randomcodespace/codeiq/go/internal/analyzer"
 	"github.com/randomcodespace/codeiq/go/internal/cache"
@@ -11,7 +14,12 @@ import (
 
 func init() {
 	registerSubcommand(func() *cobra.Command {
-		var graphDir string
+		var (
+			graphDir       string
+			memProfile     string
+			maxBufferPool  int64
+			copyThreads    int
+		)
 		cmd := &cobra.Command{
 			Use:   "enrich [path]",
 			Short: "Load the SQLite cache into Kuzu and run linkers, classifiers, intelligence.",
@@ -48,9 +56,28 @@ become available and the stdio MCP server can serve clients.`,
 					return fmt.Errorf("open cache %s: %w", cachePath, err)
 				}
 				defer c.Close()
-				summary, err := analyzer.Enrich(root, c, analyzer.EnrichOptions{GraphDir: graphDir})
+				opts := analyzer.EnrichOptions{GraphDir: graphDir}
+				if maxBufferPool > 0 {
+					opts.StoreBufferPoolBytes = uint64(maxBufferPool)
+				}
+				if copyThreads > 0 {
+					opts.StoreCopyThreads = uint64(copyThreads)
+				}
+				summary, err := analyzer.Enrich(root, c, opts)
 				if err != nil {
 					return err
+				}
+				if memProfile != "" {
+					runtime.GC()
+					f, ferr := os.Create(memProfile)
+					if ferr != nil {
+						return fmt.Errorf("create mem profile: %w", ferr)
+					}
+					defer f.Close()
+					if perr := pprof.WriteHeapProfile(f); perr != nil {
+						return fmt.Errorf("write mem profile: %w", perr)
+					}
+					fmt.Fprintf(cmd.ErrOrStderr(), "heap profile written to %s\n", memProfile)
 				}
 				fmt.Fprintf(cmd.OutOrStdout(),
 					"enrich complete: %d nodes, %d edges, %d services\n",
@@ -60,6 +87,12 @@ become available and the stdio MCP server can serve clients.`,
 		}
 		cmd.Flags().StringVar(&graphDir, "graph-dir", "",
 			"Output directory for the Kuzu graph store (default: <path>/.codeiq/graph/codeiq.kuzu).")
+		cmd.Flags().StringVar(&memProfile, "memprofile", "",
+			"Write a heap profile to this path after enrich completes. For OOM debugging — use with /usr/bin/time -v.")
+		cmd.Flags().Int64Var(&maxBufferPool, "max-buffer-pool", 0,
+			"Cap Kuzu BufferPoolSize in bytes (default: 2 GiB; 0 means default).")
+		cmd.Flags().IntVar(&copyThreads, "copy-threads", 0,
+			"Cap Kuzu COPY FROM parallelism (default: min(4, GOMAXPROCS); 0 means default).")
 		return cmd
 	})
 }

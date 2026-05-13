@@ -23,6 +23,12 @@ type EnrichOptions struct {
 	// GraphDir overrides the Kuzu output directory. When "", the default
 	// `<root>/.codeiq/graph/codeiq.kuzu` is used.
 	GraphDir string
+	// StoreBufferPoolBytes caps Kuzu's buffer pool. Zero -> graph package
+	// default (2 GiB).
+	StoreBufferPoolBytes uint64
+	// StoreCopyThreads caps Kuzu COPY FROM parallelism. Zero -> graph
+	// package default (min(4, GOMAXPROCS)).
+	StoreCopyThreads uint64
 }
 
 // EnrichSummary reports per-run counters from a successful Enrich.
@@ -109,7 +115,10 @@ func Enrich(root string, c *cache.Cache, opts EnrichOptions) (EnrichSummary, err
 
 	// 6. Bulk-load Kuzu — schema + nodes + edges + indexes. The store is
 	//    closed when this function returns; read-side commands re-open it.
-	store, err := graph.Open(opts.GraphDir)
+	store, err := graph.OpenWithOptions(opts.GraphDir, graph.OpenOptions{
+		BufferPoolBytes: opts.StoreBufferPoolBytes,
+		MaxThreads:      opts.StoreCopyThreads,
+	})
 	if err != nil {
 		return EnrichSummary{}, fmt.Errorf("enrich: open graph: %w", err)
 	}
