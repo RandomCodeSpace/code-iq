@@ -19,15 +19,43 @@ type Node = sitter.Node
 // recurse into the current node's children, false to skip them. Walking stops
 // when the visitor returns false at the root or when all descendants have
 // been visited. nil-safe.
+//
+// Implementation uses tree-sitter's TreeCursor for iterative traversal.
+// Compared to the previous recursive `n.Child(i)` form, the cursor avoids
+// Go-level recursion frames per descent and matches the canonical
+// tree-sitter walking idiom. Note: each visited node still flows through
+// smacker's per-Tree node cache (allocates one *Node on first visit per
+// node), so the allocation count is roughly the same as the recursive form
+// — the win is in stack discipline and code clarity, not GC pressure.
 func Walk(n *Node, visit func(*Node) bool) {
 	if n == nil || visit == nil {
 		return
 	}
-	if !visit(n) {
-		return
-	}
-	for i := 0; i < int(n.ChildCount()); i++ {
-		Walk(n.Child(i), visit)
+	cur := sitter.NewTreeCursor(n)
+	defer cur.Close()
+	// Visit root.
+	descend := visit(cur.CurrentNode())
+	for {
+		if descend && cur.GoToFirstChild() {
+			descend = visit(cur.CurrentNode())
+			continue
+		}
+		// No children to descend into; advance to next sibling, climbing
+		// out of the subtree as necessary. The loop terminates when
+		// GoToParent returns false (we have climbed back above the
+		// original root).
+		for {
+			if cur.GoToNextSibling() {
+				descend = visit(cur.CurrentNode())
+				break
+			}
+			if !cur.GoToParent() {
+				return
+			}
+			// After climbing to parent, the parent itself was already
+			// visited when we descended into it — do NOT re-visit. Continue
+			// trying GoToNextSibling at the parent's level.
+		}
 	}
 }
 
