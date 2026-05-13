@@ -1,6 +1,6 @@
 # Project Summary: codeiq
 
-> Refreshed 2026-05-13 after Phase 6 cutover (v1.0.0). Audience: AI
+> Refreshed 2026-05-13 after Phase 6 cutover (v0.3.0). Audience: AI
 > agents (and humans) who need to understand and modify this codebase.
 >
 > **Canonical depth lives in [`CLAUDE.md`](CLAUDE.md)** (~16 KB,
@@ -16,7 +16,7 @@
   infrastructure, auth patterns, framework usage. No AI, pure static
   analysis. LLM is opt-in via `codeiq review`.
 - **Type**: CLI tool + MCP stdio server, single static binary.
-- **Status**: v1.0.0 (Phase 6 cutover landed 2026-05-13). Active.
+- **Status**: v0.3.0 (Phase 6 cutover landed 2026-05-13). Active.
 - **Primary language**: Go 1.25.10. CGO required.
 
 ## Tech stack

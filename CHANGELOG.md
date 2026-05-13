@@ -14,7 +14,7 @@ for that specific tag for the per-commit details.
 
 ## [Unreleased]
 
-## [v1.0.0] - 2026-05-13
+## [v0.3.0] - 2026-05-13
 
 ### Changed
 
@@ -24,16 +24,16 @@ for that specific tag for the per-commit details.
   `.github/workflows/{ci-java,beta-java,release-java,go-parity}.yml`.
   ~8.9 MB / ~1500 files removed.
 
-### v1.0.0 surface
+### v0.3.0 surface
 
-What ships in v1.0.0 (carrying forward from the c363727 squash + c630245 release infra):
+What ships in v0.3.0 (carrying forward from the c363727 squash + c630245 release infra):
 
 - 100 detectors across 35+ languages.
 - Deterministic graph with confidence-aware NodeMerger and canonical
   `(src, tgt, kind)` edge dedup; phantom-drop visibility.
 - 6 consolidated mode-driven MCP tools + `run_cypher` escape hatch +
   `review_changes`. The deprecated 34 narrow tools remain wired for
-  back-compat in this release; targeted for removal in v1.1.0.
+  back-compat in this release; targeted for removal in a future minor.
 - `codeiq review` CLI + `review_changes` MCP tool with Ollama (local
   or Cloud) for LLM-driven PR review against graph evidence.
 - Goreleaser cross-platform binaries (linux/amd64, linux/arm64,
@@ -55,7 +55,7 @@ Pre-cutover Java-side history is preserved in the squash-merge commit
 `c363727` and on `origin/main`. Anyone needing to recover Java files
 can `git show c363727:<path>` or `git checkout c363727 -- <path>`.
 
-[v1.0.0]: https://github.com/RandomCodeSpace/codeiq/releases/tag/v1.0.0
+[v0.3.0]: https://github.com/RandomCodeSpace/codeiq/releases/tag/v0.3.0
 
 ### Added
 
