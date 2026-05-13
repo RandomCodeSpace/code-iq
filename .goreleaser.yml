@@ -24,12 +24,14 @@ before:
     - sh -c "cd go && go test ./... -count=1"
 
 builds:
-  - id: codeiq
+  # linux/amd64 — native build on the ubuntu-latest runner.
+  - id: codeiq-linux-amd64
     main: ./cmd/codeiq
     dir: go
     binary: codeiq
     env:
       - CGO_ENABLED=1
+      - CC=gcc
     flags:
       - -trimpath
     ldflags:
@@ -38,20 +40,29 @@ builds:
       - -X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Commit={{.ShortCommit}}'
       - -X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Date={{.Date}}'
       - -X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Dirty={{.IsGitDirty}}'
-    # CGO + kuzudb makes cross-arch fragile from a single host; the
-    # release workflow runs this config once per (OS, arch) runner.
-    goos:
-      - linux
-      - darwin
-    goarch:
-      - amd64
-      - arm64
-    ignore:
-      # darwin/amd64 needs a darwin runner — skip when this config is
-      # consumed on a linux runner. The release workflow re-runs the
-      # darwin builds on macOS runners.
-      - goos: darwin
-        goarch: amd64
+    goos: [linux]
+    goarch: [amd64]
+  # linux/arm64 — cross-compile from the ubuntu-latest runner using
+  # gcc-aarch64-linux-gnu installed in the release workflow.
+  - id: codeiq-linux-arm64
+    main: ./cmd/codeiq
+    dir: go
+    binary: codeiq
+    env:
+      - CGO_ENABLED=1
+      - CC=aarch64-linux-gnu-gcc
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Version={{.Version}}'
+      - -X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Commit={{.ShortCommit}}'
+      - -X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Date={{.Date}}'
+      - -X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Dirty={{.IsGitDirty}}'
+    goos: [linux]
+    goarch: [arm64]
+  # darwin/arm64 deferred — needs a macos runner. Follow-up:
+  # release-darwin.yml attaches macOS binaries to the same draft Release.
 
 archives:
   - id: codeiq
