@@ -1,6 +1,16 @@
 module github.com/randomcodespace/codeiq/go
 
-go 1.25.7
+// Minimum Go version that can compile this module — clamped at 1.25.0
+// because github.com/modelcontextprotocol/go-sdk v1.6 (Phase 3, MCP
+// server) declares `go 1.25.0`. `go mod tidy` rewrites anything lower
+// back to 1.25.0. Bumping out of 1.25 should wait until a release of
+// that SDK that targets 1.26+.
+go 1.25.0
+
+// Actual build toolchain. Pinned to 1.25.7 — 1.26+ isn't on enough
+// developer machines yet. CI pins the same version (.github/workflows/
+// go-ci.yml + go-parity.yml).
+toolchain go1.25.7
 
 require github.com/mattn/go-sqlite3 v1.14.22
 
