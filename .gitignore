@@ -107,4 +107,9 @@ docs/superpowers/baselines/**/raw/**
 # Agent-generated plans / scratch (not project deliverables)
 phase*-plan.md
 *-plan.md
+# …but project-deliverable plans land under docs/superpowers/plans/ and
+# must be trackable. The directory itself needs un-ignoring first because
+# the outer `docs/superpowers/*` rule above excludes the dir, and an
+# ignored directory's contents cannot be re-included by a later pattern.
+!docs/superpowers/plans/
 !docs/superpowers/plans/*.md
