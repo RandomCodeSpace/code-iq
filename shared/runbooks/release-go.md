@@ -17,7 +17,6 @@ The pipeline is **tag-triggered, fully automated, and keyless-signed**:
    the public Rekor log).
 6. GitHub release is created as a **draft** with the verification
    recipe embedded in the release notes header.
-7. Optional Homebrew tap publish — see "Homebrew tap" below.
 
 ## Cutting a release
 
@@ -40,8 +39,6 @@ Within ~5 minutes:
 
 - `release-go` workflow finishes and creates a **draft** Release.
 - Sigstore transparency log records the signature.
-- (If `HOMEBREW_TAP_GITHUB_TOKEN` is configured) the `homebrew-codeiq`
-  tap gets a Formula bump.
 
 Review the draft release on GitHub — verify artifact list, checksums,
 SBOM presence, release notes — then click **Publish release**.
@@ -68,24 +65,6 @@ A successful `cosign verify-blob` proves:
   fork, not a manually-uploaded artifact).
 - The build ran on a GitHub-hosted runner under GitHub's OIDC token.
 - The signature was logged to the Rekor public transparency log.
-
-## Homebrew tap
-
-The tap repo lives at `RandomCodeSpace/homebrew-codeiq` (separate from
-the main repo; Homebrew's convention).
-
-Setup checklist (one-time, by a repo admin):
-
-1. Create the repo `homebrew-codeiq` under the `RandomCodeSpace` org.
-2. Generate a fine-grained PAT with `Contents: write` on
-   `homebrew-codeiq` only.
-3. Add it to `codeiq` repo secrets as `HOMEBREW_TAP_GITHUB_TOKEN`.
-
-After setup, every tag release updates the Formula automatically.
-
-If the secret is **not** set, the Homebrew step in `.goreleaser.yml`
-skips silently — useful for forks and for local `goreleaser release
---snapshot` dry runs.
 
 ## Local dry run
 

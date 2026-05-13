@@ -36,8 +36,6 @@ landing) and `c630245` (release infra).
   helper.
 - **`spf13/cobra`** — CLI framework. Subcommand registration via
   `internal/cli` blank imports.
-- **`golang-jwt/jwt/v5`** — token validation surface (kept from a
-  serve-mode prototype; serve isn't fully ported yet).
 
 ## Architecture
 
@@ -46,9 +44,14 @@ landing) and `c630245` (release infra).
 ```
 index:   FileDiscovery → Parsers → Detectors (goroutine pool) → GraphBuilder → SQLite cache
 enrich:  SQLite → Linkers → LayerClassifier → LexicalEnricher → LanguageEnricher → ServiceDetector → Kuzu (COPY FROM)
-serve:   (deferred — not ported in v0.3.0)
 mcp:     Kuzu → QueryService → 6 consolidated MCP tools + run_cypher escape hatch + review_changes
 ```
+
+codeiq has no REST API and no web UI surface — by design. Consumers
+interact through the CLI or through the stdio MCP server (read-only).
+The Java reference had a `codeiq serve` subcommand (Spring Boot REST
++ React SPA); both were removed in the Go port and will not be
+reintroduced.
 
 ### Pipeline components
 
@@ -426,10 +429,8 @@ Release pipeline:
 - Release tag must be `v*.*.*`; pre-releases use the
   `vX.Y.Z-rc.N` form (Goreleaser `prerelease: auto` honors it).
 - Cosign keyless via GitHub OIDC — no long-lived key on the runner.
-  Verification needs the cert + sig + the OIDC identity regex (see
-  `shared/runbooks/release-go.md`).
-- Homebrew tap publish is opt-in via `HOMEBREW_TAP_GITHUB_TOKEN`.
-  Forks leave the secret unset and the brew step skips silently.
+  Verification needs the cosign bundle file + the OIDC identity regex
+  (see `shared/runbooks/release-go.md`).
 
 ## Updating This File
 

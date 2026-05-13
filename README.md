@@ -63,13 +63,6 @@ cosign verify-blob \
   checksums.sha256
 ```
 
-### Homebrew
-
-```bash
-brew tap RandomCodeSpace/codeiq
-brew install codeiq
-```
-
 ### Build from source
 
 Requires Go 1.25.10+ and a C toolchain (CGO).
