@@ -57,8 +57,9 @@ func TestPythonStructuresPositive(t *testing.T) {
 	if methods < 4 {
 		t.Errorf("expected at least 4 methods (top-level + class methods), got %d", methods)
 	}
-	if modules != 1 {
-		t.Errorf("expected 1 module node (__all__), got %d", modules)
+	// 1 __all__ module + 1 file-as-module (anchor for imports edges).
+	if modules != 2 {
+		t.Errorf("expected 2 module nodes (__all__ + file anchor), got %d", modules)
 	}
 	// Import edges + defines + extends
 	if len(r.Edges) < 4 {

@@ -199,29 +199,57 @@ func (d PythonStructuresDetector) Detect(ctx *detector.Context) *detector.Result
 		}
 	}
 
-	// Imports
+	// Imports — emit anchor nodes so the edges survive the GraphBuilder
+	// phantom-drop. Pre-fix, both endpoints were free-form strings (file
+	// path and module name) with no matching CodeNode. The dedup map
+	// collapses the per-file external nodes across files (every file
+	// importing `requests` gets one shared py:external:requests target).
+	fileModuleID := "py:file:" + fp
+	importSeen := make(map[string]bool)
+	ensureFile := func() {
+		if !importSeen["__file__"] {
+			importSeen["__file__"] = true
+			fn := model.NewCodeNode(fileModuleID, model.NodeModule, fp)
+			fn.FilePath = fp
+			fn.Source = "PythonStructuresDetector"
+			fn.Confidence = model.ConfidenceLexical
+			fn.Properties["module_type"] = "py_file"
+			nodes = append(nodes, fn)
+		}
+	}
+	emitImport := func(mod string) {
+		mod = strings.TrimSpace(mod)
+		if mod == "" || importSeen["mod:"+mod] {
+			return
+		}
+		importSeen["mod:"+mod] = true
+		ensureFile()
+		targetID := "py:external:" + mod
+		if !importSeen["tgt:"+mod] {
+			importSeen["tgt:"+mod] = true
+			tn := model.NewCodeNode(targetID, model.NodeExternal, mod)
+			tn.Source = "PythonStructuresDetector"
+			tn.Confidence = model.ConfidenceLexical
+			tn.Properties["module"] = mod
+			nodes = append(nodes, tn)
+		}
+		e := model.NewCodeEdge(fileModuleID+"->imports->"+targetID, model.EdgeImports, fileModuleID, targetID)
+		e.Source = "PythonStructuresDetector"
+		e.Confidence = model.ConfidenceLexical
+		edges = append(edges, e)
+	}
 	for _, m := range pyImportRE.FindAllStringSubmatchIndex(text, -1) {
 		var fromMod string
 		if m[2] >= 0 {
 			fromMod = text[m[2]:m[3]]
 		}
-		importNames := text[m[4]:m[5]]
 		if fromMod != "" {
-			e := model.NewCodeEdge(fp+"->imports->"+fromMod, model.EdgeImports, fp, fromMod)
-			e.Source = "PythonStructuresDetector"
-			e.Confidence = model.ConfidenceLexical
-			edges = append(edges, e)
-		} else {
-			for _, n := range strings.Split(importNames, ",") {
-				t := strings.TrimSpace(n)
-				if t == "" {
-					continue
-				}
-				e := model.NewCodeEdge(fp+"->imports->"+t, model.EdgeImports, fp, t)
-				e.Source = "PythonStructuresDetector"
-				e.Confidence = model.ConfidenceLexical
-				edges = append(edges, e)
-			}
+			emitImport(fromMod)
+			continue
+		}
+		importNames := text[m[4]:m[5]]
+		for _, n := range strings.Split(importNames, ",") {
+			emitImport(n)
 		}
 	}
 
