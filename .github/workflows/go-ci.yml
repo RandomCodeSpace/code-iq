@@ -7,10 +7,9 @@ on:
     branches: [main]
   # No `paths:` filter — branch protection requires this job name. A
   # path filter would cause skip-on-no-go-changes, which never reports
-  # a status and deadlocks "Waiting for status to be reported" (same
-  # trap that hit ci-java.yml before its filter was dropped, and that
-  # blocked PR #131). Go build + test is ~2 minutes with the module
-  # cache; cheap enough to always run.
+  # a status and deadlocks "Waiting for status to be reported".
+  # Go build + test is ~2 minutes with the module cache; cheap enough
+  # to always run.
 
 permissions:
   contents: read
