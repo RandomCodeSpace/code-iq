@@ -3,6 +3,7 @@ package extractor
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -94,11 +95,18 @@ func (en *Enricher) Enrich(nodes []*model.CodeNode, edges *[]*model.CodeEdge, ro
 
 	// Run per-file work concurrently; collect into indexed slots so the
 	// final concat order matches `paths` (sorted) — deterministic output.
+	// Cap concurrent goroutines at 2*GOMAXPROCS so the simultaneously-live
+	// tree-sitter Trees + file content strings stay bounded. Polyglot
+	// targets like airflow (~7k Python files) previously spawned one
+	// goroutine per file, driving peak RSS into OOM territory.
 	out := make([][]*model.CodeEdge, len(tasks))
+	sem := make(chan struct{}, 2*runtime.GOMAXPROCS(0))
 	var wg sync.WaitGroup
 	for i, t := range tasks {
 		wg.Add(1)
+		sem <- struct{}{}
 		go func(i int, t task) {
+			defer func() { <-sem }()
 			defer wg.Done()
 			full := filepath.Join(root, t.path)
 			raw, err := os.ReadFile(full)
