@@ -57,8 +57,7 @@ Verify (Sigstore keyless):
 ```bash
 sha256sum -c checksums.sha256
 cosign verify-blob \
-  --certificate checksums.sha256.pem \
-  --signature checksums.sha256.sig \
+  --bundle checksums.sha256.cosign.bundle \
   --certificate-identity-regexp 'https://github.com/RandomCodeSpace/codeiq/.github/workflows/release-go.yml@.*' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   checksums.sha256

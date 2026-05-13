@@ -98,19 +98,21 @@ sboms:
 # supplies the OIDC token via `id-token: write`; cosign records the
 # signature transparency entry in Rekor (public Sigstore log). No
 # long-lived signing key required.
+#
+# Cosign v4 deprecated `--output-signature` and `--output-certificate`
+# in favor of a single `--bundle` file (DSSE-style). The bundle carries
+# both the signature and the cert; users verify with one flag.
 signs:
   - id: cosign
     cmd: cosign
     args:
       - sign-blob
       - '--yes'
-      - '--output-signature=${signature}'
-      - '--output-certificate=${certificate}'
+      - '--bundle=${signature}'
       - '${artifact}'
     artifacts: checksum
     output: true
-    certificate: '${artifact}.pem'
-    signature: '${artifact}.sig'
+    signature: '${artifact}.cosign.bundle'
 
 # Homebrew tap publish — opt-in via $HOMEBREW_TAP_GITHUB_TOKEN. When the
 # env var is empty (forks, dry runs), the upload is skipped so the same
@@ -152,10 +154,9 @@ release:
         # Checksum
         sha256sum -c checksums.sha256
 
-        # Signature (Sigstore keyless)
+        # Signature (Sigstore keyless, bundle format)
         cosign verify-blob \
-          --certificate checksums.sha256.pem \
-          --signature checksums.sha256.sig \
+          --bundle checksums.sha256.cosign.bundle \
           --certificate-identity-regexp 'https://github.com/RandomCodeSpace/codeiq/.github/workflows/release-go.yml@.*' \
           --certificate-oidc-issuer https://token.actions.githubusercontent.com \
           checksums.sha256
