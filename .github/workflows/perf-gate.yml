@@ -1,0 +1,112 @@
+name: perf-gate
+
+# Performance regression gate. Runs `codeiq index` against fixture-multi-lang
+# and asserts wall-clock + node-count budgets. Catches regressions like:
+#   - Regex pathology re-introduced (e.g. the CertificateAuthDetector
+#     pre-screen miss that pushed indexing from 0.1s → 42s on PSA).
+#   - Detector over-emission past the dedup budget.
+#
+# Trigger: push to main + PRs that touch go/**. Manual via workflow_dispatch.
+# Failure is informational on PRs (`continue-on-error`) until the threshold
+# is curated against real-world load; once stable, set strict gate.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'go/**'
+      - '.github/workflows/perf-gate.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'go/**'
+      - '.github/workflows/perf-gate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    name: index perf gate (fixture-multi-lang)
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: '1'
+      # Per-target budgets. Tune as the fixture grows. Current
+      # fixture-multi-lang sits at ~50 files; an 8 s ceiling leaves
+      # headroom over the observed ~0.3 s without hiding obvious
+      # regressions (10x cushion catches the kinds of regex pathology
+      # that pushed PSA from 0.1 s → 42 s mid-port).
+      MAX_INDEX_SECONDS: '8'
+      MIN_NODES: '40'
+      MAX_PHANTOM_DROP_RATIO: '50'
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version: '1.25.10'
+          cache: true
+          cache-dependency-path: go/go.sum
+      - name: Install C toolchain
+        run: sudo apt-get update -y && sudo apt-get install -y build-essential
+      - name: Build codeiq
+        working-directory: go
+        run: go build -o /tmp/codeiq ./cmd/codeiq
+      - name: Stage fixture (separate copy so cache writes don't dirty git)
+        run: cp -r go/testdata/fixture-multi-lang /tmp/fm-perf
+      - name: Run + measure
+        id: bench
+        run: |
+          set -euo pipefail
+          START=$(date +%s.%N)
+          /tmp/codeiq index /tmp/fm-perf > /tmp/perf.log 2>&1
+          END=$(date +%s.%N)
+          ELAPSED=$(awk "BEGIN{printf \"%.3f\", $END - $START}")
+
+          # Parse the "Files: F  Nodes: N  Edges: E  ..." summary line.
+          NODES=$(awk -F'[ ]+' '/^Files:/ {print $4}' /tmp/perf.log)
+          EDGES=$(awk -F'[ ]+' '/^Files:/ {print $6}' /tmp/perf.log)
+          # Optional "Deduped: D nodes, ... Dropped: P phantom edges"
+          # line; absence is fine, defaults to 0.
+          DEDUP_NODES=$(awk -F'[ ,]+' '/^Deduped:/ {print $2}' /tmp/perf.log)
+          DEDUP_NODES=${DEDUP_NODES:-0}
+          DROPPED=$(awk -F'[ ]+' '/^Deduped:/ {for(i=1;i<=NF;i++) if($i=="Dropped:") print $(i+1)}' /tmp/perf.log)
+          DROPPED=${DROPPED:-0}
+
+          echo "elapsed=$ELAPSED" >> "$GITHUB_OUTPUT"
+          echo "nodes=$NODES"     >> "$GITHUB_OUTPUT"
+          echo "edges=$EDGES"     >> "$GITHUB_OUTPUT"
+          echo "dropped=$DROPPED" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## codeiq perf gate"
+            echo ""
+            echo "| metric | value | budget |"
+            echo "|---|---:|---:|"
+            echo "| wall-clock (s) | $ELAPSED | $MAX_INDEX_SECONDS |"
+            echo "| nodes | $NODES | >= $MIN_NODES |"
+            echo "| edges | $EDGES | — |"
+            echo "| deduped nodes | $DEDUP_NODES | — |"
+            echo "| dropped phantom edges | $DROPPED | ratio gated |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          cat /tmp/perf.log >> "$GITHUB_STEP_SUMMARY"
+
+          # --- Hard gates ---
+          fail=0
+          if awk "BEGIN{exit !($ELAPSED > $MAX_INDEX_SECONDS)}"; then
+            echo "::error::wall-clock $ELAPSED s exceeds budget $MAX_INDEX_SECONDS s"
+            fail=1
+          fi
+          if [ "${NODES:-0}" -lt "$MIN_NODES" ]; then
+            echo "::error::node count $NODES below minimum $MIN_NODES"
+            fail=1
+          fi
+          if [ "${EDGES:-0}" -gt 0 ] && [ "${DROPPED:-0}" -gt 0 ]; then
+            RATIO=$(( DROPPED * 100 / (EDGES + DROPPED) ))
+            if [ "$RATIO" -gt "$MAX_PHANTOM_DROP_RATIO" ]; then
+              echo "::error::phantom-edge drop ratio ${RATIO}% exceeds ${MAX_PHANTOM_DROP_RATIO}%"
+              fail=1
+            fi
+          fi
+          exit $fail

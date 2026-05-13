@@ -1,0 +1,151 @@
+# Goreleaser config for codeiq Go binary releases.
+#
+# Trigger: tag push `vX.Y.Z` → .github/workflows/release-go.yml fires
+# this config. Local dry runs: `goreleaser release --snapshot --clean`.
+#
+# CGO is required (kuzudb + go-sqlite3 native deps), so we cross-compile
+# via per-target runners — see the release workflow matrix. This file
+# is consumed once per target OS.
+
+version: 2
+project_name: codeiq
+
+env:
+  - CGO_ENABLED=1
+  - GO_VERSION=1.25.10
+
+before:
+  hooks:
+    # Sanity gate. Failing here aborts the release before any binary
+    # leaves the runner.
+    - cd go && go mod download
+    - cd go && go test ./... -count=1
+
+builds:
+  - id: codeiq
+    main: ./cmd/codeiq
+    dir: go
+    binary: codeiq
+    env:
+      - CGO_ENABLED=1
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Version={{.Version}}'
+      - -X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Commit={{.ShortCommit}}'
+      - -X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Date={{.Date}}'
+      - -X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Dirty={{.IsGitDirty}}'
+    # CGO + kuzudb makes cross-arch fragile from a single host; the
+    # release workflow runs this config once per (OS, arch) runner.
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      # darwin/amd64 needs a darwin runner — skip when this config is
+      # consumed on a linux runner. The release workflow re-runs the
+      # darwin builds on macOS runners.
+      - goos: darwin
+        goarch: amd64
+
+archives:
+  - id: codeiq
+    formats: [tar.gz]
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    files:
+      - LICENSE*
+      - README.md
+      - CHANGELOG.md
+
+checksum:
+  name_template: 'checksums.sha256'
+  algorithm: sha256
+
+snapshot:
+  version_template: '{{ incpatch .Version }}-next'
+
+# SBOM generation — Plan §5 SBOM signing requirement. Syft is the
+# OSS-CLI choice (matches the existing security.yml stack).
+sboms:
+  - id: codeiq-sbom
+    artifacts: archive
+    documents:
+      - '{{ .ArtifactName }}.sbom.spdx.json'
+    cmd: syft
+    args:
+      - '$artifact'
+      - --output
+      - 'spdx-json={{ .ArtifactName }}.sbom.spdx.json'
+
+# Cosign keyless signing of the checksum manifest. The release workflow
+# supplies the OIDC token via `id-token: write`; cosign records the
+# signature transparency entry in Rekor (public Sigstore log). No
+# long-lived signing key required.
+signs:
+  - id: cosign
+    cmd: cosign
+    args:
+      - sign-blob
+      - '--yes'
+      - '--output-signature=${signature}'
+      - '--output-certificate=${certificate}'
+      - '${artifact}'
+    artifacts: checksum
+    output: true
+    certificate: '${artifact}.pem'
+    signature: '${artifact}.sig'
+
+# Homebrew tap publish — opt-in via $HOMEBREW_TAP_GITHUB_TOKEN. When the
+# env var is empty (forks, dry runs), the upload is skipped so the same
+# .goreleaser.yml works for the owning org and downstream forks alike.
+brews:
+  - name: codeiq
+    repository:
+      owner: '{{ envOrDefault "HOMEBREW_TAP_OWNER" "RandomCodeSpace" }}'
+      name: '{{ envOrDefault "HOMEBREW_TAP_REPO" "homebrew-codeiq" }}'
+      token: '{{ envOrDefault "HOMEBREW_TAP_GITHUB_TOKEN" "" }}'
+    skip_upload: '{{ if eq (envOrDefault "HOMEBREW_TAP_GITHUB_TOKEN" "") "" }}true{{ else }}false{{ end }}'
+    commit_author:
+      name: codeiq-bot
+      email: noreply@github.com
+    directory: Formula
+    homepage: 'https://github.com/RandomCodeSpace/codeiq'
+    description: 'Deterministic code knowledge graph + MCP server'
+    license: 'Apache-2.0'
+    install: |
+      bin.install "codeiq"
+    test: |
+      assert_match "codeiq", shell_output("#{bin}/codeiq --version")
+
+release:
+  github:
+    owner: RandomCodeSpace
+    name: codeiq
+  draft: true
+  prerelease: auto
+  mode: replace
+  name_template: 'v{{ .Version }}'
+  header: |
+    ## codeiq v{{ .Version }}
+
+    Deterministic code knowledge graph — Go single-binary release.
+
+    Verify the download:
+
+        # Checksum
+        sha256sum -c checksums.sha256
+
+        # Signature (Sigstore keyless)
+        cosign verify-blob \
+          --certificate checksums.sha256.pem \
+          --signature checksums.sha256.sig \
+          --certificate-identity-regexp 'https://github.com/RandomCodeSpace/codeiq/.github/workflows/release-go.yml@.*' \
+          --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+          checksums.sha256
+  footer: |
+    ---
+    Built with Go {{ envOrDefault "GO_VERSION" "1.25.10" }} via Goreleaser.
