@@ -78,6 +78,40 @@ func TestDockerfileNegative(t *testing.T) {
 	}
 }
 
+// TestDockerfileImports_EdgeSurvivesSnapshot verifies that the anchor nodes
+// emitted alongside FROM depends_on edges are present in the detector result,
+// so GraphBuilder.Snapshot's phantom-drop filter does not discard them.
+func TestDockerfileImports_EdgeSurvivesSnapshot(t *testing.T) {
+	d := NewDockerfileDetector()
+	r := d.Detect(&detector.Context{FilePath: "Dockerfile", Language: "dockerfile", Content: dockerfileSource})
+
+	var moduleNodes, externalNodes int
+	for _, n := range r.Nodes {
+		switch n.Kind {
+		case model.NodeModule:
+			moduleNodes++
+		case model.NodeExternal:
+			externalNodes++
+		}
+	}
+	if moduleNodes == 0 {
+		t.Fatal("expected at least one MODULE anchor node for the file endpoint")
+	}
+	if externalNodes == 0 {
+		t.Fatal("expected at least one EXTERNAL anchor node for the image target")
+	}
+
+	dependsEdges := 0
+	for _, e := range r.Edges {
+		if e.Kind == model.EdgeDependsOn {
+			dependsEdges++
+		}
+	}
+	if dependsEdges == 0 {
+		t.Fatal("expected at least one surviving depends_on edge, got 0")
+	}
+}
+
 func TestDockerfileDeterminism(t *testing.T) {
 	d := NewDockerfileDetector()
 	ctx := &detector.Context{FilePath: "Dockerfile", Language: "dockerfile", Content: dockerfileSource}

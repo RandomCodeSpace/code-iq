@@ -71,6 +71,40 @@ func TestBicepNegative(t *testing.T) {
 	}
 }
 
+// TestBicepImports_EdgeSurvivesSnapshot verifies that the anchor nodes emitted
+// alongside module depends_on edges are present in the detector result, so
+// GraphBuilder.Snapshot's phantom-drop filter does not discard them.
+func TestBicepImports_EdgeSurvivesSnapshot(t *testing.T) {
+	d := NewBicepDetector()
+	r := d.Detect(&detector.Context{FilePath: "main.bicep", Language: "bicep", Content: bicepSource})
+
+	var moduleNodes, externalNodes int
+	for _, n := range r.Nodes {
+		switch n.Kind {
+		case model.NodeModule:
+			moduleNodes++
+		case model.NodeExternal:
+			externalNodes++
+		}
+	}
+	if moduleNodes == 0 {
+		t.Fatal("expected at least one MODULE anchor node for the file endpoint")
+	}
+	if externalNodes == 0 {
+		t.Fatal("expected at least one EXTERNAL anchor node for the module target")
+	}
+
+	dependsEdges := 0
+	for _, e := range r.Edges {
+		if e.Kind == model.EdgeDependsOn {
+			dependsEdges++
+		}
+	}
+	if dependsEdges == 0 {
+		t.Fatal("expected at least one surviving depends_on edge, got 0")
+	}
+}
+
 func TestBicepDeterminism(t *testing.T) {
 	d := NewBicepDetector()
 	ctx := &detector.Context{FilePath: "main.bicep", Language: "bicep", Content: bicepSource}

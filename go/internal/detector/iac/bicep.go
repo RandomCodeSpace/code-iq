@@ -36,6 +36,7 @@ func (d BicepDetector) Detect(ctx *detector.Context) *detector.Result {
 	var edges []*model.CodeEdge
 	fp := ctx.FilePath
 	lines := strings.Split(text, "\n")
+	seen := map[string]bool{}
 
 	for i, line := range lines {
 		if m := bicepResourceRE.FindStringSubmatch(line); len(m) >= 3 {
@@ -84,7 +85,12 @@ func (d BicepDetector) Detect(ctx *detector.Context) *detector.Result {
 			n.Properties["module_path"] = modPath
 			nodes = append(nodes, n)
 
-			e := model.NewCodeEdge(fp+":depends_on:"+modPath, model.EdgeDependsOn, fp, modPath)
+			// Emit anchor nodes so the depends_on edge survives GraphBuilder's
+			// phantom-drop filter. Without anchors, fp and modPath are free-form
+			// strings that don't match any CodeNode.
+			srcID := base.EnsureFileAnchor(ctx, "bicep", "BicepDetector", model.ConfidenceLexical, &nodes, seen)
+			tgtID := base.EnsureExternalAnchor(modPath, "bicep:external", "BicepDetector", model.ConfidenceLexical, &nodes, seen)
+			e := model.NewCodeEdge(srcID+":depends_on:"+tgtID, model.EdgeDependsOn, srcID, tgtID)
 			e.Source = "BicepDetector"
 			e.Properties["module_name"] = name
 			edges = append(edges, e)

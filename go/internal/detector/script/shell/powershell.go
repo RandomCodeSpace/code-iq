@@ -39,6 +39,7 @@ func (d PowerShellDetector) Detect(ctx *detector.Context) *detector.Result {
 	var edges []*model.CodeEdge
 	fp := ctx.FilePath
 	lines := strings.Split(text, "\n")
+	seen := map[string]bool{}
 
 	for i, line := range lines {
 		// Functions
@@ -66,18 +67,23 @@ func (d PowerShellDetector) Detect(ctx *detector.Context) *detector.Result {
 			nodes = append(nodes, n)
 		}
 
-		// Import-Module
+		// Import-Module — emit anchor nodes so the imports edge survives
+		// GraphBuilder's phantom-drop filter.
 		if m := psImportRE.FindStringSubmatch(line); len(m) >= 2 {
 			imp := m[1]
-			e := model.NewCodeEdge(fp+":imports:"+imp, model.EdgeImports, fp, imp)
+			srcID := base.EnsureFileAnchor(ctx, "powershell", "PowerShellDetector", model.ConfidenceLexical, &nodes, seen)
+			tgtID := base.EnsureExternalAnchor(imp, "powershell:external", "PowerShellDetector", model.ConfidenceLexical, &nodes, seen)
+			e := model.NewCodeEdge(srcID+":imports:"+tgtID, model.EdgeImports, srcID, tgtID)
 			e.Source = "PowerShellDetector"
 			edges = append(edges, e)
 		}
 
-		// . path\to\file.ps1
+		// . path\to\file.ps1 — emit anchor nodes so the imports edge survives.
 		if m := psDotSourceRE.FindStringSubmatch(line); len(m) >= 2 {
 			src := m[1]
-			e := model.NewCodeEdge(fp+":dotsource:"+src, model.EdgeImports, fp, src)
+			srcID := base.EnsureFileAnchor(ctx, "powershell", "PowerShellDetector", model.ConfidenceLexical, &nodes, seen)
+			tgtID := base.EnsureExternalAnchor(src, "powershell:external", "PowerShellDetector", model.ConfidenceLexical, &nodes, seen)
+			e := model.NewCodeEdge(srcID+":dotsource:"+tgtID, model.EdgeImports, srcID, tgtID)
 			e.Source = "PowerShellDetector"
 			edges = append(edges, e)
 		}

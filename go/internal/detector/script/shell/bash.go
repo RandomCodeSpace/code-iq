@@ -39,6 +39,7 @@ func (d BashDetector) Detect(ctx *detector.Context) *detector.Result {
 	var edges []*model.CodeEdge
 	fp := ctx.FilePath
 	lines := strings.Split(text, "\n")
+	seen := map[string]bool{}
 
 	// Shebang → MODULE node for the script
 	if len(lines) > 0 {
@@ -69,9 +70,12 @@ func (d BashDetector) Detect(ctx *detector.Context) *detector.Result {
 		}
 
 		// source ./lib.sh / . helpers.sh
+		// Emit anchor nodes so the imports edge survives GraphBuilder's phantom-drop.
 		if m := bashSourceRE.FindStringSubmatch(line); len(m) >= 2 {
 			src := m[1]
-			e := model.NewCodeEdge(fp+":sources:"+src, model.EdgeImports, fp, src)
+			srcID := base.EnsureFileAnchor(ctx, "bash", "BashDetector", model.ConfidenceLexical, &nodes, seen)
+			tgtID := base.EnsureExternalAnchor(src, "bash:external", "BashDetector", model.ConfidenceLexical, &nodes, seen)
+			e := model.NewCodeEdge(srcID+":sources:"+tgtID, model.EdgeImports, srcID, tgtID)
 			e.Source = "BashDetector"
 			edges = append(edges, e)
 		}
@@ -89,6 +93,7 @@ func (d BashDetector) Detect(ctx *detector.Context) *detector.Result {
 	}
 
 	// Tool calls — dedup across the whole file, skip comments
+	// Emit anchor nodes so the calls edges survive GraphBuilder's phantom-drop.
 	toolsSeen := map[string]bool{}
 	for _, line := range lines {
 		stripped := strings.TrimLeft(line, " \t")
@@ -101,7 +106,9 @@ func (d BashDetector) Detect(ctx *detector.Context) *detector.Result {
 				continue
 			}
 			toolsSeen[tool] = true
-			e := model.NewCodeEdge(fp+":calls:"+tool, model.EdgeCalls, fp, tool)
+			srcID := base.EnsureFileAnchor(ctx, "bash", "BashDetector", model.ConfidenceLexical, &nodes, seen)
+			tgtID := base.EnsureExternalAnchor(tool, "bash:tool", "BashDetector", model.ConfidenceLexical, &nodes, seen)
+			e := model.NewCodeEdge(srcID+":calls:"+tgtID, model.EdgeCalls, srcID, tgtID)
 			e.Source = "BashDetector"
 			e.Properties["tool"] = tool
 			edges = append(edges, e)
