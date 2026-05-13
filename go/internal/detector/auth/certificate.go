@@ -62,14 +62,26 @@ var (
 	}
 	certCertPathRE = regexp.MustCompile(`['"]([^'"]*\.(?:pem|crt|key|cert|pfx|p12))['"]`)
 	certTenantIDRE = regexp.MustCompile(`AZURE_TENANT_ID\s*[=:]\s*['"]?([a-f0-9-]+)['"]?`)
-	certPreScreen  = regexp.MustCompile(
-		`ssl_verify_client|requestCert|clientAuth|X509|` +
-			`AddCertificateForwarding|CertificateAuthenticationDefaults|` +
-			`\.x509\(|javax\.net\.ssl|SSLContext|tls\.createServer|` +
-			`trustStore|AzureAd|AZURE_TENANT_ID|AZURE_CLIENT_ID|` +
-			`ClientCertificateCredential|AddMicrosoftIdentityWebApi|` +
-			`msal|MSAL|@azure/msal|\.pem|\.crt|\.cert`,
-	)
+	// certStrictKeywords gate detector entry. STRICT subset: file must
+	// contain at least one of these high-signal markers before we even
+	// consider running the 20 per-pattern regexes. Loose keywords like
+	// ".pem"/".crt"/".cert" are NOT in this set because they show up as
+	// path/extension references in millions of unrelated lines (e.g. C#
+	// `using System.Security.Cryptography.X509Certificates`) and would
+	// turn the per-line gate into a no-op.
+	//
+	// Profiling on PSScriptAnalyzer (593 files, 203 C#) showed
+	// CertificateAuthDetector consuming 99% of indexing CPU before this
+	// pre-screen. Tighter gate keeps the detector fast on cert-free repos.
+	certStrictKeywords = []string{
+		"ssl_verify_client", "requestCert", "clientAuth=",
+		"AddCertificateForwarding", "CertificateAuthenticationDefaults",
+		".x509(", "X509AuthenticationFilter",
+		"javax.net.ssl", "SSLContext", "tls.createServer",
+		"trustStore", "AzureAd", "AZURE_TENANT_ID", "AZURE_CLIENT_ID",
+		"ClientCertificateCredential", "AddMicrosoftIdentityWebApi",
+		"@azure/msal",
+	}
 )
 
 var certAllPatterns []certPatternDef
@@ -81,12 +93,24 @@ func init() {
 	certAllPatterns = append(certAllPatterns, certAzureAdPatterns...)
 }
 
+// certLineQuickScan returns true if s contains any of the auth-cert
+// keywords. Cheap O(n*k) byte scan beats running 20 regex alternation
+// engines per line. Used both as a file-level and a per-line gate.
+func certLineQuickScan(s string) bool {
+	for _, kw := range certStrictKeywords {
+		if strings.Contains(s, kw) {
+			return true
+		}
+	}
+	return false
+}
+
 func (d CertificateAuthDetector) Detect(ctx *detector.Context) *detector.Result {
 	text := ctx.Content
 	if text == "" {
 		return detector.EmptyResult()
 	}
-	if !certPreScreen.MatchString(text) {
+	if !certLineQuickScan(text) {
 		return detector.EmptyResult()
 	}
 
@@ -95,6 +119,11 @@ func (d CertificateAuthDetector) Detect(ctx *detector.Context) *detector.Result 
 	seenLines := map[int]bool{}
 
 	for lineIdx, line := range lines {
+		// Per-line pre-screen: skip the 20 regex passes on lines without
+		// any cert-auth keyword. ~99% reduction on real codebases.
+		if !certLineQuickScan(line) {
+			continue
+		}
 		for _, pdef := range certAllPatterns {
 			if seenLines[lineIdx] {
 				break
