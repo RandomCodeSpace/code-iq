@@ -101,9 +101,17 @@ func (s *Store) copyNodeBatch(batch []*model.CodeNode) error {
 
 	// Kuzu COPY FROM with explicit column list. ToSlash for Windows path
 	// portability — Kuzu's parser accepts forward slashes on all platforms.
-	// DELIM='|' matches the pipe-separated staging file written above.
+	//
+	// DELIM='|' matches the pipe-separated staging file written above. The
+	// explicit QUOTE/ESCAPE pair overrides Kuzu's default backslash-escape
+	// behaviour with RFC-4180 (doubled-quote) escaping so that Go's
+	// encoding/csv writer (which emits "field""with""quotes" form) round-
+	// trips correctly. Fields containing the delimiter (e.g. Istio service
+	// names like "inbound|7070|tcplocal|s1tcp.none") are wrapped by the Go
+	// writer; Kuzu then dequotes them only when the matching escape rule is
+	// set.
 	q := fmt.Sprintf(
-		"COPY CodeNode(%s) FROM '%s' (header=false, DELIM='|')",
+		`COPY CodeNode(%s) FROM '%s' (header=false, DELIM='|', QUOTE='"', ESCAPE='"')`,
 		strings.Join(nodeColumns, ", "),
 		filepath.ToSlash(tmp.Name()),
 	)
@@ -263,9 +271,10 @@ func (s *Store) copyEdgeBatch(kind model.EdgeKind, batch []*model.CodeEdge) erro
 		return fmt.Errorf("graph: csv close: %w", err)
 	}
 
-	// DELIM='|' matches the pipe-separated staging file written above.
+	// DELIM/QUOTE/ESCAPE — see copyNodeBatch for the rationale (RFC-4180
+	// round-trip with Go's encoding/csv).
 	q := fmt.Sprintf(
-		"COPY %s FROM '%s' (header=false, DELIM='|')",
+		`COPY %s FROM '%s' (header=false, DELIM='|', QUOTE='"', ESCAPE='"')`,
 		relTableName(kind),
 		filepath.ToSlash(tmp.Name()),
 	)
