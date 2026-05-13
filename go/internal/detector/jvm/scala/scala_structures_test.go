@@ -121,6 +121,44 @@ func TestScalaStructuresNegative(t *testing.T) {
 	}
 }
 
+// TestScalaStructuresNoFrameworkEmissions verifies the structures detector emits
+// ONLY structural nodes (class/interface/method) on plain Scala files — no
+// framework-flavored (endpoint, middleware, guard) nodes regardless of content.
+func TestScalaStructuresNoFrameworkEmissions(t *testing.T) {
+	d := NewScalaStructuresDetector()
+	plainUtils := `package com.example.utils
+
+object PlainUtils {
+  def add(a: Int, b: Int): Int = a + b
+  def greet(name: String): String = s"Hello, $name!"
+}
+
+class Counter(initial: Int) {
+  private var count = initial
+  def increment(): Unit = { count += 1 }
+  def value: Int = count
+}
+`
+	ctx := &detector.Context{FilePath: "PlainUtils.scala", Language: "scala", Content: plainUtils}
+	r := d.Detect(ctx)
+	for _, n := range r.Nodes {
+		switch n.Kind {
+		case model.NodeClass, model.NodeInterface, model.NodeMethod:
+			// expected structural nodes — OK
+		default:
+			t.Errorf("unexpected framework node kind %q (id=%q) on plain Scala file", n.Kind, n.ID)
+		}
+	}
+	for _, e := range r.Edges {
+		switch e.Kind {
+		case model.EdgeImports, model.EdgeExtends, model.EdgeImplements:
+			// expected structural edges — OK
+		default:
+			t.Errorf("unexpected framework edge kind %q on plain Scala file", e.Kind)
+		}
+	}
+}
+
 func TestScalaStructuresDeterminism(t *testing.T) {
 	d := NewScalaStructuresDetector()
 	ctx := &detector.Context{FilePath: "src/A.scala", Language: "scala", Content: scalaStructuresSample}

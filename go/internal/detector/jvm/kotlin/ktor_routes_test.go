@@ -90,6 +90,50 @@ func TestKtorRoutesNegative(t *testing.T) {
 	}
 }
 
+// TestKtorRoutesNoFireOnPlainDSL verifies the import discriminator prevents false
+// positives when plain Kotlin code uses DSL patterns that visually resemble Ktor
+// (routing {}, get("/path") {}, install(...)) but has no io.ktor import.
+func TestKtorRoutesNoFireOnPlainDSL(t *testing.T) {
+	d := NewKtorRouteDetector()
+	plainWithDSL := `package com.example
+
+fun runTest() {
+    routing { println("not ktor") }
+    get("/fake") { doSomething() }
+    post("/fake") { doSomething() }
+    install(Something)
+}
+`
+	ctx := &detector.Context{FilePath: "src/PlainUtils.kt", Language: "kotlin", Content: plainWithDSL}
+	r := d.Detect(ctx)
+	if len(r.Nodes) != 0 {
+		t.Fatalf("expected 0 nodes on plain Kotlin DSL without io.ktor import, got %d nodes", len(r.Nodes))
+	}
+}
+
+// TestKtorRoutesNoFireOnFixturePlainUtils verifies zero framework emissions on
+// the PlainUtils.kt fixture (stdlib only, no framework imports).
+func TestKtorRoutesNoFireOnFixturePlainUtils(t *testing.T) {
+	d := NewKtorRouteDetector()
+	plainUtils := `package com.example.utils
+
+fun add(a: Int, b: Int): Int = a + b
+
+fun greet(name: String): String = "Hello, $name!"
+
+class Counter(initial: Int) {
+    private var count = initial
+    fun increment() { count++ }
+    fun value(): Int = count
+}
+`
+	ctx := &detector.Context{FilePath: "src/PlainUtils.kt", Language: "kotlin", Content: plainUtils}
+	r := d.Detect(ctx)
+	if len(r.Nodes) != 0 {
+		t.Fatalf("expected 0 framework nodes on PlainUtils.kt, got %d", len(r.Nodes))
+	}
+}
+
 func TestKtorRoutesDeterminism(t *testing.T) {
 	d := NewKtorRouteDetector()
 	ctx := &detector.Context{FilePath: "src/Routes.kt", Language: "kotlin", Content: ktorRoutesSample}

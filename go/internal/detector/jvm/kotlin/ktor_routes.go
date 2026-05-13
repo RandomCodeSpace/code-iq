@@ -12,6 +12,10 @@ import (
 // KtorRouteDetector mirrors Java KtorRouteDetector regex tier. Detects
 // `routing { get("/p") { } }` blocks, `route("/api") {` prefixes,
 // `authenticate("...") {` guards, and `install(...)` features.
+//
+// REQUIRES a Ktor-specific discriminator import (`io.ktor`) to avoid false
+// positives on plain Kotlin code that uses similar DSL idioms (e.g. custom
+// routing DSLs, test fixtures, or coroutine builders named `routing`/`get`).
 type KtorRouteDetector struct{}
 
 func NewKtorRouteDetector() *KtorRouteDetector { return &KtorRouteDetector{} }
@@ -71,6 +75,14 @@ func (d KtorRouteDetector) Detect(ctx *detector.Context) *detector.Result {
 	if text == "" {
 		return detector.EmptyResult()
 	}
+
+	// Discriminator: require an io.ktor import to avoid false positives on
+	// plain Kotlin code that uses DSL patterns (routing {}, get("...") {})
+	// without any Ktor dependency.
+	if !strings.Contains(text, "io.ktor") {
+		return detector.EmptyResult()
+	}
+
 	fp := ctx.FilePath
 	var nodes []*model.CodeNode
 
