@@ -34,9 +34,9 @@ func TestBashPositive(t *testing.T) {
 	for _, n := range r.Nodes {
 		kinds[n.Kind]++
 	}
-	// 1 shebang module
-	if kinds[model.NodeModule] != 1 {
-		t.Errorf("expected 1 MODULE (shebang), got %d", kinds[model.NodeModule])
+	// 1 shebang module + 1 file-anchor module (emitted by import/calls anchor helpers)
+	if kinds[model.NodeModule] != 2 {
+		t.Errorf("expected 2 MODULE (shebang + file anchor), got %d", kinds[model.NodeModule])
 	}
 	// 2 functions (deploy, cleanup)
 	if kinds[model.NodeMethod] != 2 {
@@ -72,6 +72,46 @@ func TestBashNegative(t *testing.T) {
 	r := d.Detect(&detector.Context{FilePath: "x.sh", Language: "bash", Content: ""})
 	if len(r.Nodes) != 0 {
 		t.Fatal("expected 0 nodes")
+	}
+}
+
+// TestBashImports_EdgeSurvivesSnapshot verifies that the anchor nodes emitted
+// alongside source/calls edges are present in the detector result, so
+// GraphBuilder.Snapshot's phantom-drop filter does not discard them.
+func TestBashImports_EdgeSurvivesSnapshot(t *testing.T) {
+	d := NewBashDetector()
+	r := d.Detect(&detector.Context{FilePath: "deploy.sh", Language: "bash", Content: bashSource})
+
+	var moduleNodes, externalNodes int
+	for _, n := range r.Nodes {
+		switch n.Kind {
+		case model.NodeModule:
+			moduleNodes++
+		case model.NodeExternal:
+			externalNodes++
+		}
+	}
+	if moduleNodes == 0 {
+		t.Fatal("expected at least one MODULE anchor node for the file endpoint")
+	}
+	if externalNodes == 0 {
+		t.Fatal("expected at least one EXTERNAL anchor node for imported/called targets")
+	}
+
+	var importEdges, callEdges int
+	for _, e := range r.Edges {
+		switch e.Kind {
+		case model.EdgeImports:
+			importEdges++
+		case model.EdgeCalls:
+			callEdges++
+		}
+	}
+	if importEdges == 0 {
+		t.Fatal("expected at least one surviving imports edge, got 0")
+	}
+	if callEdges == 0 {
+		t.Fatal("expected at least one surviving calls edge, got 0")
 	}
 }
 

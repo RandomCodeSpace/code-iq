@@ -43,6 +43,7 @@ func (d DockerfileDetector) Detect(ctx *detector.Context) *detector.Result {
 	var nodes []*model.CodeNode
 	var edges []*model.CodeEdge
 	fp := ctx.FilePath
+	seen := map[string]bool{}
 
 	// Stage tracking — alias → node id, plus offsets so we can resolve which
 	// FROM is the *current* stage at any byte offset later in the file.
@@ -86,7 +87,12 @@ func (d DockerfileDetector) Detect(ctx *detector.Context) *detector.Result {
 		fromOffsets = append(fromOffsets, fromOffset{offset: m[0], nodeIndex: len(nodes)})
 		nodes = append(nodes, n)
 
-		e := model.NewCodeEdge(fp+":depends_on:"+image, model.EdgeDependsOn, fp, image)
+		// Emit anchor nodes so the depends_on edge survives GraphBuilder's
+		// phantom-drop filter. Without anchors, fp and image are free-form
+		// strings that don't match any CodeNode.
+		srcID := base.EnsureFileAnchor(ctx, "dockerfile", "DockerfileDetector", model.ConfidenceLexical, &nodes, seen)
+		tgtID := base.EnsureExternalAnchor(image, "docker:image", "DockerfileDetector", model.ConfidenceLexical, &nodes, seen)
+		e := model.NewCodeEdge(srcID+":depends_on:"+tgtID, model.EdgeDependsOn, srcID, tgtID)
 		e.Source = "DockerfileDetector"
 		edges = append(edges, e)
 	}

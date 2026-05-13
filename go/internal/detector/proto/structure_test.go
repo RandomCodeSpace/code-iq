@@ -80,6 +80,40 @@ func TestProtoNegative(t *testing.T) {
 	}
 }
 
+// TestProtoImports_EdgeSurvivesSnapshot verifies that the anchor nodes emitted
+// alongside proto import edges are present in the detector result, so
+// GraphBuilder.Snapshot's phantom-drop filter does not discard them.
+func TestProtoImports_EdgeSurvivesSnapshot(t *testing.T) {
+	d := NewStructureDetector()
+	r := d.Detect(&detector.Context{FilePath: "api.proto", Language: "proto", Content: protoSource})
+
+	var moduleNodes, externalNodes int
+	for _, n := range r.Nodes {
+		switch n.Kind {
+		case model.NodeModule:
+			moduleNodes++
+		case model.NodeExternal:
+			externalNodes++
+		}
+	}
+	if moduleNodes == 0 {
+		t.Fatal("expected at least one MODULE anchor node for the file endpoint")
+	}
+	if externalNodes == 0 {
+		t.Fatal("expected at least one EXTERNAL anchor node for the import target")
+	}
+
+	importEdges := 0
+	for _, e := range r.Edges {
+		if e.Kind == model.EdgeImports {
+			importEdges++
+		}
+	}
+	if importEdges == 0 {
+		t.Fatal("expected at least one surviving imports edge, got 0")
+	}
+}
+
 func TestProtoDeterminism(t *testing.T) {
 	d := NewStructureDetector()
 	ctx := &detector.Context{FilePath: "api.proto", Language: "proto", Content: protoSource}

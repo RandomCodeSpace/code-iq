@@ -39,6 +39,7 @@ func (d StructureDetector) Detect(ctx *detector.Context) *detector.Result {
 	var edges []*model.CodeEdge
 	fp := ctx.FilePath
 	lines := strings.Split(text, "\n")
+	seen := map[string]bool{}
 
 	// Package (first match only)
 	for i, line := range lines {
@@ -55,11 +56,15 @@ func (d StructureDetector) Detect(ctx *detector.Context) *detector.Result {
 		}
 	}
 
-	// Imports
+	// Imports — emit anchor nodes so the imports edge survives GraphBuilder's
+	// phantom-drop filter. Without anchors, fp and imp are free-form strings
+	// that don't match any CodeNode.
 	for _, line := range lines {
 		if m := protoImportRE.FindStringSubmatch(line); len(m) >= 2 {
 			imp := m[1]
-			e := model.NewCodeEdge(fp+":imports:"+imp, model.EdgeImports, fp, imp)
+			srcID := base.EnsureFileAnchor(ctx, "proto", "ProtoStructureDetector", model.ConfidenceLexical, &nodes, seen)
+			tgtID := base.EnsureExternalAnchor(imp, "proto:external", "ProtoStructureDetector", model.ConfidenceLexical, &nodes, seen)
+			e := model.NewCodeEdge(srcID+":imports:"+tgtID, model.EdgeImports, srcID, tgtID)
 			e.Source = "ProtoStructureDetector"
 			edges = append(edges, e)
 		}
