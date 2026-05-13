@@ -14,16 +14,15 @@ name: Java CI
 on:
   push:
     branches: [main]
-    paths:
-      - 'src/**'
-      - 'pom.xml'
-      - '.github/workflows/ci-java.yml'
   pull_request:
     branches: [main]
-    paths:
-      - 'src/**'
-      - 'pom.xml'
-      - '.github/workflows/ci-java.yml'
+  # NOTE: no `paths:` filter. The `build` job name is a required check
+  # on main's branch protection, and a `paths:` filter would cause the
+  # check to be skipped on PRs that don't touch Java — leaving the
+  # required check stuck at "Waiting for status to be reported", which
+  # blocks merge of every non-Java PR (e.g. PR #131 phase 5 release infra).
+  # Java compile is ~1 minute; the cost is worth the always-on signal
+  # until Phase 6 cutover deletes the Java tree entirely.
 
 permissions: read-all
 
