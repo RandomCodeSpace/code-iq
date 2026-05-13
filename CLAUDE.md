@@ -1,498 +1,440 @@
-# codeiq (Java) -- Project Instructions
+# codeiq (Go) — Project Instructions
 
 ## What This Project Is
 
-**codeiq** -- a CLI tool + server that scans codebases to build a deterministic code knowledge graph. No AI, no external APIs -- pure static analysis. 99 detectors, 35+ languages, Neo4j Embedded graph database, Spring AI MCP server, REST API, web UI.
+**codeiq** — a CLI tool + MCP server that scans codebases to build a
+deterministic code knowledge graph. No AI, no external APIs — pure
+static analysis. 100 detectors, 35+ languages, Kuzu embedded graph
+database, MCP stdio server, single static Go binary.
 
-- **Maven coordinates:** `io.github.randomcodespace.iq:code-iq` (artifactId intentionally unchanged)
-- **CLI command:** `codeiq` (via `java -jar`; JAR filename remains `code-iq-*-cli.jar`)
-- **Java package:** `io.github.randomcodespace.iq` (under `src/main/java/`)
-- **GitHub repo:** `RandomCodeSpace/codeiq` (branch: `main`)
-- **Cache directory on disk:** `.codeiq/cache` (H2 analysis cache)
-- **Neo4j directory on disk:** `.codeiq/graph/graph.db` (enriched graph)
-- **Config file:** `codeiq.yml` (project-level overrides)
+- **CLI command**: `codeiq` (single binary from `go/cmd/codeiq/main.go`)
+- **Go module**: `github.com/randomcodespace/codeiq/go`
+- **Go directive**: `go 1.25.0` (dep-mandated by `modelcontextprotocol/go-sdk`); `toolchain go1.25.10`
+- **GitHub repo**: `RandomCodeSpace/codeiq` (default branch: `main`)
+- **Cache on disk**: `.codeiq/cache/codeiq.sqlite` (SQLite analysis cache)
+- **Graph on disk**: `.codeiq/graph/codeiq.kuzu` (Kuzu embedded graph)
+- **Config file**: `codeiq.yml` (project-level overrides)
+
+The Java/Spring Boot reference that seeded this codebase was deleted
+in Phase 6 cutover (v1.0.0). For history, see commits `c363727` (port
+landing) and `c630245` (release infra).
 
 ## Tech Stack
 
-> **Source of truth:** `pom.xml` and `src/main/frontend/package.json`. Update
-> these pins together — when `pom.xml` bumps, this list moves with it as part
-> of the same PR. Pre-PR-5 the list had drifted (Spring Boot 4.0.5,
-> Neo4j 2026.02.3, Spring AI 2.0.0-M3); PR 5 brought it back in sync.
+> Source of truth: `go/go.mod` + `go/go.sum`. Update pins there; this
+> list moves with them in the same commit.
 
-- Java 25 (virtual threads, pattern matching, records, sealed classes)
-- Spring Boot 4.0.6 (parent POM `<version>`)
-- Neo4j Embedded 2026.04.0 (Community Edition, no external server)
-- Spring AI 2.0.0-M4 (MCP server, `@McpTool` annotations, streamable HTTP)
-- Bucket4j 8.18.0 (`bucket4j_jdk17-core`, in-process token-bucket rate limiter)
-- logstash-logback-encoder 9.0 (JSON-structured logging in `serving` profile)
-- micrometer-registry-prometheus (`/actuator/prometheus`, version managed by Boot BOM)
-- JavaParser 3.28.0 (Java AST analysis)
-- ANTLR 4.13.2 (TypeScript/JavaScript, Python, Go, C#, Rust, C++ grammars)
-- Picocli 4.7.7 (CLI framework, integrated with Spring Boot)
-- React 18 + TypeScript + Vite 6 + Ant Design v5 + ECharts v5 (web UI)
-- H2 (incremental analysis cache)
+- **Go 1.25.10** — toolchain pin; module min is 1.25.0 (clamped by the
+  MCP SDK's own `go` directive).
+- **Kuzu 0.7.1** (`github.com/kuzudb/go-kuzu`) — embedded graph DB.
+  CGO. v0.7.1 quirks documented in `## Gotchas` below.
+- **`mattn/go-sqlite3` 1.14.22** — SQLite analysis cache. CGO.
+- **`smacker/go-tree-sitter`** — AST parsing for Java / Python /
+  TypeScript / Go.
+- **`modelcontextprotocol/go-sdk` v1.6** — stdio MCP server. v1.6 API
+  shape: `Server.Serve(ctx, mcpsdk.Transport)`; no `NewStdioTransport`
+  helper.
+- **`spf13/cobra`** — CLI framework. Subcommand registration via
+  `internal/cli` blank imports.
+- **`golang-jwt/jwt/v5`** — token validation surface (kept from a
+  serve-mode prototype; serve isn't fully ported yet).
 
 ## Architecture
-
-### Deployment Model
-
-```
-Developer machine:
-  codeiq index  /repo  →  H2 cache (.codeiq/cache/)
-  codeiq enrich /repo  →  Neo4j (.codeiq/graph/graph.db)
-  codeiq bundle /repo  →  bundle.zip (graph + source snapshot)
-
-Remote server (or local):
-  codeiq serve /repo   →  read-only API + MCP + UI (from Neo4j)
-```
-
-**Key principle:** MCP and API are strictly **read-only**. No data manipulation from the serving layer. Analysis happens only via CLI (`index`/`enrich`). The remote server may not have source code access (bundle deployment model).
 
 ### Pipeline
 
 ```
-index:   FileDiscovery → Parsers → Detectors (virtual threads) → GraphBuilder → H2 cache
-enrich:  H2 → Linkers → LayerClassifier → LexicalEnricher → LanguageEnricher → ServiceDetector → Neo4j (UNWIND bulk-load)
-serve:   Neo4j → GraphStore → QueryService → REST API / MCP / Web UI
+index:   FileDiscovery → Parsers → Detectors (goroutine pool) → GraphBuilder → SQLite cache
+enrich:  SQLite → Linkers → LayerClassifier → LexicalEnricher → LanguageEnricher → ServiceDetector → Kuzu (COPY FROM)
+serve:   (deferred — not ported in v1.0.0)
+mcp:     Kuzu → QueryService → 6 consolidated MCP tools + run_cypher escape hatch + review_changes
 ```
 
-### Pipeline Components
-- **FileDiscovery** -- discovers files via `git ls-files` or directory walk, maps extensions to languages
-- **StructuredParser** -- routes files to JavaParser (Java), ANTLR (TS/Py/Go/C#/Rust/C++), or raw text
-- **Detectors** -- 97 concrete detector beans (Spring `@Component`), auto-discovered via classpath scan
-- **GraphBuilder** -- buffers all nodes and edges, flushes nodes first then edges (determinism guarantee)
-- **Linkers** -- run after all detectors: `TopicLinker`, `EntityLinker`, `ModuleContainmentLinker`
-- **LayerClassifier** -- sets `layer` property on every node using node kind, framework, and path heuristics
-- **ServiceDetector** -- scans filesystem for build files (30+ build systems), creates SERVICE nodes with CONTAINS edges
-- **GraphStore** -- facade over Neo4j, UNWIND-based bulk save, Cypher reads (no SDN for reads)
-- **AnalysisCache** -- H2-backed file hash cache for incremental analysis
+### Pipeline components
 
-### Spring Profiles
-- **`indexing`** -- active during CLI index/analyze/stats/graph/query/find/flow/bundle/cache/plugins commands. No Neo4j.
-- **`serving`** -- active during `serve` command. Starts Neo4j Embedded, REST API, MCP server, web UI.
+- **`internal/analyzer/file_discovery.go`** — `git ls-files` first,
+  dir-walk fallback. Maps extension → `parser.Language` via
+  `LanguageFromExtension` in `internal/parser/parser.go`.
+- **`internal/parser`** — tree-sitter wrappers + a structured parser
+  for YAML/JSON/TOML/INI/properties. Falls back to regex-only when
+  parse fails (matches Java's per-file try/catch).
+- **`internal/detector`** — `@Component` analogue is Go's `init()`
+  blank-import pattern; every detector registers itself with
+  `detector.Default`. Auto-discovery via `internal/cli/detectors_register.go`
+  (this file is the choke point — every detector package leaf must
+  blank-import here or the binary won't fire it).
+- **`internal/analyzer/graph_builder.go`** — buffers detector results.
+  Confidence-aware node merge (`mergeNode`), canonical
+  `(source, target, kind)` edge dedup, deterministic Snapshot with
+  dangling-edge drop. Surfaces dedup/drop counts on `Stats`.
+- **`internal/analyzer/linker/`** — TopicLinker, EntityLinker,
+  ModuleContainmentLinker. Each emits `Result{Nodes, Edges}` that's
+  `.Sorted()` at the call site (Phase 1 §1.4).
+- **`internal/graph`** — Kuzu wrapper. Read-only via `OpenReadOnly`
+  (mutation gate in `cypher.go`).
+- **`internal/mcp`** — 6 consolidated mode-driven tools (`graph_summary`,
+  `find_in_graph`, `inspect_node`, `trace_relationships`,
+  `analyze_impact`, `topology_view`), `run_cypher` escape hatch, the
+  34 deprecated narrow tools, plus `review_changes`.
+- **`internal/review`** — diff parser, Ollama-compatible chat client,
+  ReviewService orchestrator. Default endpoint = local Ollama;
+  `OLLAMA_API_KEY` flips to Ollama Cloud.
 
-## Package Structure
+### Package layout
 
 ```
-io.github.randomcodespace.iq
-  |-- CodeIqApplication.java       # Spring Boot main class
-  |-- analyzer/                    # Pipeline: Analyzer, FileDiscovery, GraphBuilder, LayerClassifier, ServiceDetector
-  |   |-- linker/                  # Cross-file linkers: TopicLinker, EntityLinker, ModuleContainmentLinker
-  |-- api/                         # REST controllers: GraphController (read-only), FlowController, TopologyController
-  |-- cache/                       # AnalysisCache (H2), FileHasher
-  |-- cli/                         # Picocli commands: index, enrich, serve, analyze, stats, etc.
-  |-- config/                      # Spring config: Neo4jConfig, CodeIqConfig, JacksonConfig
-  |-- detector/                    # Detector interface + 97 concrete detectors
-  |   |-- auth/                    # LDAP, certificate, session/header auth (cross-cutting)
-  |   |-- csharp/                  # EF Core, Minimal APIs, C# structures
-  |   |-- frontend/                # React, Vue, Angular, Svelte, frontend routes
-  |   |-- generic/                 # Generic imports
-  |   |-- go/                      # Go web, ORM, structures
-  |   |-- iac/                     # Terraform, Dockerfile, Bicep
-  |   |-- jvm/                     # JVM-family languages
-  |   |   |-- java/                # 27 Java detectors (Spring, JPA, Kafka, gRPC, etc.)
-  |   |   |-- kotlin/              # Ktor, Kotlin structures
-  |   |   |-- scala/               # Scala structures
-  |   |-- markup/                  # Markdown structure (renamed from docs/)
-  |   |-- proto/                   # Proto structures
-  |   |-- python/                  # Django, FastAPI, Flask, SQLAlchemy, Celery, etc.
-  |   |-- script/                  # Scripting languages
-  |   |   |-- shell/               # Bash, PowerShell
-  |   |-- sql/                     # (placeholder — follow-up #48)
-  |   |-- structured/              # YAML, JSON, TOML, INI, properties, K8s, Helm, GHA, etc. (renamed from config/)
-  |   |-- systems/                 # Systems languages
-  |   |   |-- cpp/                 # C++ structures
-  |   |   |-- rust/                # Actix-web, Rust structures
-  |   |-- typescript/              # Express, NestJS, Fastify, Prisma, TypeORM, etc.
-  |-- flow/                        # FlowEngine, FlowRenderer, FlowViews, FlowModels
-  |-- grammar/                     # ANTLR parser factory + generated parsers
-  |-- graph/                       # GraphStore (Neo4j facade), GraphRepository (SDN, writes only)
-  |-- health/                      # GraphHealthIndicator (Spring Actuator)
-  |-- mcp/                         # McpTools (34 @McpTool methods, read-only, includes intelligence tools)
-  |-- model/                       # CodeNode, CodeEdge, NodeKind (34), EdgeKind (28), Confidence
-  |-- intelligence/               # Intelligence enrichment (Phase 2-5)
-  |   |-- lexical/                # LexicalEnricher, LexicalQueryService, DocCommentExtractor, SnippetStore
-  |   |-- extractor/              # LanguageEnricher, LanguageExtractor, LanguageExtractionResult
-  |   |   |-- java/               # JavaLanguageExtractor
-  |   |   |-- typescript/         # TypeScriptLanguageExtractor
-  |   |   |-- python/             # PythonLanguageExtractor
-  |   |   |-- go/                 # GoLanguageExtractor
-  |   |-- evidence/               # EvidencePack, EvidencePackAssembler
-  |   |-- query/                  # QueryPlanner, QueryRoute, QueryPlan
-  |-- query/                       # QueryService, StatsService (categorized), TopologyService
-  |-- web/                         # Static resource serving (React SPA)
+go/
+├── cmd/codeiq/                 # main package — single binary entrypoint
+├── internal/
+│   ├── analyzer/               # pipeline orchestration
+│   │   └── linker/             # cross-file enrichers
+│   ├── buildinfo/              # version/commit/date from -ldflags
+│   ├── cache/                  # SQLite analysis cache
+│   ├── cli/                    # cobra subcommands + detector registrations
+│   ├── detector/               # 100 detectors organized by category
+│   │   ├── auth/
+│   │   ├── base/               # AbstractDetector analogues + helpers
+│   │   ├── csharp/
+│   │   ├── frontend/           # React, Vue, Svelte, Angular, frontend routes
+│   │   ├── generic/
+│   │   ├── golang/
+│   │   ├── iac/                # Terraform, Bicep, Dockerfile, CloudFormation
+│   │   ├── jvm/
+│   │   │   ├── java/           # ~37 Java detectors
+│   │   │   ├── kotlin/
+│   │   │   └── scala/
+│   │   ├── markup/             # Markdown
+│   │   ├── proto/
+│   │   ├── python/
+│   │   ├── script/shell/       # PowerShell, Bash
+│   │   ├── sql/                # SqlMigration
+│   │   ├── structured/         # YAML, JSON, TOML, K8s, Helm, OpenAPI, …
+│   │   ├── systems/{cpp,rust}/
+│   │   └── typescript/
+│   ├── flow/                   # architecture-flow diagram engine
+│   ├── graph/                  # Kuzu facade
+│   ├── intelligence/           # Lexical + language extractors + evidence + query planner
+│   ├── mcp/                    # MCP server + tool definitions
+│   ├── model/                  # CodeNode, CodeEdge, NodeKind, EdgeKind, Confidence, Layer
+│   ├── parser/                 # tree-sitter + structured parsers
+│   ├── query/                  # service / topology / stats
+│   └── review/                 # PR-review pipeline (diff + LLM)
+├── parity/                     # parity harness (build tag `parity`)
+├── testdata/                   # fixtures
+├── go.mod
+└── go.sum
 ```
 
 ## Critical Rules
 
-### Read-Only Serving Layer
-- MCP and API are **strictly read-only** -- no data manipulation
-- Analysis/enrichment happens only via CLI (`index`, `enrich`)
-- Remote servers may not have source code access (bundle deployment)
-- No `POST /api/analyze` or `analyze_codebase` MCP tool
+### Read-Only MCP
 
-### Determinism is Non-Negotiable
-- Same input MUST produce same output, every time
-- No `Set` iteration without sorting first (`TreeSet` or `stream().sorted()`)
-- No dependency on thread completion order (GraphBuilder uses indexed result slots)
-- All detectors must be stateless -- no mutable instance fields, use method-local state only
+The MCP server is **strictly read-only** — no data mutation from tool
+calls. `run_cypher` rejects mutation keywords at the gate
+(`internal/graph/cypher.go`). `review_changes` reads the graph and
+shells out to `git`; it never writes to `.codeiq/`.
 
-### Generic Detection -- Not Example-Specific
-- Every feature must work for ALL languages and architectures, not just the example given
-- Framework detectors must have discriminator guards (e.g., Quarkus detector requires `io.quarkus` import)
-- ServiceDetector supports 30+ build systems across all ecosystems, not just Maven
-- Never fix for one language and forget others
+Analysis/enrichment happens only via the CLI commands `index` /
+`enrich`.
 
-### Virtual Thread Safety
-- All file I/O and Neo4j operations run on virtual threads
-- The H2 analysis cache uses `synchronized` blocks for thread safety
-- Detectors MUST be stateless -- Spring `@Component` beans are singletons
+### Determinism
+
+- Same input MUST produce same output. Every run.
+- No `map` iteration without sorting first (every range loop over a
+  map sorts keys before emit).
+- `GraphBuilder.Snapshot` sorts nodes + edges by ID.
+- Linker outputs go through `Result.Sorted()` at the boundary.
+- All detectors are stateless — no mutable struct fields. Stateless
+  methods only. The single shared instance per detector type is
+  registered with `detector.Default` at package init.
+
+### Detector dispatch is choke-pointed
+
+Adding a new detector package under `internal/detector/<dir>/` is NOT
+enough. The package must be blank-imported in
+[`internal/cli/detectors_register.go`](go/internal/cli/detectors_register.go).
+Without that line, the package's `init()` never runs and the binary
+ships without your detector. The Phase 4 benchmark exposed this bug
+when 15 language families silently produced 0 nodes — see commit
+`04098be` for the fix.
+
+### Goroutine safety
+
+- File I/O and SQLite writes run on a bounded worker pool
+  (`Analyzer.opts.Workers`, default 2× GOMAXPROCS).
+- Detectors must be stateless. Method-local state only.
+- Kuzu reads use the embedded API; one query at a time per
+  `Store.Cypher` call. The store internal mutex serializes.
 
 ## CLI Commands
 
-| Command | Description |
-|---------|-------------|
-| `index [path]` | Memory-efficient batched scanning to H2 (preferred for large codebases) |
-| `enrich [path]` | Load H2 into Neo4j, run linkers, classify layers, detect services |
-| `serve [path]` | Start read-only web UI + REST API + MCP server (requires enrich first) |
-| `analyze [path]` | Legacy in-memory scan (use index+enrich for large codebases) |
-| `stats [path]` | Show rich categorized statistics from analyzed graph |
-| `graph [path]` | Export graph (JSON, YAML, Mermaid, DOT) |
-| `query [path]` | Query graph relationships (consumers, producers, callers) |
-| `find [what] [path]` | Preset queries (endpoints, guards, entities, topics, etc.) |
-| `cypher [query]` | Execute raw Cypher queries against Neo4j |
-| `flow [path]` | Generate architecture flow diagrams |
-| `bundle [path]` | Package graph + source into distributable ZIP |
-| `cache [action]` | Manage analysis cache |
-| `plugins [action]` | List and inspect detectors |
-| `topology [path]` | Show service topology map |
-| `version` | Show version info |
+| Command | Purpose |
+|---|---|
+| `index [path]` | Scan files → SQLite analysis cache. |
+| `enrich [path]` | Load cache → Kuzu graph; run linkers + LayerClassifier + intelligence. |
+| `mcp [path]` | Stdio MCP server (Claude / Cursor). |
+| `stats [path]` | Categorized statistics from the enriched graph. |
+| `query <kind> <id> [path]` | consumers/producers/callers/dependencies/dependents/shortest-path/cycles/dead-code. |
+| `find <preset> [path]` | endpoints, entities, services, … |
+| `cypher <query> [path]` | Raw Cypher (read-only) against Kuzu. |
+| `flow [path]` | Architecture-flow diagrams (mermaid/dot/yaml). |
+| `graph [path]` | Export graph in json / yaml / mermaid / dot. |
+| `topology [path]` | Service-topology projection. |
+| `review [path]` | LLM-driven PR review (Ollama by default). |
+| `cache <action>` | Inspect / clear the SQLite cache. |
+| `plugins <action>` | List + describe registered detectors. |
+| `config <action>` | Validate / explain `codeiq.yml`. |
+| `version` | `--version` long form. |
 
-### Standard Pipeline
+### Standard pipeline
 
 ```bash
-# For large codebases (44K+ files):
-codeiq index /path/to/repo           # ~220s for 44K files, writes to H2
-codeiq enrich /path/to/repo          # loads H2 → Neo4j with linkers/layers/services
-codeiq serve /path/to/repo           # read-only server
-
-# For small codebases:
-codeiq analyze /path/to/repo         # in-memory, all-in-one
-codeiq serve /path/to/repo           # needs enrich if using index
+codeiq index /path/to/repo
+codeiq enrich /path/to/repo
+codeiq stats /path/to/repo
+codeiq mcp /path/to/repo                # for Claude / Cursor wiring
 ```
 
-## Server Endpoints (all read-only)
+## MCP Tools
 
-### REST API (`/api`) -- 37 endpoints
+The MCP server registers 6 consolidated mode-driven tools + `run_cypher`
++ `review_changes`. The 34 narrow tools from the Java side stay wired
+for one release (v1.0.x) for back-compat with agents pinned to old
+names; they'll be removed in v1.1.0.
 
-**GraphController** (`/api`):
-- `GET /api/stats` -- Rich categorized statistics (graph, languages, frameworks, infra, connections, auth, architecture)
-- `GET /api/stats/detailed?category=` -- Single category stats
-- `GET /api/kinds` -- Node kinds with counts
-- `GET /api/kinds/{kind}` -- Paginated nodes by kind
-- `GET /api/nodes` -- Paginated node queries
-- `GET /api/nodes/{id}/detail` -- Full node detail with edges
-- `GET /api/nodes/{id}/neighbors` -- Neighbor traversal
-- `GET /api/edges` -- Paginated edge queries
-- `GET /api/ego/{center}` -- Ego subgraph
-- `GET /api/query/cycles` -- Cycle detection
-- `GET /api/query/shortest-path` -- Shortest path between nodes
-- `GET /api/query/consumers/{id}`, `/producers/{id}`, `/callers/{id}`, `/dependencies/{id}`, `/dependents/{id}`
-- `GET /api/query/dead-code` -- Dead code detection (semantic edge filtering, excludes entry points)
-- `GET /api/triage/component?file=` -- Agentic triage by file
-- `GET /api/triage/impact/{id}` -- Impact trace
-- `GET /api/search?q=` -- Free-text search
-- `GET /api/file?path=` -- Source files (path traversal protected)
-
-**TopologyController** (`/api/topology`):
-- `GET /api/topology` -- Service topology map
-- `GET /api/topology/services/{name}` -- Service detail
-- `GET /api/topology/services/{name}/deps` -- Service dependencies
-- `GET /api/topology/services/{name}/dependents` -- Service dependents
-- `GET /api/topology/blast-radius/{nodeId}` -- Blast radius analysis
-- `GET /api/topology/path` -- Find path between services
-- `GET /api/topology/bottlenecks` -- Find bottleneck services
-- `GET /api/topology/circular` -- Circular dependency detection
-- `GET /api/topology/dead` -- Dead service detection
-
-**FlowController** (`/api/flow`):
-- `GET /api/flow` -- List available flow views
-- `GET /api/flow/{view}` -- Flow diagram for specific view
-- `GET /api/flow/{view}/{nodeId}/children` -- Node children in flow
-- `GET /api/flow/{view}/{nodeId}/parent` -- Node parent in flow
-
-**IntelligenceController** (`/api/intelligence`):
-- `GET /api/intelligence/evidence` -- Evidence pack for a node
-- `GET /api/intelligence/manifest` -- Artifact manifest
-- `GET /api/intelligence/capabilities` -- Capability matrix
-
-### MCP Tools (34, via `@McpTool` annotation)
-`get_stats`, `get_detailed_stats`, `query_nodes`, `query_edges`, `get_node_neighbors`, `get_ego_graph`, `find_cycles`, `find_shortest_path`, `find_consumers`, `find_producers`, `find_callers`, `find_dependencies`, `find_dependents`, `find_dead_code`, `generate_flow`, `run_cypher`, `find_component_by_file`, `trace_impact`, `find_related_endpoints`, `search_graph`, `read_file`, `get_topology`, `service_detail`, `service_dependencies`, `service_dependents`, `blast_radius`, `find_path`, `find_bottlenecks`, `find_circular_deps`, `find_dead_services`, `find_node`, `get_evidence_pack`, `get_artifact_metadata`, `get_capabilities`
+| Consolidated tool | mode dispatch |
+|---|---|
+| `graph_summary` | `overview` / `categories` / `capabilities` / `provenance` |
+| `find_in_graph` | `nodes` / `edges` / `text` / `fuzzy` / `by_file` / `by_endpoint` |
+| `inspect_node` | `neighbors` / `ego` / `evidence` / `source` |
+| `trace_relationships` | `callers` / `consumers` / `producers` / `dependencies` / `dependents` / `shortest_path` |
+| `analyze_impact` | `blast_radius` / `trace` / `cycles` / `circular_deps` / `dead_code` / `dead_services` / `bottlenecks` |
+| `topology_view` | `summary` / `service` / `service_deps` / `service_dependents` / `flow` |
+| `run_cypher` | (escape hatch — mutation-rejected) |
+| `review_changes` | (Ollama-driven PR review) |
 
 ## Adding a New Detector
 
-1. Create file in `detector/<category>/MyDetector.java`
-2. Implement the `Detector` interface:
-   ```java
-   @Component
-   public class MyDetector implements Detector {
-       @Override public String getName() { return "my_detector"; }
-       @Override public Set<String> getSupportedLanguages() { return Set.of("java"); }
-       @Override public DetectorResult detect(DetectorContext ctx) {
-           DetectorResult result = new DetectorResult();
-           // Your detection logic here
-           return result;
-       }
+1. Create file in `go/internal/detector/<category>/my_detector.go`.
+2. Implement the `detector.Detector` interface:
+
+   ```go
+   package mycategory
+
+   import (
+       "github.com/randomcodespace/codeiq/go/internal/detector"
+       "github.com/randomcodespace/codeiq/go/internal/detector/base"
+       "github.com/randomcodespace/codeiq/go/internal/model"
+   )
+
+   type MyDetector struct{}
+
+   func NewMyDetector() *MyDetector { return &MyDetector{} }
+
+   func (MyDetector) Name() string                        { return "my_detector" }
+   func (MyDetector) SupportedLanguages() []string        { return []string{"java"} }
+   func (MyDetector) DefaultConfidence() model.Confidence { return base.RegexDetectorDefaultConfidence }
+
+   func init() { detector.RegisterDefault(NewMyDetector()) }
+
+   func (MyDetector) Detect(ctx *detector.Context) *detector.Result {
+       // … pattern matching → return detector.ResultOf(nodes, edges)
+       return detector.EmptyResult()
    }
    ```
-3. **No registry changes needed** -- auto-discovered via Spring classpath scan
-4. **Framework-specific detectors MUST have discriminator guards** -- require framework-specific imports before detecting (e.g., Quarkus requires `io.quarkus`, Fastify requires `fastify` import)
-5. For Java files needing AST access, extend `AbstractJavaParserDetector`
-6. For multi-language support via ANTLR, extend `AbstractAntlrDetector`
-7. For regex-only detection, extend `AbstractRegexDetector`
-8. Create test in `src/test/java/.../detector/<category>/MyDetectorTest.java`
-9. Include a determinism test (run twice, assert identical output)
-10. Run `mvn test` -- all tests must pass
 
-### Detector Base Classes
-| Class | Use Case |
-|-------|----------|
-| `Detector` | Interface -- implement directly for simple detectors |
-| `AbstractRegexDetector` | Regex-based pattern matching (most detectors) |
-| `AbstractJavaParserDetector` | Java AST via JavaParser (Spring, JPA, etc.) |
-| `AbstractAntlrDetector` | ANTLR grammar-based (TS, Python, Go, C#, Rust, C++) |
-| `AbstractStructuredDetector` | Structured file parsing (YAML, JSON, TOML, etc.) |
-| `AbstractPythonAntlrDetector` | Python ANTLR detectors (shared parse, getBaseClassesText, extractClassBody) |
-| `AbstractPythonDbDetector` | Python ORM detectors (adds ensureDbNode/addDbEdge via DetectorDbHelper) |
-| `AbstractTypeScriptDetector` | TypeScript regex detectors (shared getSupportedLanguages, detect→detectWithRegex) |
-| `AbstractJavaMessagingDetector` | Java messaging detectors (shared CLASS_RE, extractClassName, addMessagingEdge) |
+3. **CRITICAL** — if the package is a NEW directory under
+   `internal/detector/`, blank-import it in
+   `go/internal/cli/detectors_register.go`. Existing directories
+   already covered.
+4. Add a test file at the same path (`my_detector_test.go`). Include
+   positive match, negative match, determinism (run twice, assert
+   identical output).
+5. `cd go && CGO_ENABLED=1 go test ./internal/detector/<category>/...
+   -count=1`.
 
-### Shared Detector Helpers
-| Class | Purpose |
-|-------|---------|
-| `DetectorDbHelper` | Static ensureDbNode/addDbEdge for any detector emitting DATABASE_CONNECTION nodes |
-| `FrontendDetectorHelper` | Static createComponentNode/lineAt for Angular, React, Vue detectors |
-| `StructuresDetectorHelper` | Static addImportEdge/createStructureNode for Scala/Kotlin structures |
+### Detector base helpers
+
+| File | Purpose |
+|---|---|
+| `base/regex.go` | `FindLineNumber`, `RegexDetectorDefaultConfidence`. |
+| `base/imports_helpers.go` | `EnsureFileAnchor`, `EnsureExternalAnchor` — emit anchor nodes so imports/depends_on edges survive `Snapshot`'s phantom filter. |
+| `base/component.go` | `CreateComponentNode` for React/Vue/Angular component detectors. |
+| `base/structures.go` | `AddImportEdge`, `CreateStructureNode` for Scala/Kotlin/etc structure detectors. |
+
+## Configuration
+
+`codeiq.yml` at the repo root. Resolution order (last wins):
+
+1. Built-in defaults
+2. `~/.codeiq/config.yml`
+3. `./codeiq.yml`
+4. `CODEIQ_<SECTION>_<KEY>` env vars
+5. CLI flags
+
+`codeiq config validate` + `codeiq config explain`.
 
 ## Testing
 
 ```bash
-# Run all tests (~3219 tests)
-mvn test
+cd go
 
-# Run a specific test class
-mvn test -Dtest=SpringRestDetectorTest
+# Full suite
+CGO_ENABLED=1 go test ./... -count=1
 
-# Run E2E quality tests (requires cloned test repo)
-E2E_PETCLINIC_DIR=/path/to/spring-petclinic mvn test -Dtest=E2EQualityTest
+# Race detector
+CGO_ENABLED=1 go test ./... -race -count=1
 
-# Run with verbose output
-mvn test -Dsurefire.useFile=false
+# Single package
+CGO_ENABLED=1 go test ./internal/detector/jvm/java/...
+
+# Verbose
+CGO_ENABLED=1 go test ./... -v
 ```
 
-- Every detector needs: positive match test, negative match test, determinism test
-- Server tests use standalone MockMvc (no Spring context needed)
-- MCP tools tested by calling `McpTools` methods directly
-- E2E quality tests validate against Context7-sourced ground truth (21 tests for petclinic)
-- Use `@ActiveProfiles("test")` for any `@SpringBootTest` to avoid Neo4j startup
-
-### E2E Quality Testing Strategy (mandatory for detection changes)
-1. Build ground truth using Context7 for well-known repos
-2. Clone official repo, run full pipeline (index → enrich → serve)
-3. Query ALL API endpoints, validate against ground truth
-4. Fix findings in loop with parallel agents until 95%+ pass rate
-5. Ground truth files: `src/test/resources/e2e/ground-truth-*.json`
+828+ tests. Every detector ships with positive, negative, and
+determinism tests.
 
 ## Build Commands
 
 ```bash
-# Build (skip tests)
-mvn clean package -DskipTests
+cd go
 
-# Build + test
-mvn clean package
+# Build
+CGO_ENABLED=1 go build -o /usr/local/bin/codeiq ./cmd/codeiq
 
-# Run pipeline
-java -jar target/code-iq-*-cli.jar index /path/to/repo
-java -jar target/code-iq-*-cli.jar enrich /path/to/repo
-java -jar target/code-iq-*-cli.jar serve /path/to/repo
-
-# SpotBugs static analysis
-mvn spotbugs:check
-
-# OWASP dependency vulnerability check
-mvn dependency-check:check
+# Build with version info (release-go.yml does this with goreleaser):
+CGO_ENABLED=1 go build \
+  -ldflags "-X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Version=v1.0.0' \
+            -X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Commit=$(git rev-parse --short HEAD)' \
+            -X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Date=$(date -u +%Y-%m-%dT%H:%M:%SZ)'" \
+  -o /usr/local/bin/codeiq ./cmd/codeiq
 ```
 
-## Key Files
-
-| File | Purpose |
-|------|---------|
-| `CodeIqApplication.java` | Spring Boot main class |
-| `analyzer/Analyzer.java` | Pipeline orchestrator (discovery -> detect -> build -> link -> classify) |
-| `analyzer/FileDiscovery.java` | File discovery via git ls-files or directory walk |
-| `analyzer/GraphBuilder.java` | Buffered graph construction (nodes first, then edges) |
-| `analyzer/LayerClassifier.java` | Deterministic layer classification (kind + framework + path heuristics) |
-| `analyzer/ServiceDetector.java` | Service boundary detection from build files (30+ build systems) |
-| `analyzer/linker/*.java` | Cross-file linkers: TopicLinker, EntityLinker, ModuleContainmentLinker |
-| `detector/Detector.java` | Detector interface |
-| `model/NodeKind.java` | 34 node types enum |
-| `model/EdgeKind.java` | 28 edge types enum |
-| `model/CodeNode.java` | Graph node entity |
-| `model/CodeEdge.java` | Graph edge entity |
-| `graph/GraphStore.java` | Neo4j facade (UNWIND bulk save, Cypher reads, indexes) |
-| `config/Neo4jConfig.java` | Embedded Neo4j configuration |
-| `config/CodeIqConfig.java` | Application configuration properties |
-| `config/JacksonConfig.java` | Jackson config (FAIL_ON_UNKNOWN_PROPERTIES disabled for MCP compat) |
-| `cache/AnalysisCache.java` | H2 incremental cache |
-| `api/GraphController.java` | REST API endpoints (read-only) |
-| `mcp/McpTools.java` | 34 MCP tool definitions (`@McpTool`, read-only) |
-| `query/QueryService.java` | Graph query operations with Spring caching |
-| `query/StatsService.java` | Rich categorized statistics (7 categories) |
-| `query/TopologyService.java` | Service topology queries |
-| `cli/IndexCommand.java` | Memory-efficient batched indexing to H2 |
-| `cli/EnrichCommand.java` | H2 → Neo4j with linkers, layers, services |
-| `cli/ServeCommand.java` | Read-only server startup |
-| `intelligence/extractor/LanguageEnricher.java` | Language-specific enrichment orchestrator (Phase 5) |
-| `intelligence/extractor/LanguageExtractor.java` | Language extractor interface |
-| `intelligence/evidence/EvidencePackAssembler.java` | Evidence pack generation |
-| `intelligence/query/QueryPlanner.java` | Intelligent query routing |
-| `intelligence/lexical/LexicalEnricher.java` | Doc comment + snippet enrichment |
+Release pipeline:
+[`shared/runbooks/release-go.md`](shared/runbooks/release-go.md).
 
 ## Code Conventions
 
-- Java 25+ features: records, sealed classes, pattern matching, virtual threads
-- Spring Boot 4 conventions: constructor injection, `@Component` beans, profile activation
-- Spring AI 2.0: `@McpTool`/`@McpToolParam` annotations (not `@Tool`/`@ToolParam`)
-- Picocli for CLI with Spring integration (`picocli-spring-boot-starter`)
-- Detectors are `@Component` beans -- stateless, thread-safe, auto-discovered
-- Framework detectors require discriminator guards (framework-specific imports)
-- ID format: `"{prefix}:{filepath}:{type}:{identifier}"` for cross-file uniqueness
-- Properties map for detector-specific metadata (`auth_type`, `framework`, `roles`, etc.)
-- Spring detectors set `framework: "spring_boot"` on their nodes
-- `layer` property on every node: `frontend | backend | infra | shared | unknown`
-- Neo4j reads use embedded API (no SDN hydration). Writes use SDN or UNWIND Cypher.
-- Neo4j properties round-trip via `prop_*` prefix (written by `bulkSave`, read by `nodeFromNeo4j`)
-- Jackson `FAIL_ON_UNKNOWN_PROPERTIES` disabled globally for MCP protocol compatibility
-- UTF-8 encoding everywhere (explicit `StandardCharsets.UTF_8`)
-- Property key constants: `private static final String PROP_FRAMEWORK = "framework"` — extract when a string literal appears 3+ times in a file
-
-## Configuration
-
-Single source of truth: **`codeiq.yml`** at the repo root. See
-`docs/codeiq.yml.example` for the full schema (snake_case throughout;
-camelCase accepted as a deprecated alias for one release). Resolution order
-(last wins):
-
-1. Built-in defaults (`ConfigDefaults.builtIn()`)
-2. `~/.codeiq/config.yml` (user-global)
-3. `./codeiq.yml` (project)
-4. `CODEIQ_<SECTION>_<KEY>` env vars (e.g. `CODEIQ_SERVING_PORT=9090`)
-5. CLI flags on `codeiq <command>`
-
-Validate and introspect with:
-
-```bash
-codeiq config validate
-codeiq config explain
-```
-
-### Spring-owned keys (stay in `application.yml`)
-
-A small set of keys still lives in `src/main/resources/application.yml`
-because they drive Spring's `@ConditionalOnProperty` / `@Value` wiring and
-have not been migrated into `codeiq.yml`:
-
-- `codeiq.neo4j.enabled` -- profile-conditional toggle (`false` in the
-  `indexing` profile, `true` in `serving`).
-- `codeiq.neo4j.bolt.port` -- embedded Neo4j Bolt listener port.
-- `codeiq.cors.allowed-origin-patterns` -- CORS allow-list for the REST API.
-- `codeiq.ui.enabled` -- toggles the React SPA static resource handler.
-
-`UnifiedConfigBeans` bridges the unified config to the legacy `CodeIqConfig`
-bean for code paths that haven't been ported yet.
+- Go 1.25+ idioms — generics where they reduce repetition, `slices.`
+  and `maps.` over hand-rolled loops, `min`/`max` builtins.
+- `model.Confidence` and `Source` are mandatory on every `CodeNode` /
+  `CodeEdge`. Base classes stamp the per-detector floor at the
+  orchestration boundary (LEXICAL for regex bases, SYNTACTIC for
+  AST/structured bases).
+- Property union semantics: in `mergeNode`, donor only fills keys the
+  survivor doesn't already have. Don't clobber a high-confidence
+  detector's framework/auth_type stamping.
+- ID format: `<prefix>:<filepath>:<type>:<identifier>` — keep prefixes
+  stable; the GraphBuilder dedup map relies on them.
+- File-anchor / external-anchor IDs:
+  - `<lang>:file:<path>` for the file-as-module
+  - `<lang>:external:<name>` for imported packages
+  This pattern saves imports edges from phantom drop.
+- Detectors with framework guards: require a framework-specific
+  import before emitting (e.g. Quarkus requires `io.quarkus`).
+- UTF-8 everywhere — explicit `[]byte` only when interfacing with
+  Kuzu or SQLite.
 
 ## Gotchas & Lessons Learned
 
-- **Pipeline is index → enrich → serve**: Don't put analysis/enrichment in serve. Serve is read-only.
-- **MCP/API is read-only**: No data manipulation from serving layer. Remote servers may lack source code.
-- **Framework false positives**: Quarkus/Micronaut/Fastify detectors matched generic patterns (router.get, @Transactional). Always add discriminator guards requiring framework-specific imports.
-- **Neo4j property round-trip**: Properties stored as `prop_*` keys in Neo4j. `nodeFromNeo4j()` must restore them. Verify properties survive write→read.
-- **Edge persistence**: Edges must be attached to source nodes before `bulkSave()`. MATCH silently returns 0 rows for missing nodes -- pre-validate IDs.
-- **ServiceDetector must scan filesystem**: Don't rely on node file paths for build file detection. Many build files (pom.xml) don't produce CodeNodes. Walk the filesystem directly.
-- **Generic, not example-specific**: Every feature must work for ALL architectures. Don't fix for the specific example given and forget other ecosystems.
-- **Neo4j indexes**: Created by `enrich` on `id`, `kind`, `layer`, `module`, `filePath`, `label_lower`, `fqn_lower`, plus two fulltext indexes (`search_index` over `[label_lower, fqn_lower]` and `lexical_index` over `[prop_lex_comment, prop_lex_config_keys]`). Critical for query performance and free-text search on large graphs.
-- **Default batch size is 500**: Performs better than 1000 for indexing.
-- **Spring Boot startup overhead**: 8-16s for embedded Neo4j + Spring context init.
-- **Virtual thread concurrency on the H2 cache**: JDK 25 + JEP 491 means neither `synchronized` nor `java.util.concurrent.locks.*` pin virtual-thread carriers, so the lock primitive is no longer the constraint. `AnalysisCache` uses a `ReentrantReadWriteLock` so virtual threads can read in parallel while writes stay serialized — this is what prevents `ClosedChannelException` from concurrent writes against H2's MVStore file channel. Do not regress to coarse `synchronized` methods "for virtual-thread safety"; that advice is stale.
-- **ANTLR generated sources**: Generated during `mvn generate-sources` from `.g4` files. Do not edit.
-- **`@ActiveProfiles("test")`**: Required on any `@SpringBootTest` to avoid Neo4j startup conflicts.
-- **Dead code detection**: Must filter by semantic edges only (calls, imports, depends_on). Exclude structural edges (contains, defines) and entry points (endpoints, config files).
-- **H2 reserved words**: `key`, `value`, `order` are reserved in H2 SQL. Use `meta_key`, `meta_value` etc. in CREATE TABLE statements.
-- **Cache versioning**: `AnalysisCache` has a `CACHE_VERSION` constant (currently `5`, bumped from `4` for the resolver `confidence` + `source` schema). Bump it when changing the hash algorithm, H2 schema, or any field that becomes mandatory on cached nodes/edges so stale caches are auto-cleared on next run.
-- **Symbol resolver runs at index-time only.** `Analyzer.bootstrapResolvers()` and `Analyzer.resolveFor()` are wired into `run` / `runBatchedIndex` / `runSmartIndex` paths only — never at `serve`. The resolver SPI lives under `intelligence/resolver/`. If you find yourself reaching for `ResolverRegistry` from a serve-mode code path, stop — the graph is the source of truth at serve.
-- **`Confidence` + `source` are mandatory on every `CodeNode` / `CodeEdge`.** `DetectorEmissionDefaults.applyDefaults` stamps the per-detector floor (`LEXICAL` for regex bases, `SYNTACTIC` for AST/JavaParser/structured bases) at the orchestration boundary; detectors that consume `ctx.resolved()` upgrade to `Confidence.RESOLVED` and attach a `target_fqn` property. Reading legacy data without these fields is non-throwing — they read back as `LEXICAL` / null.
-- **`JavaSymbolResolver.resolve()` allocates a fresh `JavaParser` per call.** JavaParser instances aren't thread-safe and `resolve()` is invoked from virtual threads concurrently. Per-call allocation is intentional, not a perf bug — don't "optimize" by sharing one parser across calls.
-- **`JavaSymbolResolver.resolve(String)` enforces strict parse-success.** When JavaParser flags any problem (`!parseResult.isSuccessful()`), the resolver returns `EmptyResolved.INSTANCE` rather than a partial-CU `JavaResolved`. This prevents silent simple-name-only edges from broken parses that look like RESOLVED-tier coverage. Detectors must treat `ctx.resolved()` returning `EmptyResolved` as "lexical fallback" — never assume RESOLVED edges land for every Java file.
-- **`JavaSymbolResolver` fields are `volatile`.** `combined` and `solver` are written by `bootstrap()` and read by `resolve()` + the public accessors from arbitrary virtual-thread carriers. The JLS Thread Start Rule covers the `executor.submit()` path; `volatile` covers post-bootstrap callers on other threads. Don't drop the keyword.
-- **FileHasher uses SHA-256**: Changed from MD5. Hash output is 64 hex chars (not 32). Tests must expect 64-char hashes.
-- **SnakeYAML parses `on` as Boolean.TRUE**: In YAML files, bare `on` key becomes `Boolean.TRUE`. Use `String.valueOf(key)` comparisons, not `Boolean.TRUE.equals(key)` (SonarCloud S2159).
-- **Regex possessive quantifiers**: Use `*+` instead of `*` for nested quantifiers like `([^"\\]*(?:\\.[^"\\]*)*)` → `([^"\\]*+(?:\\.[^"\\]*+)*+)` to prevent stack overflow (SonarCloud S5998).
-- **Parallel agent conflicts**: Don't dispatch multiple agents editing the same files concurrently. Use worktree isolation or sequential execution.
-- **SonarCloud project key**: `RandomCodeSpace_codeiq`, org: `randomcodespace`
-- **CI workflow**: Single `ci-java.yml` runs build + SonarCloud analysis. No cross-platform builds needed (JVM).
-- **Spring Security only loads in the `serving` profile.** `application.yml` excludes `SecurityAutoConfiguration` + `SecurityFilterAutoConfiguration` + `UserDetailsServiceAutoConfiguration` at the **default** level so adding `spring-boot-starter-security` doesn't break ~3000 MockMvc tests by activating a default HTTP Basic chain. The `serving` profile re-enables them by listing only `UserDetailsServiceAutoConfiguration` (suppresses the auto user/password printout); the chain itself is built by `config/security/SecurityConfig`. **Don't** drop the default exclude — non-serving contexts (CLI, tests) must have no Spring Security wiring at all.
-- **`BearerAuthFilter.shouldNotFilter` and `SecurityConfig.permitAll()` paths must stay in sync.** The filter runs before Spring's `AuthorizationFilter`, so if a path is in `permitAll()` but NOT in `shouldNotFilter`, the filter rejects it with 401 before Spring's chain can permit it. Open paths today: `/`, `/index.html`, `/favicon.ico`, `/assets/**`, `/static/**`, `/error`, `/actuator/health`, `/actuator/health/liveness`, `/actuator/health/readiness`. Adding any new permit-all endpoint requires updating BOTH places.
-- **Constant-time bearer-token compare uses SHA-256 pre-hash.** Both the provided and expected token are hashed with SHA-256 before `MessageDigest.isEqual`. SHA-256 always produces 32-byte digests, so `isEqual` runs over fixed-size arrays — defeats the length oracle that makes raw `isEqual` unsafe across mismatched-length inputs. **Don't** "optimize" by removing the hash and comparing raw token bytes; that re-introduces the oracle.
-- **Never log the `Authorization` header.** `BearerAuthFilter` deliberately never passes the header value to a logger, even at DEBUG. The rejection log line carries only `method` and `requestURI`. There's a regression test (`tokenValueNeverAppearsInLogs`) that captures all log lines for the filter and asserts the secret substring is absent.
-- **`mode=none` + active `serving` profile = startup failure** unless `codeiq.mcp.auth.allow_unauthenticated=true` is **explicitly** set. This is by design — operators must opt into permissive mode deliberately. `mode=mtls` is reserved and currently throws "not yet implemented" (better than silently passing through).
-- **`server.error.include-stacktrace: never`** is set in the serving profile as defense-in-depth alongside `GlobalExceptionHandler`. Don't enable it for "easier debugging" — stack frames in the response body leak class names + paths (CWE-209). Use the `request_id` in the envelope to correlate to the WARN log line where the full stack is captured.
-- **Cypher transaction wall-clock cap is configured at the DBMS level**, not per-call. `Neo4jConfig.databaseManagementService(...)` sets `GraphDatabaseSettings.transaction_timeout = 30s` so every transaction gets the cap automatically. Don't reach for `graphDb.beginTx(timeout, unit)` overload in tool code — the test suite mocks `beginTx()` with no args and the overload changes the matcher signature, breaking the existing stubs across `McpToolsTest` / `McpToolsExpandedTest` / `McpToolsEvidenceTest`.
-- **`McpTools.runCypher` row cap is enforced in the iteration loop, not via `LIMIT`.** After `maxResults` rows are accumulated the loop breaks and the response carries `truncated: true` + `max_results: N`. Don't try to inject `LIMIT N` into the user-supplied query string — that would require parsing the query (and the user's query may already have its own LIMIT).
-- **`McpTools.getCachedData()` 60-second TTL snapshot is a bridge fix.** It's NOT the proper solution — the proper solution is to rewrite each topology MCP tool to use a targeted Cypher query so the full graph never needs to live on heap. The cache caps peak memory under concurrent calls but the snapshot itself is still multi-GB on large graphs. When that refactor lands, the `AtomicReference<CachedSnapshot>` and `getCachedData()` itself can be deleted.
-- **`RateLimitFilter` keys by `sha256(Authorization)`** — the raw token NEVER goes into the bucket key map. The 16-hex-char digest is enough collision resistance for keying. Falls back to `X-Forwarded-For` (first hop) → `RemoteAddr` when no auth header is present. Buckets live in a `ConcurrentHashMap` — bounded in practice by `num_distinct_clients`, which for the single-tenant pod shape is small. Swap to a Caffeine cache with a max-size eviction if multi-tenant exposure is ever added.
-- **Filter chain order in `serving` profile**: `SecurityHeadersFilter` → `RateLimitFilter` → `BearerAuthFilter` → ... → controller. Each `addFilterBefore(X, UsernamePasswordAuthenticationFilter.class)` inserts X immediately before UPAFilter, pushing the previously-inserted filter farther from the target — so the **registration order in `SecurityConfig.servingFilterChain` IS the chain order**. Don't shuffle without re-reasoning about it: if `RateLimitFilter` ran AFTER `BearerAuthFilter`, an unauthenticated brute-force attempt would never get throttled (would just see 401 over and over, hitting the slow path).
-- **`Files.probeContentType` is best-effort** — JDK 25 on Linux uses `/etc/mime.types` + magic-byte fallback. It returns `null` if the type can't be determined; treat that as "let it through" (the byte cap in `SafeFileReader` still bounds size). The allowlist for `/api/file` is `text/*` + `application/{json,xml,x-yaml,javascript}` — extending requires adding to the explicit list in `GraphController.readFile`.
-- **Sanitize user-controlled values before logging.** `BearerAuthFilter.sanitizeForLog(String)` strips `\p{Cntrl}` and truncates at 256 chars. Use it on anything tainted by `request.getRequestURI()`, `request.getMethod()`, headers, etc. before passing to a logger. CodeQL `java/log-injection` will flag direct `log.warn("... {} ...", request.getRequestURI())` as a vuln.
-- **`mcp.limits.max_depth` is a NEW field on `McpLimitsConfig`** (default 10). Audit #10 / C3 — the original audit assumed it existed but it didn't. When adding new MCP traversal tools, cap depth via `Math.min(callerSupplied, maxDepth)` before passing to Cypher. The REST endpoint already had this guard via `config.getMaxDepth()` from `CodeIqConfig`; the MCP path now mirrors it via `McpLimitsConfig.maxDepth()`.
-- **`codeiq bundle` writes `checksums.sha256` LAST and excludes itself.** `BundleCommand#writeChecksumsManifest` runs after every other entry has been written, then the digests collected in `LinkedHashMap<String,String> checksums` are emitted as `<sha256>  <path>\n` per line — exactly GNU coreutils `sha256sum` format, so receivers verify with `sha256sum -c checksums.sha256`. The manifest itself is intentionally NOT in the digest list (would be circular); to verify `checksums.sha256` against tampering, sign the bundle.zip out-of-band (Sigstore, GPG, or compare to the GitHub Release SHA-256). Don't try to "fix" the circular omission by hashing checksums.sha256 into the manifest — that turns into a cat-and-mouse loop.
-- **`writeFileHashed` reads each file once, feeding both the SHA-256 and the ZIP stream.** Hundreds-of-MB graph DBs / CLI JARs can't be double-read for a separate hash pass. The 8KB chunk size in `BundleCommand` is small enough to keep memory flat regardless of file size; do NOT collect bytes into a `byte[]` and then split for "convenience".
-- **`serve.sh` and `serve.bat` MUST NOT contain network calls.** Audit RAN-46 §3 — air-gapped deploy model. Pre-PR-3 these scripts had `curl -fL https://repo1.maven.org/...` to download the CLI JAR on first run; that's gone. Receivers must `--include-jar` when bundling or stage the JAR from an internal mirror. There's a regression test in `BundleCommandTest#bundleCreatesZipWithCorrectStructure` that asserts `serve.sh` contains neither `curl` nor `maven.org` — keep that test green.
-- **`.dockerignore` does NOT inherit `.gitignore`.** Docker resolves COPY against the build context, which includes uncommitted/untracked working-tree files. `.gitignore` only stops things being staged; it has no effect on what `docker build` sees. Mirror the secret-pattern globs explicitly in `.dockerignore` (`.env*`, `*.jks`, `id_rsa`, `credentials.{json,yaml}`, etc.). Pre-PR-3 the `.dockerignore` was 9 lines and would have shipped a `.env.prod` straight into a published image.
-- **Semgrep is pinned to `semgrep==1.161.0`** in `.github/workflows/security.yml`. Bumps go through Dependabot's pip ecosystem on a documented cadence — `pip install --upgrade semgrep` (floating) was previously flagged by Scorecard `Pinned-Dependencies`. Don't unpin to "always get latest"; a CI-time auto-bump on a security-scanner can break the build silently when the new release adds rules.
-- **`RequestIdFilter` MUST stay outermost in the security chain.** Filter chain order (set in `SecurityConfig#servingFilterChain`): RequestIdFilter → SecurityHeadersFilter → RateLimitFilter → BearerAuthFilter. If you reorder and put RequestIdFilter inside, the rate-limit reject and auth-reject log lines will fire BEFORE MDC is populated, and clients won't get a correlated `X-Request-Id` response header on 401/429. The filter is registered LAST in the `addFilterBefore(..., UPAFilter.class)` sequence because each `addFilterBefore` pushes the previously-inserted filter further from the target — so the LAST registration is the OUTERMOST in the actual chain.
-- **Inbound `X-Request-Id` is allow-list validated, NOT escaped.** `RequestIdFilter` accepts only `[A-Za-z0-9_-]{8,64}`; anything else is replaced with a generated UUID. Don't try to "be helpful" by lowercasing/trimming — the allow-list is the defense, not the sanitizer. CWE-117 log-forging via `X-Request-Id: \nINFO: granted access` is impossible because the value never reaches a logger before validation.
-- **MDC must be cleared in finally — even on throw.** `RequestIdFilter.doFilterInternal` puts MDC.request_id, runs the chain in a try-block, and clears in finally. There's a regression test (`RequestIdFilterTest#clearsMdcEvenWhenChainThrows`) that asserts the clear runs when the chain throws. Tomcat's NIO worker pool and virtual-thread carriers both reuse threads; a leaked MDC entry from request N is visible to request N+1 if you skip the finally.
-- **`GraphHealthIndicator` is on the readiness probe ONLY.** Configured via `management.endpoint.health.group.{liveness,readiness}` in `application.yml`. Liveness = "JVM up; restart on fail". Readiness = "graph loaded; route traffic only when up". Putting `graphHealthIndicator` on the liveness probe means a graph-down event flaps the pod (k8s killing it) instead of just routing away. If you add another HealthIndicator that's about app health (not infra dependencies), it goes on liveness; if it's about a specific dependency (DB, message bus), it goes on readiness.
-- **Logback `serving` profile uses JSON, others use plaintext.** `logback-spring.xml` defines a `JSON` appender (LogstashEncoder) used only by the `<springProfile name="serving">` block. CLI / indexing / default profiles use the `CONSOLE` (plaintext `%msg%n`) appender so that `codeiq index` doesn't dump JSON-shaped log lines into the user's terminal. Don't switch the global default appender to JSON — the CLI is interactive and the project deliberately uses `System.out` for status messages alongside the logger.
-- **MCP errors return a structured envelope `{code, message, request_id, error}`.** `McpTools#errorEnvelope(code, exception)` is the canonical wrapper. Codes: `INTERNAL_ERROR` (catch-all), `INVALID_INPUT` (IllegalArgumentException), `FILE_READ_FAILED` (file IO), `SERIALIZATION_FAILED` (Jackson). The legacy `error` field is preserved for backwards-compat with older MCP clients reading `error` directly — DON'T remove it without grepping for clients in this org first. Full exception always logged server-side at WARN with request_id; only sanitized envelope reaches the client.
-- **`/actuator/prometheus` is bearer-authenticated, NOT permitAll.** It matches the `/actuator/**` rule in `SecurityConfig`. Don't add `prometheus` to the permitAll list "for the scraper" — Prometheus's `bearer_token_file` config field exists for exactly this case. Anonymous metric scraping is reconnaissance data (request rates, error counts, JVM internals). The application tag `codeiq` is set via `management.metrics.tags.application` so multi-pod ingestion is filterable.
+### Pipeline
 
-## Supply-chain observability (OpenSSF)
+- **Pipeline is `index → enrich → (mcp|stats|query)`.** Don't put
+  analysis in MCP. MCP is read-only.
+- **Detector registration choke point** (`internal/cli/detectors_register.go`).
+  Forgetting the blank import ships an empty registry for that
+  language. Caught by the polyglot benchmark — 15 language families
+  silently produced 0 nodes pre-fix. Test: `codeiq plugins` lists
+  every detector by name; new ones must appear.
 
-Two OpenSSF signals are published. **`shared/runbooks/engineering-standards.md` §1 + §5 is the SSoT for the security stack** — this section is the operator-level summary.
+### Kuzu v0.7.1 quirks
 
-### Best Practices badge
+- FTS extension not bundled, not downloadable offline. `INSTALL fts`
+  errors with "fts is not an official extension". `CreateIndexes()`
+  no-ops FTS; `SearchByLabel` / `SearchLexical` use case-insensitive
+  `CONTAINS` predicates.
+- LIMIT / SKIP can't be parameterized. Inline as literals;
+  parameterize the needle only.
+- Uses `lower()` (SQL) not `toLower()` (openCypher).
+- `RETURN DISTINCT` scope tighter than openCypher; `ORDER BY` must
+  reference the projected alias, not the bound variable.
+- List comprehension binder rejects out-of-scope variables. Use
+  `properties(nodes(p), 'id')` instead of `[n IN nodes(p) | n.id]`.
+- `EXISTS { … }` subquery doesn't see outer-scope `$param`. Inline
+  static lists as rel-pattern alternations.
+- Go binding's `goValueToKuzuValue` accepts `[]any` only. Added
+  `stringsToAny` widener for `IN $param` use cases.
+- Multi-label rel alternation + kleene-star in the same recursive
+  pattern breaks the binder. BlastRadius uses an anonymous recursive
+  pattern.
 
-- Project: https://www.bestpractices.dev/projects/12650 — registered 2026-04-25 by the board.
-- Manifest: `.bestpractices.json` at repo root (project_id, evidence map, audit dates).
-- **Hard gate per the board: badge level `passing`.** The final `in_progress` → `passing` flip happens in the bestpractices.dev admin UI (board-owned). Repo-side criteria (CHANGELOG, SECURITY.md, signed commits, OSS-CLI security stack, Scorecard wiring, dependency updates) are evidenced via the manifest above.
+### MCP SDK v1.6
 
-### Scorecard baseline + target
+- No `NewStdioTransport(in, out)` helper. `StdioTransport{}`
+  zero-value bound to `os.Stdin`/`os.Stdout`. Tests use
+  `NewInMemoryTransports()`.
+- `Server.AddTool(t *Tool, h ToolHandler)` — two args, not aggregate.
+- `CallToolRequest.Params` is `*CallToolParamsRaw{Arguments
+  json.RawMessage}`. Wrapper unmarshals once, hands raw JSON to the
+  handler.
+- ToolHandler JSON-marshals returned values. Special-case `string`
+  in `mcp/tool.go` for the `generate_flow` rendered output —
+  otherwise the Mermaid/DOT string gets double-encoded.
 
-- Workflow: [`.github/workflows/scorecard.yml`](.github/workflows/scorecard.yml) — push to `main`, weekly cron (Mondays 06:00 UTC), `workflow_dispatch`. SARIF lands on the Security tab; results also publish to https://api.securityscorecards.dev/projects/github.com/RandomCodeSpace/codeiq.
-- **Baseline (RAN-52 close, 2026-04-26):** read live from the Scorecard project page above; no static checked-in score (it would rot).
-- **Target:** ≥ **8.0 / 10** stretch, with these checks at max: `Pinned-Dependencies`, `Token-Permissions`, `Branch-Protection`, `Code-Review`, `Maintained`, `License`, `SAST`, `Vulnerabilities`. Scorecard is observational; the `passing` Best Practices badge is the only hard gate per the board.
-- **Known floor reductions:** `Webhooks` (no public webhook surface — N/A); `Signed-Releases` (release-java workflow signs the GA commit; we are not yet signing every release artifact via Sigstore — tracked under follow-up).
+### Go RE2 vs Java regex
 
-### OSS-CLI security stack (path B board ruling — RAN-46 AC §3)
+- No lookahead / lookbehind. Plan-spec patterns like
+  `CALL\s+(?!db\.)` won't compile. Rewrites: two-stage match (collect
+  every CALL site, then allow-list each procedure name).
+- No possessive quantifiers (`*+`). RE2 doesn't need them — its NFA
+  doesn't backtrack. Strip them when porting Java regex.
+- No DOTALL — use `(?s)` prefix.
 
-[`.github/workflows/security.yml`](.github/workflows/security.yml) runs six gate-blocking jobs: **OSV-Scanner** (SCA on the npm lockfile), **Trivy** (filesystem + Maven + OS scan), **Semgrep** (SAST: `p/security-audit` + `p/owasp-top-ten` + `p/java`), **Gitleaks** (secret scan, full git history), **jscpd** (duplication < 3% on production code), and **`anchore/sbom-action`** (SPDX + CycloneDX SBOM, artifact-only). Push + PR + weekly cron. Per the path-B board ruling, **do not re-introduce SonarCloud, CodeQL, or any NVD-direct tool (e.g. OWASP Dependency-Check)** without an explicit board reversal — see engineering-standards.md §5.1.
+### Detector authoring traps
 
-## Deploy
+- **Phantom edges**: emit edges with anchor nodes on both ends
+  (`base.EnsureFileAnchor` + `base.EnsureExternalAnchor`). Without
+  anchors, the edge drops at Snapshot.
+- **Discriminator guards**: framework detectors must require a
+  framework-specific import or annotation before emitting. Without a
+  guard, generic patterns (e.g. `@Transactional`) match across
+  unrelated frameworks and produce false positives.
+- **Determinism**: never iterate a Go `map` without sorting keys
+  first. Run the determinism test twice with `count=1` to catch this.
 
-codeiq's deploy surface is **Maven Central + GitHub Releases** (per RAN-46 AC #10 ruling, option a). The single Java JAR (with the React UI bundled inside) is published via two `workflow_dispatch`-only workflows: `.github/workflows/beta-java.yml` (manual beta cut → Sonatype Central beta + GitHub pre-release) and `.github/workflows/release-java.yml` (manual GA cut with a `version` input → the workflow builds a GPG-signed release commit on a detached HEAD, deploys from that exact tree, then creates and pushes a GPG-signed annotated `vX.Y.Z` tag pointing at the release commit + a GitHub Release). There is no static-CDN frontend, no hosted backend, no VPS — codeiq runs on the developer's machine. See [`shared/runbooks/release.md`](shared/runbooks/release.md) and [`shared/runbooks/engineering-standards.md`](shared/runbooks/engineering-standards.md) §7.1.
+### Filesystem & paths
+
+- File discovery dir-walk fallback ingests `node_modules/`,
+  `vendor/`, `target/`, etc. — see `DefaultExcludeDirs` in
+  `analyzer/file_discovery.go`. Add new ignored dirs there.
+- `Files.probeContentType` is best-effort on Linux (JDK note from the
+  Java side — replaced in Go by `net/http.DetectContentType` plus an
+  explicit allowlist in `mcp/read_file.go`).
+
+### Performance
+
+- CertificateAuthDetector once consumed 99% of indexing CPU on
+  C#-heavy projects because its pre-screen included `.cert` / `.crt`
+  / `.pem` substrings that match `using
+  System.Security.Cryptography.X509Certificates;`. Use a STRICT
+  keyword list (high-signal markers only — not path extensions) in
+  any cross-language regex pre-screen.
+
+### Release / signing
+
+- Release tag must be `v*.*.*`; pre-releases use the
+  `vX.Y.Z-rc.N` form (Goreleaser `prerelease: auto` honors it).
+- Cosign keyless via GitHub OIDC — no long-lived key on the runner.
+  Verification needs the cert + sig + the OIDC identity regex (see
+  `shared/runbooks/release-go.md`).
+- Homebrew tap publish is opt-in via `HOMEBREW_TAP_GITHUB_TOKEN`.
+  Forks leave the secret unset and the brew step skips silently.
 
 ## Updating This File
 
-After significant changes (new detectors, new endpoints, architectural decisions, conventions learned), update this CLAUDE.md to reflect the current state. Keep it concise and actionable.
+After significant changes (new detectors, new MCP tools, architectural
+decisions, conventions learned), update this file. Keep it concise.
+The full pre-cutover Java-side history of these notes is on the
+squash-merge `c363727`; reach for that via `git show` when you need
+context.

@@ -1,311 +1,181 @@
 <p align="center">
   <h1 align="center">codeiq</h1>
   <p align="center">
-    <strong>Deterministic code knowledge graph -- scans codebases to map services, endpoints, entities, infrastructure, auth patterns, and framework usage. No AI, pure static analysis.</strong>
+    <strong>Deterministic code knowledge graph — scans codebases to map services, endpoints, entities, infrastructure, auth patterns, and framework usage. No AI, pure static analysis. Single static Go binary; MCP server included.</strong>
   </p>
 </p>
 
 <p align="center">
-  <a href="https://central.sonatype.com/artifact/io.github.randomcodespace.iq/code-iq"><img src="https://img.shields.io/maven-central/v/io.github.randomcodespace.iq/code-iq?style=flat-square&logo=apachemaven&label=Maven%20Central" alt="Maven Central"></a>
-  <a href="https://github.com/RandomCodeSpace/codeiq/actions/workflows/ci-java.yml"><img src="https://img.shields.io/github/actions/workflow/status/RandomCodeSpace/codeiq/ci-java.yml?branch=main&style=flat-square&logo=github&label=CI" alt="CI"></a>
-  <a href="https://www.oracle.com/java/technologies/downloads/"><img src="https://img.shields.io/badge/Java-25-orange?style=flat-square&logo=openjdk&logoColor=white" alt="Java 25"></a>
-  <a href="https://github.com/RandomCodeSpace/codeiq/blob/main/LICENSE"><img src="https://img.shields.io/github/license/RandomCodeSpace/codeiq?style=flat-square&label=License" alt="MIT License"></a>
-  <a href="https://github.com/RandomCodeSpace/codeiq/actions/workflows/security.yml"><img src="https://img.shields.io/github/actions/workflow/status/RandomCodeSpace/codeiq/security.yml?branch=main&style=flat-square&logo=github&label=Security%20%28OSS-CLI%29" alt="Security (OSV-Scanner + Trivy + Semgrep + Gitleaks + jscpd + SBOM)"></a>
+  <a href="https://github.com/RandomCodeSpace/codeiq/releases/latest"><img src="https://img.shields.io/github/v/release/RandomCodeSpace/codeiq?style=flat-square&logo=go&label=Release" alt="Latest release"></a>
+  <a href="https://github.com/RandomCodeSpace/codeiq/actions/workflows/go-ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/RandomCodeSpace/codeiq/go-ci.yml?branch=main&style=flat-square&logo=github&label=CI" alt="CI"></a>
+  <a href="https://go.dev/dl/"><img src="https://img.shields.io/badge/Go-1.25.10-00ADD8?style=flat-square&logo=go&logoColor=white" alt="Go 1.25.10"></a>
+  <a href="https://github.com/RandomCodeSpace/codeiq/blob/main/LICENSE"><img src="https://img.shields.io/github/license/RandomCodeSpace/codeiq?style=flat-square&label=License" alt="License"></a>
+  <a href="https://github.com/RandomCodeSpace/codeiq/actions/workflows/security.yml"><img src="https://img.shields.io/github/actions/workflow/status/RandomCodeSpace/codeiq/security.yml?branch=main&style=flat-square&logo=github&label=Security%20%28OSS-CLI%29" alt="Security"></a>
   <a href="https://api.securityscorecards.dev/projects/github.com/RandomCodeSpace/codeiq"><img src="https://api.securityscorecards.dev/projects/github.com/RandomCodeSpace/codeiq/badge" alt="OpenSSF Scorecard"></a>
   <a href="https://www.bestpractices.dev/projects/12650"><img src="https://www.bestpractices.dev/projects/12650/badge" alt="OpenSSF Best Practices"></a>
-  <a href="https://github.com/RandomCodeSpace/codeiq"><img src="https://img.shields.io/badge/detectors-97-brightgreen?style=flat-square&logo=codefactor&logoColor=white" alt="97 Detectors"></a>
+  <a href="https://github.com/RandomCodeSpace/codeiq"><img src="https://img.shields.io/badge/detectors-100-brightgreen?style=flat-square&logo=codefactor&logoColor=white" alt="100 Detectors"></a>
   <a href="https://github.com/RandomCodeSpace/codeiq"><img src="https://img.shields.io/badge/languages-35%2B-blue?style=flat-square&logo=stackblitz&logoColor=white" alt="35+ Languages"></a>
 </p>
 
 ---
 
-## Development — Go Port (Phase 1)
+## What it is
 
-An in-progress Go port lives in [`go/`](./go/). Phase 1 ships `codeiq index`
-over 5 detectors with byte-level parity against the Java side on
-`go/testdata/fixture-minimal`. Phases 2-6 land enrich, MCP, the remaining 94
-detectors, release infra, and Java cutover (see
-[`docs/superpowers/specs/2026-05-11-codeiq-go-port-design.md`](docs/superpowers/specs/2026-05-11-codeiq-go-port-design.md)).
+codeiq scans a codebase and produces a deterministic graph of its
+services, endpoints, entities, infrastructure, auth patterns, and
+framework usage. Same input ⇒ same output, every time.
 
-Build and run:
+- **Single static binary** — built from the `go/` tree. No JVM, no
+  Spring Boot start time. ~30 MB. CGO enabled (Kuzu graph + SQLite
+  cache).
+- **100 detectors** across 35+ languages — Java, Kotlin, Scala, Python,
+  TypeScript/JavaScript, Go, Rust, C#, C++, Terraform, Bicep, Helm,
+  Kubernetes, Docker, GitHub Actions, GitLab CI, …
+- **MCP server included** — `codeiq mcp` runs an MCP stdio server with
+  6 consolidated mode-driven tools (plus 34 deprecated narrow tools for
+  back-compat) so Claude / Cursor / any MCP-aware agent can query the
+  graph directly.
+- **LLM-driven PR review** — `codeiq review` walks the diff, queries
+  the indexed graph for evidence, and asks Ollama (Cloud or local) for
+  review comments.
 
-```bash
-cd go
-CGO_ENABLED=1 go build -o codeiq ./cmd/codeiq
-./codeiq index .
-./codeiq --version
-```
+## Install
 
-The Go binary writes to the same `.codeiq/cache/` location the Java side
-uses, but `CACHE_VERSION` is bumped to 6 so the first run triggers a clean
-rebuild. Phase 1 is parity-only — use the Java side for production runs.
+### Pre-built binary
 
-## Quick Start
-
-```bash
-# Build from source (requires Java 25+, Maven 3.9+)
-git clone https://github.com/RandomCodeSpace/codeiq.git
-cd codeiq
-mvn clean package -DskipTests
-
-# Analyze a codebase
-java -jar target/code-iq-*-cli.jar analyze /path/to/repo
-
-# Start server (REST API + MCP + React UI)
-java -jar target/code-iq-*-cli.jar serve /path/to/repo
-# Open http://localhost:8080
-```
-
-## How It Works
-
-codeiq scans source files using 99 detectors across 35+ languages, builds a knowledge graph of code relationships, and serves it via REST API, MCP server, and React UI.
-
-```mermaid
-graph TD
-    subgraph "1. Index"
-        A[File Discovery] -->|git ls-files| B[Parsing Layer]
-        B -->|JavaParser / ANTLR / Regex| C[99 Detectors]
-        C -->|Virtual Threads| D[Graph Builder]
-        D --> E[(H2 Cache)]
-    end
-
-    subgraph "2. Enrich"
-        E --> F[Neo4j Bulk Load]
-        F --> G[Cross-file Linkers]
-        G --> H[Layer Classifier]
-        H --> I[Service Detector]
-        I --> J[(Neo4j Graph)]
-    end
-
-    subgraph "3. Serve"
-        J --> K[REST API - 37 endpoints]
-        J --> L[MCP Server - 34 tools]
-        J --> M[React UI - 4 pages]
-    end
-```
-
-### Three-Command Pipeline
-
-For large codebases or memory-constrained environments:
+Grab from
+[Releases](https://github.com/RandomCodeSpace/codeiq/releases/latest):
 
 ```bash
-# 1. Index: batched H2 streaming, low memory (~1-2GB for 20K files)
-java -jar code-iq-*-cli.jar index /path/to/repo --batch-size 500
-
-# 2. Enrich: load H2 into Neo4j, run linkers + classifier + topology
-java -jar code-iq-*-cli.jar enrich /path/to/repo
-
-# 3. Serve: REST API + MCP + React UI
-java -jar code-iq-*-cli.jar serve /path/to/repo
+curl -L https://github.com/RandomCodeSpace/codeiq/releases/latest/download/codeiq_$(uname -s | tr A-Z a-z)_$(uname -m | sed s/x86_64/amd64/).tar.gz | tar xz
+sudo install codeiq /usr/local/bin/
+codeiq --version
 ```
 
-For small codebases, `analyze` does everything in one step:
+Verify (Sigstore keyless):
 
 ```bash
-java -jar code-iq-*-cli.jar analyze /path/to/repo
+sha256sum -c checksums.sha256
+cosign verify-blob \
+  --certificate checksums.sha256.pem \
+  --signature checksums.sha256.sig \
+  --certificate-identity-regexp 'https://github.com/RandomCodeSpace/codeiq/.github/workflows/release-go.yml@.*' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  checksums.sha256
 ```
 
-## CLI Commands
-
-| Command | Description |
-|---------|-------------|
-| `analyze [path]` | Scan and build knowledge graph (in-memory, all-in-one) |
-| `index [path]` | Memory-efficient batched indexing to H2 |
-| `enrich [path]` | Load H2 into Neo4j with linkers + classifier + topology |
-| `serve [path]` | Start React UI + REST API + MCP server |
-| `stats [path]` | Rich categorized statistics |
-| `graph [path]` | Export graph (JSON, YAML, Mermaid, DOT) |
-| `query [path]` | Query relationships (consumers, producers, callers) |
-| `find [what] [path]` | Preset queries (endpoints, guards, entities, topics) |
-| `cypher [query]` | Execute raw Cypher queries against Neo4j |
-| `topology [path]` | Service topology (blast radius, circular deps, bottlenecks) |
-| `flow [path]` | Architecture flow diagrams |
-| `bundle [path]` | Package graph + source into distributable ZIP |
-| `cache [action]` | Manage analysis cache |
-| `plugins [action]` | List/inspect detectors, suggest config |
-| `version` | Show version info |
-
-## Server
+### Homebrew
 
 ```bash
-java -jar target/code-iq-*-cli.jar serve /path/to/repo --port 8080
+brew tap RandomCodeSpace/codeiq
+brew install codeiq
 ```
 
-```mermaid
-graph LR
-    subgraph "http://localhost:8080"
-        A["/ React UI"] --- B["/api REST API"]
-        B --- C["/mcp MCP Server"]
-    end
-```
+### Build from source
 
-| Interface | Description |
-|-----------|-------------|
-| **React UI** (`/`) | Dashboard (stats + charts), Codebase Map (ECharts treemap), Explorer (node browser), MCP Console (tool invocationgrams, MCP Console, API Docs |
-| **REST API** (`/api`) | 37 endpoints -- stats, nodes, edges, topology, triage, search, flow |
-| **MCP Server** (`/mcp`) | 34 tools via Spring AI streamable HTTP for AI-powered code triage |
-
-## Supported Frameworks
-
-| Language | Frameworks & Patterns |
-|----------|----------------------|
-| **Java** | Spring REST, Spring Security, JPA/Hibernate, Kafka, RabbitMQ, JMS, gRPC, JAX-RS, WebSocket, Quarkus, Micronaut |
-| **Python** | Flask, Django (views + models + auth), FastAPI (routes + auth), SQLAlchemy, Celery, Pydantic |
-| **TypeScript** | Express, NestJS, Fastify, Remix, GraphQL, TypeORM, Prisma, Sequelize, Mongoose, KafkaJS, Passport/JWT |
-| **Frontend** | React, Vue, Angular, Svelte components and routes |
-| **Go** | Gin, Echo, Chi, gorilla/mux, net/http, GORM, sqlx |
-| **C#** | Entity Framework Core, Minimal APIs, ASP.NET Core |
-| **Rust** | Actix-web, Axum |
-| **Kotlin** | Ktor routes |
-| **Infra** | Terraform, Kubernetes, Docker Compose, Dockerfile, Bicep, Helm, GitHub Actions, GitLab CI, CloudFormation |
-| **Auth** | Spring Security, Django Auth, FastAPI Auth, NestJS Guards, Passport/JWT, K8s RBAC, LDAP |
-
-## Service Topology
-
-AppDynamics-style service topology from static code analysis:
-
-```bash
-# View service topology
-java -jar code-iq-*-cli.jar topology /path/to/monorepo
-
-# Blast radius analysis
-java -jar code-iq-*-cli.jar topology /path/to/repo --blast-radius service-name
-
-# Multi-repo support
-java -jar code-iq-*-cli.jar index /repo1 --graph /shared --service-name frontend
-java -jar code-iq-*-cli.jar index /repo2 --graph /shared --service-name backend
-java -jar code-iq-*-cli.jar serve /shared
-```
-
-## Configuration
-
-codeiq is configured by a single YAML file at the repo root: **`codeiq.yml`**.
-Every field is optional; omitted fields fall back to the in-code defaults
-(`ConfigDefaults.builtIn()`). See
-[`docs/codeiq.yml.example`](docs/codeiq.yml.example) for the full reference
-with inline documentation. All keys are **snake_case**; camelCase spellings
-are accepted as deprecated aliases for one release and log a WARN on load.
-
-### Resolution order (last wins)
-
-1. Built-in defaults
-2. `~/.codeiq/config.yml` (user-global)
-3. `./codeiq.yml` (project)
-4. Environment variables: `CODEIQ_<SECTION>_<KEY>` (e.g. `CODEIQ_SERVING_PORT=9090`,
-   `CODEIQ_MCP_AUTH_MODE=bearer`, `CODEIQ_INDEXING_BATCH_SIZE=1000`). Nested
-   keys are flattened with underscores; values parse as YAML scalars.
-5. CLI flags on `codeiq <command>`
-
-### Commands
-
-```bash
-codeiq config validate              # Validate ./codeiq.yml, exit 1 on error
-codeiq config validate -p custom.yml
-codeiq config explain                # Print each effective value + its source layer
-```
-
-### Minimal example
-
-```yaml
-project:
-  name: my-service
-  root: .
-
-indexing:
-  exclude: ['**/node_modules/**', '**/build/**', '**/dist/**']
-  cache_dir: .codeiq/cache
-  batch_size: 500
-
-serving:
-  port: 8080
-  bind_address: 0.0.0.0
-
-mcp:
-  enabled: true
-  transport: http
-```
-
-### Spring-owned keys (stay in `application.yml`)
-
-A handful of keys drive Spring's `@ConditionalOnProperty` / `@Value` wiring
-and have not been migrated into `codeiq.yml`. Keep them in
-`src/main/resources/application.yml`:
-
-- `codeiq.neo4j.enabled` -- profile-conditional Neo4j toggle (`false` under
-  the `indexing` profile, `true` under `serving`).
-- `codeiq.neo4j.bolt.port` -- embedded Neo4j Bolt listener port.
-- `codeiq.cors.allowed-origin-patterns` -- CORS allow-list for the REST API.
-- `codeiq.ui.enabled` -- toggles the React SPA static resource handler.
-
-Everything else belongs in `codeiq.yml`. `UnifiedConfigBeans` bridges the
-two worlds for values that exist in both.
-
-See `docs/codeiq.yml.example` for the full schema.
-
-## Graph Model
-
-```mermaid
-graph LR
-    subgraph "Node Types (34)"
-        direction TB
-        N1[service] --- N2[endpoint]
-        N2 --- N3[class]
-        N3 --- N4[method]
-        N4 --- N5[entity]
-        N5 --- N6[topic / queue]
-        N6 --- N7[guard / middleware]
-        N7 --- N8[config_file]
-    end
-
-    subgraph "Edge Types (28)"
-        direction TB
-        E1[calls] --- E2[imports]
-        E2 --- E3[depends_on]
-        E3 --- E4[produces / consumes]
-        E4 --- E5[queries / connects_to]
-        E5 --- E6[extends / implements]
-        E6 --- E7[protects / contains]
-    end
-```
-
-## Benchmarks
-
-| Project | Files | Nodes | Edges | Time |
-|---------|-------|-------|-------|------|
-| kubernetes | 20,240 | 193,391 | 349,707 | 9s |
-| kafka | 6,919 | 62,692 | 120,422 | 50s |
-| django | 3,467 | 51,402 | 99,086 | 54s |
-| spring-boot | 10,524 | 27,993 | 39,776 | 27s |
-| fastapi | 2,740 | 25,475 | 30,430 | 10s |
-| nest | 2,037 | 5,757 | 11,904 | 1s |
-
-All results are 100% deterministic across runs.
-
-## Development
+Requires Go 1.25.10+ and a C toolchain (CGO).
 
 ```bash
 git clone https://github.com/RandomCodeSpace/codeiq.git
-cd codeiq
-mvn clean package    # Build + test (3,270 tests across 236 files)
-mvn test             # Tests only
+cd codeiq/go
+CGO_ENABLED=1 go build -o /usr/local/bin/codeiq ./cmd/codeiq
+codeiq --version
 ```
 
-### Maven Dependency
+## Quickstart
 
-```xml
-<dependency>
-    <groupId>io.github.randomcodespace.iq</groupId>
-    <artifactId>code-iq</artifactId>
-    <version>0.0.1-beta.0</version>
-</dependency>
+```bash
+# Index a repository → SQLite analysis cache.
+codeiq index /path/to/repo
+
+# Enrich → Kuzu graph at .codeiq/graph/codeiq.kuzu.
+codeiq enrich /path/to/repo
+
+# Query.
+codeiq stats /path/to/repo
+codeiq find endpoints /path/to/repo
+codeiq query consumers <node-id> /path/to/repo
+codeiq topology /path/to/repo
+codeiq flow /path/to/repo --view overview --format mermaid
+
+# LLM PR review (local Ollama; OLLAMA_API_KEY → Cloud).
+codeiq review --base origin/main --head HEAD /path/to/repo
 ```
+
+## MCP integration
+
+Add to your MCP client config (e.g. `.mcp.json` at the project root):
+
+```json
+{
+  "mcpServers": {
+    "code-mcp": {
+      "command": "codeiq",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+Six mode-driven tools (`graph_summary`, `find_in_graph`, `inspect_node`,
+`trace_relationships`, `analyze_impact`, `topology_view`) plus
+`run_cypher` (escape hatch) and `review_changes` (in-agent PR review).
+The deprecated 34 narrow tools remain wired for one release for
+back-compat.
+
+## CLI reference
+
+| Command | Purpose |
+|---|---|
+| `index [path]` | Scan files → SQLite analysis cache. |
+| `enrich [path]` | Load cache → Kuzu graph; run linkers + layer classifier. |
+| `mcp [path]` | Stdio MCP server (Claude / Cursor). |
+| `stats [path]` | Categorized statistics. |
+| `query <kind> <id> [path]` | consumers / producers / callers / dependencies / dependents / shortest-path / cycles / dead-code. |
+| `find <preset> [path]` | endpoints, entities, services, … |
+| `cypher <query> [path]` | Raw Cypher against Kuzu (read-only). |
+| `flow [path]` | Mermaid / dot / yaml flow diagrams. |
+| `graph [path]` | Export graph: json / yaml / mermaid / dot. |
+| `topology [path]` | Service-topology projection. |
+| `review [path]` | LLM-driven PR review. |
+| `cache <action>` | Inspect / clear the analysis cache. |
+| `plugins <action>` | List + describe registered detectors. |
+| `config <action>` | Validate / explain `codeiq.yml`. |
+| `version` | Build info. |
+
+`codeiq <cmd> --help` for full flag listing.
+
+## Design
+
+The graph is canonical and deterministic — `GraphBuilder` deduplicates
+nodes by ID (confidence-aware merge) and edges by canonical
+`(source, target, kind)` tuple. Phantom edges (endpoint missing from
+the graph) are dropped at snapshot. Every run prints a
+"Deduped: N nodes, M edges  Dropped: K phantom edges" line so graph
+hygiene is visible.
+
+See [`docs/project/architecture.md`](docs/project/architecture.md) for
+the pipeline (FileDiscovery → tree-sitter / regex → detectors →
+GraphBuilder → linkers → LayerClassifier → Kuzu) and
+[`docs/project/conventions.md`](docs/project/conventions.md) for the
+detector authoring contract.
+
+## Releases
+
+Tag `vX.Y.Z` → `.github/workflows/release-go.yml` builds linux/amd64,
+linux/arm64, darwin/arm64 archives with SPDX SBOMs (Syft); the
+checksum manifest is keyless-signed via Cosign + GitHub OIDC
+(Sigstore Rekor). Runbook:
+[`shared/runbooks/release-go.md`](shared/runbooks/release-go.md).
+
+## Security
+
+See [SECURITY.md](SECURITY.md). Supply-chain stack: OpenSSF Best
+Practices [12650](https://www.bestpractices.dev/projects/12650),
+OpenSSF Scorecard, and the OSS-CLI workflow
+([`security.yml`](.github/workflows/security.yml)) running OSV-Scanner,
+Trivy, Semgrep, Gitleaks, jscpd, and `anchore/sbom-action` on every PR.
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
-
----
-
-<p align="center">
-  Built with intelligence. No AI required.
-</p>
+See [LICENSE](LICENSE).
