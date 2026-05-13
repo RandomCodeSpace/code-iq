@@ -38,6 +38,13 @@ jobs:
       MAX_INDEX_SECONDS: '8'
       MIN_NODES: '40'
       MAX_PHANTOM_DROP_RATIO: '50'
+      # Memory ceiling for `codeiq enrich` on fixture-multi-lang. Local
+      # baseline post-Phase-A+B+C of the 2026-05-13 OOM-fix plan: ~108 MB
+      # peak RSS. 300 MB ceiling gives ~2.7x headroom — tight enough to
+      # surface real regressions, loose enough to absorb GC / scheduler
+      # variance on CI runners. Bump only if a deliberate enrich-mem
+      # regression is documented in a PR.
+      MAX_ENRICH_RSS_KB: '307200'
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
@@ -108,3 +115,33 @@ jobs:
             fi
           fi
           exit $fail
+      # Enrich memory regression gate. Locks in the gains from the
+      # 2026-05-13 OOM-fix plan (Phases A-C). Pre-Phase-A on the same
+      # fixture peaked at ~600 MB; current main lives at ~108 MB peak.
+      # If a refactor pushes peak past MAX_ENRICH_RSS_KB, fail the PR.
+      - name: Enrich memory gate
+        run: |
+          set -euo pipefail
+          # Run enrich against the already-indexed fixture; /usr/bin/time
+          # -v reports peak RSS.
+          /usr/bin/time -v /tmp/codeiq enrich /tmp/fm-perf \
+            > /tmp/perf-enrich.log 2> /tmp/perf-enrich.time
+          RSS=$(awk -F': ' '/Maximum resident set size/ {print $2}' /tmp/perf-enrich.time)
+          RSS=${RSS:-0}
+          ELAPSED=$(awk -F': ' '/Elapsed \(wall clock\)/ {print $2}' /tmp/perf-enrich.time)
+
+          {
+            echo ""
+            echo "## codeiq enrich memory gate"
+            echo ""
+            echo "| metric | value | budget |"
+            echo "|---|---:|---:|"
+            echo "| peak RSS (KB) | $RSS | <= $MAX_ENRICH_RSS_KB |"
+            echo "| wall-clock | $ELAPSED | — |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat /tmp/perf-enrich.log >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$RSS" -gt "$MAX_ENRICH_RSS_KB" ]; then
+            echo "::error::enrich peak RSS ${RSS} KB exceeds budget ${MAX_ENRICH_RSS_KB} KB"
+            exit 1
+          fi

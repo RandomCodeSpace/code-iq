@@ -429,6 +429,34 @@ Release pipeline:
   System.Security.Cryptography.X509Certificates;`. Use a STRICT
   keyword list (high-signal markers only — not path extensions) in
   any cross-language regex pre-screen.
+- **Enrich memory ceiling (Phase A+B+C OOM-fix plan, 2026-05-13).**
+  Pre-fix `codeiq enrich` peaked at 3.8 GB on the airflow polyglot
+  target (9k Python files) and OOM-killed at exit 137 on ~/projects/-
+  scale (49k files). Three landed fixes brought peak RSS down to:
+  - **fixture-multi-lang (22 files): ~108 MB** (CI-gated via
+    perf-gate workflow at 300 MB ceiling)
+  - **airflow (9,151 files): 1.27 GB** (1× /usr/bin/time -v on
+    16 GB CI host)
+  - **~/projects/ (49,076 files): 3.12 GB** (well under the 4 GiB
+    acceptance bar from the plan)
+
+  The three fixes:
+  1. `intelligence/extractor/enricher.go` parses tree-sitter trees
+     once per file (was per-node, ~13× over-parse on Python).
+  2. `intelligence/extractor/enricher.go` bounds the per-file
+     goroutine pool to `2 * GOMAXPROCS` (was unbounded — 7k+ goroutines
+     held live trees + file content strings).
+  3. `graph.Open()` caps Kuzu `BufferPoolSize` to 2 GiB by default
+     (was 80% of system RAM via `kuzu.DefaultSystemConfig()`).
+
+  Tunable knobs on `codeiq enrich`:
+  - `--memprofile=<path>` writes a Go heap profile (analyze with
+    `go tool pprof -top -inuse_space ...`).
+  - `--max-buffer-pool=N` overrides the 2 GiB Kuzu cap.
+  - `--copy-threads=N` overrides `MaxNumThreads` (default `min(4,
+    GOMAXPROCS)`).
+
+  Plan + research history: `docs/superpowers/plans/2026-05-13-enrich-oom-fix.md`.
 
 ### Release / signing
 
