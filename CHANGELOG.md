@@ -16,6 +16,24 @@ for that specific tag for the per-commit details.
 
 ### Added
 
+- **Go port (Phases 1-4 of the rewrite)** — codeiq is being ported from
+  Java/Spring Boot to a single static Go binary on the `port/go-port`
+  branch. PR #130. 100 detectors at 1:1 parity with the Java side; 34 MCP
+  tools (deprecated) + 6 consolidated mode-driven tools (new); `codeiq
+  review` CLI + `review_changes` MCP tool for LLM-driven PR review via
+  Ollama (Cloud or local). Java tree untouched until Phase 6 cutover.
+- **Graph dedup + determinism** (Go side) — `GraphBuilder` deduplicates
+  nodes by ID with confidence-aware merging, edges by canonical
+  `(source, target, kind)` tuple. Linker output sorted at the boundary.
+  `codeiq index` surfaces "Deduped: N nodes, M edges  Dropped: K phantom
+  edges" so graph hygiene is visible.
+- **`codeiq review`** — LLM-driven review of `git diff base..head` against
+  the indexed graph. Defaults to local Ollama (`gpt-oss:20b`); set
+  `OLLAMA_API_KEY` to flip to Ollama Cloud. `--format=markdown|json`,
+  `--out`, `--focus`. Graph evidence (nodes-in-file + 1-hop blast radius)
+  attached per changed file when the Kuzu store is enriched.
+- **`review_changes` MCP tool** — same review flow exposed over MCP for
+  agent-driven invocation. Strictly read-only against the graph.
 - OpenSSF supply-chain wiring — Best Practices project
   [12650](https://www.bestpractices.dev/projects/12650), live Scorecard at
   [securityscorecards.dev](https://api.securityscorecards.dev/projects/github.com/RandomCodeSpace/codeiq),

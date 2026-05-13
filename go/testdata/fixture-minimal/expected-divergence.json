@@ -1,0 +1,6 @@
+{
+  "comment": "Phase 1 expected divergences against the Java side. Empty for now -- the 5 ported detectors target byte-equivalent output on fixture-minimal. Populated in phases 2-4 as the Java side ships features the Go side has not yet ported.",
+  "missing_nodes": [],
+  "missing_edges": [],
+  "property_drift": []
+}

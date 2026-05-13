@@ -1,0 +1,43 @@
+{
+  "graph": {
+    "nodes": 24,
+    "edges": 31,
+    "files": 9,
+    "edges_by_kind": {
+      "contains": 20,
+      "imports": 11
+    }
+  },
+  "languages": {
+    "java": 14,
+    "python": 6
+  },
+  "frameworks": {
+    "django": 1,
+    "flask": 1,
+    "jpa": 1,
+    "spring_boot": 1
+  },
+  "infra": {
+    "databases": {},
+    "messaging": {},
+    "cloud": {}
+  },
+  "connections": {
+    "rest": {
+      "total": 2,
+      "by_method": {
+        "GET": 1,
+        "POST": 1
+      }
+    },
+    "grpc": 0,
+    "websocket": 0,
+    "producers": 0,
+    "consumers": 0
+  },
+  "auth": {},
+  "architecture": {
+    "modules": 16
+  }
+}

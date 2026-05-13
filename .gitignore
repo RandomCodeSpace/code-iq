@@ -16,6 +16,9 @@ target/
 *.swo
 *~
 
+# Claude Code local state (progress trackers, settings, ralph-loop state)
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db
@@ -94,6 +97,7 @@ dist/
 build/
 *.whl
 pyproject.toml
+!go/testdata/**/pyproject.toml
 uv.lock
 .venv/
 venv/
@@ -116,3 +120,7 @@ graph.db/
 # Phase A baseline
 .seeds/
 docs/superpowers/baselines/**/raw/**
+
+# Agent-generated plans / scratch (not project deliverables)
+go-port-phase4-plan.md
+phase*-plan.md

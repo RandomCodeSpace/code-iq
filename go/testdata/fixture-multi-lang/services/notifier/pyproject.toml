@@ -1,0 +1,5 @@
+[project]
+name = "notifier"
+version = "1.0.0"
+description = "Notification service for the multi-lang fixture."
+requires-python = ">=3.10"

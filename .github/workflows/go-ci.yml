@@ -1,0 +1,66 @@
+name: go-ci
+
+on:
+  push:
+    branches: [main]
+    paths: ['go/**', '.github/workflows/go-ci.yml']
+  pull_request:
+    branches: [main]
+    paths: ['go/**', '.github/workflows/go-ci.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    name: vet / test / staticcheck / gosec / govulncheck
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: "1"
+    defaults:
+      run:
+        working-directory: go
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          # Pin to 1.25.x — 1.26+ isn't on enough developer machines yet.
+          # 1.25.10 includes the fix for GO-2026-4918 (HTTP/2 SETTINGS
+          # infinite loop) which is reachable via review.Client.Review.
+          go-version: '1.25.10'
+          cache: true
+          cache-dependency-path: go/go.sum
+      - name: Install C toolchain
+        run: sudo apt-get update -y && sudo apt-get install -y build-essential
+      - name: go vet
+        run: go vet ./...
+      - name: go test (race)
+        run: go test ./... -race -count=1
+      - name: staticcheck
+        run: |
+          # staticcheck must understand the Go toolchain version that built
+          # the binaries above. 2024.1.1 errors with "internal error in
+          # importing internal/byteorder (unsupported version: 2)" against
+          # Go 1.25's stdlib. 2025.1.1 is the first release that handles it.
+          go install honnef.co/go/tools/cmd/staticcheck@2025.1.1
+          "$(go env GOPATH)/bin/staticcheck" ./...
+      - name: gosec
+        run: |
+          # v2.21.4 won't compile under Go 1.25 — its pinned
+          # golang.org/x/tools v0.25.0 hits an int64 constant-overflow
+          # bug in tokeninternal.go. v2.22.0 ships an x/tools bump that
+          # builds clean on 1.25.x.
+          go install github.com/securego/gosec/v2/cmd/gosec@v2.22.0
+          # Suppressed rule rationale (all reviewed manually):
+          # G104 — idiomatic deferred Close()/Rollback() error drops
+          # G115 — uint64→int64 on counter rows from Kuzu, bounded
+          # G202 — analysis-cache LIMIT/OFFSET; ints, not user input
+          # G204 — git ls-files / mvn shellouts, no user input
+          # G301/G306 — codeiq cache files are dev-local, 0o755/0o644 ok
+          # G304 — fixture and cache files under controlled dirs
+          # G401/G404/G501 — non-crypto hashing (MD5 for ID dedup, etc.)
+          "$(go env GOPATH)/bin/gosec" -quiet -exclude=G104,G115,G202,G204,G301,G304,G306,G401,G404,G501 ./...
+      - name: govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          "$(go env GOPATH)/bin/govulncheck" ./...

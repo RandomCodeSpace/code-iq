@@ -19,6 +19,27 @@
 
 ---
 
+## Development — Go Port (Phase 1)
+
+An in-progress Go port lives in [`go/`](./go/). Phase 1 ships `codeiq index`
+over 5 detectors with byte-level parity against the Java side on
+`go/testdata/fixture-minimal`. Phases 2-6 land enrich, MCP, the remaining 94
+detectors, release infra, and Java cutover (see
+[`docs/superpowers/specs/2026-05-11-codeiq-go-port-design.md`](docs/superpowers/specs/2026-05-11-codeiq-go-port-design.md)).
+
+Build and run:
+
+```bash
+cd go
+CGO_ENABLED=1 go build -o codeiq ./cmd/codeiq
+./codeiq index .
+./codeiq --version
+```
+
+The Go binary writes to the same `.codeiq/cache/` location the Java side
+uses, but `CACHE_VERSION` is bumped to 6 so the first run triggers a clean
+rebuild. Phase 1 is parity-only — use the Java side for production runs.
+
 ## Quick Start
 
 ```bash
