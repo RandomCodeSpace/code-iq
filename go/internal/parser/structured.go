@@ -162,7 +162,7 @@ func parseTOML(source []byte) ParsedEnvelope {
 			continue
 		}
 		if strings.HasPrefix(raw, "[") && strings.HasSuffix(raw, "]") {
-			section := strings.TrimSpace(raw[1 : len(raw)-1])
+			section := unquote(strings.TrimSpace(raw[1 : len(raw)-1]))
 			currentSection = section
 			// Walk into a nested map; only create the top-level section in
 			// data — nested namespacing is preserved by the dotted key.
@@ -176,7 +176,7 @@ func parseTOML(source []byte) ParsedEnvelope {
 		if eq <= 0 {
 			continue
 		}
-		key := strings.TrimSpace(raw[:eq])
+		key := unquote(strings.TrimSpace(raw[:eq]))
 		val := strings.TrimSpace(raw[eq+1:])
 		val = unquote(val)
 		if currentSection == "" {
