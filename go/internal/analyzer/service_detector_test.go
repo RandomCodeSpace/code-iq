@@ -64,13 +64,59 @@ func TestServiceDetectorTwoModules(t *testing.T) {
 	if mavenSvc.Layer != model.LayerBackend {
 		t.Fatalf("maven svc layer = %v, want backend", mavenSvc.Layer)
 	}
-	if mavenSvc.ID != "service:my-java-app" {
-		t.Fatalf("maven svc id = %q, want service:my-java-app", mavenSvc.ID)
+	if mavenSvc.ID != "service:.:my-java-app" {
+		t.Fatalf("maven svc id = %q, want service:.:my-java-app", mavenSvc.ID)
 	}
 
 	npmSvc := serviceByLabel(t, r.Nodes, "api-server")
 	if got := npmSvc.Properties["build_tool"]; got != "npm" {
 		t.Fatalf("npm svc build_tool = %v, want npm", got)
+	}
+	if npmSvc.ID != "service:api:api-server" {
+		t.Fatalf("npm svc id = %q, want service:api:api-server", npmSvc.ID)
+	}
+}
+
+// TestServiceDetectorPathQualifiedIDsBreakCollision: two modules in different
+// directories that share the same service name MUST get distinct IDs so Kuzu's
+// BulkLoadNodes COPY doesn't abort on duplicate primary key. Pre-fix this
+// emitted "service:checkbox" twice and the whole batch was rejected.
+func TestServiceDetectorPathQualifiedIDsBreakCollision(t *testing.T) {
+	root := t.TempDir()
+	// Two distinct Python modules in different folders, both named "checkbox".
+	writeFile(t, root, "frontend/widgets/checkbox/pyproject.toml", `[project]
+name = "checkbox"
+`)
+	writeFile(t, root, "backend/components/checkbox/pyproject.toml", `[project]
+name = "checkbox"
+`)
+
+	d := &ServiceDetector{}
+	r := d.Detect(nil, nil, "p", root)
+
+	if len(r.Nodes) != 2 {
+		t.Fatalf("want 2 service nodes, got %d", len(r.Nodes))
+	}
+
+	ids := map[string]bool{}
+	for _, n := range r.Nodes {
+		if n.Label != "checkbox" {
+			t.Errorf("want both labels = checkbox, got %q", n.Label)
+		}
+		if ids[n.ID] {
+			t.Fatalf("duplicate service ID %q — Kuzu BulkLoad would abort here", n.ID)
+		}
+		ids[n.ID] = true
+	}
+
+	want := map[string]bool{
+		"service:frontend/widgets/checkbox:checkbox": true,
+		"service:backend/components/checkbox:checkbox": true,
+	}
+	for id := range want {
+		if !ids[id] {
+			t.Errorf("missing expected ID %q. got: %v", id, ids)
+		}
 	}
 }
 
