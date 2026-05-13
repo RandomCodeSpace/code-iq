@@ -5,9 +5,8 @@
 >
 > **Canonical depth lives in [`CLAUDE.md`](CLAUDE.md)** (~16 KB,
 > agent-oriented, hand-maintained). This file is a thin entry point
-> that links into `CLAUDE.md`, the runbooks under
-> [`shared/runbooks/`](shared/runbooks/), and the deep-dives under
-> [`docs/project/`](docs/project/).
+> that links into `CLAUDE.md` and the runbooks under
+> [`shared/runbooks/`](shared/runbooks/).
 
 ## Identity
 
@@ -54,7 +53,7 @@ codeiq/
 │   │   ├── cli/                     — cobra subcommands
 │   │   ├── detector/                — 100 detectors organized by category
 │   │   ├── flow/                    — architecture-flow diagram engine
-│   │   ├── graph/                   — Kuzu facade (read-only on serve path)
+│   │   ├── graph/                   — Kuzu facade (read-only)
 │   │   ├── intelligence/            — lexical + language extractors + evidence + planner
 │   │   ├── mcp/                     — MCP server + tool definitions
 │   │   ├── model/                   — CodeNode, CodeEdge, kinds, Confidence
@@ -65,8 +64,7 @@ codeiq/
 │   ├── testdata/                    — fixtures (fixture-minimal, fixture-multi-lang)
 │   ├── go.mod
 │   └── go.sum
-├── .github/workflows/               — go-ci, perf-gate, release-go, security, scorecard
-├── docs/project/                    — architecture + conventions + flows deep-dives
+├── .github/workflows/               — go-ci, perf-gate, release-go, release-darwin, security, scorecard
 ├── shared/runbooks/                 — release-go.md + engineering-standards.md
 ├── CHANGELOG.md
 ├── CLAUDE.md                        — SSoT internals doc
@@ -104,8 +102,8 @@ CGO_ENABLED=1 go build -o /usr/local/bin/codeiq ./cmd/codeiq
 ```
 
 **Required env / external services**: none for build. At run-time the
-binary reads `OLLAMA_API_KEY` (optional) and `HOMEBREW_TAP_GITHUB_TOKEN`
-(release-side only).
+binary reads `OLLAMA_API_KEY` (optional, switches `codeiq review` to
+Ollama Cloud).
 
 ## Conventions an agent must respect
 
@@ -126,8 +124,7 @@ binary reads `OLLAMA_API_KEY` (optional) and `HOMEBREW_TAP_GITHUB_TOKEN`
   boundary; detectors override only when they have higher-confidence
   evidence.
 
-Full set in [`CLAUDE.md` §Code Conventions](CLAUDE.md#code-conventions)
-and [`docs/project/conventions.md`](docs/project/conventions.md).
+Full set in [`CLAUDE.md` §Code Conventions](CLAUDE.md#code-conventions).
 
 ## Gotchas
 
@@ -147,8 +144,6 @@ and [`docs/project/conventions.md`](docs/project/conventions.md).
 
 ## Where to look next
 
-- Architecture & components → [`docs/project/architecture.md`](docs/project/architecture.md)
-- Conventions (full) → [`docs/project/conventions.md`](docs/project/conventions.md)
 - Build & release → [`shared/runbooks/release-go.md`](shared/runbooks/release-go.md)
 - MCP integration → [`README.md#mcp-integration`](README.md#mcp-integration)
 - Internal SSoT → [`CLAUDE.md`](CLAUDE.md)

@@ -61,8 +61,8 @@ builds:
       - -X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Dirty={{.IsGitDirty}}'
     goos: [linux]
     goarch: [arm64]
-  # darwin/arm64 deferred — needs a macos runner. Follow-up:
-  # release-darwin.yml attaches macOS binaries to the same draft Release.
+  # darwin/arm64 ships from `release-darwin.yml` (macos-14 runner) and
+  # attaches to the same Release that this config creates.
 
 archives:
   - id: codeiq
@@ -113,28 +113,6 @@ signs:
     artifacts: checksum
     output: true
     signature: '${artifact}.cosign.bundle'
-
-# Homebrew tap publish — opt-in via $HOMEBREW_TAP_GITHUB_TOKEN. When the
-# env var is empty (forks, dry runs), the upload is skipped so the same
-# .goreleaser.yml works for the owning org and downstream forks alike.
-brews:
-  - name: codeiq
-    repository:
-      owner: '{{ envOrDefault "HOMEBREW_TAP_OWNER" "RandomCodeSpace" }}'
-      name: '{{ envOrDefault "HOMEBREW_TAP_REPO" "homebrew-codeiq" }}'
-      token: '{{ envOrDefault "HOMEBREW_TAP_GITHUB_TOKEN" "" }}'
-    skip_upload: '{{ if eq (envOrDefault "HOMEBREW_TAP_GITHUB_TOKEN" "") "" }}true{{ else }}false{{ end }}'
-    commit_author:
-      name: codeiq-bot
-      email: noreply@github.com
-    directory: Formula
-    homepage: 'https://github.com/RandomCodeSpace/codeiq'
-    description: 'Deterministic code knowledge graph + MCP server'
-    license: 'Apache-2.0'
-    install: |
-      bin.install "codeiq"
-    test: |
-      assert_match "codeiq", shell_output("#{bin}/codeiq --version")
 
 release:
   github:
