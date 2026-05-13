@@ -43,27 +43,14 @@ jobs:
           mv osv-scanner_linux_amd64 osv-scanner
           chmod +x osv-scanner
           ./osv-scanner --version
-      - name: Run osv-scanner (npm lockfile)
-        # Scoped to the npm lockfile by design:
-        #
-        #   - osv-scanner v2's `transitivedependency/pomxml` plugin resolves
-        #     Maven transitive deps via the `deps.dev` gRPC service. That
-        #     service is intermittently `Unavailable` in GitHub-hosted CI
-        #     (observed on PR #91 5th-pass), causing the scanner to exit
-        #     non-zero even when zero vulnerabilities are found.
-        #   - Maven coverage is already provided by Trivy (filesystem scan,
-        #     this same workflow) plus Dependabot security updates against
-        #     `pom.xml`. The OSV.dev advisory feed pulls from GHSA, which
-        #     Dependabot also consumes — there is no SCA gap.
-        #   - The npm lockfile is where osv-scanner adds unique value
-        #     (deeper transitive resolution + ecosystem-specific advisories
-        #     than Trivy provides for Node).
-        #
-        # AC §3 ("Zero High/Critical CVEs in dependency tree") is satisfied
-        # by the union of OSV-Scanner (npm) + Trivy (Maven, OS, container)
-        # + Dependabot (cross-ecosystem) — no single tool gates every
-        # ecosystem.
-        run: ./osv-scanner --lockfile=src/main/frontend/package-lock.json
+      - name: Run osv-scanner (Go module graph)
+        # Phase 6 cutover: project is Go-only. osv-scanner reads go.mod
+        # (the entire module graph including transitive deps) and emits
+        # any matching advisories from OSV.dev / GHSA. govulncheck (in
+        # go-ci.yml) is the call-graph-aware companion that filters to
+        # *reachable* vulns — keeping both gives both "have we got it"
+        # AND "are we exposed".
+        run: ./osv-scanner --lockfile=go/go.mod
 
   trivy:
     name: Trivy (filesystem + container scan)
@@ -97,13 +84,16 @@ jobs:
         # — setup-python@v6 ships a current vendored pip, and the Scorecard
         # rule fires only on user-installed packages.
         run: python -m pip install --quiet 'semgrep==1.161.0'
-      - name: Run semgrep (security-audit + owasp-top-ten + java)
+      - name: Run semgrep (security-audit + owasp-top-ten + golang)
+        # Phase 6 cutover: project is Go-only. p/java replaced with
+        # p/golang. p/security-audit + p/owasp-top-ten stay (both
+        # language-agnostic rule sets).
         run: |
           semgrep scan \
             --error \
             --config p/security-audit \
             --config p/owasp-top-ten \
-            --config p/java \
+            --config p/golang \
             --severity ERROR \
             --metrics off
 
@@ -145,52 +135,32 @@ jobs:
         with:
           node-version: '20'
       - run: |
-          # Scope jscpd to production code only:
-          #   - src/main/java          — Java production code
-          #   - src/main/frontend/src  — React/TS production code
-          # Tests (Java unit/integration, TS unit, Playwright e2e specs)
-          # share fixture/assertion shape by design — that parallelism is a
-          # feature for catching contract regressions, not a refactoring
-          # target. Scanning ./ as the AC originally proposed produces
-          # ~12.83% duplication driven by *.spec.ts e2e parallelism +
-          # *LanguageExtractorTest.java parallel-shape tests; both are
-          # intentional. AC §3 wording "duplication < 3% on new code" —
-          # interpreting "new code" as production code, gated per-PR via
-          # this scoped scan.
+          # Scope jscpd to Go production code only:
+          #   - go/cmd       — main entry point
+          #   - go/internal  — production code (100 detectors + pipeline + MCP)
+          # Tests share fixture/assertion shape by design (parallelism for
+          # catching contract regressions, not a refactoring target).
           #
-          # `*LanguageExtractor.java` files (one per language under
-          # intelligence/extractor/{java,typescript,python,go}) implement
-          # the same template-method shape against per-language ASTs by
-          # design — collapsing them into a base class would couple
-          # unrelated grammars and erase the per-language readability that
-          # makes them reviewable. Excluded from jscpd; cleanup-via-base-class
-          # is a separate board call, not a CI gate.
-          # `--min-tokens 200` is calibrated to Java's verbosity floor.
-          # A 97-detector codebase has, by definition, 97 file headers
-          # consisting of `package` + 8–15 imports + `@Component public class`
-          # + interface-implementation scaffold + a few constants — that's
-          # 150–180 tokens of identical structural boilerplate per file, with
-          # zero refactor surface (the imports differ by detector concern,
-          # the type names differ by node kind, but the *shape* is shared
-          # template-method conformance). At the jscpd default of 50, those
-          # headers produce ~400 trivial clones; at 100 they still produce
-          # ~130. 200 tokens roughly corresponds to a meaningful method body
-          # or a non-trivial code block — i.e. real duplicate logic, not
-          # language scaffolding. Threshold (3%) and the production-only
-          # scope are unchanged.
+          # `*language_extractor.go` (one per language under
+          # intelligence/extractor/{java,typescript,python,golang}) and
+          # `structures.go` (kotlin/scala/cpp/rust) implement the same
+          # template-method shape against per-language ASTs by design;
+          # collapsing into a base would couple unrelated grammars and
+          # erase per-language readability. Excluded.
           #
-          # `*StructuresDetector.java` (Kotlin/Scala/Cpp/Rust) implement the
-          # same template-method shape against per-language ASTs by design,
-          # same as the LanguageExtractors above. Excluded for the same
-          # reason — collapsing into a base class would couple unrelated
-          # grammars and obscure per-language readability.
+          # --min-tokens 200 calibrated to Go's verbosity floor: each
+          # detector file's package decl + imports + Type/init/Name/
+          # SupportedLanguages/DefaultConfidence/Detect scaffold is
+          # ~150-180 tokens of identical structural boilerplate across
+          # 100 detectors. 200 tokens is the floor for "real duplicate
+          # logic" rather than language scaffolding.
           npx --yes jscpd@4 \
             --threshold 3 \
             --min-tokens 200 \
             --reporters consoleFull \
-            --format "java,javascript,typescript" \
-            --ignore "**/target/**,**/node_modules/**,**/grammar/**,**/generated-sources/**,**/dist/**,**/build/**,**/coverage/**,**/intelligence/extractor/**/*LanguageExtractor.java,**/detector/**/*StructuresDetector.java" \
-            src/main/java src/main/frontend/src
+            --format "go" \
+            --ignore "**/vendor/**,**/testdata/**,**/grammar/**,**/generated/**,**/dist/**,**/coverage/**,**/intelligence/extractor/**/language_extractor.go,**/detector/**/structures.go" \
+            go/cmd go/internal
 
   sbom:
     name: SBOM (SPDX + CycloneDX)

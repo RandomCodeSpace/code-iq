@@ -1,4 +1,0 @@
-project:
-  name: my-service
-indexing:
-  batchSize: 2000

@@ -1,13 +1,12 @@
-# Java build
-target/
-*.class
-*.jar
-!src/main/resources/static/js/vendor/*.js
-.classpath
-.project
-.settings/
-.factorypath
-*.iml
+# Go build
+go/codeiq
+go/dist/
+
+# Go test artifacts
+*.test
+*.out
+coverage.out
+coverage.html
 
 # IDE
 .idea/
@@ -23,20 +22,23 @@ target/
 .DS_Store
 Thumbs.db
 
-# Project runtime data
+# Project runtime data — the embedded Kuzu graph + SQLite analysis cache
+# both land under .codeiq/ when codeiq runs against a target repo. Never
+# commit either; they're per-repo and per-machine.
 .codeiq/
 *.db
 *.db-wal
 *.db-shm
-*.mv.db
+# Stray Kuzu temp files
+*.wal
+*.kuzu-tmp
 
 # Environment & secrets
 # Broad .env* glob catches .env, .env.local, .env.prod, .env.test, .env.* — all
-# variants. Pre-PR-3 we only excluded the first two and several .env.<env>
-# variants would have committed silently.
+# variants.
 .env
 .env.*
-# Java keystores & PKCS#12 archives — high-value secrets that have shown up in
+# Keystores / PKCS#12 archives — high-value secrets that have shown up in
 # audits; never commit, even encrypted.
 *.jks
 *.p12
@@ -63,27 +65,12 @@ secrets.yaml
 # Logs
 *.log
 
-# Frontend
-src/main/frontend/node_modules/
-src/main/frontend/node/
-src/main/frontend/dist/
-src/main/frontend/tsconfig.tsbuildinfo
-playwright-report/
-test-results/
-# Generated explorer CSS (rebuild via: cd src/main/frontend && npm run build:explorer-css)
-src/main/resources/static/css/explorer.css
-# Frontend build output copied into Spring static resources
-src/main/resources/static/index.html
-src/main/resources/static/assets/CodeGraphView-*.js
-src/main/resources/static/assets/index-*.js
-src/main/resources/static/assets/index-*.css
-src/main/resources/static/assets/vendor-*.js
-
-# Distribution
+# Distribution / release artifacts
 *.tar.gz
 *.zip
+dist/
 
-# Python (legacy — removed from project)
+# Python tooling that codeiq sometimes shells out to (linters, etc.)
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -93,8 +80,6 @@ __pycache__/
 .pytest_cache/
 pytest-of-*/
 htmlcov/
-dist/
-build/
 *.whl
 pyproject.toml
 !go/testdata/**/pyproject.toml
@@ -107,14 +92,12 @@ venv/
 docs/superpowers/*
 !docs/superpowers/baselines/
 
-# Docker & Helm (bundled separately)
+# Docker & Helm (bundled separately by the release flow if/when needed)
 Dockerfile
 docker-compose.yml
 helm/
 
-# Neo4j embedded data
-neo4j-data/
-graph.db/
+# Worktrees
 .worktrees/
 
 # Phase A baseline
@@ -122,5 +105,6 @@ graph.db/
 docs/superpowers/baselines/**/raw/**
 
 # Agent-generated plans / scratch (not project deliverables)
-go-port-phase4-plan.md
 phase*-plan.md
+*-plan.md
+!docs/superpowers/plans/*.md
