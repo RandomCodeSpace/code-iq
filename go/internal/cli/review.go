@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/randomcodespace/codeiq/go/internal/graph"
 	"github.com/randomcodespace/codeiq/go/internal/review"
 
 	"github.com/spf13/cobra"
@@ -54,7 +55,20 @@ Plan §3 — Phase 3 of the optimization plan.`,
 					cfg.Model = model
 				}
 				client := review.NewClient(cfg)
-				svc := review.NewService(client, nil)
+
+				// Best-effort: open the enriched Kuzu store read-only so the
+				// review prompt carries graph evidence per changed file. If
+				// the store isn't present (no enrich yet) we fall back to
+				// diff-only review with a stderr warning.
+				var gctx review.GraphContext
+				gdir := filepath.Join(abs, ".codeiq", "graph", "codeiq.kuzu")
+				if store, err := graph.OpenReadOnly(gdir, 30*time.Second); err == nil {
+					defer store.Close()
+					gctx = review.NewKuzuGraphContext(store)
+				} else {
+					fmt.Fprintf(os.Stderr, "review: graph store not available (%v); falling back to diff-only review. Run 'codeiq enrich' first to include graph evidence.\n", err)
+				}
+				svc := review.NewService(client, gctx)
 
 				ctx, cancel := context.WithTimeout(cmd.Context(), cfg.Timeout+30*time.Second)
 				defer cancel()

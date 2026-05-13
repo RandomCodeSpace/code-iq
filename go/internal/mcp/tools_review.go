@@ -40,7 +40,12 @@ func toolReviewChanges(d *Deps) Tool {
 			if p.Model != "" {
 				cfg.Model = p.Model
 			}
-			svc := review.NewService(review.NewClient(cfg), nil)
+			// Reuse the MCP server's already-open Kuzu store for evidence.
+			var gctx review.GraphContext
+			if d.Store != nil {
+				gctx = review.NewKuzuGraphContext(d.Store)
+			}
+			svc := review.NewService(review.NewClient(cfg), gctx)
 			rep, err := svc.Review(ctx, d.RootPath, p.BaseRef, p.HeadRef, p.FocusFiles)
 			if err != nil {
 				return NewErrorEnvelope(CodeInternalError, fmt.Errorf("review: %w", err), RequestID(ctx)), nil
