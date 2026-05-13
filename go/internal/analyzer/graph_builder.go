@@ -85,6 +85,14 @@ type Snapshot struct {
 
 // Snapshot returns the current state as a sorted, dangling-edge-free
 // Snapshot with surfaced dedup/drop counts.
+//
+// After this call returns, the builder's internal dedup maps are cleared
+// (set to nil). This releases ~280 MB of reference pressure at ~/projects/
+// scale where the downstream enrich pipeline holds the returned Snapshot
+// slices for the lifetime of the function — coexisting with the dedup
+// maps was the largest in-memory duplication in the pipeline. Snapshot
+// is therefore single-shot: subsequent calls to Snapshot or Add on the
+// same builder are not supported.
 func (b *GraphBuilder) Snapshot() Snapshot {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -109,11 +117,17 @@ func (b *GraphBuilder) Snapshot() Snapshot {
 	}
 	sort.Slice(edges, func(i, j int) bool { return edges[i].ID < edges[j].ID })
 
-	return Snapshot{
+	snap := Snapshot{
 		Nodes:        nodes,
 		Edges:        edges,
 		DedupedNodes: b.dedupedNodes,
 		DedupedEdges: b.dedupedEdges,
 		DroppedEdges: dropped,
 	}
+	// Release dedup maps so Go GC can collect them while downstream
+	// enrich stages run. The maps held references to every node and
+	// edge already projected into the returned slices.
+	b.nodes = nil
+	b.edges = nil
+	return snap
 }

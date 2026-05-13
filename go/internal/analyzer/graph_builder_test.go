@@ -7,6 +7,21 @@ import (
 	"github.com/randomcodespace/codeiq/go/internal/model"
 )
 
+func TestSnapshotReleasesDedupMaps(t *testing.T) {
+	gb := NewGraphBuilder()
+	gb.Add(&detector.Result{
+		Nodes: []*model.CodeNode{model.NewCodeNode("x", model.NodeClass, "X")},
+		Edges: []*model.CodeEdge{{ID: "e:x:x", SourceID: "x", TargetID: "x", Kind: model.EdgeContains}},
+	})
+	_ = gb.Snapshot()
+	if gb.nodes != nil {
+		t.Errorf("Snapshot must nil GraphBuilder.nodes to allow GC; got len=%d", len(gb.nodes))
+	}
+	if gb.edges != nil {
+		t.Errorf("Snapshot must nil GraphBuilder.edges to allow GC; got len=%d", len(gb.edges))
+	}
+}
+
 func TestGraphBuilderDeduplicatesByID(t *testing.T) {
 	gb := NewGraphBuilder()
 	n1 := model.NewCodeNode("a", model.NodeClass, "A")
