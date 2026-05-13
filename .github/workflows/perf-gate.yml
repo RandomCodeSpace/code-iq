@@ -13,14 +13,12 @@ name: perf-gate
 on:
   push:
     branches: [main]
-    paths:
-      - 'go/**'
-      - '.github/workflows/perf-gate.yml'
   pull_request:
     branches: [main]
-    paths:
-      - 'go/**'
-      - '.github/workflows/perf-gate.yml'
+  # No `paths:` filter — same reason as go-ci.yml. If branch protection
+  # ever marks this required, a path filter would deadlock "Waiting for
+  # status to be reported" on non-Go PRs. Wall-clock is ~1 minute; the
+  # signal is worth the cost.
   workflow_dispatch:
 
 permissions:
