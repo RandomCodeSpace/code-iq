@@ -3,18 +3,21 @@ package extractor
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/randomcodespace/codeiq/go/internal/model"
+	"github.com/randomcodespace/codeiq/go/internal/parser"
 )
 
 // fakeExtractor is a test-only LanguageExtractor that records each call so we
 // can assert the orchestrator's read-once contract and per-language dispatch.
 type fakeExtractor struct {
 	lang       string
-	calls      int32 // atomic counter of Extract() invocations
+	calls      int32 // counts per-node visits (across both Extract and ExtractFromTree)
 	filesSeen  []string
 	emitEdge   bool
 	emitHint   bool
@@ -25,9 +28,9 @@ type fakeExtractor struct {
 
 func (f *fakeExtractor) Language() string { return f.lang }
 
-func (f *fakeExtractor) Extract(ctx Context, node *model.CodeNode) Result {
-	atomic.AddInt32(&f.calls, 1)
-	f.filesSeen = append(f.filesSeen, ctx.FilePath)
+// resultFor synthesises a Result for one node — shared between Extract and
+// ExtractFromTree so behaviour is identical regardless of call path.
+func (f *fakeExtractor) resultFor(node *model.CodeNode) Result {
 	r := EmptyResult()
 	if f.emitEdge {
 		r.CallEdges = []*model.CodeEdge{{
@@ -45,6 +48,26 @@ func (f *fakeExtractor) Extract(ctx Context, node *model.CodeNode) Result {
 		r.TypeHints = map[string]string{f.hintKey: f.hintValue}
 	}
 	return r
+}
+
+func (f *fakeExtractor) Extract(ctx Context, node *model.CodeNode) Result {
+	atomic.AddInt32(&f.calls, 1)
+	f.filesSeen = append(f.filesSeen, ctx.FilePath)
+	return f.resultFor(node)
+}
+
+func (f *fakeExtractor) ExtractFromTree(ctx Context, _ *parser.Tree, nodes []*model.CodeNode) []Result {
+	atomic.AddInt32(&f.calls, int32(len(nodes)))
+	f.filesSeen = append(f.filesSeen, ctx.FilePath)
+	results := make([]Result, len(nodes))
+	for i, n := range nodes {
+		if n == nil {
+			results[i] = EmptyResult()
+			continue
+		}
+		results[i] = f.resultFor(n)
+	}
+	return results
 }
 
 func TestEnricher_DispatchesPerLanguageAndAppendsEdges(t *testing.T) {
@@ -154,6 +177,82 @@ func TestEnricher_SkipsFilteredFiles(t *testing.T) {
 	if atomic.LoadInt32(&ext.calls) != 0 {
 		t.Fatalf("Extract calls = %d, want 0", ext.calls)
 	}
+}
+
+// concurrencyTrackingExtractor records the maximum number of goroutines
+// observed inside ExtractFromTree at the same time, so we can assert that
+// the orchestrator bounds the fan-out.
+type concurrencyTrackingExtractor struct {
+	lang     string
+	inFlight atomic.Int32
+	maxSeen  atomic.Int32
+	hold     time.Duration
+}
+
+func (c *concurrencyTrackingExtractor) Language() string { return c.lang }
+
+func (c *concurrencyTrackingExtractor) Extract(ctx Context, node *model.CodeNode) Result {
+	// Unused for this test; orchestrator hits ExtractFromTree.
+	return EmptyResult()
+}
+
+func (c *concurrencyTrackingExtractor) ExtractFromTree(_ Context, _ *parser.Tree, nodes []*model.CodeNode) []Result {
+	cur := c.inFlight.Add(1)
+	defer c.inFlight.Add(-1)
+	for {
+		old := c.maxSeen.Load()
+		if cur <= old || c.maxSeen.CompareAndSwap(old, cur) {
+			break
+		}
+	}
+	time.Sleep(c.hold)
+	results := make([]Result, len(nodes))
+	for i := range results {
+		results[i] = EmptyResult()
+	}
+	return results
+}
+
+func TestEnricher_BoundedConcurrency(t *testing.T) {
+	// Generate enough files to overwhelm the goroutine pool if it were
+	// unbounded — 4 * cap files at minimum.
+	cap := 2 * runtime.GOMAXPROCS(0)
+	nFiles := 4 * cap
+	dir := t.TempDir()
+	nodes := make([]*model.CodeNode, 0, nFiles)
+	for i := 0; i < nFiles; i++ {
+		// Deterministic distinct file paths so the orchestrator schedules
+		// one task per file.
+		rel := filepath.Join("src", "f", "F"+itoa(i)+".java")
+		writeFile(t, filepath.Join(dir, rel), "class F"+itoa(i)+" {}")
+		n := model.NewCodeNode("n:"+itoa(i), model.NodeClass, "F"+itoa(i))
+		n.FilePath = rel
+		nodes = append(nodes, n)
+	}
+	ext := &concurrencyTrackingExtractor{lang: "java", hold: 25 * time.Millisecond}
+	en := NewEnricher(ext)
+	var edges []*model.CodeEdge
+	en.Enrich(nodes, &edges, dir)
+	peak := ext.maxSeen.Load()
+	if peak == 0 {
+		t.Fatal("peak in-flight was 0 — orchestrator never invoked the extractor")
+	}
+	if int(peak) > cap {
+		t.Fatalf("peak concurrent ExtractFromTree calls = %d, want <= %d (2*GOMAXPROCS)", peak, cap)
+	}
+}
+
+func itoa(i int) string {
+	const digits = "0123456789"
+	if i == 0 {
+		return "0"
+	}
+	out := make([]byte, 0, 8)
+	for i > 0 {
+		out = append([]byte{digits[i%10]}, out...)
+		i /= 10
+	}
+	return string(out)
 }
 
 func TestEnricher_NoExtractorsIsNoop(t *testing.T) {

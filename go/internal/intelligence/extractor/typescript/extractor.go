@@ -34,35 +34,64 @@ func New() *Extractor { return &Extractor{} }
 func (e *Extractor) Language() string { return "typescript" }
 
 // Extract dispatches by node kind: METHOD -> call edges, MODULE -> exports
-// hint. Other kinds short-circuit.
+// hint. Single-node convenience wrapper; production paths use ExtractFromTree.
 func (e *Extractor) Extract(ctx extractor.Context, node *model.CodeNode) extractor.Result {
-	if node.Kind != model.NodeMethod && node.Kind != model.NodeModule {
+	tree, _ := parser.ParseByName("typescript", []byte(ctx.Content))
+	if tree != nil {
+		defer tree.Close()
+	}
+	out := e.ExtractFromTree(ctx, tree, []*model.CodeNode{node})
+	if len(out) == 0 {
 		return extractor.EmptyResult()
 	}
-	tree, err := parser.ParseByName("typescript", []byte(ctx.Content))
-	if err != nil || tree == nil || tree.Root == nil {
-		return extractor.EmptyResult()
+	return out[0]
+}
+
+// ExtractFromTree walks the pre-parsed tree once per input node, returning
+// one Result per node in matching order. tree may be nil.
+func (e *Extractor) ExtractFromTree(ctx extractor.Context, tree *parser.Tree, nodes []*model.CodeNode) []extractor.Result {
+	results := make([]extractor.Result, len(nodes))
+	for i := range results {
+		results[i] = extractor.EmptyResult()
 	}
-	defer tree.Close()
+	if tree == nil || tree.Root == nil {
+		return results
+	}
 	root := tree.Root.RootNode()
 	if root == nil {
-		return extractor.EmptyResult()
+		return results
 	}
-	if node.Kind == model.NodeMethod {
-		return extractor.Result{
-			CallEdges:  collectCallEdges(root, ctx.Content, node, ctx.Registry),
-			Confidence: model.CapabilityPartial,
+	// collectExports only reads the tree root; compute once for all MODULE
+	// nodes in the input.
+	var moduleExports string
+	var moduleExportsComputed bool
+	for i, node := range nodes {
+		if node == nil {
+			continue
+		}
+		switch node.Kind {
+		case model.NodeMethod:
+			results[i] = extractor.Result{
+				CallEdges:  collectCallEdges(root, ctx.Content, node, ctx.Registry),
+				Confidence: model.CapabilityPartial,
+			}
+		case model.NodeModule:
+			if !moduleExportsComputed {
+				exports := collectExports(root, ctx.Content)
+				if len(exports) > 0 {
+					moduleExports = strings.Join(exports, ", ")
+				}
+				moduleExportsComputed = true
+			}
+			if moduleExports != "" {
+				results[i] = extractor.Result{
+					TypeHints:  map[string]string{"module_exports": moduleExports},
+					Confidence: model.CapabilityPartial,
+				}
+			}
 		}
 	}
-	// MODULE
-	exports := collectExports(root, ctx.Content)
-	if len(exports) == 0 {
-		return extractor.EmptyResult()
-	}
-	return extractor.Result{
-		TypeHints:  map[string]string{"module_exports": strings.Join(exports, ", ")},
-		Confidence: model.CapabilityPartial,
-	}
+	return results
 }
 
 // collectCallEdges finds the function-like declaration matching fn.Label and

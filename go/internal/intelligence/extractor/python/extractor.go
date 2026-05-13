@@ -39,45 +39,75 @@ func New() *Extractor { return &Extractor{} }
 // Language returns "python".
 func (e *Extractor) Language() string { return "python" }
 
-// Extract dispatches by node kind.
+// Extract dispatches by node kind. Single-node convenience wrapper; parses
+// the file each call. Production paths use ExtractFromTree to amortise the
+// parse across every node in a file.
 func (e *Extractor) Extract(ctx extractor.Context, node *model.CodeNode) extractor.Result {
-	switch node.Kind {
-	case model.NodeMethod, model.NodeClass, model.NodeModule:
-	default:
+	tree, _ := parser.ParseByName("python", []byte(ctx.Content))
+	if tree != nil {
+		defer tree.Close()
+	}
+	out := e.ExtractFromTree(ctx, tree, []*model.CodeNode{node})
+	if len(out) == 0 {
 		return extractor.EmptyResult()
 	}
-	tree, err := parser.ParseByName("python", []byte(ctx.Content))
-	if err != nil || tree == nil || tree.Root == nil {
-		return extractor.EmptyResult()
+	return out[0]
+}
+
+// ExtractFromTree walks a single pre-parsed tree once and produces a Result
+// per input node. Order matches `nodes`. tree may be nil — every node maps
+// to EmptyResult in that case.
+func (e *Extractor) ExtractFromTree(ctx extractor.Context, tree *parser.Tree, nodes []*model.CodeNode) []extractor.Result {
+	results := make([]extractor.Result, len(nodes))
+	for i := range results {
+		results[i] = extractor.EmptyResult()
 	}
-	defer tree.Close()
+	if tree == nil || tree.Root == nil {
+		return results
+	}
 	root := tree.Root.RootNode()
 	if root == nil {
-		return extractor.EmptyResult()
+		return results
 	}
+	// matchAllList only reads ctx.Content; compute once per file and reuse
+	// across every Module node in the input.
+	var moduleAllExports string
+	var moduleAllExportsComputed bool
 
-	switch node.Kind {
-	case model.NodeMethod:
-		return extractor.Result{
-			CallEdges:  collectFunctionCallEdges(root, ctx.Content, node, ctx.Registry),
-			Confidence: model.CapabilityPartial,
+	for i, node := range nodes {
+		if node == nil {
+			continue
 		}
-	case model.NodeClass:
-		if base := classBase(root, ctx.Content, node.Label); base != "" {
-			return extractor.Result{
-				TypeHints:  map[string]string{"extends_type": base},
-				Confidence: model.CapabilityPartial,
+		switch node.Kind {
+		case model.NodeMethod:
+			edges := collectFunctionCallEdges(root, ctx.Content, node, ctx.Registry)
+			if len(edges) > 0 {
+				results[i] = extractor.Result{
+					CallEdges:  edges,
+					Confidence: model.CapabilityPartial,
+				}
 			}
-		}
-	case model.NodeModule:
-		if all := matchAllList(ctx.Content); all != "" {
-			return extractor.Result{
-				TypeHints:  map[string]string{"all_exports": all},
-				Confidence: model.CapabilityPartial,
+		case model.NodeClass:
+			if base := classBase(root, ctx.Content, node.Label); base != "" {
+				results[i] = extractor.Result{
+					TypeHints:  map[string]string{"extends_type": base},
+					Confidence: model.CapabilityPartial,
+				}
+			}
+		case model.NodeModule:
+			if !moduleAllExportsComputed {
+				moduleAllExports = matchAllList(ctx.Content)
+				moduleAllExportsComputed = true
+			}
+			if moduleAllExports != "" {
+				results[i] = extractor.Result{
+					TypeHints:  map[string]string{"all_exports": moduleAllExports},
+					Confidence: model.CapabilityPartial,
+				}
 			}
 		}
 	}
-	return extractor.EmptyResult()
+	return results
 }
 
 // matchAllList extracts the literal entries of a `__all__ = [...]` list as

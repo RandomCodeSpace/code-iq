@@ -15,11 +15,59 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"time"
 
 	kuzu "github.com/kuzudb/go-kuzu"
 )
+
+// DefaultBufferPoolBytes caps Kuzu's buffer pool to 2 GiB by default.
+// kuzu.DefaultSystemConfig() allocates 80% of system RAM (~12 GiB on a 15
+// GiB host) before any Go-side enrich work runs, leaving insufficient
+// headroom for the in-memory enricher pipeline. 2 GiB is enough for
+// real-world graphs at ~/projects/-scale (~430k nodes / ~300k edges) while
+// keeping the host OOM bar well below ceiling.
+const DefaultBufferPoolBytes uint64 = 2 << 30
+
+// defaultMaxThreads returns the per-query thread cap for Kuzu — bounded so
+// COPY FROM's working set scales with parallelism in a controlled way.
+// min(4, GOMAXPROCS): keeps headroom even on small hosts; 4 is enough to
+// saturate IO+CPU for our COPY shape.
+func defaultMaxThreads() uint64 {
+	n := runtime.GOMAXPROCS(0)
+	if n > 4 {
+		n = 4
+	}
+	if n < 1 {
+		n = 1
+	}
+	return uint64(n)
+}
+
+// OpenOptions tunes how Open and OpenReadOnly wire the underlying Kuzu
+// SystemConfig. Zero-valued fields fall back to safe defaults documented
+// alongside each field.
+type OpenOptions struct {
+	// BufferPoolBytes caps Kuzu's buffer pool in bytes. Zero -> DefaultBufferPoolBytes.
+	BufferPoolBytes uint64
+	// MaxThreads caps Kuzu's per-query parallelism. Zero -> defaultMaxThreads().
+	MaxThreads uint64
+	// ReadOnly opens the database in read-only mode.
+	ReadOnly bool
+	// QueryTimeout, if > 0, sets the per-query wall-clock timeout.
+	QueryTimeout time.Duration
+}
+
+func (o OpenOptions) resolved() OpenOptions {
+	if o.BufferPoolBytes == 0 {
+		o.BufferPoolBytes = DefaultBufferPoolBytes
+	}
+	if o.MaxThreads == 0 {
+		o.MaxThreads = defaultMaxThreads()
+	}
+	return o
+}
 
 // Store is the embedded Kuzu graph store facade. It owns one Kuzu database
 // and a single long-lived connection. The zero value is not usable — call
@@ -32,14 +80,26 @@ type Store struct {
 	readOnly bool
 }
 
-// Open creates or opens a Kuzu database at the given directory path. Kuzu
-// itself creates the directory if it does not exist; we ensure the parent
-// exists so a fresh `.codeiq/graph/codeiq.kuzu/` works on first run.
+// Open creates or opens a Kuzu database with safe default OpenOptions
+// (capped BufferPoolBytes + MaxThreads). For tuning, see OpenWithOptions.
 func Open(path string) (*Store, error) {
+	return OpenWithOptions(path, OpenOptions{})
+}
+
+// OpenWithOptions creates or opens a Kuzu database, applying any non-zero
+// fields of opts. Zero-valued fields fall back to safe defaults — see
+// OpenOptions and DefaultBufferPoolBytes.
+func OpenWithOptions(path string, opts OpenOptions) (*Store, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, fmt.Errorf("graph: mkdir parent: %w", err)
 	}
+	opts = opts.resolved()
 	sys := kuzu.DefaultSystemConfig()
+	sys.BufferPoolSize = opts.BufferPoolBytes
+	sys.MaxNumThreads = opts.MaxThreads
+	if opts.ReadOnly {
+		sys.ReadOnly = true
+	}
 	db, err := kuzu.OpenDatabase(path, sys)
 	if err != nil {
 		return nil, fmt.Errorf("graph: open db: %w", err)
@@ -49,7 +109,10 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("graph: open conn: %w", err)
 	}
-	return &Store{db: db, conn: conn, path: path}, nil
+	if opts.QueryTimeout > 0 {
+		conn.SetTimeout(uint64(opts.QueryTimeout / time.Millisecond))
+	}
+	return &Store{db: db, conn: conn, path: path, readOnly: opts.ReadOnly}, nil
 }
 
 // OpenReadOnly opens an existing Kuzu store in read-only mode and sets a
@@ -65,21 +128,10 @@ func Open(path string) (*Store, error) {
 // queryTimeout <= 0 disables the per-query timeout. Kuzu interprets the
 // timeout in milliseconds; we accept a Go duration for ergonomics.
 func OpenReadOnly(path string, queryTimeout time.Duration) (*Store, error) {
-	sys := kuzu.DefaultSystemConfig()
-	sys.ReadOnly = true
-	db, err := kuzu.OpenDatabase(path, sys)
-	if err != nil {
-		return nil, fmt.Errorf("graph: open read-only %q: %w", path, err)
-	}
-	conn, err := kuzu.OpenConnection(db)
-	if err != nil {
-		db.Close()
-		return nil, fmt.Errorf("graph: open ro conn: %w", err)
-	}
-	if queryTimeout > 0 {
-		conn.SetTimeout(uint64(queryTimeout / time.Millisecond))
-	}
-	return &Store{db: db, conn: conn, path: path, readOnly: true}, nil
+	return OpenWithOptions(path, OpenOptions{
+		ReadOnly:     true,
+		QueryTimeout: queryTimeout,
+	})
 }
 
 // IsReadOnly reports whether the store rejects mutating Cypher.

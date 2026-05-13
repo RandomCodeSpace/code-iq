@@ -38,36 +38,54 @@ func New() *Extractor { return &Extractor{} }
 func (e *Extractor) Language() string { return "java" }
 
 // Extract returns CALLS edges for METHOD nodes and type-hierarchy hints for
-// CLASS / ABSTRACT_CLASS / INTERFACE nodes. All other node kinds short-circuit
-// to EmptyResult.
+// CLASS / ABSTRACT_CLASS / INTERFACE nodes. Single-node convenience wrapper —
+// parses once per call. Production paths use ExtractFromTree.
 func (e *Extractor) Extract(ctx extractor.Context, node *model.CodeNode) extractor.Result {
-	switch node.Kind {
-	case model.NodeMethod, model.NodeClass,
-		model.NodeAbstractClass, model.NodeInterface:
-	default:
+	tree, _ := parser.ParseByName("java", []byte(ctx.Content))
+	if tree != nil {
+		defer tree.Close()
+	}
+	out := e.ExtractFromTree(ctx, tree, []*model.CodeNode{node})
+	if len(out) == 0 {
 		return extractor.EmptyResult()
 	}
-	tree, err := parser.ParseByName("java", []byte(ctx.Content))
-	if err != nil || tree == nil || tree.Root == nil {
-		return extractor.EmptyResult()
+	return out[0]
+}
+
+// ExtractFromTree walks the pre-parsed tree once per input node and returns
+// one Result per node in matching order. tree may be nil — all results are
+// EmptyResult in that case.
+func (e *Extractor) ExtractFromTree(ctx extractor.Context, tree *parser.Tree, nodes []*model.CodeNode) []extractor.Result {
+	results := make([]extractor.Result, len(nodes))
+	for i := range results {
+		results[i] = extractor.EmptyResult()
 	}
-	defer tree.Close()
+	if tree == nil || tree.Root == nil {
+		return results
+	}
 	root := tree.Root.RootNode()
 	if root == nil {
-		return extractor.EmptyResult()
+		return results
 	}
-
-	if node.Kind == model.NodeMethod {
-		return extractor.Result{
-			CallEdges:  collectCallEdges(root, ctx.Content, node, ctx.Registry),
-			Confidence: model.CapabilityPartial,
+	for i, node := range nodes {
+		if node == nil {
+			continue
+		}
+		switch node.Kind {
+		case model.NodeMethod:
+			results[i] = extractor.Result{
+				CallEdges:  collectCallEdges(root, ctx.Content, node, ctx.Registry),
+				Confidence: model.CapabilityPartial,
+			}
+		case model.NodeClass, model.NodeAbstractClass, model.NodeInterface:
+			hints := extractTypeHierarchyHints(root, ctx.Content, node.Label)
+			results[i] = extractor.Result{
+				TypeHints:  hints,
+				Confidence: model.CapabilityPartial,
+			}
 		}
 	}
-	hints := extractTypeHierarchyHints(root, ctx.Content, node.Label)
-	return extractor.Result{
-		TypeHints:  hints,
-		Confidence: model.CapabilityPartial,
-	}
+	return results
 }
 
 // collectCallEdges walks the tree to locate the method_declaration whose

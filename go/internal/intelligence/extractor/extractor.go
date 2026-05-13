@@ -7,7 +7,10 @@
 // language via DetectLanguage.
 package extractor
 
-import "github.com/randomcodespace/codeiq/go/internal/model"
+import (
+	"github.com/randomcodespace/codeiq/go/internal/model"
+	"github.com/randomcodespace/codeiq/go/internal/parser"
+)
 
 // Context is the per-file context an extractor sees during enrich. The
 // orchestrator reads the file once and passes the contents to every node-level
@@ -52,6 +55,15 @@ type LanguageExtractor interface {
 	// Language returns the canonical language key, lower-case (e.g. "java").
 	// This key must match DetectLanguage for the orchestrator to dispatch.
 	Language() string
-	// Extract runs the extractor against a single node within a parsed file.
+	// Extract runs the extractor against a single node, parsing ctx.Content
+	// internally. Retained as the single-node convenience wrapper for tests
+	// and ad-hoc callers; the orchestrator uses ExtractFromTree to avoid
+	// re-parsing N times for a file with N nodes.
 	Extract(ctx Context, node *model.CodeNode) Result
+	// ExtractFromTree runs the extractor against every node in `nodes` using
+	// a single pre-parsed tree. Returns one Result per input node in matching
+	// order, so callers can stamp TypeHints back onto the corresponding node.
+	// `tree` may be nil when ctx.Language has no tree-sitter grammar — the
+	// extractor must handle that by returning len(nodes) EmptyResult entries.
+	ExtractFromTree(ctx Context, tree *parser.Tree, nodes []*model.CodeNode) []Result
 }
