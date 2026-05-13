@@ -16,7 +16,7 @@ database, MCP stdio server, single static Go binary.
 - **Config file**: `codeiq.yml` (project-level overrides)
 
 The Java/Spring Boot reference that seeded this codebase was deleted
-in Phase 6 cutover (v1.0.0). For history, see commits `c363727` (port
+in Phase 6 cutover (v0.3.0). For history, see commits `c363727` (port
 landing) and `c630245` (release infra).
 
 ## Tech Stack
@@ -46,7 +46,7 @@ landing) and `c630245` (release infra).
 ```
 index:   FileDiscovery → Parsers → Detectors (goroutine pool) → GraphBuilder → SQLite cache
 enrich:  SQLite → Linkers → LayerClassifier → LexicalEnricher → LanguageEnricher → ServiceDetector → Kuzu (COPY FROM)
-serve:   (deferred — not ported in v1.0.0)
+serve:   (deferred — not ported in v0.3.0)
 mcp:     Kuzu → QueryService → 6 consolidated MCP tools + run_cypher escape hatch + review_changes
 ```
 
@@ -200,7 +200,7 @@ codeiq mcp /path/to/repo                # for Claude / Cursor wiring
 The MCP server registers 6 consolidated mode-driven tools + `run_cypher`
 + `review_changes`. The 34 narrow tools from the Java side stay wired
 for one release (v1.0.x) for back-compat with agents pinned to old
-names; they'll be removed in v1.1.0.
+names; they'll be removed in a future minor.
 
 | Consolidated tool | mode dispatch |
 |---|---|
@@ -305,7 +305,7 @@ CGO_ENABLED=1 go build -o /usr/local/bin/codeiq ./cmd/codeiq
 
 # Build with version info (release-go.yml does this with goreleaser):
 CGO_ENABLED=1 go build \
-  -ldflags "-X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Version=v1.0.0' \
+  -ldflags "-X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Version=v0.3.0' \
             -X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Commit=$(git rev-parse --short HEAD)' \
             -X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Date=$(date -u +%Y-%m-%dT%H:%M:%SZ)'" \
   -o /usr/local/bin/codeiq ./cmd/codeiq
