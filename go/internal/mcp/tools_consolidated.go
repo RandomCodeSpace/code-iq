@@ -32,6 +32,7 @@ func RegisterConsolidated(srv *Server, d *Deps) error {
 		toolTraceRelationships(d),
 		toolAnalyzeImpact(d),
 		toolTopologyView(d),
+		toolReviewChanges(d),
 	} {
 		if err := srv.Register(t); err != nil {
 			return fmt.Errorf("mcp: register consolidated tool %q: %w", t.Name, err)
