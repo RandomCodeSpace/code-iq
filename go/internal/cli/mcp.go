@@ -143,26 +143,26 @@ To register with Claude Code, add to .mcp.json at the repo root:
 	return cmd
 }
 
-// registerAllTools wires every tool family onto srv. All four families
-// land here unconditionally — graph (20) + topology (9) + flow (1) +
-// intelligence (4) = 34 tools — matching the Java McpTools registration
-// count. The `optionalRegisterHooks` slice remains for forward-compat
-// with new tool families that may land in later phases (drill-down
-// flows, query planner v2, etc.) without re-touching this function.
+// registerAllTools wires every user-facing MCP tool family onto srv:
+// graph (run_cypher + read_file = 2) + flow (generate_flow = 1) +
+// consolidated (6 mode-driven) + review_changes = 10 tools.
+//
+// The narrow graph / topology / intelligence tool implementations are
+// retained inside the mcp package because the consolidated tools
+// delegate to them at the Go-API level, but they are no longer
+// registered as user-facing MCP tools (greenfield project, no
+// external consumers — the back-compat surface was dropped).
+//
+// `optionalRegisterHooks` remains for forward-compat with new tool
+// families that may land in later phases without re-touching this
+// function.
 func registerAllTools(srv *mcp.Server, d *mcp.Deps) error {
-	if err := mcp.RegisterGraph(srv, d); err != nil {
+	if err := mcp.RegisterGraphUserFacing(srv, d); err != nil {
 		return fmt.Errorf("register graph tools: %w", err)
-	}
-	if err := mcp.RegisterTopology(srv, d); err != nil {
-		return fmt.Errorf("register topology tools: %w", err)
 	}
 	if err := mcp.RegisterFlow(srv, d); err != nil {
 		return fmt.Errorf("register flow tools: %w", err)
 	}
-	if err := mcp.RegisterIntelligence(srv, d); err != nil {
-		return fmt.Errorf("register intelligence tools: %w", err)
-	}
-	// Plan §2 — consolidated tools alongside the deprecated 34.
 	if err := mcp.RegisterConsolidated(srv, d); err != nil {
 		return fmt.Errorf("register consolidated tools: %w", err)
 	}

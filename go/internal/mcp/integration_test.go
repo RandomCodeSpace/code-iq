@@ -2,7 +2,8 @@
 
 // End-to-end MCP integration test. Spawns the real `codeiq mcp` binary,
 // exchanges JSON-RPC frames over its stdin / stdout, and asserts the
-// initialize handshake completes and tools/list returns all 34 tools.
+// initialize handshake completes and tools/list returns the 10
+// user-facing tools (2 graph + 1 flow + 6 consolidated + 1 review).
 //
 // Build tag `integration` keeps this out of the default `go test ./...`
 // loop because it does a full `go build` first and stands up a fresh
@@ -240,7 +241,7 @@ func TestMCPServerInitializeAndListTools(t *testing.T) {
 		t.Fatalf("tools/list had no result: %v", listResp)
 	}
 	tools, _ := listResult["tools"].([]any)
-	if len(tools) != 34 {
+	if len(tools) != 10 {
 		names := make([]string, 0, len(tools))
 		for _, tl := range tools {
 			if m, ok := tl.(map[string]any); ok {
@@ -249,11 +250,15 @@ func TestMCPServerInitializeAndListTools(t *testing.T) {
 				}
 			}
 		}
-		t.Fatalf("tools/list returned %d tools, want 34. names=%v", len(tools), names)
+		t.Fatalf("tools/list returned %d tools, want 10. names=%v", len(tools), names)
 	}
 
-	// 4. Spot-check one tool from each family.
-	wantNames := []string{"get_stats", "get_topology", "generate_flow", "find_node", "get_capabilities"}
+	// 4. Spot-check representative tool names from the 10-tool surface.
+	wantNames := []string{
+		"graph_summary", "find_in_graph", "inspect_node",
+		"trace_relationships", "analyze_impact", "topology_view",
+		"run_cypher", "read_file", "generate_flow", "review_changes",
+	}
 	have := map[string]bool{}
 	for _, tl := range tools {
 		if m, ok := tl.(map[string]any); ok {
@@ -268,33 +273,34 @@ func TestMCPServerInitializeAndListTools(t *testing.T) {
 		}
 	}
 
-	// 5. Call get_capabilities — synchronous round trip that exercises
-	// the full tool dispatch path.
+	// 5. Call graph_summary in capabilities mode — synchronous round
+	// trip that exercises the consolidated tool dispatch path (which
+	// internally delegates to the toolGetCapabilities builder).
 	callResp := client.rpc(t, map[string]any{
 		"jsonrpc": "2.0",
 		"id":      3,
 		"method":  "tools/call",
 		"params": map[string]any{
-			"name":      "get_capabilities",
-			"arguments": map[string]any{},
+			"name":      "graph_summary",
+			"arguments": map[string]any{"mode": "capabilities"},
 		},
 	})
 	callResult, ok := callResp["result"].(map[string]any)
 	if !ok {
-		t.Fatalf("tools/call get_capabilities had no result: %v", callResp)
+		t.Fatalf("tools/call graph_summary had no result: %v", callResp)
 	}
 	content, _ := callResult["content"].([]any)
 	if len(content) == 0 {
-		t.Fatalf("get_capabilities returned empty content")
+		t.Fatalf("graph_summary returned empty content")
 	}
 	first, _ := content[0].(map[string]any)
 	text, _ := first["text"].(string)
 	var body map[string]any
 	if err := json.Unmarshal([]byte(text), &body); err != nil {
-		t.Fatalf("parse get_capabilities body: %v\ntext=%s", err, text)
+		t.Fatalf("parse graph_summary body: %v\ntext=%s", err, text)
 	}
 	if _, hasMatrix := body["matrix"]; !hasMatrix {
-		t.Fatalf("get_capabilities body missing matrix: %v", body)
+		t.Fatalf("graph_summary capabilities body missing matrix: %v", body)
 	}
 }
 

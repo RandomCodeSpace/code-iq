@@ -17,9 +17,16 @@ import (
 	"github.com/randomcodespace/codeiq/go/internal/graph"
 )
 
-// graphTools returns the slice of graph-facing Tool definitions for d.
-// Each tool is fully self-contained — no shared mutable state. The
-// returned slice is registered in order by RegisterGraph.
+// graphTools returns every graph-tier Tool definition for d — the 18
+// narrow tools the consolidated layer delegates to, plus the two
+// user-facing tools that survive the consolidation: run_cypher (Cypher
+// escape hatch) and read_file (utility).
+//
+// Production wiring (cli/mcp.go → RegisterGraphUserFacing) registers
+// only the 2 user-facing tools; tests that exercise the narrow tool
+// implementations directly call RegisterGraph to surface all 20. The
+// narrow toolXxx(d) builders are also called from tools_consolidated.go
+// for Go-API delegation, independent of MCP registration.
 func graphTools(d *Deps) []Tool {
 	return []Tool{
 		toolGetStats(d),
@@ -43,6 +50,19 @@ func graphTools(d *Deps) []Tool {
 		toolRunCypher(d),
 		toolReadFile(d),
 	}
+}
+
+// RegisterGraphUserFacing registers only the user-facing graph-tier
+// tools (run_cypher + read_file). Used by production cli wiring —
+// the 18 narrow tools were dropped from the user MCP surface in
+// favor of the 6 consolidated mode-driven tools.
+func RegisterGraphUserFacing(srv *Server, d *Deps) error {
+	for _, t := range []Tool{toolRunCypher(d), toolReadFile(d)} {
+		if err := srv.Register(t); err != nil {
+			return fmt.Errorf("mcp: register graph tool %q: %w", t.Name, err)
+		}
+	}
+	return nil
 }
 
 // RegisterGraph appends every graph-facing tool to srv. Errors halt the

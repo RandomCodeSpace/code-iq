@@ -130,6 +130,19 @@ func TestRegisterGraphRegistersAllTwentyTools(t *testing.T) {
 	}
 }
 
+func TestRegisterGraphUserFacingRegistersTwoTools(t *testing.T) {
+	srv, _ := mcp.NewServer(mcp.ServerOptions{Name: "x", Version: "0"})
+	if err := mcp.RegisterGraphUserFacing(srv, &mcp.Deps{}); err != nil {
+		t.Fatalf("RegisterGraphUserFacing: %v", err)
+	}
+	want := []string{"read_file", "run_cypher"}
+	got := srv.Registry().Names()
+	sort.Strings(got)
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("registered tools:\n got=%v\nwant=%v", got, want)
+	}
+}
+
 func TestGetStatsReturnsCounts(t *testing.T) {
 	d := fixtureDeps(t)
 	out := callTool(t, d, "get_stats", nil)
