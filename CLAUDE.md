@@ -77,8 +77,12 @@ reintroduced.
   (mutation gate in `cypher.go`).
 - **`internal/mcp`** — 6 consolidated mode-driven tools (`graph_summary`,
   `find_in_graph`, `inspect_node`, `trace_relationships`,
-  `analyze_impact`, `topology_view`), `run_cypher` escape hatch, the
-  34 deprecated narrow tools, plus `review_changes`.
+  `analyze_impact`, `topology_view`), `run_cypher` escape hatch,
+  `read_file` utility, `generate_flow`, and `review_changes` — 10
+  user-facing tools total. The narrow toolXxx(d) builder funcs remain
+  in tools_graph.go/tools_intelligence.go/tools_topology.go as Go-API
+  delegation targets for the consolidated layer; they are NOT
+  registered as user-facing MCP tools.
 - **`internal/review`** — diff parser, Ollama-compatible chat client,
   ReviewService orchestrator. Default endpoint = local Ollama;
   `OLLAMA_API_KEY` flips to Ollama Cloud.
@@ -200,10 +204,12 @@ codeiq mcp /path/to/repo                # for Claude / Cursor wiring
 
 ## MCP Tools
 
-The MCP server registers 6 consolidated mode-driven tools + `run_cypher`
-+ `review_changes`. The 34 narrow tools from the Java side stay wired
-for one release (v1.0.x) for back-compat with agents pinned to old
-names; they'll be removed in a future minor.
+The MCP server registers 10 user-facing tools — 6 consolidated
+mode-driven, `run_cypher` (escape hatch), `read_file` (utility),
+`generate_flow`, and `review_changes`. The 24 narrow tools that the
+consolidated layer subsumes were dropped from the MCP surface;
+their Go-API implementations (`toolXxx(d) Tool`) stay in the package
+because the consolidated tools delegate to them.
 
 | Consolidated tool | mode dispatch |
 |---|---|

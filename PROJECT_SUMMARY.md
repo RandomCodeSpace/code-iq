@@ -36,7 +36,7 @@
 | CLI / MCP server | `go/cmd/codeiq/main.go` | The only binary. All subcommands live in `internal/cli`. |
 | Subcommand registry | `internal/cli/root.go` | Sets up cobra root + registers per-subcommand inits. |
 | Detector registry | `internal/cli/detectors_register.go` | Blank-imports every detector package leaf. **Choke point** — forget it and detectors silently no-op. |
-| Stdio MCP | `internal/cli/mcp.go` + `internal/mcp/server.go` | Wires consolidated tools + the deprecated 34 + `review_changes`. |
+| Stdio MCP | `internal/cli/mcp.go` + `internal/mcp/server.go` | Wires 10 user-facing tools: 6 consolidated + `run_cypher` + `read_file` + `generate_flow` + `review_changes`. |
 | Analyzer pipeline | `internal/analyzer/analyzer.go` | FileDiscovery → parser → detectors (pool) → GraphBuilder → SQLite. |
 | Enrich pipeline | `internal/analyzer/enrich.go` | SQLite → Kuzu + linkers + layer classifier + intelligence. |
 

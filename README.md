@@ -31,10 +31,11 @@ framework usage. Same input ⇒ same output, every time.
 - **100 detectors** across 35+ languages — Java, Kotlin, Scala, Python,
   TypeScript/JavaScript, Go, Rust, C#, C++, Terraform, Bicep, Helm,
   Kubernetes, Docker, GitHub Actions, GitLab CI, …
-- **MCP server included** — `codeiq mcp` runs an MCP stdio server with
-  6 consolidated mode-driven tools (plus 34 deprecated narrow tools for
-  back-compat) so Claude / Cursor / any MCP-aware agent can query the
-  graph directly.
+- **MCP server included** — `codeiq mcp` runs an MCP stdio server
+  exposing 10 user-facing tools (6 consolidated mode-driven +
+  `run_cypher` + `read_file` + `generate_flow` + `review_changes`)
+  so Claude / Cursor / any MCP-aware agent can query the graph
+  directly.
 - **LLM-driven PR review** — `codeiq review` walks the diff, queries
   the indexed graph for evidence, and asks Ollama (Cloud or local) for
   review comments.
@@ -109,11 +110,10 @@ Add to your MCP client config (e.g. `.mcp.json` at the project root):
 }
 ```
 
-Six mode-driven tools (`graph_summary`, `find_in_graph`, `inspect_node`,
-`trace_relationships`, `analyze_impact`, `topology_view`) plus
-`run_cypher` (escape hatch) and `review_changes` (in-agent PR review).
-The deprecated 34 narrow tools remain wired for one release for
-back-compat.
+Ten user-facing tools: six mode-driven (`graph_summary`,
+`find_in_graph`, `inspect_node`, `trace_relationships`,
+`analyze_impact`, `topology_view`) plus `run_cypher` (Cypher escape
+hatch), `read_file` (utility), `generate_flow`, and `review_changes`.
 
 ## CLI reference
 
