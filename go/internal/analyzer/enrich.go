@@ -70,12 +70,14 @@ func Enrich(root string, c *cache.Cache, opts EnrichOptions) (EnrichSummary, err
 	edges := snap.Edges
 
 	// 1. Linkers — order matches Analyzer.java.
+	// Plan §1.4 — Sorted() at the boundary makes the output independent of
+	// any linker's internal iteration order.
 	for _, l := range []linker.Linker{
 		linker.NewTopicLinker(),
 		linker.NewEntityLinker(),
 		linker.NewModuleContainmentLinker(),
 	} {
-		r := l.Link(nodes, edges)
+		r := l.Link(nodes, edges).Sorted()
 		nodes = append(nodes, r.Nodes...)
 		edges = append(edges, r.Edges...)
 	}

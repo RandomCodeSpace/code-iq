@@ -6,12 +6,26 @@
 // Mirrors src/main/java/io/github/randomcodespace/iq/analyzer/linker/.
 package linker
 
-import "github.com/randomcodespace/codeiq/go/internal/model"
+import (
+	"sort"
+
+	"github.com/randomcodespace/codeiq/go/internal/model"
+)
 
 // Result is the bag of new nodes + edges a linker contributes.
 type Result struct {
 	Nodes []*model.CodeNode
 	Edges []*model.CodeEdge
+}
+
+// Sorted returns r with Nodes and Edges sorted by ID. Plan §1.4 — a
+// defensive wrapper applied at the linker boundary so a future linker
+// change can't re-introduce drift even if its internal map-iteration
+// order shifts.
+func (r Result) Sorted() Result {
+	sort.SliceStable(r.Nodes, func(i, j int) bool { return r.Nodes[i].ID < r.Nodes[j].ID })
+	sort.SliceStable(r.Edges, func(i, j int) bool { return r.Edges[i].ID < r.Edges[j].ID })
+	return r
 }
 
 // Linker mirrors the Java Linker interface. Implementations MUST be
