@@ -2,6 +2,7 @@
 package markup
 
 import (
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -93,7 +94,16 @@ func (d MarkdownStructureDetector) Detect(ctx *detector.Context) *detector.Resul
 		edges = append(edges, e)
 	}
 
-	// Internal links → DEPENDS_ON
+	// Internal links → DEPENDS_ON.
+	//
+	// Target IDs are resolved relative to fp's directory so a link from
+	// docs/a.md → ./b.md becomes the canonical md:docs/b.md target. The
+	// referenced file may not have been indexed yet (forward ref), but
+	// when it IS indexed its own MarkdownStructureDetector emission
+	// creates the same md:<path> node — GraphBuilder's dedup map
+	// stitches the two together. Pre-fix, the target was the raw link
+	// path (e.g. "./b.md") which never matched anything and the edge
+	// got dropped at Snapshot's phantom filter.
 	for _, line := range lines {
 		for _, m := range mdLinkRE.FindAllStringSubmatch(line, -1) {
 			linkText := m[1]
@@ -105,14 +115,35 @@ func (d MarkdownStructureDetector) Detect(ctx *detector.Context) *detector.Resul
 			if linkPath == "" {
 				continue
 			}
+			resolved := resolveMarkdownLink(fp, linkPath)
+			targetID := "md:" + resolved
 			e := model.NewCodeEdge(
-				moduleID+":depends_on:"+linkPath, model.EdgeDependsOn, moduleID, linkPath,
+				moduleID+":depends_on:"+targetID, model.EdgeDependsOn, moduleID, targetID,
 			)
 			e.Source = "MarkdownStructureDetector"
 			e.Properties["link_text"] = linkText
+			e.Properties["link_target"] = linkPath
 			edges = append(edges, e)
 		}
 	}
 
 	return detector.ResultOf(nodes, edges)
+}
+
+// resolveMarkdownLink turns a link from sourceFP's perspective into a
+// repo-relative forward-slash path that matches the moduleID format used
+// by other Markdown files. Absolute links (leading "/") are returned
+// without the slash. Relative links are joined against the source's
+// directory and cleaned ("./", "../" resolved). Result is always
+// forward-slash-only for cross-platform stability.
+func resolveMarkdownLink(sourceFP, target string) string {
+	target = strings.TrimSpace(target)
+	if strings.HasPrefix(target, "/") {
+		return strings.TrimPrefix(target, "/")
+	}
+	dir := path.Dir(strings.ReplaceAll(sourceFP, "\\", "/"))
+	if dir == "." || dir == "" {
+		return path.Clean(target)
+	}
+	return path.Clean(dir + "/" + target)
 }

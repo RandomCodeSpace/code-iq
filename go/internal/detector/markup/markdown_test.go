@@ -97,6 +97,33 @@ func TestMarkdownNegative(t *testing.T) {
 	}
 }
 
+func TestMarkdownLinkResolvesRelativePath(t *testing.T) {
+	d := NewMarkdownStructureDetector()
+	ctx := &detector.Context{
+		FilePath: "docs/intro.md",
+		Language: "markdown",
+		Content:  "# Intro\n\nSee [setup](./setup.md) and [arch](../architecture.md).\n",
+	}
+	r := d.Detect(ctx)
+	wantTargets := map[string]bool{
+		"md:docs/setup.md":    false,
+		"md:architecture.md":  false,
+	}
+	for _, e := range r.Edges {
+		if e.Kind != model.EdgeDependsOn {
+			continue
+		}
+		if _, ok := wantTargets[e.TargetID]; ok {
+			wantTargets[e.TargetID] = true
+		}
+	}
+	for tgt, got := range wantTargets {
+		if !got {
+			t.Errorf("missing depends_on edge to %s; edges: %+v", tgt, r.Edges)
+		}
+	}
+}
+
 func TestMarkdownDeterminism(t *testing.T) {
 	d := NewMarkdownStructureDetector()
 	ctx := &detector.Context{FilePath: "README.md", Language: "markdown", Content: mdSource}
