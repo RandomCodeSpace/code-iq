@@ -24,8 +24,8 @@ jobs:
       run:
         working-directory: go
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
         with:
           # Pin to 1.25.x — 1.26+ isn't on enough developer machines yet.
           # 1.25.10 includes the fix for GO-2026-4918 (HTTP/2 SETTINGS
