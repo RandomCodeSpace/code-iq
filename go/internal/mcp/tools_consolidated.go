@@ -118,7 +118,7 @@ func toolFindInGraph(d *Deps) Tool {
 			case "by_file":
 				return delegate(ctx, toolFindComponentByFile(d), map[string]any{"file_path": p.FilePath})
 			case "by_endpoint":
-				return delegate(ctx, toolFindRelatedEndpoints(d), map[string]any{"node_id": p.NodeID})
+				return delegate(ctx, toolFindRelatedEndpoints(d), map[string]any{"identifier": p.NodeID})
 			default:
 				return NewErrorEnvelope(CodeInvalidInput, fmt.Errorf("unknown mode %q", p.Mode), RequestID(ctx)), nil
 			}
@@ -182,17 +182,17 @@ func toolTraceRelationships(d *Deps) Tool {
 			}
 			switch p.Mode {
 			case "callers":
-				return delegate(ctx, toolFindCallers(d), map[string]any{"node_id": p.NodeID})
+				return delegate(ctx, toolFindCallers(d), map[string]any{"target_id": p.NodeID})
 			case "consumers":
-				return delegate(ctx, toolFindConsumers(d), map[string]any{"node_id": p.NodeID})
+				return delegate(ctx, toolFindConsumers(d), map[string]any{"target_id": p.NodeID})
 			case "producers":
-				return delegate(ctx, toolFindProducers(d), map[string]any{"node_id": p.NodeID})
+				return delegate(ctx, toolFindProducers(d), map[string]any{"target_id": p.NodeID})
 			case "dependencies":
-				return delegate(ctx, toolFindDependencies(d), map[string]any{"node_id": p.NodeID})
+				return delegate(ctx, toolFindDependencies(d), map[string]any{"target_id": p.NodeID})
 			case "dependents":
-				return delegate(ctx, toolFindDependents(d), map[string]any{"node_id": p.NodeID})
+				return delegate(ctx, toolFindDependents(d), map[string]any{"target_id": p.NodeID})
 			case "shortest_path":
-				return delegate(ctx, toolFindShortestPath(d), map[string]any{"from": p.From, "to": p.To})
+				return delegate(ctx, toolFindShortestPath(d), map[string]any{"source": p.From, "target": p.To})
 			default:
 				return NewErrorEnvelope(CodeInvalidInput, fmt.Errorf("unknown mode %q", p.Mode), RequestID(ctx)), nil
 			}

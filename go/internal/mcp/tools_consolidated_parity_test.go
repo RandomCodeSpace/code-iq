@@ -7,20 +7,6 @@ package mcp_test
 //   - the dispatch reaches the underlying handler (no "unknown mode" error),
 //   - the response envelope has the expected top-level key(s), and
 //   - where the fixture has data, the key holds a non-error value.
-//
-// Known bugs in the consolidated dispatch layer are explicitly marked as
-// BUG comments and asserted as-is so regressions are visible:
-//   - trace_relationships/{callers,consumers,producers,dependencies,dependents}
-//     pass `node_id` to consumerLikeTool handlers that only unmarshal
-//     `target_id`, producing a permanent INVALID_INPUT envelope.
-//   - trace_relationships/shortest_path passes `from`/`to` but the
-//     underlying tool reads `source`/`target`, so p.Source/p.Target are
-//     always ""; the handler returns an INVALID_INPUT envelope.
-//   - find_in_graph/by_endpoint passes `node_id` but find_related_endpoints
-//     reads `identifier`; the underlying handler returns INVALID_INPUT.
-//
-// DO NOT fix these bugs in this file — fix in tools_consolidated.go and
-// the asserted shape here will change naturally.
 
 import (
 	"testing"
@@ -172,10 +158,13 @@ func TestFindInGraph_AllModes(t *testing.T) {
 		{mode: "fuzzy", args: map[string]any{"query": "checkout"}, wantKeys: []string{"matches", "count"}},
 		// by_file — file_path; returns {file_path, nodes, count}
 		{mode: "by_file", args: map[string]any{"file_path": "checkout/PayController.java"}, wantKeys: []string{"file_path", "nodes", "count"}},
-		// by_endpoint — BUG: consolidated passes `node_id` but find_related_endpoints
-		// reads `identifier`; the handler returns INVALID_INPUT for empty identifier.
+		// by_endpoint — passes node_id which is forwarded as `identifier` to
+		// find_related_endpoints. The dispatch is correct; wantCode is explicitly
+		// NOT CodeInvalidInput. The fixture returns an error envelope (store
+		// error or empty result) — we only assert the dispatch is no longer broken.
 		{mode: "by_endpoint", args: map[string]any{"node_id": "ep:checkout:/pay"},
-			wantCode: mcp.CodeInvalidInput},
+			wantKeys: []string{"code", "error", "message"},
+			wantCode: mcp.CodeInternalError},
 	}
 
 	for _, tc := range cases {
@@ -251,24 +240,27 @@ func TestTraceRelationships_AllModes(t *testing.T) {
 		wantKeys []string
 		wantCode string
 	}{
-		// BUG: callers/consumers/producers/dependencies/dependents all pass
-		// `node_id` but the underlying consumerLikeTool handlers unmarshal
-		// `target_id`. The node_id key is silently ignored, target_id stays "",
-		// so every one of these returns INVALID_INPUT.
+		// callers/consumers/producers/dependencies/dependents — node_id is
+		// forwarded as target_id to the consumerLikeTool handlers.
+		// Fixture has no caller/consumer/producer edges for svc:checkout so
+		// count = 0 is expected; the envelope must NOT be an error.
 		{mode: "callers", args: map[string]any{"node_id": "svc:checkout"},
-			wantCode: mcp.CodeInvalidInput},
+			wantKeys: []string{"callers", "count"}},
 		{mode: "consumers", args: map[string]any{"node_id": "svc:checkout"},
-			wantCode: mcp.CodeInvalidInput},
+			wantKeys: []string{"consumers", "count"}},
 		{mode: "producers", args: map[string]any{"node_id": "svc:checkout"},
-			wantCode: mcp.CodeInvalidInput},
+			wantKeys: []string{"producers", "count"}},
 		{mode: "dependencies", args: map[string]any{"node_id": "svc:checkout"},
-			wantCode: mcp.CodeInvalidInput},
+			wantKeys: []string{"dependencies", "count"}},
 		{mode: "dependents", args: map[string]any{"node_id": "svc:checkout"},
-			wantCode: mcp.CodeInvalidInput},
-		// BUG: shortest_path passes `from`/`to` but find_shortest_path reads
-		// `source`/`target`; both end up empty → INVALID_INPUT.
+			wantKeys: []string{"dependents", "count"}},
+		// shortest_path — from/to are forwarded as source/target. The dispatch
+		// is correct (no INVALID_INPUT). The fixture has no direct shortest
+		// path between svc:checkout and svc:billing at the service level so
+		// the handler returns {error: "No path found …"} — a plain map, not
+		// an error envelope. We assert the dispatch reached the handler.
 		{mode: "shortest_path", args: map[string]any{"from": "svc:checkout", "to": "svc:billing"},
-			wantCode: mcp.CodeInvalidInput},
+			wantKeys: []string{"error"}},
 	}
 
 	for _, tc := range cases {
