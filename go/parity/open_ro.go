@@ -1,3 +1,5 @@
+//go:build parity
+
 package parity
 
 import "github.com/randomcodespace/codeiq/go/internal/cache"

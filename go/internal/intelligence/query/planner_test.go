@@ -23,14 +23,6 @@ func allLexical() CapabilityMatrix {
 	return out
 }
 
-// allUnsupported returns a CapabilityMatrix where every dimension is UNSUPPORTED.
-func allUnsupported() CapabilityMatrix {
-	out := make(CapabilityMatrix, len(allDimensions))
-	for _, d := range allDimensions {
-		out[d] = LevelUnsupported
-	}
-	return out
-}
 
 // fixed returns a planner whose capability provider always returns m, regardless
 // of language. Lets each test isolate routing logic from the per-language tables.

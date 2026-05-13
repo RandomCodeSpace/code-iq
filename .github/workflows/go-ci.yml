@@ -35,7 +35,11 @@ jobs:
         run: go test ./... -race -count=1
       - name: staticcheck
         run: |
-          go install honnef.co/go/tools/cmd/staticcheck@2024.1.1
+          # staticcheck must understand the Go toolchain version that built
+          # the binaries above. 2024.1.1 errors with "internal error in
+          # importing internal/byteorder (unsupported version: 2)" against
+          # Go 1.25's stdlib. 2025.1.1 is the first release that handles it.
+          go install honnef.co/go/tools/cmd/staticcheck@2025.1.1
           "$(go env GOPATH)/bin/staticcheck" ./...
       - name: gosec
         run: |

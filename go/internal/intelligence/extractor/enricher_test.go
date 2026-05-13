@@ -47,12 +47,6 @@ func (f *fakeExtractor) Extract(ctx Context, node *model.CodeNode) Result {
 	return r
 }
 
-// fileReadCounter wraps os.ReadFile by spying on filesystem reads. We track
-// distinct paths to assert read-once.
-type fileReadCounter struct {
-	reads map[string]int
-}
-
 func TestEnricher_DispatchesPerLanguageAndAppendsEdges(t *testing.T) {
 	dir := t.TempDir()
 	javaPath := "src/Foo.java"

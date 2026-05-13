@@ -127,12 +127,6 @@ func stringProp(p map[string]any, key string) string {
 	return ""
 }
 
-// edgeColumns is the column order written to each rel-table staging CSV.
-// MUST match the per-kind REL table DDL in schema.go: the FROM/TO node
-// primary keys come first (Kuzu COPY convention for rel tables), followed
-// by the user columns id, confidence, source, props.
-var edgeColumns = []string{"from", "to", "id", "confidence", "source", "props"}
-
 // BulkLoadEdges groups edges by Kind and issues one COPY FROM per rel
 // table. A mixed-kind batch is split internally — callers don't need to
 // pre-partition. Empty input is a no-op.

@@ -26,12 +26,6 @@ func isCINode(id string) bool {
 	return strings.Contains(id, "gha:") || strings.Contains(id, "gitlab:")
 }
 
-// containsInfra reports whether the node's ID contains the supplied
-// substring (case-insensitive for "dockerfile" matches).
-func containsInfra(id, needle string) bool {
-	return strings.Contains(id, needle)
-}
-
 // buildOverview is the high-level architecture view with 4 subgraphs:
 // CI/CD, Infrastructure, Application, Security.
 //
@@ -74,12 +68,8 @@ func buildOverview(snap *Snapshot) *Diagram {
 
 	// --- Infrastructure subgraph ---
 	var infraNodesRaw []*model.CodeNode
-	for _, n := range snap.FindByKind(model.NodeInfraResource) {
-		infraNodesRaw = append(infraNodesRaw, n)
-	}
-	for _, n := range snap.FindByKind(model.NodeAzureResource) {
-		infraNodesRaw = append(infraNodesRaw, n)
-	}
+	infraNodesRaw = append(infraNodesRaw, snap.FindByKind(model.NodeInfraResource)...)
+	infraNodesRaw = append(infraNodesRaw, snap.FindByKind(model.NodeAzureResource)...)
 
 	if len(infraNodesRaw) > 0 {
 		var k8s, docker, terraform []*model.CodeNode

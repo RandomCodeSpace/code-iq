@@ -28,14 +28,6 @@ type Service struct {
 // NewService constructs a Service bound to the given graph.Store.
 func NewService(store *graph.Store) *Service { return &Service{store: store} }
 
-// runtimeEdgeKinds enumerates the "consumer-direction" edges that count a
-// caller as a consumer for findConsumers. Matches the plan-spec list.
-// Returned as a Cypher rel-pattern alternation, e.g. `r:CALLS|PRODUCES|...`.
-var runtimeEdgeKinds = []string{
-	"CALLS", "PRODUCES", "CONSUMES", "QUERIES", "CONNECTS_TO",
-	"PUBLISHES", "LISTENS", "SENDS_TO", "RECEIVES_FROM",
-}
-
 // FindConsumers returns nodes m where m -[consumes|listens]-> target.
 // Mirrors QueryService.findConsumers + GraphStore.findConsumers on the Java
 // side; the runtime-edge set is the consumer-direction subset.

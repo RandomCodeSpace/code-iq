@@ -42,16 +42,27 @@ jobs:
           cp -r go/testdata/fixture-minimal /tmp/fm-java
       - name: Run Java index on fixture
         run: java -jar target/code-iq-*-cli.jar index /tmp/fm-java
+      - name: Run Java enrich on fixture
+        run: |
+          # `graph -f json` reads from Neo4j (serving profile), not H2. Need
+          # to enrich the H2 cache into Neo4j first or the export prints
+          # "No graph data found. Run 'codeiq analyze' first."
+          java -Dspring.profiles.active=serving -jar target/code-iq-*-cli.jar enrich /tmp/fm-java
       - name: Normalize Java output via Java helper
         run: |
           # The Java cache is H2, not SQLite — parity-normalize (Go-side)
           # cannot read it directly. Instead, use the Java side's `graph`
-          # command to emit JSON, then a small jq filter to produce the
-          # same canonical shape the Go normalizer emits. This jq script
-          # lives at parity/java-normalize.jq (committed in this PR).
-          java -jar target/code-iq-*-cli.jar graph /tmp/fm-java -f json \
+          # command to emit JSON (requires serving profile to access Neo4j),
+          # then a small jq filter to produce the same canonical shape the
+          # Go normalizer emits. The jq script lives at
+          # parity/java-normalize.jq (committed in this PR).
+          # Run from the fixture dir so the Neo4j path is resolved relative
+          # to where `enrich` wrote it.
+          cd /tmp/fm-java
+          java -Dspring.profiles.active=serving \
+            -jar "$GITHUB_WORKSPACE"/target/code-iq-*-cli.jar graph . -f json \
             > /tmp/java-raw.json
-          jq -f go/parity/java-normalize.jq /tmp/java-raw.json \
+          jq -f "$GITHUB_WORKSPACE"/go/parity/java-normalize.jq /tmp/java-raw.json \
             > /tmp/java-normalized.json
       - name: Run Go parity test
         working-directory: go
