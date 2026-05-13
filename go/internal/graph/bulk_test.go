@@ -145,6 +145,84 @@ func TestBulkLoadEdgesGroupedByKind(t *testing.T) {
 	}
 }
 
+// TestBulkLoadEdgesCommaInProperties is a regression test for the bug where
+// Properties JSON containing commas (e.g. {"language":"python","module":"glob"})
+// caused Kuzu's CSV parser to count more fields than expected and abort with
+// "Copy exception: expected 6 values per row, but got more". The fix switches
+// the staging file to pipe-separated (DELIM='|'), which is unambiguous because
+// Go's json.Marshal never emits a '|' character.
+func TestBulkLoadEdgesCommaInProperties(t *testing.T) {
+	s, err := graph.Open(filepath.Join(t.TempDir(), "g.kuzu"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	if err := s.ApplySchema(); err != nil {
+		t.Fatal(err)
+	}
+	nodes := []*model.CodeNode{
+		{ID: "py:file:check_structure.py", Kind: model.NodeModule, Label: "check_structure.py"},
+		{ID: "py:external:glob", Kind: model.NodeExternal, Label: "glob"},
+	}
+	if err := s.BulkLoadNodes(nodes); err != nil {
+		t.Fatal(err)
+	}
+	edges := []*model.CodeEdge{{
+		ID:         "py:file:check_structure.py->py:external:glob:imports",
+		Kind:       model.EdgeImports,
+		SourceID:   "py:file:check_structure.py",
+		TargetID:   "py:external:glob",
+		Confidence: model.ConfidenceLexical,
+		Source:     "GenericImportsDetector",
+		Properties: map[string]any{
+			"language": "python",
+			"module":   "glob",
+		},
+	}}
+	if err := s.BulkLoadEdges(edges); err != nil {
+		t.Fatalf("BulkLoadEdges with comma-bearing Properties: %v", err)
+	}
+	rows, err := s.Cypher("MATCH ()-[r:IMPORTS]->() RETURN r.id AS id")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("want 1 IMPORTS row, got %d: %v", len(rows), rows)
+	}
+}
+
+// TestBulkLoadNodesCommaInProperties is a regression test for nodes whose
+// props JSON column contains commas — same root cause as the edge variant.
+func TestBulkLoadNodesCommaInProperties(t *testing.T) {
+	s, err := graph.Open(filepath.Join(t.TempDir(), "g.kuzu"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	if err := s.ApplySchema(); err != nil {
+		t.Fatal(err)
+	}
+	nodes := []*model.CodeNode{{
+		ID:    "py:file:app.py",
+		Kind:  model.NodeModule,
+		Label: "app.py",
+		Properties: map[string]any{
+			"language": "python",
+			"module":   "flask,requests,os", // value itself contains commas
+		},
+	}}
+	if err := s.BulkLoadNodes(nodes); err != nil {
+		t.Fatalf("BulkLoadNodes with comma-bearing Properties: %v", err)
+	}
+	rows, err := s.Cypher("MATCH (n:CodeNode {id: 'py:file:app.py'}) RETURN n.id AS id")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("want 1 node, got %d: %v", len(rows), rows)
+	}
+}
+
 // TestBulkLoadEdgesEmpty — zero edges is a no-op like the node path.
 func TestBulkLoadEdgesEmpty(t *testing.T) {
 	s, err := graph.Open(filepath.Join(t.TempDir(), "g.kuzu"))
