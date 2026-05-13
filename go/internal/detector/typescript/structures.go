@@ -143,10 +143,41 @@ func (d TypeScriptStructuresDetector) Detect(ctx *detector.Context) *detector.Re
 		nodes = append(nodes, mk(id, model.NodeEnum, name, base.FindLineNumber(text, m[0]), nil))
 	}
 
-	// Imports
+	// Imports — emit a SOURCE-side file node + an EXTERNAL/MODULE target node
+	// so the edge survives Snapshot's phantom-drop. Pre-fix, both endpoints
+	// were free-form strings (the file path and the module name) with no
+	// matching CodeNode anywhere, so every imports edge got dropped at
+	// snapshot. On large TypeScript repos (e.g. nuxt) that produced ~50%
+	// phantom-edge waste in the cache.
+	fileNodeID := "ts:file:" + fp
+	importTargets := make(map[string]bool)
 	for _, m := range tsImportRE.FindAllStringSubmatchIndex(text, -1) {
 		mod := text[m[2]:m[3]]
-		e := model.NewCodeEdge(fp+"->imports->"+mod, model.EdgeImports, fp, mod)
+		if importTargets[mod] {
+			continue
+		}
+		importTargets[mod] = true
+		// Ensure the file-as-source node exists once.
+		if !existing[fileNodeID] {
+			existing[fileNodeID] = true
+			fn := model.NewCodeNode(fileNodeID, model.NodeModule, fp)
+			fn.FilePath = fp
+			fn.Source = "TypeScriptStructuresDetector"
+			fn.Confidence = model.ConfidenceLexical
+			fn.Properties["module_type"] = "ts_file"
+			nodes = append(nodes, fn)
+		}
+		// Ensure the external module target node exists.
+		targetID := "ts:external:" + mod
+		if !existing[targetID] {
+			existing[targetID] = true
+			tn := model.NewCodeNode(targetID, model.NodeExternal, mod)
+			tn.Source = "TypeScriptStructuresDetector"
+			tn.Confidence = model.ConfidenceLexical
+			tn.Properties["module"] = mod
+			nodes = append(nodes, tn)
+		}
+		e := model.NewCodeEdge(fileNodeID+"->imports->"+targetID, model.EdgeImports, fileNodeID, targetID)
 		e.Source = "TypeScriptStructuresDetector"
 		e.Confidence = model.ConfidenceLexical
 		edges = append(edges, e)

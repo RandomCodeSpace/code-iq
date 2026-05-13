@@ -74,11 +74,24 @@ func TestTypeScriptStructuresPositive(t *testing.T) {
 	if enums != 1 {
 		t.Errorf("expected 1 enum, got %d", enums)
 	}
-	if modules != 1 {
-		t.Errorf("expected 1 module (namespace), got %d", modules)
+	// 1 namespace + 1 file-as-module (anchor for imports edges so they
+	// survive the GraphBuilder phantom-drop).
+	if modules != 2 {
+		t.Errorf("expected 2 modules (namespace + file), got %d", modules)
 	}
 	if len(r.Edges) != 2 {
 		t.Errorf("expected 2 imports, got %d", len(r.Edges))
+	}
+	// Each import target should also exist as an EXTERNAL node so the
+	// edge isn't dropped at snapshot.
+	var externals int
+	for _, n := range r.Nodes {
+		if n.Kind == model.NodeExternal {
+			externals++
+		}
+	}
+	if externals != 2 {
+		t.Errorf("expected 2 external module nodes (imports targets), got %d", externals)
 	}
 }
 
