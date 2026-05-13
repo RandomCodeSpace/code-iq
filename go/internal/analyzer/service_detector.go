@@ -165,7 +165,7 @@ func (sd *ServiceDetector) Detect(nodes []*model.CodeNode, edges []*model.CodeEd
 		info := modules[dir]
 		name := sd.extractServiceName(dir, info, projectDir, projectRoot)
 		sn := &model.CodeNode{
-			ID:          "service:" + name,
+			ID:          serviceID(dir, name),
 			Kind:        model.NodeService,
 			Label:       name,
 			FilePath:    ifBlank(dir, "."),
@@ -213,7 +213,7 @@ func (sd *ServiceDetector) Detect(nodes []*model.CodeNode, edges []*model.CodeEd
 		}
 		n.Properties["service"] = sn.Label
 		newEdges = append(newEdges, &model.CodeEdge{
-			ID:         fmt.Sprintf("edge:service:%s:contains:%s", sn.Label, n.ID),
+			ID:         fmt.Sprintf("edge:%s:contains:%s", sn.ID, n.ID),
 			Kind:       model.EdgeContains,
 			SourceID:   sn.ID,
 			TargetID:   n.ID,
@@ -440,4 +440,13 @@ func matchFirst(re *regexp.Regexp, s string) string {
 		return ""
 	}
 	return strings.TrimSpace(m[1])
+}
+
+// serviceID builds a path-qualified service node ID. Two modules that share a
+// service name in different directories must not collide on the same primary
+// key — Kuzu's COPY FROM aborts the whole batch when a duplicate PK appears.
+// Root module (empty dir) uses "." so the format stays consistent with the
+// FilePath stamping at line 171.
+func serviceID(dir, name string) string {
+	return "service:" + ifBlank(dir, ".") + ":" + name
 }
