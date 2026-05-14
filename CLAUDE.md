@@ -26,15 +26,16 @@ landing) and `c630245` (release infra).
 
 - **Go 1.25.10** — toolchain pin; module min is 1.25.0 (clamped by the
   MCP SDK's own `go` directive).
-- **Kuzu 0.7.1** (`github.com/kuzudb/go-kuzu`) — embedded graph DB.
-  CGO. v0.11.3 capability matrix documented in `## Gotchas` below.
-- **`mattn/go-sqlite3` 1.14.22** — SQLite analysis cache. CGO.
+- **Kuzu 0.11.3** (`github.com/kuzudb/go-kuzu`) — embedded graph DB.
+  CGO. Native FTS via `CALL CREATE_FTS_INDEX` / `QUERY_FTS_INDEX`.
+  Capability matrix documented in `## Gotchas` below.
+- **`mattn/go-sqlite3` 1.14.44** — SQLite analysis cache. CGO.
 - **`smacker/go-tree-sitter`** — AST parsing for Java / Python /
   TypeScript / Go.
 - **`modelcontextprotocol/go-sdk` v1.6** — stdio MCP server. v1.6 API
   shape: `Server.Serve(ctx, mcpsdk.Transport)`; no `NewStdioTransport`
   helper.
-- **`spf13/cobra`** — CLI framework. Subcommand registration via
+- **`spf13/cobra` 1.10.2** — CLI framework. Subcommand registration via
   `internal/cli` blank imports.
 
 ## Architecture

@@ -14,6 +14,56 @@ for that specific tag for the per-commit details.
 
 ## [Unreleased]
 
+### Fixed
+
+- `codeiq enrich` survives polyglot codebases at `~/projects/` scale (49k
+  files, 15 GiB host). Pre-fix runs OOM-killed at exit 137; now exits 0
+  with peak RSS 1.8–2.2 GiB. PRs #145, #146, #147, #148.
+- Five enrich pipeline correctness fixes that surfaced at scale (each one
+  blocked the next — landed in order):
+  - PR #149: MCP dispatch arg names in `tools_consolidated` (7 modes were
+    permanently returning `INVALID_INPUT`).
+  - PR #150: pipe-delimited Kuzu COPY staging — JSON property values
+    containing commas (e.g. Python `imports`) no longer break the parser.
+  - PR #151: path-qualified SERVICE node IDs — two modules sharing a name
+    in different folders no longer collide on primary key.
+  - PR #152: TOML detector unquotes quoted keys (e.g. airflow's
+    `.cherry_picker.toml` `"check_sha" = ...`).
+  - PR #153: explicit `QUOTE='"', ESCAPE='"'` on Kuzu COPY so RFC-4180
+    quoting round-trips correctly (Istio EDS cluster names with `|`).
+
+### Changed
+
+- **Kuzu 0.7.1 → 0.11.3** (PR #155). Migrates the embedded graph DB to a
+  release with bundled FTS extension and bound `LIMIT`/`SKIP` parameters.
+- **Real FTS replaces CONTAINS predicates** (PR #159). `SearchByLabel`
+  and `SearchLexical` now route through `CALL QUERY_FTS_INDEX` with BM25
+  ranking; CONTAINS fallback retained for pre-enrich graphs. Auto-suffix
+  `*` on single-token queries preserves prefix-match UX. Two indexes
+  created at enrich time:
+  - `code_node_label_fts`   over `(label, fqn_lower)`
+  - `code_node_lexical_fts` over `(prop_lex_comment, prop_lex_config_keys)`
+- **Parameterized `LIMIT`/`SKIP`** across the query layer (PR #159).
+  `intLiteral` helper removed; `fmt.Sprintf("LIMIT %d", n)` replaced with
+  `LIMIT $lim` bindings.
+- **Dropped `stringsToAny` widener** (PR #159). Kuzu 0.11's Go binding
+  accepts `[]string` directly for `IN $param` clauses.
+- **Mutation gate** allow-lists read-only `CALL QUERY_FTS_INDEX` (PR #159);
+  `CREATE_FTS_INDEX` / `DROP_FTS_INDEX` stay blocked under
+  `OpenReadOnly`.
+- **Dependabot config** rewritten (PR #154) — drops the dead Java `maven`
+  (`/`) and `npm` (`/src/main/frontend`) ecosystems, adds `gomod` (`/go`)
+  with groups for `kuzu`, `tree-sitter`, `mcp`, `cobra-viper`, `sqlite`,
+  `test-libs`. Routine bumps land via PRs #155, #156, #157, #158.
+
+### Added
+
+- `codeiq enrich` knobs (PR #147): `--memprofile=<path>` writes a Go
+  heap profile; `--max-buffer-pool=N` overrides the 2 GiB Kuzu cap;
+  `--copy-threads=N` overrides `MaxNumThreads` default.
+- Perf-gate CI step (PR #148): `/usr/bin/time -v codeiq enrich` runs on
+  fixture-multi-lang; fails the build if peak RSS exceeds 300 MB.
+
 ## [v0.3.0] - 2026-05-13
 
 ### Changed
