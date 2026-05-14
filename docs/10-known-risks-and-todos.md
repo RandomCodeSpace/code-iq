@@ -2,7 +2,7 @@
 
 ## TODO / FIXME / HACK markers in code
 
-**Zero.** A repo-wide grep for `TODO`, `FIXME`, `HACK`, `XXX` in `internal/`, `cmd/`, and `parity/` returns **0 occurrences**.
+**Zero.** A repo-wide grep for `TODO`, `FIXME`, `HACK`, `XXX` in `internal/` and `cmd/` returns **0 occurrences**.
 
 This is the result of a deliberate "no TODOs in main" discipline — incomplete work either ships behind a clear interface or is captured in plan files (now wiped). The flip side: there's no in-code roadmap for "things known to need work". The list below substitutes for that, drawn from comments, deleted plan files, and observed bugs.
 
@@ -58,7 +58,6 @@ This is the result of a deliberate "no TODOs in main" discipline — incomplete 
 | **No structured logging** | Across packages | Plain `fmt.Fprintln(os.Stderr, ...)` at `-v` levels. Fine for a CLI; would be limiting in a long-running service (and there isn't one, so it's fine). |
 | **`config <action>` subcommand not implemented** | [`internal/cli/`](../internal/cli/) — no `config.go` | Older docs referenced this. Today only the root `--config` flag exists. |
 | **Java detector `.java` test fixtures** | [`testdata/fixture-minimal/`](../testdata/fixture-minimal/) | The fixture has `User.java` + `UserController.java` to exercise the Java detector. They are content, not project Java code — easy to confuse with stale Java-era artifacts. |
-| **`parity/` harness mostly idle** | [`parity/`](../parity/) | Build-tag `parity`. Used during the Java → Go port; now sits behind the tag waiting for someone to wake it up or delete it. |
 
 ### Incomplete features
 
@@ -97,4 +96,3 @@ This is the result of a deliberate "no TODOs in main" discipline — incomplete 
 3. **Snapshot tests for tree-sitter grammar output** on canonical files per language; pin grammar versions in `go.mod` rather than the wildcard tag patterns currently in use.
 4. **`gh attestation verify` documentation** for release consumers.
 5. **Consider extracting an `extra_files` block in `.goreleaser.yml`** with `match: optional` rather than the `*`-glob hack for README.md.
-6. **Delete `parity/` or revive it** — Phase 5 of the Java port is over; the harness is in limbo.

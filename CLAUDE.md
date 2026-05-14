@@ -120,7 +120,6 @@ codeiq/
 │   ├── parser/            — tree-sitter + structured parsers
 │   ├── query/             — service / topology / stats / dead-code Cypher templates
 │   └── review/            — PR-review pipeline (diff + Ollama)
-├── parity/                — parity harness (build tag `parity`); mostly idle
 ├── testdata/              — fixture-minimal, fixture-multi-lang
 ├── scripts/               — release / git-setup shell helpers
 ├── .github/workflows/     — go-ci, perf-gate, release-go, release-darwin, security, scorecard

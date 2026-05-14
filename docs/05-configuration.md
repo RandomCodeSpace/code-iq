@@ -117,7 +117,6 @@ The project does not use a feature-flag system. Build-time switches are limited 
 
 | Switch | Mechanism |
 |---|---|
-| Parity harness | Go build tag `parity` (see [`parity/`](../parity/)). |
 | Detector registration | Blank-import gate in [`internal/cli/detectors_register.go`](../internal/cli/detectors_register.go). |
 | Verbose logging | `-v` count flag on the root command. |
 
