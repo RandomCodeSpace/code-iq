@@ -2,14 +2,14 @@
 
 ## Supported versions
 
-Security fixes are issued against the latest minor release line on Maven Central. While codeiq is pre-1.0 (`0.x.y`) only the **latest** released `0.MINOR.x` line receives backports; older minor lines are EOL the moment a new minor ships.
+Security fixes are issued against the latest minor release line. While codeiq is pre-1.0 (`0.x.y`) only the **latest** released `0.MINOR.x` line receives backports; older minor lines are EOL the moment a new minor ships.
 
 | Version line | Status |
 |---|---|
-| `0.1.x` | Supported (current) |
-| `< 0.1.0` | Unsupported |
+| `0.3.x` | Supported (current — Go single binary) |
+| `0.2.x` and below | Unsupported (Java/Spring Boot reference, deleted at Phase 6 cutover) |
 
-`-SNAPSHOT` builds are development snapshots; they do not receive security fixes by themselves — you should be tracking the latest tagged release.
+Development builds (untagged `main`) are not covered — track the latest tagged release.
 
 ## Reporting a vulnerability
 
@@ -22,8 +22,8 @@ Use one of:
 
 Please include:
 
-- The codeiq version (`java -jar code-iq-*-cli.jar version` or `pom.xml` coordinate).
-- The shortest reproducer you can produce — a CLI command or test case is ideal.
+- The codeiq version (`codeiq --version`).
+- The shortest reproducer you can produce — a CLI command, a test case, or an indexed-fixture path.
 - Your assessment of impact (e.g., RCE, path traversal, info-disclosure, DoS).
 - Whether the issue is in a transitive dependency (please name the dependency + advisory ID if known).
 
@@ -40,26 +40,28 @@ We do not currently run a paid bug bounty.
 
 In-scope:
 
-- The codeiq CLI (`code-iq-*-cli.jar`).
-- The library JAR (`io.github.randomcodespace.iq:code-iq`).
-- The bundled REST API + MCP server (`serve` subcommand) — including path traversal, authn/authz, deserialisation, request smuggling, and SSRF.
-- The bundled React UI assets shipped inside the JAR.
-- The pipeline cache (H2) and graph store (Neo4j Embedded) — including local privilege escalation and data tampering.
+- The `codeiq` CLI binary and every subcommand (`index`, `enrich`, `mcp`, `query`, `find`, `cypher`, `stats`, `flow`, `graph`, `topology`, `review`, `cache`, `plugins`, `config`).
+- The stdio MCP server (`codeiq mcp`) — including its 10 user-facing tools (`graph_summary`, `find_in_graph`, `inspect_node`, `trace_relationships`, `analyze_impact`, `topology_view`, `run_cypher`, `read_file`, `generate_flow`, `review_changes`). The mutation gate on `run_cypher` is in-scope — bypassing it to mutate the read-only Kuzu store is a vulnerability.
+- The pipeline cache (SQLite, `.codeiq/cache/codeiq.sqlite`) and graph store (Kuzu embedded, `.codeiq/graph/codeiq.kuzu`) — including local privilege escalation and data tampering of the indexed graph.
+- File-read sandboxing in `read_file` and `codeiq review` — path traversal out of the indexed root is in-scope.
+- The release pipeline — Goreleaser config, signing keys (cosign keyless via OIDC), GitHub Actions workflows under `.github/workflows/`, and the published artifacts (binary tarballs + checksums + cosign bundles).
 
 Out of scope:
 
 - Vulnerabilities that require pre-existing local code execution on the developer's machine (we ship as a developer tool — by definition you trust the code you point it at).
-- Public-internet attack surface — codeiq does not expose any service to the public internet by default; deploying the `serve` endpoint behind hostile reverse-proxies is out of scope.
-- Findings in third-party services we do not control (Maven Central, GitHub itself, SonarCloud, etc.) — please report those upstream.
+- Public-internet attack surface — codeiq does not expose any service to the public internet. It is a CLI + stdio MCP server only; there is no REST API and no web UI (the Java reference had both; they were deleted in Phase 6 cutover and will not be reintroduced).
+- Vulnerabilities in the LLM endpoint used by `codeiq review` (Ollama local or cloud) — those are the LLM vendor's surface area.
+- Findings in third-party services we do not control (GitHub itself, OpenSSF, Socket Security, etc.) — please report those upstream.
 
 ## Hardening references
 
 - [`shared/runbooks/engineering-standards.md`](shared/runbooks/engineering-standards.md) — CVE policy and quality gates.
 - [`shared/runbooks/rollback.md`](shared/runbooks/rollback.md) §6 — secret rotation flow.
 - `.github/workflows/scorecard.yml` — OpenSSF Scorecard supply-chain checks.
-- GitHub repo-level **CodeQL default setup** (java-kotlin + javascript-typescript + actions) — code scanning, SARIF in the Security tab. Configured under repo Settings → Code security → Code scanning, not via a workflow file (a workflow-driven `codeql.yml` was tried and removed because GitHub rejects duplicate SARIF uploads when default setup is on for the same language).
-- `.github/dependabot.yml` — automated dependency / GHA / npm bumps.
+- `.github/workflows/security.yml` — CodeQL, Semgrep, OSV-Scanner, Trivy, Gitleaks, SBOM, Socket Security on every PR.
+- `.github/workflows/perf-gate.yml` — enrich memory regression gate (300 MB ceiling on fixture-multi-lang).
+- `.github/dependabot.yml` — automated `gomod` + `github-actions` bumps, grouped per ecosystem.
 
 ## Changelog
 
-This file is versioned as part of the repo. Material changes (e.g., raising the supported-versions table, changing the disclosure timeline) are announced via a Release note and a Paperclip board comment.
+This file is versioned as part of the repo. Material changes (e.g., raising the supported-versions table, changing the disclosure timeline) are announced via a Release note.

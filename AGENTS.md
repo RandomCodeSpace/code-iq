@@ -4,7 +4,7 @@
 
 ## What this repo is
 
-codeiq is a CLI + read-only server that builds a deterministic code-knowledge graph over a codebase. No AI, no external APIs — pure static analysis. See [`/CLAUDE.md`](CLAUDE.md) for the architecture, package map, pipeline, conventions, and gotchas.
+codeiq is a CLI + read-only stdio MCP server that builds a deterministic code-knowledge graph over a codebase. No AI in the index/enrich pipeline; LLM use is opt-in via `codeiq review`. Single static Go binary (CGO for Kuzu + SQLite). See [`/CLAUDE.md`](CLAUDE.md) for the architecture, package map, pipeline, conventions, and gotchas.
 
 ## Pointers, in priority order
 
@@ -22,9 +22,9 @@ codeiq is a CLI + read-only server that builds a deterministic code-knowledge gr
 - **Sign every commit.** The repo-local config (`scripts/setup-git-signed.sh`) makes this automatic; do not rewrite it.
 - **One logical change per commit.** Conventional-commit subjects (`feat:`, `fix:`, `chore:`, `refactor:`, `test:`, `docs:`, `perf:`).
 - **Squash-merge only.** Branch protection rejects merge commits and force-pushes to `main`.
-- **Tests + jacoco gate must pass.** `mvn -B -ntp clean verify` is the contract.
+- **Tests + race + vet must pass.** `cd go && CGO_ENABLED=1 go test ./... -count=1` is the contract; release CI runs `-race` too. 880+ tests today.
 - **Determinism is non-negotiable.** Same input → same output, byte-for-byte. Any new detector ships with a determinism test.
-- **Read-only serving layer.** MCP and REST API on the `serve` path do not mutate. If you find yourself adding `POST /api/<verb>` that writes, stop and reconsider.
+- **Read-only MCP server.** Tool calls never write to the graph. Index/enrich happen only via the CLI commands `codeiq index` / `codeiq enrich`. The Java reference's REST API + React SPA were deleted in Phase 6 cutover (#132) and will not be reintroduced.
 - **No secrets in code.** Repo-level GitHub Actions secrets only.
 
 ## Paperclip / RAN-* coordination

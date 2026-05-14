@@ -22,11 +22,12 @@
 
 - **Go 1.25.10** — toolchain pin in `go/go.mod` (module min 1.25.0,
   clamped by `modelcontextprotocol/go-sdk`).
-- **Kuzu 0.7.1** (`github.com/kuzudb/go-kuzu`) — embedded graph DB.
-- **`mattn/go-sqlite3` 1.14.22** — SQLite analysis cache.
+- **Kuzu 0.11.3** (`github.com/kuzudb/go-kuzu`) — embedded graph DB.
+  Native FTS via `QUERY_FTS_INDEX` (bundled).
+- **`mattn/go-sqlite3` 1.14.44** — SQLite analysis cache.
 - **`smacker/go-tree-sitter`** — AST parsing (Java / Python / TS / Go).
 - **`modelcontextprotocol/go-sdk` v1.6** — stdio MCP server.
-- **`spf13/cobra`** — CLI framework.
+- **`spf13/cobra` 1.10.2** — CLI framework.
 - Manifest files read: `go/go.mod`, `go/go.sum`.
 
 ## Entry points
