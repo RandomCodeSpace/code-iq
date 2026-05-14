@@ -181,21 +181,15 @@ func toolQueryEdges(d *Deps) Tool {
 			// the anonymous-rel pattern.
 			cypher := `MATCH (a:CodeNode)-[r]->(b:CodeNode)
 				RETURN a.id AS source, b.id AS target, LABEL(r) AS kind
-				ORDER BY source, kind, target LIMIT ` + intLiteral(limit)
-			args := map[string]any{}
+				ORDER BY source, kind, target LIMIT $lim`
+			args := map[string]any{"lim": int64(limit)}
 			if p.Kind != "" {
 				cypher = `MATCH (a:CodeNode)-[r]->(b:CodeNode) WHERE LABEL(r) = $k
 					RETURN a.id AS source, b.id AS target, LABEL(r) AS kind
-					ORDER BY source, kind, target LIMIT ` + intLiteral(limit)
+					ORDER BY source, kind, target LIMIT $lim`
 				args["k"] = p.Kind
 			}
-			var rows []map[string]any
-			var err error
-			if len(args) == 0 {
-				rows, err = d.Store.Cypher(cypher)
-			} else {
-				rows, err = d.Store.Cypher(cypher, args)
-			}
+			rows, err := d.Store.Cypher(cypher, args)
 			if err != nil {
 				return NewErrorEnvelope(CodeInternalError, err, RequestID(ctx)), nil
 			}
@@ -275,11 +269,11 @@ func toolGetEgoGraph(d *Deps) Tool {
 			}
 			depth := CapDepth(p.Radius, d.MaxDepth)
 			// Variable-length match centered on Center, walking outbound up to
-			// depth. Kuzu 0.7's binder is fussy about projecting properties
-			// from the endpoint of a variable-length pattern; the supported
-			// shape is `properties(nodes(p), 'id')` over the named path.
-			// Splitting outbound + inbound queries keeps the rows shape
-			// uniform (both sides projected through nodes(p)).
+			// depth. Kuzu's binder is fussy about projecting properties from
+			// the endpoint of a variable-length pattern; the supported shape
+			// is `properties(nodes(p), 'id')` over the named path. The
+			// recursive `[*1..N]` upper bound must be a literal (binder gap);
+			// LIMIT goes through parameter binding fine.
 			limit := CapResults(0, d.MaxResults)
 			cypher := fmt.Sprintf(`
 				MATCH p = (c:CodeNode {id: $center})-[*1..%d]-(:CodeNode)
@@ -289,8 +283,10 @@ func toolGetEgoGraph(d *Deps) Tool {
 				WHERE n.id <> $center
 				RETURN n.id AS id, n.kind AS kind, n.label AS label,
 				       n.file_path AS file_path, n.layer AS layer
-				ORDER BY n.id LIMIT %d`, depth, limit)
-			rows, err := d.Store.Cypher(cypher, map[string]any{"center": p.Center})
+				ORDER BY n.id LIMIT $lim`, depth)
+			rows, err := d.Store.Cypher(cypher, map[string]any{
+				"center": p.Center, "lim": int64(limit),
+			})
 			if err != nil {
 				return NewErrorEnvelope(CodeInternalError, err, RequestID(ctx)), nil
 			}
@@ -621,7 +617,7 @@ func toolFindRelatedEndpoints(d *Deps) Tool {
 			// Endpoints that share a service container with the identifier
 			// (file path / class / fqn) — the simplest semantic match that
 			// works across languages.
-			cypher := fmt.Sprintf(`
+			cypher := `
 				MATCH (target:CodeNode)
 				WHERE target.file_path = $i OR target.label = $i OR target.id = $i OR target.fqn = $i
 				MATCH (target)<-[:CONTAINS]-(svc:CodeNode {kind: 'service'})-[:CONTAINS]->(ep:CodeNode)
@@ -629,8 +625,8 @@ func toolFindRelatedEndpoints(d *Deps) Tool {
 				RETURN DISTINCT ep.id AS id, ep.kind AS kind, ep.label AS label,
 				                ep.file_path AS file_path, ep.layer AS layer,
 				                svc.label AS service
-				ORDER BY ep.id LIMIT %d`, limit)
-			rows, err := d.Store.Cypher(cypher, map[string]any{"i": p.Identifier})
+				ORDER BY ep.id LIMIT $lim`
+			rows, err := d.Store.Cypher(cypher, map[string]any{"i": p.Identifier, "lim": int64(limit)})
 			if err != nil {
 				return NewErrorEnvelope(CodeInternalError, err, RequestID(ctx)), nil
 			}
@@ -754,13 +750,4 @@ func toolReadFile(d *Deps) Tool {
 	}
 }
 
-// intLiteral renders a non-negative int as a Cypher literal. Kuzu 0.7.1
-// rejects parameter binding on LIMIT — the value must be inline. The cap
-// floor is 1 to match Kuzu's `LIMIT 0` failure mode.
-func intLiteral(n int) string {
-	if n < 1 {
-		n = 1
-	}
-	return fmt.Sprintf("%d", n)
-}
 

@@ -27,7 +27,7 @@ landing) and `c630245` (release infra).
 - **Go 1.25.10** — toolchain pin; module min is 1.25.0 (clamped by the
   MCP SDK's own `go` directive).
 - **Kuzu 0.7.1** (`github.com/kuzudb/go-kuzu`) — embedded graph DB.
-  CGO. v0.7.1 quirks documented in `## Gotchas` below.
+  CGO. v0.11.3 capability matrix documented in `## Gotchas` below.
 - **`mattn/go-sqlite3` 1.14.22** — SQLite analysis cache. CGO.
 - **`smacker/go-tree-sitter`** — AST parsing for Java / Python /
   TypeScript / Go.
@@ -357,26 +357,34 @@ Release pipeline:
   silently produced 0 nodes pre-fix. Test: `codeiq plugins` lists
   every detector by name; new ones must appear.
 
-### Kuzu v0.7.1 quirks
+### Kuzu v0.11.3 (current pin)
 
-- FTS extension not bundled, not downloadable offline. `INSTALL fts`
-  errors with "fts is not an official extension". `CreateIndexes()`
-  no-ops FTS; `SearchByLabel` / `SearchLexical` use case-insensitive
-  `CONTAINS` predicates.
-- LIMIT / SKIP can't be parameterized. Inline as literals;
-  parameterize the needle only.
-- Uses `lower()` (SQL) not `toLower()` (openCypher).
-- `RETURN DISTINCT` scope tighter than openCypher; `ORDER BY` must
-  reference the projected alias, not the bound variable.
+**Lifted in 0.11.3** — `CLAUDE.md` previously documented these as 0.7.1
+quirks; they were unwound in the post-bump cleanup:
+
+- FTS extension ships bundled. `CreateIndexes()` runs `INSTALL fts; LOAD
+  EXTENSION fts;` then `CALL CREATE_FTS_INDEX`. `SearchByLabel` /
+  `SearchLexical` query via `CALL QUERY_FTS_INDEX` with BM25 ranking;
+  CONTAINS predicates remain as fallback for pre-enrich graphs.
+- `LIMIT $param` and `SKIP $param` work as bound parameters. No more
+  `fmt.Sprintf` for integer literals.
+- `toLower()` works (use it; `lower()` still accepted for SQL parity).
+- Go binding accepts `[]string` for `IN $param` directly. The
+  `stringsToAny` widener is gone.
+
+**Still present in 0.11.3** — keep workarounds:
+
 - List comprehension binder rejects out-of-scope variables. Use
   `properties(nodes(p), 'id')` instead of `[n IN nodes(p) | n.id]`.
 - `EXISTS { … }` subquery doesn't see outer-scope `$param`. Inline
   static lists as rel-pattern alternations.
-- Go binding's `goValueToKuzuValue` accepts `[]any` only. Added
-  `stringsToAny` widener for `IN $param` use cases.
 - Multi-label rel alternation + kleene-star in the same recursive
   pattern breaks the binder. BlastRadius uses an anonymous recursive
   pattern.
+- Recursive pattern upper bound `[*1..N]` must be a literal, not a
+  parameter — only LIMIT/SKIP are now bindable.
+- Mutation gate allows `CALL QUERY_FTS_INDEX` but blocks
+  `CALL CREATE_FTS_INDEX` / `CALL DROP_FTS_INDEX` (catalog writes).
 
 ### MCP SDK v1.6
 
