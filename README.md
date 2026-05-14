@@ -291,7 +291,6 @@ codeiq/
 │   ├── parser/             ── tree-sitter + structured parsers
 │   ├── query/              ── service / topology / stats / dead-code Cypher templates
 │   └── review/             ── PR-review pipeline (diff + Ollama)
-├── parity/                 ── parity harness (build tag `parity`)
 ├── testdata/               ── fixture-minimal + fixture-multi-lang
 ├── .github/workflows/      ── go-ci, perf-gate, release-go, release-darwin, security, scorecard
 └── .goreleaser.yml         ── Goreleaser v2 (CGO multi-arch + Cosign + Syft)
@@ -383,9 +382,8 @@ Architectural decisions: [`docs/adr/`](docs/adr/). Repo-specific Claude Code ins
 | Goreleaser pipeline + Cosign keyless | Production |
 | 884+ tests passing (race + vet + staticcheck + gosec + govulncheck on every PR) | Production |
 | `codeiq review` (LLM PR review) | Beta — works end-to-end against local Ollama |
-| `parity/` harness | Idle (Java→Go port artifact; build-tag gated) |
 
-Currently on **v0.4.1**. Release history was reset at v0.4.0 — see [`docs/00-project-overview.md`](docs/00-project-overview.md) for context.
+Currently on **v0.4.2**. Release history was reset at v0.4.0 — see [`docs/00-project-overview.md`](docs/00-project-overview.md) for context.
 
 ---
 

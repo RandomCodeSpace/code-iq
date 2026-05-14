@@ -1,6 +1,6 @@
 # 03 — Code map
 
-> All paths are repo-root-relative. Module: `github.com/randomcodespace/codeiq`. CGO required everywhere. ~395 Go files in `internal/` + `cmd/` + `parity/`.
+> All paths are repo-root-relative. Module: `github.com/randomcodespace/codeiq`. CGO required everywhere. ~395 Go files in `internal/` + `cmd/`.
 
 ## Top level
 
@@ -8,7 +8,6 @@
 codeiq/
 ├── cmd/                — main package(s)
 ├── internal/           — production code (393 .go files)
-├── parity/             — parity harness (build tag `parity`, 7 .go files)
 ├── testdata/           — fixtures (fixture-minimal, fixture-multi-lang)
 ├── scripts/            — release / git-setup shell helpers
 ├── .github/workflows/  — 6 workflows: go-ci, perf-gate, release-go, release-darwin, security, scorecard
@@ -160,10 +159,6 @@ Sample (Spring REST): [`internal/detector/jvm/java/spring_rest.go`](../internal/
 | [`internal/parser/`](../internal/parser/) | `parser.Tree`, tree-sitter wrappers, structured parser for YAML/JSON/TOML/INI/properties. `ParseStructured` dispatches by language. |
 | [`internal/model/`](../internal/model/) | Canonical types: `CodeNode`, `CodeEdge`, `NodeKind` (34 values), `EdgeKind` (28 values), `Confidence` (LEXICAL/SYNTACTIC/RESOLVED), `Layer` (frontend/backend/infra/shared/unknown). |
 | [`internal/buildinfo/`](../internal/buildinfo/) | `Version`, `Commit`, `Date`, `Dirty`, `Platform`, `GoVersion`, `Features`. `init()` falls back to `runtime/debug.BuildInfo` when no `-ldflags -X`. |
-
-## `parity/`
-
-Build-tag `parity` harness. Compares cache + graph outputs of two runs (Java side vs Go side, or two Go runs). Used heavily during the Java → Go port; now mostly idle. Build with `go build -tags parity ./parity/...`.
 
 ## `testdata/`
 

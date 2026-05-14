@@ -155,7 +155,6 @@ Each detector registers itself with `detector.RegisterDefault(NewMyDetector())` 
 - Property-fuzz the CSV bulk-load writer.
 - Snapshot tests for tree-sitter grammar outputs.
 - Document `gh attestation verify` for release consumers.
-- Decide on `parity/` — keep or delete.
 - Implement `codeiq config <action>` or formally remove the historical reference.
 
 ## References

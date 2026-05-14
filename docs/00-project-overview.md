@@ -38,7 +38,6 @@ Production-ready surface:
 
 Experimental / partial:
 - `codeiq review` — works end-to-end against local Ollama; Ollama Cloud path tested but the default endpoint is local. Output format is markdown or JSON.
-- `parity/` harness — build tag `parity`, compares cache + graph outputs across runs; used during the Java→Go port, now mostly idle.
 
 Not implemented (despite mentions in older docs):
 - **`codeiq config <action>`** — CLAUDE.md historically listed this; no `internal/cli/config.go` exists. The root `--config` flag still loads `codeiq.yml`.
@@ -53,7 +52,6 @@ Not implemented (despite mentions in older docs):
 | Kuzu 0.11.3 + native FTS | Production | Migrated from 0.7.1 with CONTAINS fallback retained |
 | Goreleaser release pipeline | Production | Cosign keyless via GitHub OIDC + Sigstore Rekor |
 | `codeiq review` (LLM PR review) | Beta | Works; quality depends on the LLM endpoint |
-| `parity/` harness | Idle | Phase 5 / Java parity verification; build-tag gated |
 | Detector coverage | Mixed | 100 detectors; some are lexical-only (regex), AST refinement is a per-detector concern |
 
 ## Release history (after the v0.4.0 reset)

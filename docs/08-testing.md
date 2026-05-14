@@ -20,7 +20,6 @@ Test file count per package (sampled from `find internal -name '*_test.go' | wc 
 | `internal/cache/` | 3 |
 | `internal/query/` | 3 |
 | `internal/review/` | 3 |
-| `parity/` | 1 |
 
 **Total:** 884+ tests pass cleanly on `main`. Race detector passes too (CI runs `go test -race -count=1`).
 

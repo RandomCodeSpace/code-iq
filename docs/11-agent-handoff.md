@@ -22,8 +22,7 @@
 16. **Never re-use a deleted version number.** Always tag forward (v0.4.X+1).
 17. There's no REST API, no web UI, no telemetry, no auto-update, no Docker image. Operator-driven CLI + stdio MCP only.
 18. Java reference implementation was deleted at v0.3.0 cutover (PR #132). Will not return.
-19. `parity/` directory is a build-tag-gated harness (`-tags parity`) from the Java→Go port; mostly idle, can be revived or deleted.
-20. Documentation lives entirely under `docs/` + `README.md` + `CLAUDE.md`. Wiped + rebuilt in this handoff (PR #168 + the doc-rewrite this file is part of).
+19. Documentation lives entirely under `docs/` + `README.md` + `CLAUDE.md`. Wiped + rebuilt in this handoff (PR #168 + the doc-rewrite this file is part of).
 
 ## Top 20 files to read first
 
@@ -147,7 +146,6 @@ codeiq --version
 | `v0.4.2` tag | Created then deleted because the v0.4.2 release failed on the goreleaser literal-file pattern. Once #169 lands, re-tag as v0.4.2. |
 | CHANGELOG `[Unreleased]` section | Will need to be cut to `[v0.4.2]` when the next release ships. See [`docs/09-build-deploy-release.md`](09-build-deploy-release.md). |
 | New reference docs | This is the deliverable. After this PR lands, the repo will have a clean `docs/` tree (the user wiped the prior set in PR #168). |
-| `parity/` harness | Build-tag idle since the Java port. Revive or delete. |
 | `config <action>` subcommand | Mentioned in older docs; never implemented. Root `--config` flag works. Implement or remove the mention. |
 
 ## Recommended next tasks (priority order)
@@ -155,7 +153,6 @@ codeiq --version
 1. **Merge PR #169** (goreleaser glob fix) → tag v0.4.2 → publish the release.
 2. **Wire the new reference docs into `go-ci.yml` or `security.yml` link-check** — broken markdown links would be the most likely doc-bitrot vector.
 3. **Add a `gh attestation verify` example to the README** — the binaries ship with build provenance but it's invisible to consumers.
-4. **Decide on `parity/`** — keep + document, or delete.
 5. **Fuzz [`MutationKeyword`](../internal/graph/mutation.go)** — adversarial Cypher with comment / string smuggling.
 6. **Property-fuzz the CSV bulk-load writer** — random byte sequences in node/edge properties (catches the next #150/#152/#153-style bug).
 7. **Snapshot tests for tree-sitter grammar outputs** — pin grammar versions; alert on AST node-name drift.
