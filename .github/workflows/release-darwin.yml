@@ -86,23 +86,52 @@ jobs:
       - name: Upload to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
         run: |
           VERSION="${TAG#v}"
-          # Retry up to 3 times to handle race with release-go.yml
-          # creating the Release.
-          for i in 1 2 3; do
-            if gh release view "$TAG" >/dev/null 2>&1; then
-              gh release upload "$TAG" \
+          # release-go.yml fires on the same tag push and creates the
+          # Release via goreleaser. With CGO + Kuzu + cosign + SBOM the
+          # full pipeline typically lands a Release in 4–8 minutes. We
+          # poll for up to 15 minutes (30 × 30s) and early-bail if the
+          # upstream release-go run for this tag already concluded as
+          # failed / cancelled / timed_out so this job's failure message
+          # is actionable rather than "timeout after 15m".
+          MAX_RETRIES=30
+          SLEEP_SECS=30
+          go_run_failed=0
+          for i in $(seq 1 "$MAX_RETRIES"); do
+            if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+              echo "Release $TAG visible after $((i-1)) wait cycles."
+              gh release upload "$TAG" --repo "$REPO" \
                 "codeiq_${VERSION}_darwin_arm64.tar.gz" \
                 "codeiq_${VERSION}_darwin_arm64.tar.gz.sbom.spdx.json" \
                 "codeiq_${VERSION}_darwin_arm64.tar.gz.cosign.bundle" \
                 --clobber
               exit 0
             fi
-            echo "Release $TAG not yet visible, waiting 30s ($i/3)..."
-            sleep 30
+            go_status=$(gh run list --repo "$REPO" \
+              --workflow release-go.yml \
+              --event push \
+              --branch "$TAG" \
+              --limit 1 \
+              --json conclusion,status 2>/dev/null || echo '[]')
+            conclusion=$(printf '%s' "$go_status" | jq -r '.[0].conclusion // ""')
+            status=$(printf '%s' "$go_status" | jq -r '.[0].status // ""')
+            case "$conclusion" in
+              failure|cancelled|timed_out)
+                go_run_failed=1
+                echo "::error::release-go.yml for $TAG ended with conclusion=$conclusion — bailing"
+                break
+                ;;
+            esac
+            echo "Release $TAG not yet visible (release-go status=${status:-unknown} conclusion=${conclusion:-pending}); waiting ${SLEEP_SECS}s ($i/$MAX_RETRIES)..."
+            sleep "$SLEEP_SECS"
           done
-          echo "::error::Release $TAG never appeared; release-go.yml may have failed"
+          if [ "$go_run_failed" = "1" ]; then
+            echo "::error::release-go.yml failed for $TAG; this darwin job cannot proceed"
+          else
+            echo "::error::Release $TAG never appeared after $((MAX_RETRIES * SLEEP_SECS))s"
+          fi
           exit 1
       - name: Attest darwin archive (build provenance)
         uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
