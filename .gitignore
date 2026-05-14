@@ -113,3 +113,11 @@ phase*-plan.md
 # ignored directory's contents cannot be re-included by a later pattern.
 !docs/superpowers/plans/
 !docs/superpowers/plans/*.md
+
+# ---- merged from go/.gitignore on go/ → root hoist ----
+/codeiq
+/codeiq.exe
+/coverage.out
+/coverage.html
+/dist/
+/.cache/

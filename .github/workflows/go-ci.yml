@@ -20,9 +20,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CGO_ENABLED: "1"
-    defaults:
-      run:
-        working-directory: go
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
@@ -32,7 +29,7 @@ jobs:
           # infinite loop) which is reachable via review.Client.Review.
           go-version: '1.25.10'
           cache: true
-          cache-dependency-path: go/go.sum
+          cache-dependency-path: go.sum
       - name: Install C toolchain
         run: sudo apt-get update -y && sudo apt-get install -y build-essential
       - name: go vet

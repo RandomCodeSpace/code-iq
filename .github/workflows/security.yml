@@ -50,7 +50,7 @@ jobs:
         # go-ci.yml) is the call-graph-aware companion that filters to
         # *reachable* vulns — keeping both gives both "have we got it"
         # AND "are we exposed".
-        run: ./osv-scanner --lockfile=go/go.mod
+        run: ./osv-scanner --lockfile=go.mod
 
   trivy:
     name: Trivy (filesystem + container scan)
@@ -136,8 +136,8 @@ jobs:
           node-version: '20'
       - run: |
           # Scope jscpd to Go production code only:
-          #   - go/cmd       — main entry point
-          #   - go/internal  — production code (100 detectors + pipeline + MCP)
+          #   - cmd       — main entry point
+          #   - internal  — production code (100 detectors + pipeline + MCP)
           # Tests share fixture/assertion shape by design (parallelism for
           # catching contract regressions, not a refactoring target).
           #
@@ -160,7 +160,7 @@ jobs:
             --reporters consoleFull \
             --format "go" \
             --ignore "**/vendor/**,**/testdata/**,**/grammar/**,**/generated/**,**/dist/**,**/coverage/**,**/intelligence/extractor/**/language_extractor.go,**/detector/**/structures.go" \
-            go/cmd go/internal
+            cmd internal
 
   sbom:
     name: SBOM (SPDX + CycloneDX)

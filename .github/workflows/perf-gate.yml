@@ -1,15 +1,13 @@
 name: perf-gate
-
 # Performance regression gate. Runs `codeiq index` against fixture-multi-lang
 # and asserts wall-clock + node-count budgets. Catches regressions like:
 #   - Regex pathology re-introduced (e.g. the CertificateAuthDetector
 #     pre-screen miss that pushed indexing from 0.1s → 42s on PSA).
 #   - Detector over-emission past the dedup budget.
 #
-# Trigger: push to main + PRs that touch go/**. Manual via workflow_dispatch.
+# Trigger: push to main + PRs that touch any source. Manual via workflow_dispatch.
 # Failure is informational on PRs (`continue-on-error`) until the threshold
 # is curated against real-world load; once stable, set strict gate.
-
 on:
   push:
     branches: [main]
@@ -20,10 +18,8 @@ on:
   # status to be reported" on non-Go PRs. Wall-clock is ~1 minute; the
   # signal is worth the cost.
   workflow_dispatch:
-
 permissions:
   contents: read
-
 jobs:
   bench:
     name: index perf gate (fixture-multi-lang)
@@ -51,14 +47,13 @@ jobs:
         with:
           go-version: '1.25.10'
           cache: true
-          cache-dependency-path: go/go.sum
+          cache-dependency-path: go.sum
       - name: Install C toolchain
         run: sudo apt-get update -y && sudo apt-get install -y build-essential
       - name: Build codeiq
-        working-directory: go
         run: go build -o /tmp/codeiq ./cmd/codeiq
       - name: Stage fixture (separate copy so cache writes don't dirty git)
-        run: cp -r go/testdata/fixture-multi-lang /tmp/fm-perf
+        run: cp -r testdata/fixture-multi-lang /tmp/fm-perf
       - name: Run + measure
         id: bench
         run: |
@@ -67,7 +62,6 @@ jobs:
           /tmp/codeiq index /tmp/fm-perf > /tmp/perf.log 2>&1
           END=$(date +%s.%N)
           ELAPSED=$(awk "BEGIN{printf \"%.3f\", $END - $START}")
-
           # Parse the "Files: F  Nodes: N  Edges: E  ..." summary line.
           NODES=$(awk -F'[ ]+' '/^Files:/ {print $4}' /tmp/perf.log)
           EDGES=$(awk -F'[ ]+' '/^Files:/ {print $6}' /tmp/perf.log)
@@ -77,12 +71,10 @@ jobs:
           DEDUP_NODES=${DEDUP_NODES:-0}
           DROPPED=$(awk -F'[ ]+' '/^Deduped:/ {for(i=1;i<=NF;i++) if($i=="Dropped:") print $(i+1)}' /tmp/perf.log)
           DROPPED=${DROPPED:-0}
-
           echo "elapsed=$ELAPSED" >> "$GITHUB_OUTPUT"
           echo "nodes=$NODES"     >> "$GITHUB_OUTPUT"
           echo "edges=$EDGES"     >> "$GITHUB_OUTPUT"
           echo "dropped=$DROPPED" >> "$GITHUB_OUTPUT"
-
           {
             echo "## codeiq perf gate"
             echo ""
@@ -94,9 +86,7 @@ jobs:
             echo "| deduped nodes | $DEDUP_NODES | — |"
             echo "| dropped phantom edges | $DROPPED | ratio gated |"
           } >> "$GITHUB_STEP_SUMMARY"
-
           cat /tmp/perf.log >> "$GITHUB_STEP_SUMMARY"
-
           # --- Hard gates ---
           fail=0
           if awk "BEGIN{exit !($ELAPSED > $MAX_INDEX_SECONDS)}"; then
@@ -129,7 +119,6 @@ jobs:
           RSS=$(awk -F': ' '/Maximum resident set size/ {print $2}' /tmp/perf-enrich.time)
           RSS=${RSS:-0}
           ELAPSED=$(awk -F': ' '/Elapsed \(wall clock\)/ {print $2}' /tmp/perf-enrich.time)
-
           {
             echo ""
             echo "## codeiq enrich memory gate"
@@ -140,7 +129,6 @@ jobs:
             echo "| wall-clock | $ELAPSED | — |"
           } >> "$GITHUB_STEP_SUMMARY"
           cat /tmp/perf-enrich.log >> "$GITHUB_STEP_SUMMARY"
-
           if [ "$RSS" -gt "$MAX_ENRICH_RSS_KB" ]; then
             echo "::error::enrich peak RSS ${RSS} KB exceeds budget ${MAX_ENRICH_RSS_KB} KB"
             exit 1
