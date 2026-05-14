@@ -23,6 +23,11 @@ even though their GitHub Releases are gone.
 
 ## [Unreleased]
 
+## [v0.4.1] - 2026-05-14
+
+Patch release. Pure CI / dependency hygiene — no codeiq pipeline or
+detector behavior changes.
+
 ### Fixed
 
 - `release-darwin.yml` race against `release-go.yml`: bumped poll budget
@@ -34,6 +39,8 @@ even though their GitHub Releases are gone.
 
 - Routine Dependabot bumps: `github.com/spf13/pflag` 1.0.9 → 1.0.10
   (PR #163), `step-security/harden-runner` 2.19.1 → 2.19.2 (PR #164).
+
+[v0.4.1]: https://github.com/RandomCodeSpace/codeiq/releases/tag/v0.4.1
 
 ## [v0.4.0] - 2026-05-14
 
