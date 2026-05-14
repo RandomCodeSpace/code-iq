@@ -145,12 +145,14 @@ func (s *Service) FindCycles(limit int) ([][]string, error) {
 	if limit <= 0 {
 		limit = 100
 	}
-	// Same Kuzu 0.7 list-comprehension caveat — `properties(nodes(p), 'id')`
-	// is the supported shape for projecting recursive-rel paths.
-	rows, err := s.store.Cypher(fmt.Sprintf(`
+	// Same list-comprehension caveat as FindShortestPath —
+	// `properties(nodes(p), 'id')` is the supported shape for projecting
+	// recursive-rel paths.
+	rows, err := s.store.Cypher(`
 		MATCH p = (a:CodeNode)-[* 2..10]->(b:CodeNode)
 		WHERE a.id = b.id
-		RETURN properties(nodes(p), 'id') AS ids LIMIT %d`, limit))
+		RETURN properties(nodes(p), 'id') AS ids LIMIT $lim`,
+		map[string]any{"lim": int64(limit)})
 	if err != nil {
 		return nil, fmt.Errorf("query: find cycles: %w", err)
 	}
@@ -201,13 +203,13 @@ func (s *Service) FindDeadCode(kinds []string, limit int) ([]*model.CodeNode, er
 		limit = 100
 	}
 
-	// Kuzu 0.7 binder gap: parameters declared at the outer scope are not
-	// visible inside an `EXISTS { MATCH ... WHERE ... }` subquery, so a
-	// `LABEL(r) IN $semanticKinds` predicate inside the EXISTS fails with
-	// "Parameter semanticKinds not found". Workaround: inline the semantic
-	// edges as a rel-pattern alternation, which is bound at parse time.
-	// Outer-scope parameters ($kinds / $excludeKinds) work fine because
-	// they live in the top-level WHERE clause.
+	// Kuzu binder gap (still present in 0.11): parameters declared at the
+	// outer scope are not visible inside an `EXISTS { MATCH ... WHERE ... }`
+	// subquery, so a `LABEL(r) IN $semanticKinds` predicate inside EXISTS
+	// fails with "Parameter semanticKinds not found". Workaround: inline the
+	// semantic edges as a rel-pattern alternation, which is bound at parse
+	// time. Outer-scope $kinds / $excludeKinds work fine because they live
+	// in the top-level WHERE clause.
 	semanticPat := ":" + strings.Join(semanticEdgeKinds, "|")
 	q := fmt.Sprintf(`
 		MATCH (n:CodeNode)
@@ -218,28 +220,17 @@ func (s *Service) FindDeadCode(kinds []string, limit int) ([]*model.CodeNode, er
 		  }
 		RETURN n.id AS id, n.kind AS kind, n.label AS label,
 		       n.file_path AS file_path, n.layer AS layer
-		ORDER BY n.id LIMIT %d`, semanticPat, limit)
+		ORDER BY n.id LIMIT $lim`, semanticPat)
 
-	// Kuzu 0.7's Go binding only accepts []any for list parameters; []string
-	// trips "unsupported type" in goValueToKuzuValue. Convert via stringsToAny.
 	rows, err := s.store.Cypher(q, map[string]any{
-		"kinds":        stringsToAny(kinds),
-		"excludeKinds": stringsToAny(entryPointKinds),
+		"kinds":        kinds,
+		"excludeKinds": entryPointKinds,
+		"lim":          int64(limit),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("query: find dead code: %w", err)
 	}
 	return rowsToNodes(rows), nil
-}
-
-// stringsToAny widens []string to []any so Kuzu's parameter binder accepts
-// it as a LIST. Kuzu 0.7's goValueToKuzuValue switch only matches []any.
-func stringsToAny(xs []string) []any {
-	out := make([]any, len(xs))
-	for i, x := range xs {
-		out[i] = x
-	}
-	return out
 }
 
 // rowsToNodes mirrors graph.rowsToNodes — kept package-local here to avoid

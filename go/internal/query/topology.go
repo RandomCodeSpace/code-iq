@@ -295,7 +295,7 @@ func (t *Topology) childNodesByKinds(serviceName string, kinds []string) ([]map[
 		RETURN n.id AS id, n.kind AS kind, n.label AS label,
 		       n.file_path AS file_path, n.layer AS layer
 		ORDER BY n.id`,
-		map[string]any{"name": serviceName, "kinds": stringsToAny(kinds)})
+		map[string]any{"name": serviceName, "kinds": kinds})
 	if err != nil {
 		return nil, fmt.Errorf("topology: childNodesByKinds %s: %w", serviceName, err)
 	}
@@ -652,7 +652,7 @@ func (t *Topology) servicesContainingNodes(nodeIDs []string) ([]string, error) {
 		WHERE s.kind = 'service' AND n.id IN $ids
 		RETURN DISTINCT s.label AS name
 		ORDER BY name`,
-		map[string]any{"ids": stringsToAny(nodeIDs)})
+		map[string]any{"ids": nodeIDs})
 	if err != nil {
 		return nil, fmt.Errorf("topology: services containing: %w", err)
 	}

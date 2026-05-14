@@ -11,8 +11,7 @@ import (
 // GraphController. All return projections through rowsToNodes (defined in
 // indexes.go) — `id`, `kind`, `label`, and optionally `file_path` / `layer`.
 //
-// Kuzu 0.7.1 caveats relevant here:
-//   - LIMIT/SKIP values must be inlined literals, not bound parameters.
+// Kuzu caveats relevant here:
 //   - count(*) on rels works fine across all rel tables via
 //     `MATCH ()-[r]->()` — Kuzu treats the wildcard as the union of every
 //     declared rel type.
@@ -107,13 +106,12 @@ func (s *Store) FindByKindPaginated(kind string, offset, limit int) ([]*model.Co
 	if limit < 0 {
 		limit = 0
 	}
-	// Kuzu 0.7.1 disallows parameter binding on SKIP/LIMIT — inline them.
-	rows, err := s.Cypher(fmt.Sprintf(`
+	rows, err := s.Cypher(`
 		MATCH (n:CodeNode) WHERE n.kind = $k
 		RETURN n.id AS id, n.kind AS kind, n.label AS label,
 		       n.file_path AS file_path, n.layer AS layer
-		ORDER BY n.id SKIP %d LIMIT %d`, offset, limit),
-		map[string]any{"k": kind})
+		ORDER BY n.id SKIP $skip LIMIT $lim`,
+		map[string]any{"k": kind, "skip": int64(offset), "lim": int64(limit)})
 	if err != nil {
 		return nil, fmt.Errorf("graph: find by kind: %w", err)
 	}

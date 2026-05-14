@@ -41,13 +41,16 @@ var callRE = regexp.MustCompile(`(?i)\bCALL\s+(\w+(?:\.\w+)?)`)
 // readOnlyCallPrefixes are case-insensitive procedure-name prefixes that
 // are permitted under CALL. db.* covers Neo4j's read-only schema
 // procedures (db.indexes, db.constraints, db.labels); show_/table_/
-// current_setting/table_info cover Kuzu's introspection helpers.
+// current_setting/table_info cover Kuzu's introspection helpers;
+// query_fts_index is Kuzu 0.11's read-only FTS search procedure
+// (create_/drop_fts_index stay blocked because they mutate the catalog).
 var readOnlyCallPrefixes = []string{
 	"db.",
 	"show_",
 	"table_",
 	"current_setting",
 	"table_info",
+	"query_fts_index",
 }
 
 // blockCommentRE matches /* … */ and line comments. Both are stripped
