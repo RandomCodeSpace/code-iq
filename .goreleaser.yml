@@ -62,10 +62,15 @@ archives:
     formats: [tar.gz]
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    # Each entry is a glob; goreleaser silently skips patterns that match
+    # zero files. The bare `README.md` / `CHANGELOG.md` form would hard-fail
+    # when the file is absent (docs were wiped in #168 ahead of a clean
+    # reference-docs rewrite). The `*` suffix turns each into a glob that
+    # matches the file when present and nothing when absent.
     files:
       - LICENSE*
-      - README.md
-      - CHANGELOG.md
+      - README.md*
+      - CHANGELOG.md*
 checksum:
   name_template: 'checksums.sha256'
   algorithm: sha256
