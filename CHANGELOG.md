@@ -5,14 +5,41 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-Per-tag release notes — including the full beta sequence (`v0.0.1-beta.0` …
-`v0.0.1-beta.46`) — are published on
+Per-tag release notes are published on
 [GitHub Releases](https://github.com/RandomCodeSpace/codeiq/releases). This file
 captures the cross-cutting changes that span multiple commits or releases (new
 quality gates, security policy, deploy surface, etc.) — see the GitHub Release
 for that specific tag for the per-commit details.
 
+The release history was reset at v0.4.0: all earlier GitHub Releases and tags
+(`v0.0.x`, `v0.1.x`, `v0.2.x`, `v0.3.0`, `v1.0.0`) were deleted because the
+Go module proxy permanently caches every published version's content. A
+deleted `v0.1.0` tag from the original Python-prototype era would have
+poisoned `go install` for any reused number. v0.4.0 is the first never-used
+version after the cleanup; the commit history under it is unchanged and
+includes everything that previously shipped as v0.3.0 plus the post-cutover
+work listed below. Historical sections below v0.4.0 are kept for the record
+even though their GitHub Releases are gone.
+
 ## [Unreleased]
+
+### Fixed
+
+- `release-darwin.yml` race against `release-go.yml`: bumped poll budget
+  from 90 s to 15 minutes and added an early-bail when the upstream
+  release-go run for the tag concluded as failure / cancelled /
+  timed_out. Pinned `--repo` on every `gh` invocation. PR #165.
+
+### Changed
+
+- Routine Dependabot bumps: `github.com/spf13/pflag` 1.0.9 → 1.0.10
+  (PR #163), `step-security/harden-runner` 2.19.1 → 2.19.2 (PR #164).
+
+## [v0.4.0] - 2026-05-14
+
+First release of the Go-native codeiq after the `/go/` subdirectory
+hoist. Same commit content as the (now deleted) v0.3.0 plus the
+post-cutover work below.
 
 ### Fixed
 
@@ -34,6 +61,10 @@ for that specific tag for the per-commit details.
 
 ### Changed
 
+- **Module hoisted from `/go/` to repo root** (PR #162). Module path drops
+  the `/go` suffix; `go install github.com/randomcodespace/codeiq/cmd/codeiq@vX.Y.Z`
+  resolves directly. 320 Go files rewritten, 5 CI workflows + goreleaser
+  + Dependabot config aligned.
 - **Kuzu 0.7.1 → 0.11.3** (PR #155). Migrates the embedded graph DB to a
   release with bundled FTS extension and bound `LIMIT`/`SKIP` parameters.
 - **Real FTS replaces CONTAINS predicates** (PR #159). `SearchByLabel`
@@ -52,9 +83,11 @@ for that specific tag for the per-commit details.
   `CREATE_FTS_INDEX` / `DROP_FTS_INDEX` stay blocked under
   `OpenReadOnly`.
 - **Dependabot config** rewritten (PR #154) — drops the dead Java `maven`
-  (`/`) and `npm` (`/src/main/frontend`) ecosystems, adds `gomod` (`/go`)
-  with groups for `kuzu`, `tree-sitter`, `mcp`, `cobra-viper`, `sqlite`,
-  `test-libs`. Routine bumps land via PRs #155, #156, #157, #158.
+  (`/`) and `npm` (`/src/main/frontend`) ecosystems, adds `gomod` with
+  groups for `kuzu`, `tree-sitter`, `mcp`, `cobra-viper`, `sqlite`,
+  `test-libs`. Routine bumps that followed: `go-kuzu` 0.7.1 → 0.11.3
+  (PR #155), `spf13/cobra` + `pflag` group (PR #156), `go-sqlite3`
+  1.14.22 → 1.14.44 (PR #157), 4 GitHub Actions (PR #158).
 
 ### Added
 
@@ -63,6 +96,14 @@ for that specific tag for the per-commit details.
   `--copy-threads=N` overrides `MaxNumThreads` default.
 - Perf-gate CI step (PR #148): `/usr/bin/time -v codeiq enrich` runs on
   fixture-multi-lang; fails the build if peak RSS exceeds 300 MB.
+- `runtime/debug.BuildInfo` fallback in the `buildinfo` package
+  (PR #161). `go install …@vX.Y.Z` binaries now self-identify their
+  version, commit, and date without needing the goreleaser `-ldflags -X`
+  path — the Go toolchain stamps `vcs.revision`/`vcs.time`/`vcs.modified`
+  and the buildinfo `init()` reads them. Goreleaser's ldflags still win
+  on release artifacts.
+
+[v0.4.0]: https://github.com/RandomCodeSpace/codeiq/releases/tag/v0.4.0
 
 ## [v0.3.0] - 2026-05-13
 
