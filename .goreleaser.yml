@@ -6,28 +6,23 @@
 # CGO is required (kuzudb + go-sqlite3 native deps), so we cross-compile
 # via per-target runners — see the release workflow matrix. This file
 # is consumed once per target OS.
-
 version: 2
 project_name: codeiq
-
 env:
   - CGO_ENABLED=1
   - GO_VERSION=1.25.10
-
 before:
   hooks:
     # Sanity gate. Failing here aborts the release before any binary
-    # leaves the runner. Goreleaser runs each hook via exec.Command
-    # (no shell), so bare `cd go && …` fails — `cd` isn't an executable
-    # in $PATH. Wrap in `sh -c` to get a working-directory side-effect.
-    - sh -c "cd go && go mod download"
-    - sh -c "cd go && go test ./... -count=1"
-
+    # leaves the runner. Module lives at repo root since the hoist; no
+    # subdirectory `cd` is needed. Hooks still go via `sh -c` for parity
+    # with the build steps and to keep shell features available.
+    - sh -c "go mod download"
+    - sh -c "go test ./... -count=1"
 builds:
   # linux/amd64 — native build on the ubuntu-latest runner.
   - id: codeiq-linux-amd64
     main: ./cmd/codeiq
-    dir: go
     binary: codeiq
     env:
       - CGO_ENABLED=1
@@ -36,17 +31,16 @@ builds:
       - -trimpath
     ldflags:
       - -s -w
-      - -X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Version={{.Version}}'
-      - -X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Commit={{.ShortCommit}}'
-      - -X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Date={{.Date}}'
-      - -X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Dirty={{.IsGitDirty}}'
+      - -X 'github.com/randomcodespace/codeiq/internal/buildinfo.Version={{.Version}}'
+      - -X 'github.com/randomcodespace/codeiq/internal/buildinfo.Commit={{.ShortCommit}}'
+      - -X 'github.com/randomcodespace/codeiq/internal/buildinfo.Date={{.Date}}'
+      - -X 'github.com/randomcodespace/codeiq/internal/buildinfo.Dirty={{.IsGitDirty}}'
     goos: [linux]
     goarch: [amd64]
   # linux/arm64 — cross-compile from the ubuntu-latest runner using
   # gcc-aarch64-linux-gnu installed in the release workflow.
   - id: codeiq-linux-arm64
     main: ./cmd/codeiq
-    dir: go
     binary: codeiq
     env:
       - CGO_ENABLED=1
@@ -55,15 +49,14 @@ builds:
       - -trimpath
     ldflags:
       - -s -w
-      - -X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Version={{.Version}}'
-      - -X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Commit={{.ShortCommit}}'
-      - -X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Date={{.Date}}'
-      - -X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Dirty={{.IsGitDirty}}'
+      - -X 'github.com/randomcodespace/codeiq/internal/buildinfo.Version={{.Version}}'
+      - -X 'github.com/randomcodespace/codeiq/internal/buildinfo.Commit={{.ShortCommit}}'
+      - -X 'github.com/randomcodespace/codeiq/internal/buildinfo.Date={{.Date}}'
+      - -X 'github.com/randomcodespace/codeiq/internal/buildinfo.Dirty={{.IsGitDirty}}'
     goos: [linux]
     goarch: [arm64]
   # darwin/arm64 ships from `release-darwin.yml` (macos-14 runner) and
   # attaches to the same Release that this config creates.
-
 archives:
   - id: codeiq
     formats: [tar.gz]
@@ -73,14 +66,11 @@ archives:
       - LICENSE*
       - README.md
       - CHANGELOG.md
-
 checksum:
   name_template: 'checksums.sha256'
   algorithm: sha256
-
 snapshot:
   version_template: '{{ incpatch .Version }}-next'
-
 # SBOM generation — Plan §5 SBOM signing requirement. Syft is the
 # OSS-CLI choice (matches the existing security.yml stack).
 sboms:
@@ -93,7 +83,6 @@ sboms:
       - '$artifact'
       - --output
       - 'spdx-json={{ .ArtifactName }}.sbom.spdx.json'
-
 # Cosign keyless signing of the checksum manifest. The release workflow
 # supplies the OIDC token via `id-token: write`; cosign records the
 # signature transparency entry in Rekor (public Sigstore log). No
@@ -113,7 +102,6 @@ signs:
     artifacts: checksum
     output: true
     signature: '${artifact}.cosign.bundle'
-
 release:
   github:
     owner: RandomCodeSpace
@@ -124,14 +112,10 @@ release:
   name_template: 'v{{ .Version }}'
   header: |
     ## codeiq v{{ .Version }}
-
     Deterministic code knowledge graph — Go single-binary release.
-
     Verify the download:
-
         # Checksum
         sha256sum -c checksums.sha256
-
         # Signature (Sigstore keyless, bundle format)
         cosign verify-blob \
           --bundle checksums.sha256.cosign.bundle \

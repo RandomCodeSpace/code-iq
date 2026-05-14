@@ -22,7 +22,7 @@ codeiq is a CLI + read-only stdio MCP server that builds a deterministic code-kn
 - **Sign every commit.** The repo-local config (`scripts/setup-git-signed.sh`) makes this automatic; do not rewrite it.
 - **One logical change per commit.** Conventional-commit subjects (`feat:`, `fix:`, `chore:`, `refactor:`, `test:`, `docs:`, `perf:`).
 - **Squash-merge only.** Branch protection rejects merge commits and force-pushes to `main`.
-- **Tests + race + vet must pass.** `cd go && CGO_ENABLED=1 go test ./... -count=1` is the contract; release CI runs `-race` too. 880+ tests today.
+- **Tests + race + vet must pass.** `CGO_ENABLED=1 go test ./... -count=1` is the contract; release CI runs `-race` too. 880+ tests today.
 - **Determinism is non-negotiable.** Same input → same output, byte-for-byte. Any new detector ships with a determinism test.
 - **Read-only MCP server.** Tool calls never write to the graph. Index/enrich happen only via the CLI commands `codeiq index` / `codeiq enrich`. The Java reference's REST API + React SPA were deleted in Phase 6 cutover (#132) and will not be reintroduced.
 - **No secrets in code.** Repo-level GitHub Actions secrets only.

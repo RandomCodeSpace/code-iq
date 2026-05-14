@@ -70,9 +70,15 @@ Requires Go 1.25.10+ and a C toolchain (CGO).
 
 ```bash
 git clone https://github.com/RandomCodeSpace/codeiq.git
-cd codeiq/go
+cd codeiq
 CGO_ENABLED=1 go build -o /usr/local/bin/codeiq ./cmd/codeiq
 codeiq --version
+```
+
+Or directly via `go install`:
+
+```bash
+CGO_ENABLED=1 go install github.com/randomcodespace/codeiq/cmd/codeiq@latest
 ```
 
 ## Quickstart

@@ -7,8 +7,8 @@ deterministic code knowledge graph. No AI, no external APIs — pure
 static analysis. 100 detectors, 35+ languages, Kuzu embedded graph
 database, MCP stdio server, single static Go binary.
 
-- **CLI command**: `codeiq` (single binary from `go/cmd/codeiq/main.go`)
-- **Go module**: `github.com/randomcodespace/codeiq/go`
+- **CLI command**: `codeiq` (single binary from `cmd/codeiq/main.go`)
+- **Go module**: `github.com/randomcodespace/codeiq`
 - **Go directive**: `go 1.25.0` (dep-mandated by `modelcontextprotocol/go-sdk`); `toolchain go1.25.10`
 - **GitHub repo**: `RandomCodeSpace/codeiq` (default branch: `main`)
 - **Cache on disk**: `.codeiq/cache/codeiq.sqlite` (SQLite analysis cache)
@@ -21,7 +21,7 @@ landing) and `c630245` (release infra).
 
 ## Tech Stack
 
-> Source of truth: `go/go.mod` + `go/go.sum`. Update pins there; this
+> Source of truth: `go.mod` + `go.sum`. Update pins there; this
 > list moves with them in the same commit.
 
 - **Go 1.25.10** — toolchain pin; module min is 1.25.0 (clamped by the
@@ -91,7 +91,7 @@ reintroduced.
 ### Package layout
 
 ```
-go/
+codeiq/
 ├── cmd/codeiq/                 # main package — single binary entrypoint
 ├── internal/
 │   ├── analyzer/               # pipeline orchestration
@@ -160,7 +160,7 @@ Analysis/enrichment happens only via the CLI commands `index` /
 
 Adding a new detector package under `internal/detector/<dir>/` is NOT
 enough. The package must be blank-imported in
-[`internal/cli/detectors_register.go`](go/internal/cli/detectors_register.go).
+[`internal/cli/detectors_register.go`](internal/cli/detectors_register.go).
 Without that line, the package's `init()` never runs and the binary
 ships without your detector. The Phase 4 benchmark exposed this bug
 when 15 language families silently produced 0 nodes — see commit
@@ -225,16 +225,16 @@ because the consolidated tools delegate to them.
 
 ## Adding a New Detector
 
-1. Create file in `go/internal/detector/<category>/my_detector.go`.
+1. Create file in `internal/detector/<category>/my_detector.go`.
 2. Implement the `detector.Detector` interface:
 
    ```go
    package mycategory
 
    import (
-       "github.com/randomcodespace/codeiq/go/internal/detector"
-       "github.com/randomcodespace/codeiq/go/internal/detector/base"
-       "github.com/randomcodespace/codeiq/go/internal/model"
+       "github.com/randomcodespace/codeiq/internal/detector"
+       "github.com/randomcodespace/codeiq/internal/detector/base"
+       "github.com/randomcodespace/codeiq/internal/model"
    )
 
    type MyDetector struct{}
@@ -255,12 +255,12 @@ because the consolidated tools delegate to them.
 
 3. **CRITICAL** — if the package is a NEW directory under
    `internal/detector/`, blank-import it in
-   `go/internal/cli/detectors_register.go`. Existing directories
+   `internal/cli/detectors_register.go`. Existing directories
    already covered.
 4. Add a test file at the same path (`my_detector_test.go`). Include
    positive match, negative match, determinism (run twice, assert
    identical output).
-5. `cd go && CGO_ENABLED=1 go test ./internal/detector/<category>/...
+5. `CGO_ENABLED=1 go test ./internal/detector/<category>/...
    -count=1`.
 
 ### Detector base helpers
@@ -287,7 +287,6 @@ because the consolidated tools delegate to them.
 ## Testing
 
 ```bash
-cd go
 
 # Full suite
 CGO_ENABLED=1 go test ./... -count=1
@@ -308,16 +307,15 @@ determinism tests.
 ## Build Commands
 
 ```bash
-cd go
 
 # Build
 CGO_ENABLED=1 go build -o /usr/local/bin/codeiq ./cmd/codeiq
 
 # Build with version info (release-go.yml does this with goreleaser):
 CGO_ENABLED=1 go build \
-  -ldflags "-X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Version=v0.3.0' \
-            -X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Commit=$(git rev-parse --short HEAD)' \
-            -X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Date=$(date -u +%Y-%m-%dT%H:%M:%SZ)'" \
+  -ldflags "-X 'github.com/randomcodespace/codeiq/internal/buildinfo.Version=v0.3.0' \
+            -X 'github.com/randomcodespace/codeiq/internal/buildinfo.Commit=$(git rev-parse --short HEAD)' \
+            -X 'github.com/randomcodespace/codeiq/internal/buildinfo.Date=$(date -u +%Y-%m-%dT%H:%M:%SZ)'" \
   -o /usr/local/bin/codeiq ./cmd/codeiq
 ```
 

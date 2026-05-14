@@ -1,5 +1,4 @@
 name: release-darwin
-
 # darwin/arm64 release on a macos-14 runner. Attaches binaries to the
 # existing GitHub Release created by release-go.yml (which only builds
 # linux). Runs after the linux release lands so the target Release
@@ -11,7 +10,6 @@ name: release-darwin
 #   - macos-14 runners are arm64 (M1+); cross-compile to darwin/arm64
 #     happens via native CC = clang.
 #   - The two workflows publish to the same tag → same Release.
-
 on:
   push:
     tags:
@@ -21,18 +19,15 @@ on:
       tag:
         description: 'Tag to release (e.g. v0.3.0). Release must already exist.'
         required: true
-
 permissions:
   contents: write
   id-token: write      # Sigstore keyless via GitHub OIDC
   attestations: write
-
 # Pass the input/ref to the shell via env vars (not inline `${{ }}`
 # interpolation) — Semgrep `yaml.github-actions.security.run-shell-injection`
 # rule. inputs.tag for workflow_dispatch; GITHUB_REF_NAME for tag pushes.
 env:
   TAG: ${{ github.event.inputs.tag || github.ref_name }}
-
 jobs:
   release-darwin:
     name: release (darwin / arm64)
@@ -45,10 +40,8 @@ jobs:
         with:
           go-version: '1.25.10'
           cache: true
-          cache-dependency-path: go/go.sum
-
+          cache-dependency-path: go.sum
       - name: Build darwin/arm64 binary
-        working-directory: go
         env:
           CGO_ENABLED: '1'
           GOOS: darwin
@@ -58,24 +51,21 @@ jobs:
           go build \
             -trimpath \
             -ldflags "-s -w \
-              -X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Version=${VERSION}' \
-              -X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Commit=$(git rev-parse --short HEAD)' \
-              -X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Date=$(date -u +%Y-%m-%dT%H:%M:%SZ)' \
-              -X 'github.com/randomcodespace/codeiq/go/internal/buildinfo.Dirty=false'" \
+              -X 'github.com/randomcodespace/codeiq/internal/buildinfo.Version=${VERSION}' \
+              -X 'github.com/randomcodespace/codeiq/internal/buildinfo.Commit=$(git rev-parse --short HEAD)' \
+              -X 'github.com/randomcodespace/codeiq/internal/buildinfo.Date=$(date -u +%Y-%m-%dT%H:%M:%SZ)' \
+              -X 'github.com/randomcodespace/codeiq/internal/buildinfo.Dirty=false'" \
             -o codeiq ./cmd/codeiq
-
       - name: Package archive
-        working-directory: go
         run: |
           VERSION="${TAG#v}"
           ARCHIVE_DIR="codeiq_${VERSION}_darwin_arm64"
           mkdir -p "${ARCHIVE_DIR}"
           cp codeiq "${ARCHIVE_DIR}/"
-          cp ../LICENSE "${ARCHIVE_DIR}/" 2>/dev/null || true
-          cp ../README.md "${ARCHIVE_DIR}/" 2>/dev/null || true
-          cp ../CHANGELOG.md "${ARCHIVE_DIR}/" 2>/dev/null || true
-          tar czf "../${ARCHIVE_DIR}.tar.gz" "${ARCHIVE_DIR}"
-
+          cp LICENSE "${ARCHIVE_DIR}/" 2>/dev/null || true
+          cp README.md "${ARCHIVE_DIR}/" 2>/dev/null || true
+          cp CHANGELOG.md "${ARCHIVE_DIR}/" 2>/dev/null || true
+          tar czf "${ARCHIVE_DIR}.tar.gz" "${ARCHIVE_DIR}"
       - name: Install Syft (SBOM)
         uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
       - name: Generate SBOM
@@ -83,7 +73,6 @@ jobs:
           VERSION="${TAG#v}"
           ARCHIVE="codeiq_${VERSION}_darwin_arm64.tar.gz"
           syft "$ARCHIVE" --output spdx-json="${ARCHIVE}.sbom.spdx.json"
-
       - name: Install Cosign (signing)
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
       - name: Sign archive (Sigstore keyless, bundle format)
@@ -94,7 +83,6 @@ jobs:
             --yes \
             --bundle "${ARCHIVE}.cosign.bundle" \
             "$ARCHIVE"
-
       - name: Upload to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -116,7 +104,6 @@ jobs:
           done
           echo "::error::Release $TAG never appeared; release-go.yml may have failed"
           exit 1
-
       - name: Attest darwin archive (build provenance)
         uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
         with:

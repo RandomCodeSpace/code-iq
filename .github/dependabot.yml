@@ -14,7 +14,7 @@ version: 2
 updates:
   # ----- Go modules (the codeiq application) -----
   - package-ecosystem: "gomod"
-    directory: "/go"
+    directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"

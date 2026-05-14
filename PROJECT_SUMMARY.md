@@ -20,7 +20,7 @@
 
 ## Tech stack
 
-- **Go 1.25.10** — toolchain pin in `go/go.mod` (module min 1.25.0,
+- **Go 1.25.10** — toolchain pin in `go.mod` (module min 1.25.0,
   clamped by `modelcontextprotocol/go-sdk`).
 - **Kuzu 0.11.3** (`github.com/kuzudb/go-kuzu`) — embedded graph DB.
   Native FTS via `QUERY_FTS_INDEX` (bundled).
@@ -28,13 +28,13 @@
 - **`smacker/go-tree-sitter`** — AST parsing (Java / Python / TS / Go).
 - **`modelcontextprotocol/go-sdk` v1.6** — stdio MCP server.
 - **`spf13/cobra` 1.10.2** — CLI framework.
-- Manifest files read: `go/go.mod`, `go/go.sum`.
+- Manifest files read: `go.mod`, `go.sum`.
 
 ## Entry points
 
 | Entrypoint | File | Purpose |
 |---|---|---|
-| CLI / MCP server | `go/cmd/codeiq/main.go` | The only binary. All subcommands live in `internal/cli`. |
+| CLI / MCP server | `cmd/codeiq/main.go` | The only binary. All subcommands live in `internal/cli`. |
 | Subcommand registry | `internal/cli/root.go` | Sets up cobra root + registers per-subcommand inits. |
 | Detector registry | `internal/cli/detectors_register.go` | Blank-imports every detector package leaf. **Choke point** — forget it and detectors silently no-op. |
 | Stdio MCP | `internal/cli/mcp.go` + `internal/mcp/server.go` | Wires 10 user-facing tools: 6 consolidated + `run_cypher` + `read_file` + `generate_flow` + `review_changes`. |
@@ -45,26 +45,25 @@
 
 ```
 codeiq/
-├── go/                              — Go module (will move to repo root post-v1)
-│   ├── cmd/codeiq/                  — main package
-│   ├── internal/
-│   │   ├── analyzer/                — pipeline orchestration + linkers
-│   │   ├── buildinfo/               — version metadata
-│   │   ├── cache/                   — SQLite analysis cache
-│   │   ├── cli/                     — cobra subcommands
-│   │   ├── detector/                — 100 detectors organized by category
-│   │   ├── flow/                    — architecture-flow diagram engine
-│   │   ├── graph/                   — Kuzu facade (read-only)
-│   │   ├── intelligence/            — lexical + language extractors + evidence + planner
-│   │   ├── mcp/                     — MCP server + tool definitions
-│   │   ├── model/                   — CodeNode, CodeEdge, kinds, Confidence
-│   │   ├── parser/                  — tree-sitter + structured parsers
-│   │   ├── query/                   — service / topology / stats
-│   │   └── review/                  — PR-review pipeline (diff + Ollama)
-│   ├── parity/                      — parity harness (build tag `parity`)
-│   ├── testdata/                    — fixtures (fixture-minimal, fixture-multi-lang)
-│   ├── go.mod
-│   └── go.sum
+├── cmd/codeiq/                      — main package (single binary)
+├── internal/
+│   ├── analyzer/                    — pipeline orchestration + linkers
+│   ├── buildinfo/                   — version metadata
+│   ├── cache/                       — SQLite analysis cache
+│   ├── cli/                         — cobra subcommands
+│   ├── detector/                    — 100 detectors organized by category
+│   ├── flow/                        — architecture-flow diagram engine
+│   ├── graph/                       — Kuzu facade (read-only)
+│   ├── intelligence/                — lexical + language extractors + evidence + planner
+│   ├── mcp/                         — MCP server + tool definitions
+│   ├── model/                       — CodeNode, CodeEdge, kinds, Confidence
+│   ├── parser/                      — tree-sitter + structured parsers
+│   ├── query/                       — service / topology / stats
+│   └── review/                      — PR-review pipeline (diff + Ollama)
+├── parity/                          — parity harness (build tag `parity`)
+├── testdata/                        — fixtures (fixture-minimal, fixture-multi-lang)
+├── go.mod                           — module: github.com/randomcodespace/codeiq
+├── go.sum
 ├── .github/workflows/               — go-ci, perf-gate, release-go, release-darwin, security, scorecard
 ├── shared/runbooks/                 — release-go.md + engineering-standards.md
 ├── CHANGELOG.md
@@ -77,12 +76,11 @@ codeiq/
 
 ## Run, build, test
 
-Commands taken from `go/go.mod`, `Makefile` (none — pure `go` tooling),
+Commands taken from `go.mod`, `Makefile` (none — pure `go` tooling),
 and `.github/workflows/go-ci.yml`:
 
 ```bash
 # Install deps (vendored via go module cache; no extra step)
-cd go
 
 # Run unit tests
 CGO_ENABLED=1 go test ./... -count=1
