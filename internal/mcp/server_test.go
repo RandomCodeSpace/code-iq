@@ -160,3 +160,25 @@ func TestRegistryRejectsDuplicateAndEmpty(t *testing.T) {
 		t.Fatalf("expected nil-handler error")
 	}
 }
+
+// TestServerWithResolvedRootInitializesCleanly verifies the InitializedHandler
+// path doesn't break the handshake when ResolvedRoot is set. The client in
+// this test doesn't expose Roots capability, so compareRootsWithClient hits
+// its silent-skip branch (ListRoots returns an error).
+func TestServerWithResolvedRootInitializesCleanly(t *testing.T) {
+	srv, err := mcp.NewServer(mcp.ServerOptions{
+		Name:         "codeiq-rooted",
+		Version:      "0",
+		ResolvedRoot: t.TempDir(),
+	})
+	if err != nil {
+		t.Fatalf("NewServer: %v", err)
+	}
+	sess, cleanup := connectInMemory(t, srv)
+	defer cleanup()
+
+	got := sess.InitializeResult()
+	if got == nil || got.ServerInfo == nil || got.ServerInfo.Name != "codeiq-rooted" {
+		t.Fatalf("handshake did not complete: %+v", got)
+	}
+}
