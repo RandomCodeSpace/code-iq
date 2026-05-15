@@ -5,6 +5,7 @@ import (
 	"os"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/randomcodespace/codeiq/internal/cache"
@@ -19,13 +20,19 @@ const DefaultBatchSize = 500
 type Options struct {
 	Cache     *cache.Cache
 	Registry  *detector.Registry
-	BatchSize int // defaults to DefaultBatchSize
-	Workers   int // defaults to 2 * GOMAXPROCS
+	BatchSize int  // defaults to DefaultBatchSize
+	Workers   int  // defaults to 2 * GOMAXPROCS
+	Force     bool // bypass cache early-exit; re-parse every file
 }
 
 // Analyzer orchestrates the index pipeline.
 type Analyzer struct {
-	opts Options
+	opts    Options
+	counter runCounter
+}
+
+type runCounter struct {
+	cacheHits atomic.Int64
 }
 
 // NewAnalyzer returns an analyzer wired to opts.
@@ -47,6 +54,9 @@ func NewAnalyzer(opts Options) *Analyzer {
 // Plan §1.5 — DedupedNodes/DedupedEdges/DroppedEdges expose dedup activity
 // so operators can see "graph collapsed 312 duplicate nodes, dropped 14
 // phantom edges" — the visibility is what makes "meaningful" diagnosable.
+//
+// Added/Modified/Deleted/Unchanged/CacheHits are incremental counters,
+// zero on full `--force` runs.
 type Stats struct {
 	Files        int
 	Nodes        int
@@ -54,13 +64,38 @@ type Stats struct {
 	DedupedNodes int
 	DedupedEdges int
 	DroppedEdges int
+	Added        int
+	Modified     int
+	Deleted      int
+	Unchanged    int
+	CacheHits    int
 }
 
 // Run executes FileDiscovery → parse → detectors → GraphBuilder → cache writes
 // and returns aggregate stats. Errors from individual file processing are
 // logged to stderr but do not stop the run — partial output is better than no
 // output (matches Java's per-file try/catch behaviour).
+//
+// On non-Force runs with a cache present, Run first runs Diff() to classify
+// files, purges cache rows for deleted files, then proceeds. processFile
+// skips parse+detect for UNCHANGED files (content_hash hit in cache).
 func (a *Analyzer) Run(root string) (Stats, error) {
+	a.counter.cacheHits.Store(0)
+
+	var d Delta
+	if a.opts.Cache != nil && !a.opts.Force {
+		var err error
+		d, err = a.Diff(root)
+		if err != nil {
+			return Stats{}, err
+		}
+		for _, path := range d.Deleted {
+			if err := a.opts.Cache.PurgeByPath(path); err != nil {
+				fmt.Fprintf(os.Stderr, "codeiq: purge %s: %v\n", path, err)
+			}
+		}
+	}
+
 	disc := NewFileDiscovery()
 	files, err := disc.Discover(root)
 	if err != nil {
@@ -99,6 +134,11 @@ func (a *Analyzer) Run(root string) (Stats, error) {
 		DedupedNodes: snap.DedupedNodes,
 		DedupedEdges: snap.DedupedEdges,
 		DroppedEdges: snap.DroppedEdges,
+		Added:        len(d.Added),
+		Modified:     len(d.Modified),
+		Deleted:      len(d.Deleted),
+		Unchanged:    len(d.Unchanged),
+		CacheHits:    int(a.counter.cacheHits.Load()),
 	}, nil
 }
 
@@ -108,6 +148,18 @@ func (a *Analyzer) processFile(f DiscoveredFile, gb *GraphBuilder) error {
 		return err
 	}
 	hash := cache.HashString(string(content))
+
+	// Fast path: cache hit. Reuse the previous emissions; skip parse+detect.
+	if a.opts.Cache != nil && !a.opts.Force && a.opts.Cache.Has(hash) {
+		entry, gerr := a.opts.Cache.Get(hash)
+		if gerr == nil && entry != nil {
+			gb.Add(&detector.Result{Nodes: entry.Nodes, Edges: entry.Edges})
+			a.counter.cacheHits.Add(1)
+			return nil
+		}
+		// Has() true but Get() failed — pathological. Fall through to re-parse.
+	}
+
 	tree, err := parser.Parse(f.Language, content)
 	if err != nil {
 		// Continue with regex-only detectors when the parser bails — matches
@@ -142,6 +194,9 @@ func (a *Analyzer) processFile(f DiscoveredFile, gb *GraphBuilder) error {
 		entry.Edges = append(entry.Edges, r.Edges...)
 	}
 	if a.opts.Cache != nil {
+		// MODIFIED files: purge prior (path, old_hash) row so a single path
+		// never has two cache entries.
+		_ = a.opts.Cache.PurgeByPath(f.RelPath)
 		if err := a.opts.Cache.Put(entry); err != nil {
 			return fmt.Errorf("cache put: %w", err)
 		}
