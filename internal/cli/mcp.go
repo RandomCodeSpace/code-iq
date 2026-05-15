@@ -117,8 +117,9 @@ To register with Claude Code, add to .mcp.json at the repo root:
 				MaxDepth:   maxDepth,
 			}
 			srv, err := mcp.NewServer(mcp.ServerOptions{
-				Name:    "CODE MCP",
-				Version: buildinfo.Version,
+				Name:         "CODE MCP",
+				Version:      buildinfo.Version,
+				ResolvedRoot: root,
 			})
 			if err != nil {
 				return err

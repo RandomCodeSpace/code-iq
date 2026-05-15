@@ -2,38 +2,39 @@ package cli
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 	"io"
-	"os"
-	"path/filepath"
 
+	"github.com/randomcodespace/codeiq/internal/projectroot"
 	"github.com/randomcodespace/codeiq/internal/query"
 )
 
 // resolvePath turns the optional [path] positional that most subcommands
-// accept into an absolute, directory-validated path. An empty args slice is
-// the current working directory. A non-empty args slice uses args[0].
+// accept into an absolute, directory-validated project root.
 //
-// Returns a usageError when the resolved path does not exist or is not a
-// directory — that path-type problem is a user-input issue (exit code 1) per
-// root.go's exit-code mapping.
+// Resolution order (highest wins): explicit positional argument, then the
+// CODEIQ_PROJECT_ROOT environment variable, then walking up from the current
+// working directory looking for `.codeiq/graph/codeiq.kuzu` (already-indexed),
+// then `.git/` (repo root). The walk-up makes `codeiq <cmd>` "just work" when
+// invoked from inside an indexed project — most relevant for MCP-client
+// configs that previously needed a hardcoded path arg.
+//
+// Returns a usageError on any resolution failure (no path arg, no env, and
+// the walk-up found nothing) — exit code 1 per root.go's exit-code mapping.
 func resolvePath(args []string) (string, error) {
-	path := "."
-	if len(args) >= 1 && args[0] != "" {
-		path = args[0]
-	}
-	abs, err := filepath.Abs(path)
+	root, err := projectroot.FromArgs(args)
 	if err != nil {
-		return "", fmt.Errorf("resolve %q: %w", path, err)
+		if errors.Is(err, projectroot.ErrNotFound) {
+			return "", newUsageError(
+				"could not resolve project root.\n" +
+					"  Try one of:\n" +
+					"    codeiq <cmd> /path/to/project\n" +
+					"    CODEIQ_PROJECT_ROOT=/path/to/project codeiq <cmd>\n" +
+					"    cd /path/to/project && codeiq <cmd>   # walk-up finds .codeiq/ or .git/")
+		}
+		return "", newUsageError("%s", err.Error())
 	}
-	st, err := os.Stat(abs)
-	if err != nil {
-		return "", newUsageError("path %q does not exist", abs)
-	}
-	if !st.IsDir() {
-		return "", newUsageError("path %q is not a directory", abs)
-	}
-	return abs, nil
+	return root, nil
 }
 
 // printOrdered writes a query.OrderedMap (or any other deterministic

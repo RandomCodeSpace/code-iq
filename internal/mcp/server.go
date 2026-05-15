@@ -3,6 +3,8 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -15,6 +17,13 @@ type ServerOptions struct {
 	Name string
 	// Version of the codeiq binary (build-info Version string).
 	Version string
+	// ResolvedRoot is the project root the server already resolved at boot
+	// (via projectroot.Resolve). When the connected MCP client also exposes
+	// roots via ListRoots, we compare the two and log a warning to stderr
+	// if they disagree — but we do not swap the open Kuzu store mid-flight
+	// (that's a larger refactor; tracked as a follow-up). Empty string
+	// disables the ListRoots check.
+	ResolvedRoot string
 }
 
 // Server is the stdio MCP server. One per `codeiq mcp` process. Tools
@@ -65,7 +74,20 @@ func (s *Server) Serve(ctx context.Context, transport mcpsdk.Transport) error {
 		Name:    s.opts.Name,
 		Version: s.opts.Version,
 	}
-	sdkSrv := mcpsdk.NewServer(impl, nil)
+	// Wire an InitializedHandler so we can ask the client for its workspace
+	// roots once the session is initialised. compareRootsWithClient runs
+	// best-effort: ListRoots may be unsupported by the client, in which case
+	// we silently keep our boot-time resolution. Mismatches go to stderr as
+	// a warning but do not swap the open Kuzu handle (out of scope for this
+	// PR; tracked as a follow-up).
+	sdkOpts := &mcpsdk.ServerOptions{}
+	if s.opts.ResolvedRoot != "" {
+		expected := s.opts.ResolvedRoot
+		sdkOpts.InitializedHandler = func(ctx context.Context, req *mcpsdk.InitializedRequest) {
+			compareRootsWithClient(ctx, req.Session, expected)
+		}
+	}
+	sdkSrv := mcpsdk.NewServer(impl, sdkOpts)
 
 	s.mu.Lock()
 	for _, t := range s.registry.All() {
@@ -75,4 +97,58 @@ func (s *Server) Serve(ctx context.Context, transport mcpsdk.Transport) error {
 	s.mu.Unlock()
 
 	return sdkSrv.Run(ctx, transport)
+}
+
+// compareRootsWithClient calls session.ListRoots and emits a stderr warning
+// when the client's roots do not include the boot-resolved root. Best-effort:
+// errors are swallowed (the client may not advertise roots capability).
+//
+// The path comparison normalises with filepath.Abs+Clean to absorb trailing
+// slashes and symlink-equivalent prefixes. The `file://` URI shape is also
+// supported because some MCP clients (Claude Code) emit roots as file URIs.
+func compareRootsWithClient(ctx context.Context, ss *mcpsdk.ServerSession, expected string) {
+	expectedAbs, err := filepath.Abs(expected)
+	if err != nil {
+		return
+	}
+	expectedAbs = filepath.Clean(expectedAbs)
+
+	res, err := ss.ListRoots(ctx, nil)
+	if err != nil || res == nil || len(res.Roots) == 0 {
+		return // client didn't expose roots — keep our boot resolution
+	}
+	var clientRoots []string
+	matched := false
+	for _, r := range res.Roots {
+		p := uriToPath(r.URI)
+		abs, err := filepath.Abs(p)
+		if err != nil {
+			continue
+		}
+		abs = filepath.Clean(abs)
+		clientRoots = append(clientRoots, abs)
+		if abs == expectedAbs {
+			matched = true
+			break
+		}
+	}
+	if !matched {
+		fmt.Fprintf(os.Stderr,
+			"codeiq mcp: WARNING — boot-resolved project root %q is not among "+
+				"the client's workspace roots %v. The MCP server will keep using %q. "+
+				"To switch, restart codeiq with that path as the positional arg or "+
+				"set CODEIQ_PROJECT_ROOT.\n",
+			expectedAbs, clientRoots, expectedAbs)
+	}
+}
+
+// uriToPath unwraps `file://<path>` URIs into bare filesystem paths. MCP
+// roots are declared as URIs per the spec; clients that send a bare path are
+// also accepted as a kindness.
+func uriToPath(uri string) string {
+	const prefix = "file://"
+	if len(uri) >= len(prefix) && uri[:len(prefix)] == prefix {
+		return uri[len(prefix):]
+	}
+	return uri
 }
