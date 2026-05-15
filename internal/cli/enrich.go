@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,16 +10,19 @@ import (
 
 	"github.com/randomcodespace/codeiq/internal/analyzer"
 	"github.com/randomcodespace/codeiq/internal/cache"
+	"github.com/randomcodespace/codeiq/internal/detector"
 	"github.com/spf13/cobra"
 )
 
 func init() {
 	registerSubcommand(func() *cobra.Command {
 		var (
-			graphDir       string
-			memProfile     string
-			maxBufferPool  int64
-			copyThreads    int
+			graphDir      string
+			memProfile    string
+			maxBufferPool int64
+			copyThreads   int
+			force         bool
+			diffOnly      bool
 		)
 		cmd := &cobra.Command{
 			Use:   "enrich [path]",
@@ -56,7 +60,34 @@ become available and the stdio MCP server can serve clients.`,
 					return fmt.Errorf("open cache %s: %w", cachePath, err)
 				}
 				defer c.Close()
-				opts := analyzer.EnrichOptions{GraphDir: graphDir}
+
+				// --diff: print Diff against the cache as JSON and exit.
+				// Does not touch the graph. Useful for previewing what an
+				// incremental enrich would do.
+				if diffOnly {
+					a := analyzer.NewAnalyzer(analyzer.Options{Cache: c, Registry: detector.Default})
+					d, dErr := a.Diff(root)
+					if dErr != nil {
+						return dErr
+					}
+					out := map[string]any{
+						"added":     d.Added,
+						"modified":  d.Modified,
+						"deleted":   d.Deleted,
+						"unchanged": d.Unchanged,
+						"counts": map[string]int{
+							"added":     len(d.Added),
+							"modified":  len(d.Modified),
+							"deleted":   len(d.Deleted),
+							"unchanged": len(d.Unchanged),
+						},
+					}
+					enc := json.NewEncoder(cmd.OutOrStdout())
+					enc.SetIndent("", "  ")
+					return enc.Encode(out)
+				}
+
+				opts := analyzer.EnrichOptions{GraphDir: graphDir, Force: force}
 				if maxBufferPool > 0 {
 					opts.StoreBufferPoolBytes = uint64(maxBufferPool)
 				}
@@ -79,9 +110,14 @@ become available and the stdio MCP server can serve clients.`,
 					}
 					fmt.Fprintf(cmd.ErrOrStderr(), "heap profile written to %s\n", memProfile)
 				}
-				fmt.Fprintf(cmd.OutOrStdout(),
-					"enrich complete: %d nodes, %d edges, %d services\n",
-					summary.Nodes, summary.Edges, summary.Services)
+				if summary.ShortCircuited {
+					fmt.Fprintln(cmd.OutOrStdout(),
+						"enrich short-circuited: graph already matches cache manifest")
+				} else {
+					fmt.Fprintf(cmd.OutOrStdout(),
+						"enrich complete: %d nodes, %d edges, %d services\n",
+						summary.Nodes, summary.Edges, summary.Services)
+				}
 				return nil
 			},
 		}
@@ -93,6 +129,10 @@ become available and the stdio MCP server can serve clients.`,
 			"Cap Kuzu BufferPoolSize in bytes (default: 2 GiB; 0 means default).")
 		cmd.Flags().IntVar(&copyThreads, "copy-threads", 0,
 			"Cap Kuzu COPY FROM parallelism (default: min(4, GOMAXPROCS); 0 means default).")
+		cmd.Flags().BoolVar(&force, "force", false,
+			"Bypass the incremental short-circuit; rebuild the graph from scratch.")
+		cmd.Flags().BoolVar(&diffOnly, "diff", false,
+			"Print the cache vs disk delta as JSON and exit without touching the graph.")
 		return cmd
 	})
 }
