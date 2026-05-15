@@ -22,6 +22,7 @@ func init() {
 		var (
 			batchSize int
 			workers   int
+			force     bool
 		)
 		cmd := &cobra.Command{
 			Use:   "index [path]",
@@ -68,6 +69,7 @@ Java and Python.`,
 					Registry:  detector.Default,
 					BatchSize: batchSize,
 					Workers:   workers,
+					Force:     force,
 				})
 				stats, err := a.Run(abs)
 				if err != nil {
@@ -81,6 +83,17 @@ Java and Python.`,
 						"Deduped: %d nodes, %d edges  Dropped: %d phantom edges\n",
 						stats.DedupedNodes, stats.DedupedEdges, stats.DroppedEdges)
 				}
+				// Incremental counters are only meaningful when the cache was
+				// consulted (i.e. not --force). Print them when any of them is
+				// non-zero so unchanged re-runs see "Unchanged: N (100%)".
+				if !force && (stats.Added+stats.Modified+stats.Deleted+stats.Unchanged) > 0 {
+					line := fmt.Sprintf("Added: %d  Modified: %d  Deleted: %d  Unchanged: %d  Cache hits: %d",
+						stats.Added, stats.Modified, stats.Deleted, stats.Unchanged, stats.CacheHits)
+					if stats.Files > 0 {
+						line += fmt.Sprintf(" (%.1f%%)", 100.0*float64(stats.CacheHits)/float64(stats.Files))
+					}
+					fmt.Fprintln(cmd.OutOrStdout(), line)
+				}
 				return nil
 			},
 		}
@@ -88,6 +101,8 @@ Java and Python.`,
 			"Number of files processed per batch (default: 500).")
 		cmd.Flags().IntVarP(&workers, "workers", "w", 0,
 			"Worker goroutine count (default: 2 * GOMAXPROCS).")
+		cmd.Flags().BoolVar(&force, "force", false,
+			"Bypass the incremental cache; re-parse every file even when the content hash hasn't changed.")
 		return cmd
 	})
 }

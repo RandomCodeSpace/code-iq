@@ -8,9 +8,10 @@ import (
 	"github.com/randomcodespace/codeiq/internal/model"
 )
 
-// TestApplySchemaCreatesAllTables asserts ApplySchema produces exactly one
-// CodeNode node table and one rel table per EdgeKind. The Java side mirrors
-// this implicitly through SDN's label-driven schema; on Kuzu we declare it.
+// TestApplySchemaCreatesAllTables asserts ApplySchema produces the expected
+// node tables (CodeNode + GraphMeta) and one rel table per EdgeKind. The
+// Java side mirrors this implicitly through SDN's label-driven schema; on
+// Kuzu we declare it.
 func TestApplySchemaCreatesAllTables(t *testing.T) {
 	s, err := graph.Open(filepath.Join(t.TempDir(), "g.kuzu"))
 	if err != nil {
@@ -26,17 +27,25 @@ func TestApplySchemaCreatesAllTables(t *testing.T) {
 	if err != nil {
 		t.Fatalf("show tables: %v", err)
 	}
-	var nodeTables, relTables int
+	nodeTables := map[string]bool{}
+	relTables := 0
 	for _, r := range rows {
 		switch r["type"] {
 		case "NODE":
-			nodeTables++
+			name, _ := r["name"].(string)
+			nodeTables[name] = true
 		case "REL":
 			relTables++
 		}
 	}
-	if nodeTables != 1 {
-		t.Errorf("want 1 node table, got %d", nodeTables)
+	if !nodeTables["CodeNode"] {
+		t.Error("CodeNode node table missing")
+	}
+	if !nodeTables["GraphMeta"] {
+		t.Error("GraphMeta node table missing")
+	}
+	if len(nodeTables) != 2 {
+		t.Errorf("want 2 node tables (CodeNode, GraphMeta), got %d: %v", len(nodeTables), nodeTables)
 	}
 	if relTables != len(model.AllEdgeKinds()) {
 		t.Errorf("want %d rel tables, got %d", len(model.AllEdgeKinds()), relTables)

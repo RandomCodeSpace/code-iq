@@ -16,6 +16,16 @@ import (
 // a label. Properties round-trip through a JSON-serialised `props` column
 // plus a small set of first-class columns we want to index / project on.
 func (s *Store) ApplySchema() error {
+	// GraphMeta stores small key→value strings (e.g., manifest hash for the
+	// incremental enrich short-circuit). One row per key; PK enforces uniqueness.
+	metaDDL := `CREATE NODE TABLE IF NOT EXISTS GraphMeta(
+		meta_key STRING,
+		value STRING,
+		PRIMARY KEY(meta_key))`
+	if _, err := s.Cypher(metaDDL); err != nil {
+		return fmt.Errorf("graph: create GraphMeta: %w", err)
+	}
+
 	nodeDDL := `CREATE NODE TABLE IF NOT EXISTS CodeNode(
 		id STRING,
 		kind STRING,

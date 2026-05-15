@@ -66,6 +66,7 @@ func (l *ModuleContainmentLinker) Link(nodes []*model.CodeNode, edges []*model.C
 				Label:  m,
 				FQN:    m,
 				Module: m,
+				Source: SrcModuleContainmentLinker,
 			})
 			existingModules[moduleID] = struct{}{}
 		}
@@ -81,6 +82,7 @@ func (l *ModuleContainmentLinker) Link(nodes []*model.CodeNode, edges []*model.C
 				Kind:       model.EdgeContains,
 				SourceID:   moduleID,
 				TargetID:   mem.ID,
+				Source:     SrcModuleContainmentLinker,
 				Properties: map[string]any{"inferred": true},
 			})
 			existingContains[key] = struct{}{}
