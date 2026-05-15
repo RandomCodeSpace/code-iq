@@ -53,6 +53,22 @@ func (s *Store) InsertFile(path string, nodes []*model.CodeNode, edges []*model.
 	return nil
 }
 
+// Reset clears every CodeNode (and its incident edges via DETACH DELETE)
+// plus every GraphMeta row, while preserving the schema. Used before a
+// full re-enrich on a graph that already holds prior state, so the
+// subsequent BulkLoad doesn't collide with stale primary keys.
+//
+// Calling Reset on a fresh (already empty) graph is a no-op.
+func (s *Store) Reset() error {
+	if _, err := s.Cypher(`MATCH (n:CodeNode) DETACH DELETE n`); err != nil {
+		return fmt.Errorf("graph: reset CodeNode: %w", err)
+	}
+	if _, err := s.Cypher(`MATCH (m:GraphMeta) DELETE m`); err != nil {
+		return fmt.Errorf("graph: reset GraphMeta: %w", err)
+	}
+	return nil
+}
+
 // WipeLinkerEdges deletes every relationship whose source property is in
 // the given sources set, across every declared rel table. Used by
 // incremental enrich to clear previous linker emissions before re-running

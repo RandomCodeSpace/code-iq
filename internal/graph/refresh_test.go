@@ -198,6 +198,50 @@ func TestWipeLinkerEdgesAlsoDropsLinkerNodes(t *testing.T) {
 	}
 }
 
+func TestResetClearsAllData(t *testing.T) {
+	s := openSchemaStore(t)
+	defer s.Close()
+	if err := s.BulkLoadNodes([]*model.CodeNode{
+		{ID: "n1", Kind: model.NodeClass, Label: "A", FilePath: "A.java"},
+		{ID: "n2", Kind: model.NodeClass, Label: "B", FilePath: "B.java"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.WriteManifest("h1"); err != nil {
+		t.Fatal(err)
+	}
+	if countCodeNodes(t, s) != 2 {
+		t.Fatal("seed didn't take")
+	}
+	if err := s.Reset(); err != nil {
+		t.Fatalf("Reset: %v", err)
+	}
+	if countCodeNodes(t, s) != 0 {
+		t.Fatal("Reset left CodeNodes")
+	}
+	got, _ := s.ReadManifest()
+	if got != "" {
+		t.Fatalf("Reset left manifest %q", got)
+	}
+	// Schema must still be usable: we can bulk-load again without re-ApplySchema.
+	if err := s.BulkLoadNodes([]*model.CodeNode{
+		{ID: "x", Kind: model.NodeClass, Label: "X", FilePath: "X.java"},
+	}); err != nil {
+		t.Fatalf("BulkLoadNodes after Reset: %v", err)
+	}
+	if countCodeNodes(t, s) != 1 {
+		t.Fatal("post-Reset BulkLoad didn't take")
+	}
+}
+
+func TestResetOnFreshGraphIsNoop(t *testing.T) {
+	s := openSchemaStore(t)
+	defer s.Close()
+	if err := s.Reset(); err != nil {
+		t.Fatalf("Reset on fresh graph: %v", err)
+	}
+}
+
 func TestReplaceFileSwapsContent(t *testing.T) {
 	s := openSchemaStore(t)
 	defer s.Close()
