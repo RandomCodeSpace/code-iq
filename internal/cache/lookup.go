@@ -10,6 +10,31 @@ func (c *Cache) GetFileByPath(path string) (hash, parsedAt string, ok bool) {
 	return hash, parsedAt, true
 }
 
+// PurgeByPath deletes every row associated with the file at path: the
+// files row, all nodes joined by its content_hash, and all edges joined
+// by its content_hash. Idempotent — a missing path returns nil.
+func (c *Cache) PurgeByPath(path string) error {
+	tx, err := c.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var hash string
+	if err := tx.QueryRow(`SELECT content_hash FROM files WHERE path = ?`, path).Scan(&hash); err != nil {
+		return nil
+	}
+	if _, err := tx.Exec(`DELETE FROM nodes WHERE content_hash = ?`, hash); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM edges WHERE content_hash = ?`, hash); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM files WHERE path = ?`, path); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 // AllFiles invokes fn once per cached file in path order. fn returning a
 // non-nil error stops iteration and propagates the error. Stream-iterated
 // via rows.Next(); the whole cache never lives in memory at once.

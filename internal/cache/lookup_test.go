@@ -81,6 +81,76 @@ func TestAllFilesYieldsEveryRow(t *testing.T) {
 	}
 }
 
+func TestPurgeByPathRemovesAllRows(t *testing.T) {
+	c, err := Open(filepath.Join(t.TempDir(), "c.sqlite"))
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer c.Close()
+	e := &Entry{
+		ContentHash: "abc",
+		Path:        "foo.go",
+		Language:    "go",
+		ParsedAt:    "t",
+		Nodes:       []*model.CodeNode{model.NewCodeNode("n1", model.NodeClass, "Foo")},
+		Edges:       []*model.CodeEdge{model.NewCodeEdge("e1", model.EdgeContains, "n1", "n2")},
+	}
+	if err := c.Put(e); err != nil {
+		t.Fatalf("put: %v", err)
+	}
+	if err := c.PurgeByPath("foo.go"); err != nil {
+		t.Fatalf("purge: %v", err)
+	}
+	if _, _, ok := c.GetFileByPath("foo.go"); ok {
+		t.Fatal("file row still present after purge")
+	}
+	if c.Has("abc") {
+		t.Fatal("cache.Has returns true after purge")
+	}
+}
+
+func TestPurgeByPathIsNoOpForMissingPath(t *testing.T) {
+	c, err := Open(filepath.Join(t.TempDir(), "c.sqlite"))
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer c.Close()
+	if err := c.PurgeByPath("nope.go"); err != nil {
+		t.Fatalf("purge of missing path should be no-op, got: %v", err)
+	}
+}
+
+func TestPurgeByPathLeavesUnrelatedRows(t *testing.T) {
+	c, err := Open(filepath.Join(t.TempDir(), "c.sqlite"))
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer c.Close()
+	_ = c.Put(&Entry{
+		ContentHash: "h-keep",
+		Path:        "keep.go",
+		Language:    "go",
+		ParsedAt:    "t",
+		Nodes:       []*model.CodeNode{model.NewCodeNode("k", model.NodeClass, "K")},
+	})
+	_ = c.Put(&Entry{
+		ContentHash: "h-drop",
+		Path:        "drop.go",
+		Language:    "go",
+		ParsedAt:    "t",
+		Nodes:       []*model.CodeNode{model.NewCodeNode("d", model.NodeClass, "D")},
+	})
+	if err := c.PurgeByPath("drop.go"); err != nil {
+		t.Fatal(err)
+	}
+	if !c.Has("h-keep") {
+		t.Fatal("unrelated file purged")
+	}
+	if c.Has("h-drop") {
+		t.Fatal("target hash still present")
+	}
+}
+
 func TestAllFilesIteratesInPathOrder(t *testing.T) {
 	c, err := Open(filepath.Join(t.TempDir(), "c.sqlite"))
 	if err != nil {
