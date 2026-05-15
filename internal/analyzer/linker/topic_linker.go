@@ -93,6 +93,7 @@ func (l *TopicLinker) Link(nodes []*model.CodeNode, edges []*model.CodeEdge) Res
 					Kind:     model.EdgeCalls,
 					SourceID: p,
 					TargetID: c,
+					Source:   SrcTopicLinker,
 					Properties: map[string]any{
 						"inferred": true,
 						"topic":    label,

@@ -136,6 +136,68 @@ func TestInsertFileEmptyIsNoop(t *testing.T) {
 	}
 }
 
+func TestWipeLinkerEdgesByTag(t *testing.T) {
+	s := openSchemaStore(t)
+	defer s.Close()
+	if err := s.BulkLoadNodes([]*model.CodeNode{
+		{ID: "a", Kind: model.NodeService, Label: "A"},
+		{ID: "b", Kind: model.NodeService, Label: "B"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.BulkLoadEdges([]*model.CodeEdge{
+		{ID: "e-det", Kind: model.EdgeDependsOn, SourceID: "a", TargetID: "b",
+			Source: "SomeDetector", Confidence: model.ConfidenceSyntactic},
+		{ID: "e-lnk", Kind: model.EdgeDependsOn, SourceID: "a", TargetID: "b",
+			Source: "linker:topic", Confidence: model.ConfidenceLexical},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.WipeLinkerEdges([]string{"linker:topic", "linker:entity", "linker:module_containment"}); err != nil {
+		t.Fatalf("WipeLinkerEdges: %v", err)
+	}
+	rows, err := s.Cypher("MATCH ()-[r:DEPENDS_ON]->() RETURN r.id AS id ORDER BY r.id")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("want 1 surviving (detector), got %d: %v", len(rows), rows)
+	}
+	if rows[0]["id"] != "e-det" {
+		t.Fatalf("wrong edge survived: %v", rows[0])
+	}
+}
+
+func TestWipeLinkerEdgesEmptySources(t *testing.T) {
+	s := openSchemaStore(t)
+	defer s.Close()
+	// Empty sources is a no-op, not an error.
+	if err := s.WipeLinkerEdges(nil); err != nil {
+		t.Fatalf("WipeLinkerEdges(nil): %v", err)
+	}
+}
+
+func TestWipeLinkerEdgesAlsoDropsLinkerNodes(t *testing.T) {
+	s := openSchemaStore(t)
+	defer s.Close()
+	if err := s.BulkLoadNodes([]*model.CodeNode{
+		{ID: "m:auth", Kind: model.NodeModule, Label: "auth", Source: "linker:module_containment"},
+		{ID: "c:Foo", Kind: model.NodeClass, Label: "Foo", Source: "SomeDetector"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.WipeLinkerEdges([]string{"linker:module_containment"}); err != nil {
+		t.Fatal(err)
+	}
+	rows, _ := s.Cypher("MATCH (n:CodeNode) RETURN n.id AS id ORDER BY n.id")
+	if len(rows) != 1 {
+		t.Fatalf("want 1 surviving (detector node), got %d: %v", len(rows), rows)
+	}
+	if rows[0]["id"] != "c:Foo" {
+		t.Fatalf("wrong node survived: %v", rows[0])
+	}
+}
+
 func TestReplaceFileSwapsContent(t *testing.T) {
 	s := openSchemaStore(t)
 	defer s.Close()

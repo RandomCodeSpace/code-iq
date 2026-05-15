@@ -86,6 +86,7 @@ func (l *EntityLinker) Link(nodes []*model.CodeNode, edges []*model.CodeEdge) Re
 				Kind:       model.EdgeQueries,
 				SourceID:   repo.ID,
 				TargetID:   ent.ID,
+				Source:     SrcEntityLinker,
 				Properties: map[string]any{"inferred": true},
 			})
 			break

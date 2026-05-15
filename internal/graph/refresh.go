@@ -53,6 +53,39 @@ func (s *Store) InsertFile(path string, nodes []*model.CodeNode, edges []*model.
 	return nil
 }
 
+// WipeLinkerEdges deletes every relationship whose source property is in
+// the given sources set, across every declared rel table. Used by
+// incremental enrich to clear previous linker emissions before re-running
+// linker passes.
+//
+// Iterates per rel-type because Kuzu (0.11.3) doesn't support a
+// heterogeneous "match any rel" DELETE across rel tables.
+//
+// Linker-emitted nodes (e.g., MODULE nodes from ModuleContainmentLinker)
+// are also wiped when their source tag is in the set — caller can pass
+// only edge-relevant tags if they want to preserve nodes.
+func (s *Store) WipeLinkerEdges(sources []string) error {
+	if len(sources) == 0 {
+		return nil
+	}
+	for _, kind := range model.AllEdgeKinds() {
+		q := fmt.Sprintf(
+			`MATCH ()-[r:%s]->() WHERE r.source IN $sources DELETE r`,
+			relTableName(kind))
+		if _, err := s.Cypher(q, map[string]any{"sources": sources}); err != nil {
+			return fmt.Errorf("graph: wipe %s edges: %w", relTableName(kind), err)
+		}
+	}
+	// Linker-emitted nodes (module nodes) — drop any CodeNode whose source
+	// tag is in the set. These re-emit on the next linker pass.
+	if _, err := s.Cypher(
+		`MATCH (n:CodeNode) WHERE n.source IN $sources DELETE n`,
+		map[string]any{"sources": sources}); err != nil {
+		return fmt.Errorf("graph: wipe linker nodes: %w", err)
+	}
+	return nil
+}
+
 // ReplaceFile is the MODIFIED-file path: RemoveFile followed by InsertFile.
 // There is a brief window between the two calls where the file's nodes are
 // absent from the graph; concurrent readers see either pre-state or
